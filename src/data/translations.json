@@ -1,0 +1,280 @@
+{
+  "cart": {
+    "title": "Carrinho de compras",
+    "subtitle": "Nesta página, você encontra os produtos adicionados ao seu carrinho.",
+    "payment_info": "Informações de pagamento",
+    "payment": {
+      "pix": "Pix"
+    },
+    "email": {
+      "label": "Informe seu email",
+      "confirm_label": "Confirme seu email",
+      "placeholder": "Insira seu email"
+    },
+    "coupon": {
+      "add": "Adicionar cupom de desconto",
+      "placeholder": "Digite seu cupom e pressione Enter",
+      "apply": "Aplicar",
+      "applied": "Cupom aplicado:"
+    },
+    "products": {
+      "title": "Produtos no carrinho",
+      "remove": "Excluir"
+    },
+    "summary": {
+      "title": "Resumo da compra",
+      "subtotal": "Subtotal ({{count}} itens)",
+      "discount": "Desconto ({{pct}}%)",
+      "total": "Total"
+    },
+    "checkout": {
+      "pix_button": "Continuar com PIX"
+    },
+    "empty": {
+      "title": "Seu carrinho está vazio",
+      "subtitle": "Adicione produtos para continuar comprando",
+      "continue_shopping": "Continuar comprando"
+    }
+  },
+  "modal": {
+    "remove": {
+      "title": "Remover item",
+      "message": "Tem certeza que deseja remover este item do carrinho?"
+    },
+    "buttons": {
+      "cancel": "Cancelar",
+      "confirm": "Confirmar",
+      "understood": "Entendi"
+    }
+  },
+  "validations": {
+    "invalid_email": "Por favor, insira um e-mail válido",
+    "emails_dont_match": "Os e-mails não coincidem",
+    "fill_email_correctly": "Por favor, preencha o email corretamente"
+  },
+  "errors": {
+    "payment_failed": "Erro ao processar pagamento. Tente novamente.",
+    "connection_error": "Erro ao conectar com o servidor."
+  },
+  "allProducts": {
+    "breadcrumb": "Todos os Produtos",
+    "featuredTitle": "Produtos em Destaque",
+    "allTitle": "Todos os Produtos",
+    "previous": "Anterior",
+    "next": "Próximo"
+  },
+  "category": {
+    "not_found": "Categoria não encontrada.",
+    "no_products": "Nenhum produto encontrado nesta categoria.",
+    "meta": {
+      "title": "{{name}} - VALNIX",
+      "description": "Compre {{name}} na VALNIX com entrega automática 24 horas. Pagamento seguro e entrega imediata."
+    }
+  },
+  "home": {
+    "featured_title": "MAIS VENDIDOS"
+  },
+  "login": {
+    "title": "Login",
+    "email_label": "Email",
+    "password_label": "Senha",
+    "submit_button": "Entrar",
+    "error": "Falha no login. Verifique suas credenciais."
+  },
+  "product": {
+    "sold": "Vendidos",
+    "auto_delivery": "Entrega Automática",
+    "out_of_stock": "ESGOTADO",
+    "low_stock": "Restam somente {{count}} {{count, plural, one {unidade} other {unidades}}}",
+    "in_stock": "Disponível",
+    "description": "Descrição",
+    "demo": "Demonstração",
+    "payment_methods": "Meios de pagamentos",
+    "buy_now": "Comprar agora",
+    "add_to_cart": "Adicionar ao carrinho",
+    "reviews": "{{count}} avaliações",
+    "rating_title": "Avaliação do produto"
+  },
+  "robuxGuide": {
+    "title": "Como conseguir robux no Roblox",
+    "warning": {
+      "title": "⚠️ Atenção",
+      "message": "Existem várias formas de conseguir robux no Roblox. Aqui apresentamos apenas métodos oficiais e seguros."
+    },
+    "methods": {
+      "premium": {
+        "title": "1. Assine o plano Roblox Premium",
+        "description": "Este é, de longe, o jeito correto mais simples de se conseguir robux. Com uma assinatura mensal do plano Roblox Premium, que possui três níveis com valores diferentes, você recebe um \"salário\" mensal de 450, 1.000 ou 2.200 robux, além de um bônus adicional de 10% para compras da moeda."
+      },
+      "game_passes": {
+        "title": "2. Venda passes e acessos de jogos",
+        "description": "Os passes de jogo são itens especiais, que oferecem opções de chat, poderes, veículos e etc., enquanto o acesso a jogo são chaves de acesso de jogos pagos. Eles podem ser criados à vontade, mesmo por quem não tem uma assinatura do plano Premium.",
+        "revenue": "No entanto, as chaves de acesso não podem custar mais do que 1.000 robux. Desenvolvedores com planos gratuitos recebem apenas 10% das vendas de acessos e passes de jogo, enquanto os assinantes ficam com um total de 70% da venda."
+      },
+      "clothing": {
+        "title": "3. Venda roupas",
+        "description": "Outra forma de conseguir robux na plataforma é vendendo roupas. Diferente dos passes e acessos de jogo, apenas os assinantes são autorizados a vender itens de vestuário em seus jogos feitos no Roblox, como calças e camisas.",
+        "payout": "Uma vez feita a venda, o valor é colocado em um status pendente por até três dias úteis e depois é creditado em conta. Assim como os passes e acessos a jogos, usuários gratuitos ficam com uma porcentagem menor das vendas, em comparação a assinantes Premium."
+      },
+      "ads": {
+        "title": "4. Crie jogos que atraiam anunciantes",
+        "description": "Por fim, outra alternativa para conseguir robux no Roblox é criar jogos apelativos, criativos e amigáveis a crianças, para atrair anunciantes e obter uma renda.",
+        "requirements": "A Roblox Corp. exige que títulos elegíveis não contenham violência ou marcas conhecidas, possuam um design atraente e atualizado, não apresentem problemas de performance e sejam populares — no mínimo 200 mil execuções por mês.",
+        "responsiveness": "O desenvolvedor também não pode ter um histórico de denúncias e precisa ser rápido ao responder solicitações dos jogadores.",
+        "promotion": "Se você se enquadra nesses quesitos, promova seu jogo nas redes sociais usando a hashtag <strong>#ROBLOXRisingStar</strong>, para que a Roblox Corp. possa verificar o título é elegível e decidir se o jogo pode ou não exibir anúncios pagos em forma de robux no Roblox."
+      }
+    }
+  },
+  "terms": {
+    "title": "Termos e Condições",
+    "breadcrumb": "Termos e Condições",
+    "sections": {
+      "acceptance": {
+        "title": "1. Aceitação dos Termos",
+        "description": "Ao acessar e usar este website, você aceita e concorda em cumprir estes termos e condições de uso. Se você não concordar com qualquer parte destes termos, não deverá usar nosso website."
+      },
+      "products": {
+        "title": "2. Produtos e Serviços",
+        "description": "Todos os produtos e serviços oferecidos em nossa plataforma são destinados exclusivamente para uso pessoal. A revenda não autorizada de nossos produtos é estritamente proibida."
+      },
+      "pricing": {
+        "title": "3. Preços e Pagamentos",
+        "list": [
+          "Todos os preços estão em Reais (BRL)",
+          "Aceitamos apenas pagamentos via PIX",
+          "Os preços podem ser alterados sem aviso prévio",
+          "A confirmação da compra será enviada após a confirmação do pagamento"
+        ]
+      },
+      "delivery": {
+        "title": "4. Entrega Digital",
+        "description": "Nossos produtos são entregues digitalmente após a confirmação do pagamento. O prazo de entrega pode variar de acordo com o produto adquirido."
+      },
+      "privacy": {
+        "title": "5. Política de Privacidade",
+        "description": "Respeitamos sua privacidade e protegemos seus dados pessoais. Todas as informações coletadas são utilizadas apenas para processar seu pedido e melhorar sua experiência em nossa plataforma."
+      },
+      "responsibility": {
+        "title": "6. Responsabilidades",
+        "description": "A VALNIX não se responsabiliza por:",
+        "list": [
+          "Uso indevido dos produtos adquiridos",
+          "Problemas técnicos fora de nosso controle",
+          "Informações incorretas fornecidas pelo usuário"
+        ]
+      },
+      "support": {
+        "title": "7. Suporte ao Cliente",
+        "description": "Oferecemos suporte através de nosso Discord oficial e e-mail. Nosso time está disponível para ajudar com quaisquer dúvidas ou problemas relacionados aos nossos produtos e serviços."
+      }
+    },
+    "footer": {
+      "last_updated": "Última atualização: {{date}}",
+      "contact": "Em caso de dúvidas, entre em contato conosco através do Discord ou e-mail."
+    }
+  },
+  "breadcrumb": {
+    "home": "Página inicial"
+  },
+  "sidebar": {
+    "categories": "Categorias"
+  },
+  "faq": {
+    "title": "Perguntas Frequentes",
+    "items": [
+      {
+        "question": "É seguro e confiável?",
+        "answer": "Sim! Priorizamos a segurança de nossos clientes em todas as etapas da compra. Utilizamos criptografia SSL no site, garantindo que suas informações e dados pessoais estejam protegidos durante a transação. Além disso, nosso sistema de pagamento é seguro e confiável, proporcionando uma experiência de compra sem riscos."
+      },
+      {
+        "question": "Como recebo o produto?",
+        "answer": "A entrega é automática e instantânea após a confirmação do pagamento. Além disso, você receberá os produtos diretamente no seu e-mail cadastrado e também poderá visualizá-los na tela de compra, garantindo total praticidade e agilidade."
+      },
+      {
+        "question": "E se eu precisar de ajuda?",
+        "answer": "Oferecemos diversas formas de garantir segurança e suporte ao cliente durante a compra, incluindo atendimento via Discord, Instagram e outros canais. Tudo isso de maneira prática, rápida e segura, com equipe disponível das 10h às 23h para oferecer o melhor suporte possível."
+      }
+    ]
+  },
+  "footer": {
+    "scroll_top": "Voltar ao topo",
+    "sections": {
+      "customer_service": "ATENDIMENTO AO CLIENTE",
+      "policies": "POLÍTICAS",
+      "categories": "CATEGORIAS",
+      "newsletter": "NEWSLETTER"
+    },
+    "contact": {
+      "email": "contato@valnix.com.br",
+      "discord": "Discord"
+    },
+    "policies_links": {
+      "about": "Sobre Nós",
+      "terms": "Termos e Condições"
+    },
+    "newsletter": {
+      "description": "Assine nossa newsletter e receba as melhores ofertas DE GRAÇA!",
+      "placeholder": "Seu e-mail",
+      "submit": "Enviar"
+    },
+    "security": {
+      "title": "Compra Segura",
+      "message": "Preços e condições de pagamento exclusivos para compras neste site oficial, podendo variar com o tempo da oferta. Evite comprar produtos mais baratos ou de outras lojas, pois você pode estar sendo enganado(a) por um golpista. Caso você compre os mesmos produtos em outras lojas, não nos responsabilizamos por quaisquer problemas."
+    },
+    "payment": {
+      "label": "Forma de Pagamento:"
+    },
+    "trust": {
+      "norton": "Norton Secured",
+      "reclame_aqui": "Reclame Aqui",
+      "google_safe": "Google Safe Browsing"
+    },
+    "copyright": "© 2021-2025 VALNIX - Todos os direitos reservados"
+  },
+  "gameCategories": {
+    "title": "Categorias",
+    "viewProducts": "Ver Produtos",
+    "descriptions": {
+      "roblox": "Explore, crie e brilhe no Roblox com estilo",
+      "valorant": "A vitória começa com estilo! Prepare-se",
+      "leagueoflegends": "Para jogadores que querem causar impacto em cada lane!",
+      "freefire": "Para jogadores que querem ir além!",
+      "fortnite": "Eleve seu estilo no Fortnite",
+      "brawlstars": "Aumente sua diversão no Brawl Stars"
+    }
+  },
+  "header": {
+    "search_placeholder": "O que está buscando?",
+    "cart_text": "Carrinho"
+  },
+    "productCard": {
+    "soldOut": "ESGOTADO"
+  },
+    "productComments": {
+    "title": "Últimas avaliações"
+  },
+    "rating": {
+    "reviews": "{{count}} avaliações"
+  },
+   "trust": {
+    "items": [
+      {
+        "title": "Compra Segura",
+        "description": "Ambiente seguro para pagamentos online"
+      },
+      {
+        "title": "Envio Imediato",
+        "description": "Envio imediato via E-mail após a compra"
+      },
+      {
+        "title": "Suporte Profissional",
+        "description": "Equipe de suporte das 10h às 23h diariamente"
+      },
+      {
+        "title": "Entrega ou Reembolso",
+        "description": "Caso haja qualquer tipo de problema, devolvemos seu dinheiro integralmente!"
+      }
+    ]
+  }
+  
+}

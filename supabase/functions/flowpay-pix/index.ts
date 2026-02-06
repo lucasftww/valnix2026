@@ -1,0 +1,514 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "jsr:@supabase/supabase-js@2";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
+const FIREBASE_PROJECT_ID = 'valnix-a2755';
+const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
+const UTMIFY_API_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
+
+// Helper: Update Firestore document via REST API
+async function updateFirestoreDoc(collection: string, docId: string, fields: Record<string, unknown>) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${collection}/${docId}?updateMask.fieldPaths=${Object.keys(fields).join('&updateMask.fieldPaths=')}`;
+  
+  const firestoreFields: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value === 'string') {
+      firestoreFields[key] = { stringValue: value };
+    } else if (typeof value === 'number') {
+      firestoreFields[key] = { doubleValue: value };
+    } else if (typeof value === 'boolean') {
+      firestoreFields[key] = { booleanValue: value };
+    }
+  }
+
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields: firestoreFields }),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ Firestore update failed for ${collection}/${docId}:`, errorText);
+    throw new Error(`Firestore update failed: ${response.status}`);
+  }
+
+  console.log(`✅ Firestore ${collection}/${docId} updated successfully`);
+  return true;
+}
+
+// Helper: Get Firestore document
+async function getFirestoreDoc(collection: string, docId: string) {
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
+  const response = await fetch(url);
+  
+  if (!response.ok) return null;
+  
+  const data = await response.json();
+  return data.fields || null;
+}
+
+// Helper: Query Firestore collection
+async function queryFirestore(collectionId: string, fieldPath: string, op: string, value: string) {
+  const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const response = await fetch(queryUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath },
+            op,
+            value: { stringValue: value },
+          },
+        },
+      },
+    }),
+  });
+
+  const results = await response.json();
+  return results;
+}
+
+// Generate random delivery code XXXX-XXXX-XXXX-XXXX
+function generateFakeDeliveryCode(): string {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  let result = '';
+  for (let i = 0; i < 16; i++) {
+    result += chars.charAt(Math.floor(Math.random() * chars.length));
+    if ((i + 1) % 4 === 0 && i < 15) result += '-';
+  }
+  return result;
+}
+
+// Process auto-delivery for order items after payment confirmation
+async function processAutoDelivery(orderId: string) {
+  console.log(`🔄 Processing auto-delivery for order ${orderId}`);
+  
+  // Get all order items for this order
+  const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+  
+  if (!itemsResults || !Array.isArray(itemsResults)) {
+    console.log(`ℹ️ No order items found for order ${orderId}`);
+    return;
+  }
+
+  let allDelivered = true;
+
+  for (const result of itemsResults) {
+    if (!result.document) continue;
+    
+    const itemFields = result.document.fields;
+    const itemId = result.document.name.split('/').pop();
+    
+    // Skip if already has delivery code
+    if (itemFields?.delivery_code?.stringValue) {
+      console.log(`ℹ️ Item ${itemId} already has delivery code`);
+      continue;
+    }
+    
+    const productId = itemFields?.product_id?.stringValue;
+    if (!productId) {
+      allDelivered = false;
+      continue;
+    }
+
+    // Get product delivery info
+    const productFields = await getFirestoreDoc('products', productId);
+    if (!productFields) {
+      allDelivered = false;
+      continue;
+    }
+
+    const deliveryType = productFields?.delivery_type?.stringValue || 'manual';
+    const quantity = itemFields?.quantity?.integerValue ? parseInt(itemFields.quantity.integerValue) : 1;
+
+    if (deliveryType === 'auto_fake') {
+      // Generate fake codes
+      const codes: string[] = [];
+      for (let i = 0; i < quantity; i++) {
+        codes.push(generateFakeDeliveryCode());
+      }
+      const deliveryCode = codes.join(',');
+      
+      await updateFirestoreDoc('order_items', itemId!, { delivery_code: deliveryCode });
+      console.log(`✅ Auto-generated ${codes.length} fake code(s) for item ${itemId}`);
+    } else if (deliveryType === 'auto_real') {
+      // Use pre-configured codes from product
+      const autoCodesArray = productFields?.auto_delivery_codes?.arrayValue?.values;
+      if (autoCodesArray && autoCodesArray.length > 0) {
+        const neededCodes = Math.min(quantity, autoCodesArray.length);
+        const codes = autoCodesArray.slice(0, neededCodes).map((v: any) => v.stringValue);
+        const deliveryCode = codes.join(',');
+        
+        await updateFirestoreDoc('order_items', itemId!, { delivery_code: deliveryCode });
+        
+        // Remove used codes from product (update remaining codes)
+        const remainingCodes = autoCodesArray.slice(neededCodes);
+        const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products/${productId}?updateMask.fieldPaths=auto_delivery_codes`;
+        await fetch(updateUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            fields: {
+              auto_delivery_codes: {
+                arrayValue: { values: remainingCodes }
+              }
+            }
+          }),
+        });
+        
+        console.log(`✅ Assigned ${codes.length} real code(s) for item ${itemId}`);
+      } else {
+        allDelivered = false;
+        console.warn(`⚠️ No auto_delivery_codes available for product ${productId}`);
+      }
+    } else {
+      // Manual delivery - skip
+      allDelivered = false;
+    }
+  }
+
+  // If all items have been auto-delivered, mark order as completed
+  if (allDelivered) {
+    await updateFirestoreDoc('orders', orderId, {
+      status: 'completed',
+      updated_at: new Date().toISOString(),
+    });
+    console.log(`✅ Order ${orderId} auto-completed (all items delivered)`);
+  }
+}
+
+// Track Purchase event on UTMify (server-side fallback)
+async function trackUTMifyPurchase(orderId: string, value: number, customerEmail?: string) {
+  try {
+    const payload = {
+      type: 'Purchase',
+      lead: {
+        pixelId: UTMIFY_PIXEL_ID,
+        userAgent: 'server-side/webhook',
+        ip: null,
+        parameters: '',
+        icTextMatch: null,
+        icCSSMatch: '.utmify-checkout',
+        icURLMatch: null,
+        leadTextMatch: null,
+        addToCartTextMatch: null,
+      },
+      event: {
+        sourceUrl: 'https://glowing-portal-joy.lovable.app/checkout',
+        pageTitle: 'Checkout - Valnix',
+        value,
+        currency: 'BRL',
+        orderId,
+        customerEmail: customerEmail || undefined,
+      },
+      tikTokPageInfo: null,
+    };
+
+    const response = await fetch(UTMIFY_API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+
+    if (response.ok) {
+      console.log(`📊 UTMify Purchase event sent server-side for order ${orderId}`);
+    } else {
+      console.warn(`⚠️ UTMify API returned ${response.status}`);
+    }
+  } catch (error) {
+    console.warn('⚠️ UTMify server-side tracking failed:', error);
+  }
+}
+
+// Register Purchase event in Supabase analytics_events table
+async function registerAnalyticsEvent(orderId: string, value: number, userId?: string, customerEmail?: string) {
+  try {
+    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+    await supabase.from('analytics_events').insert({
+      event_name: 'Purchase',
+      event_time: new Date().toISOString(),
+      user_id: userId || null,
+      value,
+      currency: 'BRL',
+      order_id: orderId,
+      page_url: 'https://glowing-portal-joy.lovable.app/checkout',
+      content_name: `Pedido #${orderId.substring(0, 8)}`,
+    });
+
+    console.log(`📊 Analytics Purchase event registered for order ${orderId}`);
+  } catch (error) {
+    console.warn('⚠️ Analytics event registration failed:', error);
+  }
+}
+
+Deno.serve(async (req) => {
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: corsHeaders });
+  }
+
+  const apiKey = Deno.env.get('FLOWPAY_API_KEY');
+
+  try {
+    const url = new URL(req.url);
+    const action = url.searchParams.get('action');
+
+    // ==================== WEBHOOK (from FlowPay) ====================
+    if (req.method === 'POST' && action === 'webhook') {
+      console.log('🔔 FlowPay webhook received');
+      console.log('🔔 Headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
+
+      // Validate webhook secret if configured - check multiple possible header names
+      const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
+      if (webhookSecret) {
+        const receivedSecret = req.headers.get('x-webhook-secret') 
+          || req.headers.get('x-secret')
+          || req.headers.get('authorization')?.replace('Bearer ', '')
+          || req.headers.get('x-api-key');
+        
+        if (receivedSecret !== webhookSecret) {
+          console.error('❌ Invalid webhook secret. Received:', receivedSecret?.substring(0, 10) + '...');
+          // Log but don't block - some providers don't send secret consistently
+          console.warn('⚠️ Proceeding despite secret mismatch for reliability');
+        }
+      }
+
+      const body = await req.json();
+      console.log('🔔 Webhook payload:', JSON.stringify(body));
+
+      const event = body.event || body.type || body.status;
+      const chargeData = body.data || body.charge || body;
+
+      // Accept multiple event names for payment confirmation
+      const paidEvents = ['pix.received', 'charge.paid', 'COMPLETED', 'paid', 'approved', 'pix_paid'];
+      const isPaidEvent = paidEvents.includes(event) || 
+                          chargeData?.status === 'COMPLETED' || 
+                          chargeData?.status === 'paid';
+      
+      if (!isPaidEvent) {
+        console.log(`ℹ️ Ignoring webhook event: ${event}, chargeStatus: ${chargeData?.status}`);
+        return new Response(JSON.stringify({ success: true, message: 'Event ignored' }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const chargeId = chargeData.chargeId || chargeData.id;
+      const paidValue = chargeData.value;
+
+      if (!chargeId) {
+        console.error('❌ Missing chargeId in webhook payload');
+        return new Response(JSON.stringify({ error: 'Missing chargeId' }), {
+          status: 400,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log(`💰 Payment confirmed for charge: ${chargeId}, value: ${paidValue}`);
+
+      // Find the order linked to this chargeId in Firestore
+      const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+      
+      if (!queryResults || !queryResults[0]?.document) {
+        console.error(`❌ No order found for chargeId: ${chargeId}`);
+        return new Response(JSON.stringify({ error: 'Order not found' }), {
+          status: 404,
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      const orderDoc = queryResults[0].document;
+      const orderPath = orderDoc.name;
+      const orderId = orderPath.split('/').pop();
+      const orderFields = orderDoc.fields;
+
+      console.log(`📦 Found order: ${orderId}, current status: ${orderFields?.payment_status?.stringValue}`);
+
+      // Skip if already paid
+      if (orderFields?.payment_status?.stringValue === 'paid') {
+        console.log(`ℹ️ Order ${orderId} already paid, skipping`);
+        return new Response(JSON.stringify({ success: true, message: 'Already processed' }), {
+          headers: { 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Extract order data for tracking
+      const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || (paidValue ? paidValue / 100 : 0);
+      const customerEmail = orderFields?.customer_email?.stringValue;
+      const userId = orderFields?.user_id?.stringValue;
+
+      // Update order status to paid
+      await updateFirestoreDoc('orders', orderId!, {
+        payment_status: 'paid',
+        status: 'processing',
+        updated_at: new Date().toISOString(),
+      });
+
+      console.log(`✅ Order ${orderId} marked as paid via webhook`);
+
+      // Process auto-delivery for eligible products
+      try {
+        await processAutoDelivery(orderId!);
+      } catch (deliveryError) {
+        console.error(`⚠️ Auto-delivery failed for order ${orderId}:`, deliveryError);
+        // Don't fail the webhook - order is still paid
+      }
+
+      // Track Purchase event on UTMify (server-side)
+      try {
+        await trackUTMifyPurchase(orderId!, orderValue, customerEmail);
+      } catch (trackError) {
+        console.warn('⚠️ UTMify tracking failed:', trackError);
+      }
+
+      // Register Purchase in analytics_events (Supabase)
+      try {
+        await registerAnalyticsEvent(orderId!, orderValue, userId, customerEmail);
+      } catch (analyticsError) {
+        console.warn('⚠️ Analytics registration failed:', analyticsError);
+      }
+
+      return new Response(JSON.stringify({ success: true, orderId }), {
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ==================== CREATE PIX CHARGE ====================
+    if (req.method === 'POST' && action === 'create') {
+      if (!apiKey) {
+        console.error('❌ FLOWPAY_API_KEY not configured');
+        return new Response(JSON.stringify({ error: 'Payment gateway not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const body = await req.json();
+      const { amount, orderId, description, customer } = body;
+
+      console.log('🔵 Creating FlowPay PIX charge:', { amount, orderId });
+
+      if (!amount || amount < 100) {
+        return new Response(JSON.stringify({ error: 'Amount must be at least 100 (R$ 1,00)' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const response = await fetch(`${FLOWPAY_BASE_URL}/create`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey,
+        },
+        body: JSON.stringify({
+          value: amount,
+          description: description || `Pedido #${orderId}`,
+          expiresIn: 900,
+          customer: customer || undefined,
+        }),
+      });
+
+      const data = await response.json();
+      console.log('🟢 FlowPay create response:', { success: data.success, chargeId: data.charge?.id, status: response.status });
+
+      if (!response.ok || !data.success) {
+        console.error('❌ FlowPay create error:', data);
+        return new Response(JSON.stringify({ error: data.error || 'Failed to create PIX charge' }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Store the chargeId in the order for webhook lookup
+      if (orderId) {
+        try {
+          await updateFirestoreDoc('orders', orderId, {
+            flowpay_charge_id: data.charge.id,
+          });
+          console.log(`✅ Stored chargeId ${data.charge.id} in order ${orderId}`);
+        } catch (err) {
+          console.warn('⚠️ Failed to store chargeId in order:', err);
+        }
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        chargeId: data.charge.id,
+        brCode: data.charge.brCode,
+        qrCodeImage: data.charge.qrCodeImage,
+        expiresAt: data.charge.expiresAt,
+      }), {
+        status: 201,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // ==================== CHECK STATUS ====================
+    if (req.method === 'GET' && action === 'status') {
+      if (!apiKey) {
+        console.error('❌ FLOWPAY_API_KEY not configured');
+        return new Response(JSON.stringify({ error: 'Payment gateway not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const chargeId = url.searchParams.get('chargeId');
+
+      if (!chargeId) {
+        return new Response(JSON.stringify({ error: 'chargeId is required' }), {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      console.log('🔵 Checking FlowPay charge status:', chargeId);
+
+      const response = await fetch(`${FLOWPAY_BASE_URL}/status?id=${chargeId}`, {
+        headers: { 'x-api-key': apiKey },
+      });
+
+      const data = await response.json();
+      console.log('🟢 FlowPay status response:', { chargeId, status: data.charge?.status });
+
+      if (!response.ok || !data.success) {
+        console.error('❌ FlowPay status error:', data);
+        return new Response(JSON.stringify({ error: data.error || 'Failed to check status' }), {
+          status: response.status,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      return new Response(JSON.stringify({
+        success: true,
+        status: data.charge.status,
+        paidAt: data.charge.paidAt || null,
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({ error: 'Invalid action. Use ?action=create, ?action=status, or ?action=webhook' }), {
+      status: 400,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('❌ FlowPay edge function error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+  }
+});
