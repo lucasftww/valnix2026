@@ -17,11 +17,19 @@ export function CrispChat() {
     script.async = true;
     document.getElementsByTagName("head")[0].appendChild(script);
 
+    // Hide only the bubble, keep chat functional when opened programmatically
+    const style = document.createElement("style");
+    style.textContent = `
+      .crisp-client .cc-1brb6 .cc-unoo {
+        display: none !important;
+      }
+    `;
+    document.head.appendChild(style);
+
     return () => {
       const existingScript = document.querySelector('script[src="https://client.crisp.chat/l.js"]');
-      if (existingScript) {
-        existingScript.remove();
-      }
+      if (existingScript) existingScript.remove();
+      style.remove();
     };
   }, []);
 
