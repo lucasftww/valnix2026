@@ -20,8 +20,17 @@ export function CrispChat() {
     // Hide only the bubble, keep chat functional when opened programmatically
     const style = document.createElement("style");
     style.textContent = `
-      .crisp-client .cc-1brb6 .cc-unoo {
+      #crisp-chatbox,
+      .crisp-client,
+      [data-crisp],
+      .crisp-client .cc-1brb6,
+      .crisp-client .cc-1brb6 .cc-unoo,
+      .crisp-client .cc-tlyw,
+      .crisp-client .cc-kxkl {
         display: none !important;
+        visibility: hidden !important;
+        opacity: 0 !important;
+        pointer-events: none !important;
       }
     `;
     document.head.appendChild(style);
