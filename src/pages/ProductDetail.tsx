@@ -11,6 +11,7 @@ import { useProductById, useProductReviews } from "@/hooks/firebase";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import pixLogo from "@/assets/pix-logo.png";
 import DOMPurify from "dompurify";
+import { trackViewContent, trackAddToCartEvent } from "@/lib/analytics";
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -78,6 +79,13 @@ const ProductDetail = () => {
     [id]
   );
 
+  // Track ViewContent for analytics funnel
+  useEffect(() => {
+    if (product) {
+      trackViewContent(user?.uid, product.name, product.category);
+    }
+  }, [product?.id]);
+
 
   // Memoizar handlers para evitar re-renders
   const handleAddToCart = useCallback(() => {
@@ -97,6 +105,9 @@ const ProductDetail = () => {
         type: 'product'
       });
     }
+    
+    // Track AddToCart for analytics funnel
+    trackAddToCartEvent(user.uid, Number(product.price) * quantity, product.name);
   }, [user, product, quantity, navigate, id, addItem]);
   
   const handleBuyNow = useCallback(() => {
