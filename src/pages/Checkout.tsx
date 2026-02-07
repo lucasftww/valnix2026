@@ -16,17 +16,11 @@ import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import pixLogo from "@/assets/pix-logo.png";
 import { trackPurchase } from "@/lib/utmify";
-import { supabase } from "@/integrations/supabase/client";
-
+import { supabase } from "@/lib/supabaseHelper";
 
 interface FormData {
   name: string;
   document: string;
-  phone: string;
-  cep: string;
-  birthDate: string;
-  estado: string;
-  cidade: string;
 }
 
 interface PaymentData {
@@ -45,135 +39,25 @@ const formatCPF = (value: string): string => {
   return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
 };
 
-// Phone mask helper
-const formatPhone = (value: string): string => {
-  const digits = value.replace(/\D/g, '').slice(0, 11);
-  if (digits.length === 0) return '';
-  if (digits.length <= 2) return `(${digits}`;
-  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
-  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
-};
-
-// CEP mask helper
-const formatCEP = (value: string): string => {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 5) return digits;
-  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
-};
-
-// Birth date mask helper (DD/MM/AAAA)
-const formatBirthDate = (value: string): string => {
-  const digits = value.replace(/\D/g, '').slice(0, 8);
-  if (digits.length <= 2) return digits;
-  if (digits.length <= 4) return `${digits.slice(0, 2)}/${digits.slice(2)}`;
-  return `${digits.slice(0, 2)}/${digits.slice(2, 4)}/${digits.slice(4)}`;
-};
-
-// Full CPF validation with check digits (algoritmo oficial)
+// Full CPF validation with check digits
 const isValidCPF = (cpf: string): boolean => {
   const digits = cpf.replace(/\D/g, '');
-  
-  // Must have 11 digits
   if (digits.length !== 11) return false;
-  
-  // Reject known invalid patterns (all same digit)
   if (/^(\d)\1{10}$/.test(digits)) return false;
   
-  // Validate first check digit
   let sum = 0;
-  for (let i = 0; i < 9; i++) {
-    sum += parseInt(digits[i]) * (10 - i);
-  }
+  for (let i = 0; i < 9; i++) sum += parseInt(digits[i]) * (10 - i);
   let remainder = (sum * 10) % 11;
   if (remainder === 10 || remainder === 11) remainder = 0;
   if (remainder !== parseInt(digits[9])) return false;
   
-  // Validate second check digit
   sum = 0;
-  for (let i = 0; i < 10; i++) {
-    sum += parseInt(digits[i]) * (11 - i);
-  }
+  for (let i = 0; i < 10; i++) sum += parseInt(digits[i]) * (11 - i);
   remainder = (sum * 10) % 11;
   if (remainder === 10 || remainder === 11) remainder = 0;
   if (remainder !== parseInt(digits[10])) return false;
   
   return true;
-};
-
-// Validate phone has 10-11 digits and valid DDD
-const isValidPhone = (phone: string): boolean => {
-  const digits = phone.replace(/\D/g, '');
-  if (digits.length < 10 || digits.length > 11) return false;
-  
-  // Valid Brazilian DDDs
-  const validDDDs = [
-    '11','12','13','14','15','16','17','18','19', // SP
-    '21','22','24', // RJ
-    '27','28', // ES
-    '31','32','33','34','35','37','38', // MG
-    '41','42','43','44','45','46', // PR
-    '47','48','49', // SC
-    '51','53','54','55', // RS
-    '61', // DF
-    '62','64', // GO
-    '63', // TO
-    '65','66', // MT
-    '67', // MS
-    '68', // AC
-    '69', // RO
-    '71','73','74','75','77', // BA
-    '79', // SE
-    '81','87', // PE
-    '82', // AL
-    '83', // PB
-    '84', // RN
-    '85','88', // CE
-    '86','89', // PI
-    '91','93','94', // PA
-    '92','97', // AM
-    '95', // RR
-    '96', // AP
-    '98','99', // MA
-  ];
-  
-  const ddd = digits.substring(0, 2);
-  return validDDDs.includes(ddd);
-};
-
-// Validate birth date is valid and person is 13+ years old
-const isValidBirthDate = (dateStr: string): { valid: boolean; error?: string } => {
-  const digits = dateStr.replace(/\D/g, '');
-  if (digits.length !== 8) return { valid: false, error: 'Data incompleta' };
-  
-  const day = parseInt(digits.slice(0, 2));
-  const month = parseInt(digits.slice(2, 4));
-  const year = parseInt(digits.slice(4, 8));
-  
-  // Basic validation
-  if (month < 1 || month > 12) return { valid: false, error: 'Mês inválido' };
-  if (day < 1 || day > 31) return { valid: false, error: 'Dia inválido' };
-  
-  // Check valid day for month
-  const daysInMonth = new Date(year, month, 0).getDate();
-  if (day > daysInMonth) return { valid: false, error: 'Data inválida' };
-  
-  // Check year range (between 1920 and current year)
-  const currentYear = new Date().getFullYear();
-  if (year < 1920 || year > currentYear) return { valid: false, error: 'Ano inválido' };
-  
-  // Check if person is at least 13 years old
-  const birthDate = new Date(year, month - 1, day);
-  const today = new Date();
-  let age = today.getFullYear() - birthDate.getFullYear();
-  const monthDiff = today.getMonth() - birthDate.getMonth();
-  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
-    age--;
-  }
-  
-  if (age < 13) return { valid: false, error: 'Idade mínima: 13 anos' };
-  if (age > 120) return { valid: false, error: 'Data inválida' };
-  
-  return { valid: true };
 };
 
 export default function Checkout() {
@@ -182,23 +66,15 @@ export default function Checkout() {
   const navigate = useNavigate();
   const { toast } = useToast();
   
-  
   const [loading, setLoading] = useState(false);
   const [initializing, setInitializing] = useState(true);
-  
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance">("pix");
   const [formData, setFormData] = useState<FormData>({
     name: "",
     document: "",
-    phone: "",
-    cep: "",
-    birthDate: "",
-    estado: "",
-    cidade: "",
   });
-  const [loadingCep, setLoadingCep] = useState(false);
   const [couponCode, setCouponCode] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
@@ -213,17 +89,14 @@ export default function Checkout() {
       return;
     }
     
-    // Redirect if cart is empty and not showing payment
     if (items.length === 0 && !paymentData) {
       navigate("/");
     }
   }, [user, authLoading, items.length, paymentData, navigate]);
 
-
   // Load user profile
   useEffect(() => {
     if (!user) return;
-    
     let mounted = true;
     
     const loadProfile = async () => {
@@ -236,7 +109,6 @@ export default function Checkout() {
           setFormData(prev => ({
             ...prev,
             name: user.displayName || profileData?.full_name || "",
-            phone: profileData?.phone ? formatPhone(profileData.phone) : "",
           }));
           setUserBalance(profileData?.balance || 0);
         }
@@ -246,20 +118,11 @@ export default function Checkout() {
     };
     
     loadProfile();
-    
     return () => { mounted = false; };
   }, [user]);
 
-  // Validate CEP (8 digits required)
-  const isValidCEP = (cep: string): boolean => {
-    const digits = cep.replace(/\D/g, '');
-    return digits.length === 8;
-  };
-
-  // Form validation with detailed feedback
+  // Form validation
   const validation = useMemo(() => {
-    const birthDateValidation = isValidBirthDate(formData.birthDate);
-    const cepDigits = formData.cep.replace(/\D/g, '');
     return {
       name: formData.name.trim().length >= 3 && formData.name.trim().split(' ').length >= 2,
       nameError: formData.name.trim().length < 3 
@@ -273,106 +136,18 @@ export default function Checkout() {
         : formData.document.replace(/\D/g, '').length < 11
           ? 'CPF incompleto'
           : undefined,
-      phone: isValidPhone(formData.phone),
-      phoneError: formData.phone.replace(/\D/g, '').length >= 10 && !isValidPhone(formData.phone)
-        ? 'DDD inválido'
-        : formData.phone.replace(/\D/g, '').length < 10
-          ? 'Telefone incompleto'
-          : undefined,
-      cep: cepDigits.length === 8,
-      cepError: cepDigits.length > 0 && cepDigits.length < 8
-        ? 'CEP incompleto (8 dígitos)'
-        : cepDigits.length === 0
-          ? 'CEP obrigatório'
-          : undefined,
-      birthDate: birthDateValidation.valid,
-      birthDateError: birthDateValidation.error,
     };
   }, [formData]);
 
-  const isFormValid = validation.name && validation.document && validation.phone && validation.cep;
-
-  // Cache de CEPs já consultados (persiste durante a sessão)
-  const [cepCache] = useState<Map<string, { uf: string; localidade: string }>>(new Map());
-  const cepLookupRef = React.useRef<string | null>(null);
-
-  // CEP lookup function - otimizada com cache e prevenção de duplicatas
-  const lookupCEP = useCallback(async (cep: string) => {
-    const digits = cep.replace(/\D/g, '');
-    if (digits.length !== 8) return;
-    
-    // Previne chamadas duplicadas para o mesmo CEP
-    if (cepLookupRef.current === digits) return;
-    cepLookupRef.current = digits;
-    
-    // Verifica cache primeiro (instantâneo)
-    const cached = cepCache.get(digits);
-    if (cached) {
-      setFormData(prev => ({
-        ...prev,
-        estado: cached.uf,
-        cidade: cached.localidade,
-      }));
-      return;
-    }
-    
-    setLoadingCep(true);
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // Timeout de 5s
-      
-      const response = await fetch(`https://viacep.com.br/ws/${digits}/json/`, {
-        signal: controller.signal,
-      });
-      clearTimeout(timeoutId);
-      
-      const data = await response.json();
-      
-      if (!data.erro && data.uf) {
-        // Salva no cache
-        cepCache.set(digits, { uf: data.uf, localidade: data.localidade || "" });
-        
-        setFormData(prev => ({
-          ...prev,
-          estado: data.uf || "",
-          cidade: data.localidade || "",
-        }));
-      }
-    } catch (error) {
-      if ((error as Error).name !== 'AbortError') {
-        console.error("Error fetching CEP:", error);
-      }
-    } finally {
-      setLoadingCep(false);
-    }
-  }, [cepCache]);
+  const isFormValid = validation.name && validation.document;
 
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     let formattedValue = value;
-    
     if (field === 'document') {
       formattedValue = formatCPF(value);
-    } else if (field === 'phone') {
-      formattedValue = formatPhone(value);
-    } else if (field === 'cep') {
-      formattedValue = formatCEP(value);
-      // Limpa estado/cidade se CEP mudou (menos de 8 dígitos)
-      const digits = value.replace(/\D/g, '');
-      if (digits.length < 8) {
-        setFormData(prev => ({ ...prev, cep: formattedValue, estado: "", cidade: "" }));
-        cepLookupRef.current = null;
-        return;
-      }
-      // Auto lookup quando CEP completo
-      if (digits.length === 8) {
-        lookupCEP(value);
-      }
-    } else if (field === 'birthDate') {
-      formattedValue = formatBirthDate(value);
     }
-    
     setFormData(prev => ({ ...prev, [field]: formattedValue }));
-  }, [lookupCEP]);
+  }, []);
 
   const handleBlur = useCallback((field: string) => {
     setTouched(prev => ({ ...prev, [field]: true }));
@@ -388,32 +163,18 @@ export default function Checkout() {
   const handleSubmit = useCallback(async () => {
     if (!user || loading) return;
     
-    // Mark all fields as touched to show validation
-    setTouched({ name: true, document: true, phone: true, cep: true, birthDate: true });
+    setTouched({ name: true, document: true });
     
     if (!isFormValid) {
-      // Build specific error message
       const errors: string[] = [];
       if (!validation.name) errors.push(validation.nameError || 'Nome inválido');
       if (!validation.document) errors.push(validation.documentError || 'CPF inválido');
-      if (!validation.phone) errors.push(validation.phoneError || 'Telefone inválido');
-      if (!validation.cep) errors.push(validation.cepError || 'CEP inválido');
       
       toast({
         title: "Verifique os campos",
         description: errors[0] || "Preencha todos os campos corretamente.",
         variant: "destructive",
       });
-      
-      // Focus first invalid field
-      const firstInvalidField = !validation.name ? 'name' : !validation.document ? 'document' : !validation.phone ? 'phone' : 'cep';
-      document.querySelector<HTMLInputElement>(`input[placeholder*="${
-        firstInvalidField === 'name' ? 'NOME' : 
-        firstInvalidField === 'document' ? '000.000' : 
-        firstInvalidField === 'phone' ? '(00)' :
-        '00000'
-      }"]`)?.focus();
-      
       return;
     }
     
@@ -442,12 +203,11 @@ export default function Checkout() {
           return;
         }
 
-        // Create order with paid status
         const orderId = await createOrder({
           user_id: user.uid,
           customer_name: formData.name,
           customer_email: user.email || "",
-          customer_phone: formData.phone,
+          customer_phone: "",
           total_amount: orderAmount,
           notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Pago com saldo` : "Pago com saldo",
           status: "processing",
@@ -455,7 +215,6 @@ export default function Checkout() {
           payment_method: "balance",
         });
 
-        // Fetch product delivery info for auto-delivery processing
         const productIds = items.map(i => i.id);
         const productsDeliveryInfo: Record<string, { delivery_type: string; auto_delivery_codes: string[] | null }> = {};
         
@@ -475,7 +234,6 @@ export default function Checkout() {
           }
         }
 
-        // Create order items with delivery info for auto-processing
         const orderItemsData = items.map(item => {
           const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: 'manual', auto_delivery_codes: null };
           return {
@@ -491,19 +249,15 @@ export default function Checkout() {
           };
         });
 
-        // Process with auto-delivery enabled since payment is already confirmed
         await createOrderItems(orderItemsData, true);
 
-        // Deduct balance from user profile
         const profileRef = doc(db, "profiles", user.uid);
         await updateDoc(profileRef, {
           balance: increment(-orderAmount)
         });
 
-        // Send Purchase event to UTMify (waits for SDK with fallback)
         await trackPurchase(orderId, orderAmount, user.email || undefined);
 
-        // Register Purchase in analytics_events (Supabase)
         try {
           await supabase.from('analytics_events').insert({
             event_name: 'Purchase',
@@ -520,30 +274,26 @@ export default function Checkout() {
         }
 
         clearCart();
-
         toast({
           title: "Pagamento confirmado!",
           description: `Pedido #${orderId.substring(0, 8)} pago com saldo. R$ ${orderAmount.toFixed(2)} debitados.`,
         });
-
         navigate("/my-orders");
         return;
       }
 
       // PIX payment flow
-      // Create order in Firebase
       const orderId = await createOrder({
         user_id: user.uid,
         customer_name: formData.name,
         customer_email: user.email || "",
-        customer_phone: formData.phone,
+        customer_phone: "",
         total_amount: orderAmount,
         notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
         status: "pending",
         payment_status: "pending",
       });
 
-      // Create order items
       const orderItemsData = items.map(item => ({
         order_id: orderId,
         product_id: item.id,
@@ -556,9 +306,7 @@ export default function Checkout() {
 
       await createOrderItems(orderItemsData);
 
-      // FlowPay PIX payment
       const amountInCents = Math.round(orderAmount * 100);
-      const phoneDigits = formData.phone.replace(/\D/g, '');
       const cpfDigits = formData.document.replace(/\D/g, '');
 
       const pixResponse = await fetch(
@@ -576,7 +324,6 @@ export default function Checkout() {
             customer: {
               name: formData.name,
               email: user.email || undefined,
-              phone: phoneDigits,
               taxId: cpfDigits,
             },
           }),
@@ -625,7 +372,6 @@ export default function Checkout() {
     return (
       <div className="min-h-screen bg-[#0d0d0d] utmify-checkout">
         <CheckoutHeader currentStep={2} />
-
         <main className="max-w-xl mx-auto px-4 py-8">
           <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-6">
             <PixPayment
@@ -635,8 +381,6 @@ export default function Checkout() {
               orderId={paymentData.orderId}
               customerEmail={user.email || undefined}
               customerName={formData.name || undefined}
-              customerPhone={formData.phone || undefined}
-              customerZipCode={formData.cep ? formData.cep.replace(/\D/g, '') : undefined}
               customerId={user.uid}
               productNames={items.map(item => item.name)}
               productIds={items.map(item => item.id)}
@@ -648,23 +392,6 @@ export default function Checkout() {
     );
   }
 
-  // Helper for input styling with validation icons
-  const getInputClassName = (field: 'name' | 'document' | 'phone' | 'birthDate', baseClass: string) => {
-    if (!touched[field] && field !== 'birthDate') return baseClass;
-    
-    // For birthDate, check if it has enough characters
-    if (field === 'birthDate') {
-      if (formData.birthDate.replace(/\D/g, '').length < 8) return baseClass;
-      return validation.birthDate 
-        ? `${baseClass} border-green-500/50 pr-10` 
-        : `${baseClass} border-red-500/50 pr-10`;
-    }
-    
-    return validation[field] 
-      ? `${baseClass} border-green-500/50 pr-10` 
-      : `${baseClass} border-red-500/50 pr-10`;
-  };
-  
   // Validation icon component
   const ValidationIcon = ({ isValid, show }: { isValid: boolean; show: boolean }) => {
     if (!show) return null;
@@ -673,6 +400,13 @@ export default function Checkout() {
     ) : (
       <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
     );
+  };
+
+  const getInputClassName = (field: 'name' | 'document', baseClass: string) => {
+    if (!touched[field]) return baseClass;
+    return validation[field] 
+      ? `${baseClass} border-green-500/50 pr-10` 
+      : `${baseClass} border-red-500/50 pr-10`;
   };
 
   return (
@@ -711,7 +445,7 @@ export default function Checkout() {
                   </Label>
                 </div>
 
-                {/* Balance Option - Only show if user has balance */}
+                {/* Balance Option */}
                 {userBalance > 0 && (
                   <div 
                     className={`relative flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
@@ -771,9 +505,8 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Personal Info Card */}
+            {/* Personal Info Card - Simplified */}
             <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5 sm:p-6">
-              {/* Header with title and badges */}
               <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
                 <div className="flex items-center gap-3">
                   <h2 className="text-[15px] font-semibold text-white">Informações Pessoais</h2>
@@ -788,8 +521,8 @@ export default function Checkout() {
                 </div>
               </div>
 
-              {/* Row 1: Name + CPF */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+              {/* Name + CPF */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 {/* Name */}
                 <div>
                   <label className="block text-[13px] text-[#888] mb-2">
@@ -807,9 +540,7 @@ export default function Checkout() {
                     <ValidationIcon isValid={validation.name} show={touched.name || false} />
                   </div>
                   {touched.name && !validation.name && (
-                    <p className="text-red-400 text-[11px] mt-1.5 flex items-center gap-1">
-                      {validation.nameError || 'Nome inválido'}
-                    </p>
+                    <p className="text-red-400 text-[11px] mt-1.5">{validation.nameError || 'Nome inválido'}</p>
                   )}
                 </div>
                 
@@ -831,125 +562,12 @@ export default function Checkout() {
                     <ValidationIcon isValid={validation.document} show={touched.document || false} />
                   </div>
                   {touched.document && !validation.document && (
-                    <p className="text-red-400 text-[11px] mt-1.5 flex items-center gap-1">
-                      {validation.documentError || 'CPF inválido'}
-                    </p>
+                    <p className="text-red-400 text-[11px] mt-1.5">{validation.documentError || 'CPF inválido'}</p>
                   )}
                 </div>
               </div>
 
-              {/* Row 2: Birth Date + WhatsApp */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                {/* Birth Date */}
-                <div>
-                <label className="block text-[13px] text-[#888] mb-2">
-                    Data de nascimento
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={formData.birthDate}
-                      onChange={(e) => handleInputChange('birthDate', e.target.value)}
-                      onBlur={() => handleBlur('birthDate')}
-                      placeholder="DD/MM/AAAA"
-                      inputMode="numeric"
-                      autoComplete="bday"
-                      className={getInputClassName('birthDate', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]")}
-                    />
-                    <ValidationIcon 
-                      isValid={validation.birthDate} 
-                      show={formData.birthDate.replace(/\D/g, '').length === 8} 
-                    />
-                  </div>
-                  {formData.birthDate.replace(/\D/g, '').length === 8 && !validation.birthDate && (
-                    <p className="text-red-400 text-[11px] mt-1.5 flex items-center gap-1">
-                      {validation.birthDateError || 'Data inválida'}
-                    </p>
-                  )}
-                </div>
-                
-                {/* WhatsApp */}
-                <div>
-                  <label className="block text-[13px] text-[#888] mb-2">
-                    WhatsApp <span className="text-red-500">*</span>
-                  </label>
-                  <div className="flex relative">
-                    <div className="flex items-center justify-center px-3 h-12 bg-[#0a0a0a] border border-r-0 border-[#1a1a1a] rounded-l-lg text-[#555] text-[12px] whitespace-nowrap font-medium">
-                      BR +55
-                    </div>
-                    <div className="relative flex-1">
-                      <Input
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        onBlur={() => handleBlur('phone')}
-                        placeholder="(00) 00000-0000"
-                        inputMode="tel"
-                        autoComplete="tel"
-                        className={getInputClassName('phone', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-l-none rounded-r-lg text-[14px] w-full")}
-                      />
-                      <ValidationIcon isValid={validation.phone} show={touched.phone || false} />
-                    </div>
-                  </div>
-                  {touched.phone && !validation.phone && (
-                    <p className="text-red-400 text-[11px] mt-1.5 flex items-center gap-1">
-                      {validation.phoneError || 'Telefone inválido'}
-                    </p>
-                  )}
-                </div>
-              </div>
-
-              {/* Row 3: CEP */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
-                {/* CEP */}
-                <div>
-                  <label className="flex items-center gap-2 text-[13px] text-[#888] mb-2">
-                    CEP 
-                    <span className="text-[10px] px-1.5 py-0.5 bg-[#1a1a1a] text-[#666] rounded">Busca automática</span>
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={formData.cep}
-                      onChange={(e) => handleInputChange('cep', e.target.value)}
-                      placeholder="00000-000"
-                      inputMode="numeric"
-                      className="h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]"
-                    />
-                    {loadingCep && (
-                      <Loader2 className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 animate-spin text-[#555]" />
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Row 4: Estado + Cidade */}
-              <div className="grid grid-cols-2 gap-4">
-                {/* Estado */}
-                <div>
-                  <label className="block text-[13px] text-[#888] mb-2">
-                    Estado
-                  </label>
-                  <Input
-                    value={formData.estado}
-                    readOnly
-                    placeholder="—"
-                    className="h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#333] rounded-lg text-[14px] cursor-default"
-                  />
-                </div>
-                
-                {/* Cidade */}
-                <div>
-                  <label className="block text-[13px] text-[#888] mb-2">
-                    Cidade
-                  </label>
-                  <Input
-                    value={formData.cidade}
-                    readOnly
-                    placeholder="Preenchido pelo CEP"
-                    className="h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#333] rounded-lg text-[14px] cursor-default"
-                  />
-                </div>
-              </div>
-
-              {/* Mobile Submit Button - More prominent */}
+              {/* Mobile Submit Button */}
               <div className="lg:hidden mt-6">
                 <Button 
                   onClick={handleSubmit}

@@ -18,7 +18,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseHelper";
 import { useToast } from "@/hooks/use-toast";
 import { Plus, Pencil, Trash2, Star } from "lucide-react";
 import { useCategories } from "@/hooks/firebase";
