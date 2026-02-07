@@ -7,7 +7,7 @@
    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
  };
  
-const FIREBASE_PROJECT_ID = "valnix-a2755";
+const FIREBASE_PROJECT_ID = "valnix";
  
  async function verifyFirebaseToken(token: string): Promise<{ uid: string; email: string } | null> {
    try {
@@ -26,20 +26,20 @@ const FIREBASE_PROJECT_ID = "valnix-a2755";
    }
  }
  
- async function isUserAdmin(uid: string): Promise<boolean> {
-   try {
-     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
-     const response = await fetch(url);
-     
-     if (!response.ok) return false;
-     
-     const doc = await response.json();
-     const role = doc.fields?.role?.stringValue;
-     return role === 'admin';
-   } catch {
-     return false;
-   }
- }
+  async function isUserAdmin(uid: string): Promise<boolean> {
+    try {
+      const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
+      const response = await fetch(url);
+      
+      if (!response.ok) return false;
+      
+      const doc = await response.json();
+      const role = doc.fields?.role?.stringValue;
+      return role === 'admin';
+    } catch {
+      return false;
+    }
+  }
  
  Deno.serve(async (req) => {
    if (req.method === "OPTIONS") {

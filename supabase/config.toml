@@ -5,3 +5,9 @@ verify_jwt = false
 
 [functions.utmify-track]
 verify_jwt = false
+
+[functions.admin-analytics]
+verify_jwt = false
+
+[functions.set-admin-role]
+verify_jwt = false
