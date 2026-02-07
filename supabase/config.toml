@@ -2,3 +2,6 @@ project_id = "tiupdhnjdcmgbqifwkrd"
 
 [functions.flowpay-pix]
 verify_jwt = false
+
+[functions.utmify-track]
+verify_jwt = false
