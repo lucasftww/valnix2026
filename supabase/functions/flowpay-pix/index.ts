@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
-const FIREBASE_PROJECT_ID = 'valnix';
+const FIREBASE_PROJECT_ID = 'valnix-a2755';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
 const UTMIFY_API_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
@@ -203,7 +203,7 @@ async function trackUTMifyPurchase(orderId: string, value: number, customerEmail
         addToCartTextMatch: null,
       },
       event: {
-        sourceUrl: 'https://glowing-portal-joy.lovable.app/checkout',
+        sourceUrl: 'https://valnix2026.lovable.app/checkout',
         pageTitle: 'Checkout - Valnix',
         value,
         currency: 'BRL',
@@ -243,7 +243,7 @@ async function registerAnalyticsEvent(orderId: string, value: number, userId?: s
       value,
       currency: 'BRL',
       order_id: orderId,
-      page_url: 'https://glowing-portal-joy.lovable.app/checkout',
+      page_url: 'https://valnix2026.lovable.app/checkout',
       content_name: `Pedido #${orderId.substring(0, 8)}`,
     });
 
@@ -347,7 +347,8 @@ Deno.serve(async (req) => {
       const customerEmail = orderFields?.customer_email?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
 
-      // Update order status to paid
+      // Update order status to paid - determine status based on delivery type
+      // First mark as paid + processing, auto-delivery will update to completed if all items are auto-delivered
       await updateFirestoreDoc('orders', orderId!, {
         payment_status: 'paid',
         status: 'processing',

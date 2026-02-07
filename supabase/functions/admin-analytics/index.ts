@@ -7,7 +7,7 @@
    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
  };
  
- const FIREBASE_PROJECT_ID = "valnix-a2755";
+const FIREBASE_PROJECT_ID = "valnix-a2755";
  
  async function verifyFirebaseToken(token: string): Promise<{ uid: string; email: string } | null> {
    try {

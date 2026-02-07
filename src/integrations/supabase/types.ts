@@ -14,7 +14,60 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      analytics_events: {
+        Row: {
+          browser: string | null
+          city: string | null
+          content_category: string | null
+          content_name: string | null
+          created_at: string
+          currency: string | null
+          device_type: string | null
+          event_name: string
+          event_time: string
+          id: string
+          order_id: string | null
+          page_url: string | null
+          state: string | null
+          user_id: string | null
+          value: number | null
+        }
+        Insert: {
+          browser?: string | null
+          city?: string | null
+          content_category?: string | null
+          content_name?: string | null
+          created_at?: string
+          currency?: string | null
+          device_type?: string | null
+          event_name: string
+          event_time?: string
+          id?: string
+          order_id?: string | null
+          page_url?: string | null
+          state?: string | null
+          user_id?: string | null
+          value?: number | null
+        }
+        Update: {
+          browser?: string | null
+          city?: string | null
+          content_category?: string | null
+          content_name?: string | null
+          created_at?: string
+          currency?: string | null
+          device_type?: string | null
+          event_name?: string
+          event_time?: string
+          id?: string
+          order_id?: string | null
+          page_url?: string | null
+          state?: string | null
+          user_id?: string | null
+          value?: number | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

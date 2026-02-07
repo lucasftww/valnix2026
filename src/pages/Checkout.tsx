@@ -15,8 +15,9 @@ import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import pixLogo from "@/assets/pix-logo.png";
-import { trackPurchase } from "@/lib/utmify";
+import { trackPurchase, trackInitiateCheckout } from "@/lib/utmify";
 import { supabase } from "@/lib/supabaseHelper";
+import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 
 interface FormData {
   name: string;
@@ -179,6 +180,14 @@ export default function Checkout() {
     }
     
     setLoading(true);
+
+    // Track InitiateCheckout for UTMify + analytics funnel
+    try {
+      await trackInitiateCheckout(finalPrice);
+      trackInitiateCheckoutEvent(user.uid, finalPrice);
+    } catch (e) {
+      console.warn('⚠️ InitiateCheckout tracking failed:', e);
+    }
     
     try {
       const orderAmount = finalPrice;
@@ -257,21 +266,7 @@ export default function Checkout() {
         });
 
         await trackPurchase(orderId, orderAmount, user.email || undefined);
-
-        try {
-          await supabase.from('analytics_events').insert({
-            event_name: 'Purchase',
-            event_time: new Date().toISOString(),
-            user_id: user.uid,
-            value: orderAmount,
-            currency: 'BRL',
-            order_id: orderId,
-            page_url: window.location.href,
-            content_name: items.map(i => i.name).join(', '),
-          });
-        } catch (e) {
-          console.warn('⚠️ Analytics event failed:', e);
-        }
+        trackPurchaseEvent(user.uid, orderAmount, orderId, items.map(i => i.name).join(', '));
 
         clearCart();
         toast({

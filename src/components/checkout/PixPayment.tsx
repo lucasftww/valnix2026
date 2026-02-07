@@ -8,9 +8,9 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { trackPurchase } from "@/lib/utmify";
+import { trackPurchaseEvent } from "@/lib/analytics";
 import { db } from "@/integrations/firebase/config";
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
-import { supabase } from "@/lib/supabaseHelper";
 
 
 interface PixPaymentProps {
@@ -134,22 +134,8 @@ export function PixPayment({
       console.warn('⚠️ UTMify Purchase tracking failed:', error);
     }
 
-    // 4. Register Purchase in analytics_events (Supabase)
-    try {
-      await supabase.from('analytics_events').insert({
-        event_name: 'Purchase',
-        event_time: new Date().toISOString(),
-        user_id: customerId || null,
-        value: amount,
-        currency: 'BRL',
-        order_id: orderId,
-        page_url: window.location.href,
-        content_name: productNames?.join(', ') || `Pedido #${orderId.substring(0, 8)}`,
-      });
-      console.log('📊 Analytics Purchase event registered');
-    } catch (error) {
-      console.warn('⚠️ Analytics event failed:', error);
-    }
+    // 4. Register Purchase in analytics_events
+    trackPurchaseEvent(customerId, amount, orderId, productNames?.join(', '));
     
     onPaymentConfirmed?.();
     
