@@ -10,7 +10,7 @@ import { useIsMobile } from "@/hooks/use-mobile";
 import { trackPurchase } from "@/lib/utmify";
 import { db } from "@/integrations/firebase/config";
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseHelper";
 
 
 interface PixPaymentProps {
@@ -20,8 +20,6 @@ interface PixPaymentProps {
   orderId: string;
   customerEmail?: string;
   customerName?: string;
-  customerPhone?: string;
-  customerZipCode?: string;
   customerId?: string;
   productNames?: string[];
   productIds?: string[];
@@ -35,8 +33,6 @@ export function PixPayment({
   orderId, 
   customerEmail,
   customerName,
-  customerPhone,
-  customerZipCode,
   customerId,
   productNames,
   productIds,

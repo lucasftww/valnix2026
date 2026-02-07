@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { db } from '@/integrations/firebase/config';
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
 import { trackPurchase } from '@/lib/utmify';
-import { supabase } from '@/integrations/supabase/client';
+import { supabase } from '@/lib/supabaseHelper';
 import type { Order } from './useFirebaseOrders';
 
 /**

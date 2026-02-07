@@ -3,11 +3,11 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
-const FIREBASE_PROJECT_ID = 'valnix-a2755';
+const FIREBASE_PROJECT_ID = 'valnix';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
 const UTMIFY_API_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 

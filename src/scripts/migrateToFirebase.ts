@@ -1,6 +1,6 @@
 import { collection, doc, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseHelper";
 
 export interface MigrationResult {
   categories: number;
