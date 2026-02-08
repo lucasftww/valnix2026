@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { isTempEmail } from "@/lib/tempEmailDomains";
 import vLogo from "@/assets/v-logo-login.png";
 
 
@@ -60,12 +61,21 @@ export default function Auth() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isTempEmail(signupEmail)) {
+      toast({
+        title: "Email não permitido",
+        description: "Não aceitamos emails temporários ou descartáveis. Use um email real.",
+        variant: "destructive",
+      });
+      return;
+    }
+
     setLoading(true);
     
     const { error } = await signUp(signupEmail, signupPassword);
     
     if (!error) {
-      
       setSignupEmail("");
       setSignupPassword("");
     }
