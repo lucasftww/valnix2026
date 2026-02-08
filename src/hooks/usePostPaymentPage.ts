@@ -31,7 +31,7 @@ export function usePostPaymentPage(addonType: string) {
           .select('*')
           .eq('addon_type', addonType)
           .eq('is_active', true)
-          .single();
+          .maybeSingle();
 
         if (fetchError) throw fetchError;
 
