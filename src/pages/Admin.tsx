@@ -11,6 +11,7 @@ import { AdminCoupons } from "@/components/admin/AdminCoupons";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminSupport } from "@/components/admin/AdminSupport";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
+import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
 import { Loader2, Search, Bell, Settings, ChevronRight, Menu } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -46,6 +47,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   banners: { title: "Banners", description: "Banners da página inicial" },
   reviews: { title: "Avaliações", description: "Gerenciar avaliações de clientes" },
   support: { title: "Suporte", description: "Atenda clientes em tempo real" },
+  "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
 };
 
 export default function Admin() {
@@ -212,6 +214,7 @@ export default function Admin() {
               {activeTab === "banners" && <AdminBanners />}
               {activeTab === "reviews" && <AdminReviews />}
               {activeTab === "support" && <AdminSupport />}
+              {activeTab === "post-payment" && <AdminPostPaymentPages />}
             </div>
           </main>
 
