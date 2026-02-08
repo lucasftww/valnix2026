@@ -48,6 +48,13 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }
   }, [orderId, navigate]);
 
+  // If no config after loading, redirect home
+  useEffect(() => {
+    if (!configLoading && !config) {
+      navigate("/");
+    }
+  }, [configLoading, config, navigate]);
+
   // Timer for PIX
   useEffect(() => {
     if (!pixData || paymentConfirmed) return;
@@ -168,7 +175,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   }
 
   if (!config) {
-    navigate("/");
     return null;
   }
 
