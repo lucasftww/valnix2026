@@ -152,7 +152,16 @@ const ProductDetail = () => {
       <Helmet>
         <title>{`Comprar ${product.name} Barato | VALNIX`}</title>
         <meta name="description" content={`Compre ${product.name} com entrega automática via PIX. Melhor preço: R$ ${product.price.toFixed(2).replace('.', ',')}. Entrega instantânea e segura na VALNIX.`} />
-        <link rel="canonical" href={`https://valnixbr.com/product/${product.id}`} />
+        <link rel="canonical" href={`https://www.valnix.com.br/product/${product.id}`} />
+        <meta property="og:title" content={`Comprar ${product.name} | VALNIX`} />
+        <meta property="og:description" content={`${product.name} por R$ ${product.price.toFixed(2).replace('.', ',')} com entrega automática via PIX.`} />
+        <meta property="og:url" content={`https://www.valnix.com.br/product/${product.id}`} />
+        <meta property="og:type" content="product" />
+        {product.image_url && <meta property="og:image" content={product.image_url} />}
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`Comprar ${product.name} | VALNIX`} />
+        <meta name="twitter:description" content={`${product.name} por R$ ${product.price.toFixed(2).replace('.', ',')} com entrega automática via PIX.`} />
+        {product.image_url && <meta name="twitter:image" content={product.image_url} />}
         <script type="application/ld+json">{JSON.stringify({
           "@context": "https://schema.org",
           "@type": "Product",
@@ -166,7 +175,7 @@ const ProductDetail = () => {
             "priceCurrency": "BRL",
             "availability": "https://schema.org/InStock",
             "seller": { "@type": "Organization", "name": "VALNIX" },
-            "url": `https://valnixbr.com/product/${product.id}`
+            "url": `https://www.valnix.com.br/product/${product.id}`
           },
           "aggregateRating": {
             "@type": "AggregateRating",

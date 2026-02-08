@@ -72,10 +72,17 @@ export default function Category() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Helmet>
-        <link rel="canonical" href={`https://valnixbr.com/${category.slug}`} />
+        <link rel="canonical" href={`https://www.valnix.com.br/${category.slug}`} />
         <title>Comprar {category.name} Barato | Gift Card {category.name} | VALNIX</title>
         <meta name="description" content={`Compre ${category.name} com entrega automática e pagamento via PIX. Gift cards ${category.name} com os melhores preços do Brasil. Entrega instantânea e segura na VALNIX.`} />
         <meta name="keywords" content={`${category.name.toLowerCase()}, comprar ${category.name.toLowerCase()}, gift card ${category.name.toLowerCase()}, ${category.name.toLowerCase()} barato, ${category.name.toLowerCase()} pix`} />
+        <meta property="og:title" content={`Comprar ${category.name} Barato | VALNIX`} />
+        <meta property="og:description" content={`Compre ${category.name} com entrega automática e pagamento via PIX. Melhores preços do Brasil.`} />
+        <meta property="og:url" content={`https://www.valnix.com.br/${category.slug}`} />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content={`Comprar ${category.name} Barato | VALNIX`} />
+        <meta name="twitter:description" content={`Compre ${category.name} com entrega automática e pagamento via PIX. Melhores preços do Brasil.`} />
       </Helmet>
       <Header />
       <Navigation />

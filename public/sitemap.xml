@@ -6,27 +6,42 @@
     <priority>1.0</priority>
   </url>
   <url>
-    <loc>https://valnix.com.br/valorant</loc>
+    <loc>https://www.valnix.com.br/valorant</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://valnix.com.br/league-of-legends</loc>
+    <loc>https://www.valnix.com.br/league-of-legends</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://valnix.com.br/roblox</loc>
+    <loc>https://www.valnix.com.br/roblox</loc>
     <changefreq>daily</changefreq>
     <priority>0.9</priority>
   </url>
   <url>
-    <loc>https://valnix.com.br/about</loc>
+    <loc>https://www.valnix.com.br/fortnite</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.valnix.com.br/free-fire</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.valnix.com.br/brawl-stars</loc>
+    <changefreq>daily</changefreq>
+    <priority>0.8</priority>
+  </url>
+  <url>
+    <loc>https://www.valnix.com.br/about</loc>
     <changefreq>monthly</changefreq>
     <priority>0.5</priority>
   </url>
   <url>
-    <loc>https://valnix.com.br/terms</loc>
+    <loc>https://www.valnix.com.br/terms</loc>
     <changefreq>monthly</changefreq>
     <priority>0.3</priority>
   </url>
