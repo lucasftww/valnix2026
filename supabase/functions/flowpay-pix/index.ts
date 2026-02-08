@@ -417,7 +417,7 @@ Deno.serve(async (req) => {
         },
         body: JSON.stringify({
           value: amount,
-          description: description || `Pedido #${orderId}`,
+          description: description || `Pedido ${orderId}`,
           expiresIn: 900,
           customer: customer || undefined,
         }),
