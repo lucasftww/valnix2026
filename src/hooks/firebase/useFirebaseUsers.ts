@@ -29,15 +29,13 @@ export const useAdminUsers = () => {
   return useQuery({
     queryKey: ["firebase-admin-users"],
     queryFn: async () => {
-      // Fetch all profiles
-      const profilesRef = collection(db, "profiles");
-      const profilesQuery = query(profilesRef, orderBy("created_at", "desc"));
-      const profilesSnapshot = await getDocs(profilesQuery);
+      // Fetch from both collections to catch all users
+      const [profilesSnapshot, usersSnapshot, ordersSnapshot] = await Promise.all([
+        getDocs(query(collection(db, "profiles"), orderBy("created_at", "desc"))),
+        getDocs(collection(db, "users")),
+        getDocs(collection(db, "orders")),
+      ]);
 
-      // Fetch all orders to calculate stats
-      const ordersRef = collection(db, "orders");
-      const ordersSnapshot = await getDocs(ordersRef);
-      
       // Create a map of user orders
       const userOrdersMap = new Map<string, { 
         total_orders: number; 
@@ -45,8 +43,8 @@ export const useAdminUsers = () => {
         last_order_date?: string;
       }>();
 
-      ordersSnapshot.forEach((doc) => {
-        const order = doc.data();
+      ordersSnapshot.forEach((d) => {
+        const order = d.data();
         const userId = order.user_id;
         
         if (userId && order.payment_status === "paid") {
@@ -68,17 +66,15 @@ export const useAdminUsers = () => {
         }
       });
 
-      // Map profiles to users with stats
-      const users: FirebaseUser[] = profilesSnapshot.docs.map((doc) => {
-        const profile = doc.data();
-        const userId = doc.id;
-        const orderStats = userOrdersMap.get(userId) || { 
-          total_orders: 0, 
-          total_spent: 0,
-          last_order_date: undefined
-        };
+      // Build user map from profiles first
+      const userMap = new Map<string, FirebaseUser>();
 
-        return {
+      profilesSnapshot.docs.forEach((d) => {
+        const profile = d.data();
+        const userId = d.id;
+        const orderStats = userOrdersMap.get(userId) || { total_orders: 0, total_spent: 0 };
+
+        userMap.set(userId, {
           id: userId,
           email: profile.email || "",
           created_at: profile.created_at || new Date().toISOString(),
@@ -90,8 +86,35 @@ export const useAdminUsers = () => {
           total_orders: orderStats.total_orders,
           total_spent: orderStats.total_spent,
           balance: profile.balance || 0,
-        };
+        });
       });
+
+      // Add users from "users" collection that don't have a profile yet
+      usersSnapshot.docs.forEach((d) => {
+        const userId = d.id;
+        if (!userMap.has(userId)) {
+          const userData = d.data();
+          const orderStats = userOrdersMap.get(userId) || { total_orders: 0, total_spent: 0 };
+
+          userMap.set(userId, {
+            id: userId,
+            email: userData.email || "",
+            created_at: userData.created_at || new Date().toISOString(),
+            phone: undefined,
+            full_name: undefined,
+            nickname: undefined,
+            avatar_url: undefined,
+            last_order_date: orderStats.last_order_date,
+            total_orders: orderStats.total_orders,
+            total_spent: orderStats.total_spent,
+            balance: 0,
+          });
+        }
+      });
+
+      // Sort by created_at descending
+      const users = Array.from(userMap.values());
+      users.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
 
       return users;
     },
