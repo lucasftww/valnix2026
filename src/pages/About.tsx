@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet-async";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { FloatingContactButtons } from "@/components/FloatingContactButtons";
@@ -7,6 +8,16 @@ import { FAQ } from "@/components/FAQ";
 export default function About() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>Sobre a VALNIX | Loja de Gift Cards e Moedas Virtuais</title>
+        <meta name="description" content="Conheça a VALNIX: loja especializada em gift cards e moedas virtuais para Valorant, Roblox, League of Legends e mais. Entrega automática via PIX." />
+        <link rel="canonical" href="https://www.valnix.com.br/about" />
+        <meta property="og:title" content="Sobre a VALNIX | Loja Gamer Segura" />
+        <meta property="og:description" content="Conheça a VALNIX: loja especializada em gift cards e moedas virtuais com entrega automática." />
+        <meta property="og:url" content="https://www.valnix.com.br/about" />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Sobre a VALNIX | Loja Gamer Segura" />
+      </Helmet>
       <Header />
       
       <main className="flex-1">

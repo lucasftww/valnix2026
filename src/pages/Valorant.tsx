@@ -15,10 +15,17 @@ export default function Valorant() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
       <Helmet>
-        <link rel="canonical" href="https://valnixbr.com/valorant" />
+        <link rel="canonical" href="https://www.valnix.com.br/valorant" />
         <title>Comprar Valorant Points VP Barato | Gift Card Valorant | VALNIX</title>
         <meta name="description" content="Compre Valorant Points (VP) com entrega automática e pagamento via PIX. Gift cards Valorant com os melhores preços do Brasil. Entrega instantânea e segura." />
         <meta name="keywords" content="valorant points, comprar vp, valorant points barato, gift card valorant, comprar valorant points pix, vp valorant" />
+        <meta property="og:title" content="Comprar Valorant Points VP Barato | VALNIX" />
+        <meta property="og:description" content="Compre Valorant Points (VP) com entrega automática e pagamento via PIX. Melhores preços do Brasil." />
+        <meta property="og:url" content="https://www.valnix.com.br/valorant" />
+        <meta property="og:type" content="website" />
+        <meta name="twitter:card" content="summary_large_image" />
+        <meta name="twitter:title" content="Comprar Valorant Points VP Barato | VALNIX" />
+        <meta name="twitter:description" content="Compre Valorant Points (VP) com entrega automática e pagamento via PIX. Melhores preços do Brasil." />
       </Helmet>
       <Header />
       <Navigation />

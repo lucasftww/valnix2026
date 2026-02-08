@@ -1,3 +1,4 @@
+import { Helmet } from "react-helmet-async";
 import { Footer } from "@/components/Footer";
 import { Header } from "@/components/Header";
 import { FloatingContactButtons } from "@/components/FloatingContactButtons";
@@ -7,6 +8,12 @@ import { FAQ } from "@/components/FAQ";
 export default function Terms() {
   return (
     <div className="min-h-screen flex flex-col bg-background">
+      <Helmet>
+        <title>Termos e Condições | VALNIX</title>
+        <meta name="description" content="Leia os termos e condições de uso da VALNIX. Informações sobre compras, entregas, reembolsos e responsabilidades." />
+        <link rel="canonical" href="https://www.valnix.com.br/terms" />
+        <meta name="robots" content="noindex, follow" />
+      </Helmet>
       <Header />
       
       <main className="flex-1">
