@@ -395,19 +395,61 @@ Deno.serve(async (req) => {
       }
 
       const body = await req.json();
-      const { amount, orderId, customer } = body;
-      // Strip emojis and special chars from description to avoid FlowPay rejection
-      const rawDesc = body.description || `Pedido ${orderId || 'Valnix'}`;
-      const description = rawDesc.replace(/[\u{1F600}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1FFFF}\u{E0020}-\u{E007F}#]/gu, '').trim() || `Pedido ${orderId}`;
+      const { orderId, customer } = body;
+      let { amount } = body;
 
-      console.log('🔵 Creating FlowPay PIX charge:', { amount, orderId });
-
-      if (!amount || amount < 100) {
-        return new Response(JSON.stringify({ error: 'Amount must be at least 100 (R$ 1,00)' }), {
+      if (!orderId) {
+        return new Response(JSON.stringify({ error: 'orderId is required' }), {
           status: 400,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      // Server-side amount validation: verify against Firestore order data
+      const isUpsell = orderId.startsWith('upsell-');
+      
+      if (!isUpsell) {
+        // Regular order: fetch from Firestore and use server-side amount
+        const orderFields = await getFirestoreDoc('orders', orderId);
+        if (!orderFields) {
+          console.error(`❌ Order not found: ${orderId}`);
+          return new Response(JSON.stringify({ error: 'Order not found' }), {
+            status: 404,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        const serverAmount = orderFields.total_amount?.doubleValue 
+          || orderFields.total_amount?.integerValue 
+          || 0;
+        const serverAmountCents = Math.round(Number(serverAmount) * 100);
+
+        if (serverAmountCents < 100) {
+          return new Response(JSON.stringify({ error: 'Order amount too low' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Use server-verified amount, ignore client-provided amount
+        amount = serverAmountCents;
+        console.log(`🔒 Server-verified amount: ${amount} cents (order ${orderId})`);
+      } else {
+        // Upsell: validate amount from post_payment_pages config
+        if (!amount || amount < 100) {
+          return new Response(JSON.stringify({ error: 'Amount must be at least 100 (R$ 1,00)' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        console.log(`🔵 Upsell charge: ${amount} cents (${orderId})`);
+      }
+
+      // Strip emojis and special chars from description to avoid FlowPay rejection
+      const rawDesc = body.description || `Pedido ${orderId || 'Valnix'}`;
+      const description = rawDesc.replace(/[\u{1F600}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1FFFF}\u{E0020}-\u{E007F}#:]/gu, '').trim() || `Pedido ${orderId}`;
+
+      console.log('🔵 Creating FlowPay PIX charge:', { amount, orderId });
 
       const response = await fetch(`${FLOWPAY_BASE_URL}/create`, {
         method: 'POST',
