@@ -1,6 +1,6 @@
 /**
  * Analytics tracking utilities
- * Records events in Supabase analytics_events for the admin funnel dashboard
+ * Records events via edge function (service_role) for the admin funnel dashboard
  */
 import { supabase } from "@/lib/supabaseHelper";
 
@@ -31,18 +31,19 @@ export async function trackAnalyticsEvent(
   } = {}
 ) {
   try {
-    await supabase.from('analytics_events').insert({
-      event_name: eventName,
-      event_time: new Date().toISOString(),
-      user_id: data.userId || null,
-      page_url: window.location.href,
-      device_type: getDeviceType(),
-      browser: getBrowser(),
-      value: data.value || null,
-      currency: data.value ? 'BRL' : null,
-      order_id: data.orderId || null,
-      content_name: data.contentName || null,
-      content_category: data.contentCategory || null,
+    await supabase.functions.invoke('track-analytics', {
+      body: {
+        event_name: eventName,
+        user_id: data.userId || null,
+        page_url: window.location.href,
+        device_type: getDeviceType(),
+        browser: getBrowser(),
+        value: data.value || null,
+        currency: data.value ? 'BRL' : null,
+        order_id: data.orderId || null,
+        content_name: data.contentName || null,
+        content_category: data.contentCategory || null,
+      },
     });
   } catch (e) {
     console.warn('⚠️ Analytics event failed:', e);

@@ -11,3 +11,6 @@ verify_jwt = false
 
 [functions.set-admin-role]
 verify_jwt = false
+
+[functions.track-analytics]
+verify_jwt = false

@@ -124,19 +124,5 @@ async function confirmPayment(order: Order) {
     console.warn('⚠️ UTMify tracking failed:', error);
   }
 
-  // 4. Analytics
-  try {
-    await supabase.from('analytics_events').insert({
-      event_name: 'Purchase',
-      event_time: new Date().toISOString(),
-      user_id: order.user_id || null,
-      value: order.total_amount,
-      currency: 'BRL',
-      order_id: order.id,
-      page_url: window.location.href,
-      content_name: `Pedido #${order.id.substring(0, 8)}`,
-    });
-  } catch (error) {
-    console.warn('⚠️ Analytics event failed:', error);
-  }
+  // 4. Analytics (handled server-side by webhook, skip duplicate client-side tracking)
 }
