@@ -315,7 +315,7 @@ export default function Checkout() {
           body: JSON.stringify({
             amount: amountInCents,
             orderId,
-            description: `Pedido #${orderId.substring(0, 8)}`,
+            description: `Pedido ${orderId.substring(0, 8)}`,
             customer: {
               name: formData.name,
               email: user.email || undefined,
