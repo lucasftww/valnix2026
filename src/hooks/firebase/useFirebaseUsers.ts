@@ -30,11 +30,21 @@ export const useAdminUsers = () => {
     queryKey: ["firebase-admin-users"],
     queryFn: async () => {
       // Fetch from both collections to catch all users
-      const [profilesSnapshot, usersSnapshot, ordersSnapshot] = await Promise.all([
+      // Use Promise.allSettled to avoid crash if one collection has permission issues
+      const [profilesResult, usersResult, ordersResult] = await Promise.allSettled([
         getDocs(query(collection(db, "profiles"), orderBy("created_at", "desc"))),
         getDocs(collection(db, "users")),
         getDocs(collection(db, "orders")),
       ]);
+
+      const profilesSnapshot = profilesResult.status === "fulfilled" ? profilesResult.value : null;
+      const usersSnapshot = usersResult.status === "fulfilled" ? usersResult.value : null;
+      const ordersSnapshot = ordersResult.status === "fulfilled" ? ordersResult.value : null;
+
+      if (!profilesSnapshot && !usersSnapshot) {
+        console.warn("Could not fetch users from any collection");
+        return [];
+      }
 
       // Create a map of user orders
       const userOrdersMap = new Map<string, { 
@@ -43,7 +53,7 @@ export const useAdminUsers = () => {
         last_order_date?: string;
       }>();
 
-      ordersSnapshot.forEach((d) => {
+      ordersSnapshot?.forEach((d) => {
         const order = d.data();
         const userId = order.user_id;
         
@@ -69,7 +79,7 @@ export const useAdminUsers = () => {
       // Build user map from profiles first
       const userMap = new Map<string, FirebaseUser>();
 
-      profilesSnapshot.docs.forEach((d) => {
+      profilesSnapshot?.docs.forEach((d) => {
         const profile = d.data();
         const userId = d.id;
         const orderStats = userOrdersMap.get(userId) || { total_orders: 0, total_spent: 0 };
@@ -90,7 +100,7 @@ export const useAdminUsers = () => {
       });
 
       // Add users from "users" collection that don't have a profile yet
-      usersSnapshot.docs.forEach((d) => {
+      usersSnapshot?.docs.forEach((d) => {
         const userId = d.id;
         if (!userMap.has(userId)) {
           const userData = d.data();

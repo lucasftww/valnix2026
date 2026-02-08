@@ -388,7 +388,7 @@ export const AdminUsers = () => {
           </div>
           <div>
             <p className="text-lg font-bold">
-              {((stats.withOrders / stats.total) * 100).toFixed(0)}%
+              {stats.total > 0 ? ((stats.withOrders / stats.total) * 100).toFixed(0) : 0}%
             </p>
             <p className="text-xs text-muted-foreground">Taxa de Conversão</p>
           </div>
