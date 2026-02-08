@@ -60,6 +60,13 @@ type SortField = "email" | "total_orders" | "total_spent" | "created_at" | "last
 type SortOrder = "asc" | "desc";
 type FilterType = "all" | "with_orders" | "without_orders" | "vip";
 
+// Safe date parser to prevent "Invalid time value" crashes
+const safeDate = (dateStr: string | undefined | null): Date => {
+  if (!dateStr) return new Date(0);
+  const d = new Date(dateStr);
+  return isNaN(d.getTime()) ? new Date(0) : d;
+};
+
 export const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [sortField, setSortField] = useState<SortField>("created_at");
@@ -191,11 +198,11 @@ export const AdminUsers = () => {
           comparison = a.total_spent - b.total_spent;
           break;
         case "created_at":
-          comparison = new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+          comparison = safeDate(a.created_at).getTime() - safeDate(b.created_at).getTime();
           break;
         case "last_order_date":
-          const dateA = a.last_order_date ? new Date(a.last_order_date).getTime() : 0;
-          const dateB = b.last_order_date ? new Date(b.last_order_date).getTime() : 0;
+          const dateA = a.last_order_date ? safeDate(a.last_order_date).getTime() : 0;
+          const dateB = b.last_order_date ? safeDate(b.last_order_date).getTime() : 0;
           comparison = dateA - dateB;
           break;
       }
@@ -258,7 +265,7 @@ export const AdminUsers = () => {
       ? users.reduce((sum, u) => sum + u.total_spent, 0) / users.filter(u => u.total_orders > 0).reduce((sum, u) => sum + u.total_orders, 0)
       : 0,
     newThisMonth: users.filter(u => {
-      const userDate = new Date(u.created_at);
+      const userDate = safeDate(u.created_at);
       const now = new Date();
       return userDate.getMonth() === now.getMonth() && userDate.getFullYear() === now.getFullYear();
     }).length,
@@ -571,7 +578,7 @@ export const AdminUsers = () => {
                         <TableCell className="hidden lg:table-cell">
                           {user.last_order_date ? (
                             <div className="text-sm text-muted-foreground">
-                              {formatDistanceToNow(new Date(user.last_order_date), { 
+                              {formatDistanceToNow(safeDate(user.last_order_date), { 
                                 addSuffix: true, 
                                 locale: ptBR 
                               })}
@@ -701,7 +708,7 @@ export const AdminUsers = () => {
                   )}
                   <div className="flex items-center gap-2 text-muted-foreground">
                     <Calendar className="h-4 w-4" />
-                    <span>Cadastrado em {format(new Date(selectedUser.created_at), "dd/MM/yyyy 'às' HH:mm")}</span>
+                    <span>Cadastrado em {format(safeDate(selectedUser.created_at), "dd/MM/yyyy 'às' HH:mm")}</span>
                   </div>
                 </div>
               </div>
@@ -723,7 +730,7 @@ export const AdminUsers = () => {
                           <div>
                             <p className="text-sm font-medium">#{order.id.slice(0, 8)}</p>
                             <p className="text-xs text-muted-foreground">
-                              {format(new Date(order.created_at), "dd/MM/yyyy")}
+                              {format(safeDate(order.created_at), "dd/MM/yyyy")}
                             </p>
                           </div>
                           <div className="text-right">
