@@ -395,7 +395,10 @@ Deno.serve(async (req) => {
       }
 
       const body = await req.json();
-      const { amount, orderId, description, customer } = body;
+      const { amount, orderId, customer } = body;
+      // Strip emojis and special chars from description to avoid FlowPay rejection
+      const rawDesc = body.description || `Pedido ${orderId || 'Valnix'}`;
+      const description = rawDesc.replace(/[\u{1F600}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1FFFF}\u{E0020}-\u{E007F}#]/gu, '').trim() || `Pedido ${orderId}`;
 
       console.log('🔵 Creating FlowPay PIX charge:', { amount, orderId });
 
