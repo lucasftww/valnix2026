@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy, where, doc, getDoc, updateDoc, deleteDoc } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, where, doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 
 export interface FirebaseUser {
@@ -146,12 +146,12 @@ export const useIsUserAdmin = (userId: string | null) => {
   });
 };
 
-// Update user balance
+// Update user balance - uses setDoc with merge to create doc if it doesn't exist
 export const updateUserBalance = async (userId: string, newBalance: number): Promise<void> => {
   const profileRef = doc(db, "profiles", userId);
-  await updateDoc(profileRef, {
+  await setDoc(profileRef, {
     balance: newBalance
-  });
+  }, { merge: true });
 };
 
 // Delete user from Firestore (profiles and user_roles collections)
