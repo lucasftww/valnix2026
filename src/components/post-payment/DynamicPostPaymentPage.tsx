@@ -127,7 +127,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           body: JSON.stringify({
             amount: amountInCents,
             orderId: `upsell-${orderId}-${addonType}`,
-            description: `Upsell: ${config.title}`,
+            description: `Upsell ${config.title}`,
             customer: { name: user?.displayName || "Cliente", email: user?.email || undefined },
           }),
         }
