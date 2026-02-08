@@ -39,13 +39,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           if (userDoc.exists()) {
             setIsAdmin(userDoc.data()?.role === "admin");
           } else {
-            // Create user profile if it doesn't exist
+            // Create user doc for role management
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
               role: "user",
               created_at: new Date().toISOString(),
             });
             setIsAdmin(false);
+          }
+          // Ensure profiles doc exists (for balance, phone, etc.)
+          const profileDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
+          if (!profileDoc.exists()) {
+            await setDoc(doc(db, "profiles", firebaseUser.uid), {
+              email: firebaseUser.email,
+              full_name: firebaseUser.displayName || null,
+              balance: 0,
+              created_at: new Date().toISOString(),
+            });
           }
         } catch (error) {
           console.error("Error checking admin status:", error);
