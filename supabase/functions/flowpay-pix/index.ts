@@ -269,20 +269,29 @@ Deno.serve(async (req) => {
       console.log('🔔 FlowPay webhook received');
       console.log('🔔 Headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
 
-      // Validate webhook secret if configured - check multiple possible header names
+      // Validate webhook secret - STRICT enforcement
       const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
-      if (webhookSecret) {
-        const receivedSecret = req.headers.get('x-webhook-secret') 
-          || req.headers.get('x-secret')
-          || req.headers.get('authorization')?.replace('Bearer ', '')
-          || req.headers.get('x-api-key');
-        
-        if (receivedSecret !== webhookSecret) {
-          console.error('❌ Invalid webhook secret. Received:', receivedSecret?.substring(0, 10) + '...');
-          // Log but don't block - some providers don't send secret consistently
-          console.warn('⚠️ Proceeding despite secret mismatch for reliability');
-        }
+      if (!webhookSecret) {
+        console.error('❌ FLOWPAY_WEBHOOK_SECRET not configured - rejecting webhook for security');
+        return new Response(
+          JSON.stringify({ error: 'Webhook authentication not configured' }),
+          { status: 500, headers: { 'Content-Type': 'application/json' } }
+        );
       }
+
+      const receivedSecret = req.headers.get('x-webhook-secret') 
+        || req.headers.get('x-secret')
+        || req.headers.get('authorization')?.replace('Bearer ', '')
+        || req.headers.get('x-api-key');
+      
+      if (receivedSecret !== webhookSecret) {
+        console.error('❌ Invalid webhook secret - rejecting request');
+        return new Response(
+          JSON.stringify({ error: 'Invalid webhook authentication' }),
+          { status: 401, headers: { 'Content-Type': 'application/json' } }
+        );
+      }
+      console.log('✅ Webhook secret validated');
 
       const body = await req.json();
       console.log('🔔 Webhook payload:', JSON.stringify(body));
