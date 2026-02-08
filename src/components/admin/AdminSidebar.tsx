@@ -44,6 +44,7 @@ const catalogMenuItems = [
 const systemMenuItems = [
   { id: "users", title: "Usuários", icon: Users, badge: null },
   { id: "coupons", title: "Cupons", icon: Tag, badge: null },
+  { id: "post-payment", title: "Pós-Venda", icon: TrendingUp, badge: "new" },
   { id: "support", title: "Suporte", icon: MessageCircle, badge: "hot" },
 ];
 

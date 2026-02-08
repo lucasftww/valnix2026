@@ -145,7 +145,7 @@ export function PixPayment({
     });
     
     setTimeout(() => {
-      navigate('/my-orders');
+      navigate(`/painel-pagar?order_id=${orderId}`);
     }, 3000);
   };
 

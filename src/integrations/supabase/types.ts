@@ -68,6 +68,123 @@ export type Database = {
         }
         Relationships: []
       }
+      post_payment_pages: {
+        Row: {
+          addon_type: string
+          badge_color: string | null
+          badge_text: string | null
+          benefits: Json | null
+          button_accept_text: string | null
+          button_skip_text: string | null
+          created_at: string
+          display_order: number
+          id: string
+          is_active: boolean
+          next_route: string
+          original_price: number | null
+          price: number
+          subtitle: string | null
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          addon_type: string
+          badge_color?: string | null
+          badge_text?: string | null
+          benefits?: Json | null
+          button_accept_text?: string | null
+          button_skip_text?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          next_route: string
+          original_price?: number | null
+          price?: number
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Update: {
+          addon_type?: string
+          badge_color?: string | null
+          badge_text?: string | null
+          benefits?: Json | null
+          button_accept_text?: string | null
+          button_skip_text?: string | null
+          created_at?: string
+          display_order?: number
+          id?: string
+          is_active?: boolean
+          next_route?: string
+          original_price?: number | null
+          price?: number
+          subtitle?: string | null
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      sale_addons: {
+        Row: {
+          addon_type: string
+          amount: number
+          created_at: string
+          customer_email: string | null
+          customer_name: string | null
+          flowpay_charge_id: string | null
+          id: string
+          order_id: string
+          paid_at: string | null
+          pix_code: string | null
+          pix_qr_code: string | null
+          status: string
+          updated_at: string
+          user_id: string | null
+          utm_campaign: string | null
+          utm_medium: string | null
+          utm_source: string | null
+        }
+        Insert: {
+          addon_type: string
+          amount?: number
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          flowpay_charge_id?: string | null
+          id?: string
+          order_id: string
+          paid_at?: string | null
+          pix_code?: string | null
+          pix_qr_code?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Update: {
+          addon_type?: string
+          amount?: number
+          created_at?: string
+          customer_email?: string | null
+          customer_name?: string | null
+          flowpay_charge_id?: string | null
+          id?: string
+          order_id?: string
+          paid_at?: string | null
+          pix_code?: string | null
+          pix_qr_code?: string | null
+          status?: string
+          updated_at?: string
+          user_id?: string | null
+          utm_campaign?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

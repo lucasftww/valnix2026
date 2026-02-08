@@ -273,7 +273,7 @@ export default function Checkout() {
           title: "Pagamento confirmado!",
           description: `Pedido #${orderId.substring(0, 8)} pago com saldo. R$ ${orderAmount.toFixed(2)} debitados.`,
         });
-        navigate("/my-orders");
+        navigate(`/painel-pagar?order_id=${orderId}`);
         return;
       }
 
