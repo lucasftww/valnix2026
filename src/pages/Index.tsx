@@ -30,7 +30,7 @@ const IndexComponent = () => {
       <Helmet>
         <title>Comprar Valorant Points VP, Robux e RP | VALNIX</title>
         <meta name="description" content="Compre Valorant Points (VP), Robux e Riot Points (RP) com entrega automática e pagamento via PIX. Loja gamer segura com os melhores preços do Brasil." />
-        <link rel="canonical" href="https://valnixbr.com/" />
+        <link rel="canonical" href="https://www.valnix.com.br/" />
       </Helmet>
       <Header />
       <Navigation />
