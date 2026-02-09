@@ -26,10 +26,10 @@ export function CrispChat() {
     const style = document.createElement("style");
     style.id = "crisp-hide-styles";
     style.textContent = `
-      .crisp-client .cc-1brb6,
-      .crisp-client .cc-tlyw,
-      .crisp-client .cc-kxkl,
-      .crisp-client .cc-1brb6 .cc-unoo {
+      .crisp-client,
+      .crisp-client *,
+      #crisp-chatbox,
+      [data-crisp-widget] {
         display: none !important;
         visibility: hidden !important;
         opacity: 0 !important;
