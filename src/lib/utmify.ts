@@ -8,8 +8,10 @@
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
 
-/** Set of already-fired event IDs to prevent duplicates */
+/** Set of successfully-fired event IDs to prevent duplicates */
 const firedEvents = new Set<string>();
+/** Events currently in-flight to prevent concurrent sends */
+const pendingEvents = new Set<string>();
 
 interface UTMifyWindow extends Window {
   Utmify?: {
@@ -87,31 +89,59 @@ export const trackUTMifyEvent = async (
 ): Promise<boolean> => {
   const eventId = makeEventId(eventType, eventData.orderId);
 
-  // Dedupe: skip if already fired
+  // Dedupe: skip if already successfully fired
   if (firedEvents.has(eventId)) {
     console.log(`⏭️ UTMify ${eventType} already fired (${eventId}), skipping`);
     return true;
   }
-  firedEvents.add(eventId);
+  // Prevent concurrent sends of the same event
+  if (pendingEvents.has(eventId)) {
+    console.log(`⏳ UTMify ${eventType} already in-flight (${eventId}), skipping`);
+    return true;
+  }
+  pendingEvents.add(eventId);
+
+  // Strip customerEmail for privacy — not needed for UTMify tracking
+  const { customerEmail, ...safeData } = eventData;
 
   try {
     console.log(`🔄 Tracking UTMify event: ${eventType} (${eventId})`);
 
-    // Try SDK native tracking
+    // For Purchase (critical): always use proxy for guaranteed delivery
+    // SDK is fire-and-forget with no confirmation, so proxy is more reliable
+    if (eventType === "Purchase") {
+      const result = await sendEventViaProxy(eventType, safeData);
+      if (result) {
+        firedEvents.add(eventId);
+      }
+      pendingEvents.delete(eventId);
+      return result;
+    }
+
+    // For non-critical events: try SDK first, fallback to proxy
     const win = window as UTMifyWindow;
     if (win.Utmify?.track) {
       try {
-        win.Utmify.track(eventType, eventData);
+        win.Utmify.track(eventType, safeData);
         console.log(`✅ UTMify ${eventType} tracked via SDK`);
-        return true; // SDK succeeded — do NOT fallback
+        firedEvents.add(eventId);
+        pendingEvents.delete(eventId);
+        return true;
       } catch (sdkError) {
         console.warn("⚠️ SDK track failed, using proxy:", sdkError);
       }
     }
 
-    // Fallback: server-side proxy (only if SDK unavailable or failed)
-    return sendEventViaProxy(eventType, eventData);
+    // Fallback: server-side proxy
+    const result = await sendEventViaProxy(eventType, safeData);
+    if (result) {
+      firedEvents.add(eventId);
+    }
+    pendingEvents.delete(eventId);
+    return result;
   } catch (error) {
+    pendingEvents.delete(eventId);
+    // Don't mark as fired — allow retry on next call
     console.warn(`⚠️ UTMify ${eventType} tracking failed silently:`, error);
     return false;
   }
