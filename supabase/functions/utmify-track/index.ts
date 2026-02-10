@@ -61,7 +61,7 @@ serve(async (req) => {
   }
 
   cleanupRateLimit();
-  cleanupOldPendings(); // fire-and-forget
+  void cleanupOldPendings(); // detached, non-blocking
 
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || req.headers.get('cf-connecting-ip')
@@ -92,7 +92,7 @@ serve(async (req) => {
       // Check existing state
       const { data: existing, error: selectError } = await supabase
         .from('utmify_event_log')
-        .select('status, locked_at')
+        .select('status, locked_at, attempt_count')
         .eq('event_id', dedupeKey)
         .maybeSingle();
 
@@ -137,15 +137,17 @@ serve(async (req) => {
           console.warn('⚠️ Dedupe INSERT error:', insertError.message);
         }
       } else {
-        // Existing pending (lock expired) → acquire lock atomically
+        // Existing pending (lock expired or null) → acquire lock atomically
+        const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
         const { data: locked } = await supabase
           .from('utmify_event_log')
           .update({
             locked_at: new Date().toISOString(),
-            attempt_count: (existing as any).attempt_count ? (existing as any).attempt_count + 1 : 1,
+            attempt_count: (existing.attempt_count || 0) + 1,
           })
           .eq('event_id', dedupeKey)
           .eq('status', 'pending')
+          .or(`locked_at.is.null,locked_at.lt.${lockThreshold}`)
           .select('event_id')
           .maybeSingle();
 
