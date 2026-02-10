@@ -28,12 +28,9 @@ const Category = lazy(() => import("./pages/Category"));
 const Seized = lazy(() => import("./pages/Seized"));
 const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
-const SeedDatabase = lazy(() => import("./pages/SeedDatabase"));
-const MigrateDatabase = lazy(() => import("./pages/MigrateDatabase"));
 const PainelPagar = lazy(() => import("./pages/PainelPagar"));
 const PainelPagarEntrega = lazy(() => import("./pages/PainelPagarEntrega"));
 const PainelPagarTrocaDados = lazy(() => import("./pages/PainelPagarTrocaDados"));
-// SetAdmin page removed for security - admin roles should only be granted via Firebase Admin SDK
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -80,12 +77,9 @@ const App = () => {
                       <Route path="/terms" element={<Terms />} />
                       <Route path="/seized" element={<Seized />} />
                       <Route path="/valorant" element={<Valorant />} />
-                      <Route path="/seed-database" element={<SeedDatabase />} />
-                      <Route path="/migrate-database" element={<MigrateDatabase />} />
                       <Route path="/painel-pagar" element={<PainelPagar />} />
                       <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
                       <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
-                      {/* SetAdmin route removed for security - privilege escalation vulnerability */}
 
                       <Route path="/product/:id" element={<ProductDetail />} />
                       {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
