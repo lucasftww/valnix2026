@@ -1,5 +1,5 @@
 import { 
-  Package, ShoppingCart, FolderTree, Home, Image, 
+  Package, ShoppingCart, FolderTree, Home, 
   BarChart3, Tag, Users, ChevronLeft, ChevronRight, LogOut,
   Zap, MessageCircle, TrendingUp
 } from "lucide-react";
