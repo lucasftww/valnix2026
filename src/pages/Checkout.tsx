@@ -15,7 +15,7 @@ import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import pixLogo from "@/assets/pix-logo.png";
-import { trackPurchase } from "@/lib/utmify";
+// trackPurchase is a no-op; saldo Purchase is sent via utmify-track edge function directly
 import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 
@@ -261,7 +261,33 @@ export default function Checkout() {
           balance: increment(-orderAmount)
         });
 
-        await trackPurchase(orderId, orderAmount, user.email || undefined);
+        // UTMify Purchase → server-side via utmify-track proxy
+        try {
+          await fetch(
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/utmify-track`,
+            {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              },
+              body: JSON.stringify({
+                type: 'Purchase',
+                eventId: `Purchase_${orderId}`,
+                orderId,
+                value: orderAmount,
+                currency: 'BRL',
+                sourceUrl: window.location.href,
+                pageTitle: document.title,
+                userAgent: navigator.userAgent,
+                icCSSMatch: '.utmify-checkout',
+              }),
+            }
+          );
+          console.log(`📊 UTMify Purchase sent via utmify-track for saldo order ${orderId}`);
+        } catch (utmifyError) {
+          console.warn('⚠️ UTMify tracking failed (non-blocking):', utmifyError);
+        }
         trackPurchaseEvent(user.uid, orderAmount, orderId, items.map(i => i.name).join(', '));
 
         clearCart();

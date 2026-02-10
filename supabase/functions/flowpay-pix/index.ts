@@ -187,7 +187,7 @@ async function processAutoDelivery(orderId: string) {
 }
 
 // Track Purchase event on UTMify (server-side, with persistent dedupe)
-async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null) {
+async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null, clientUserAgent?: string | null) {
   const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -309,7 +309,7 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
       eventId: dedupeKey,
       lead: {
         pixelId: UTMIFY_PIXEL_ID,
-        userAgent: 'server',
+        userAgent: clientUserAgent || 'server',
         ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
         parameters: '',
         icTextMatch: null,
@@ -328,7 +328,7 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
       tikTokPageInfo: null,
     };
 
-    console.log(`📊 UTMify Purchase payload:`, JSON.stringify(payload));
+    console.log(`📊 UTMify Purchase | orderId=${orderId} | eventId=${dedupeKey} | value=${value} | ip=${clientIp || 'none'} | ua=${(clientUserAgent || 'server').substring(0, 50)}`);
 
     const response = await fetch(UTMIFY_EVENTS_URL, {
       method: 'POST',
@@ -338,19 +338,20 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
 
     const responseText = await response.text();
 
-    // 3. Update dedupe status
+    // 3. Update dedupe status + structured log
     if (response.ok) {
       await supa
         .from('utmify_event_log')
         .update({ status: 'sent', locked_at: null, updated_at: new Date().toISOString() })
         .eq('event_id', dedupeKey);
-      console.log(`📊 UTMify Purchase sent server-side for order ${orderId}`);
+      console.log(`📊 UTMify RESULT | orderId=${orderId} | eventId=${dedupeKey} | status=sent | httpStatus=${response.status}`);
     } else {
+      const errorMsg = `HTTP ${response.status}: ${responseText.slice(0, 200)}`;
       await supa
         .from('utmify_event_log')
-        .update({ locked_at: null, last_error: `HTTP ${response.status}: ${responseText.slice(0, 200)}` })
+        .update({ locked_at: null, last_error: errorMsg })
         .eq('event_id', dedupeKey);
-      console.warn(`⚠️ UTMify API returned ${response.status}: ${responseText.slice(0, 100)}`);
+      console.warn(`📊 UTMify RESULT | orderId=${orderId} | eventId=${dedupeKey} | status=failed | httpStatus=${response.status} | error=${responseText.slice(0, 100)}`);
     }
   } catch (error) {
     console.warn('⚠️ UTMify server-side tracking failed:', error);
@@ -396,12 +397,13 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'webhook') {
       console.log('🔔 FlowPay webhook received');
       
-      // Capture client IP from webhook request for UTMify match quality
+      // Capture client IP and User-Agent from webhook request for UTMify match quality
       const webhookClientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
         || req.headers.get('cf-connecting-ip')
         || req.headers.get('x-real-ip')
         || null;
-      console.log('🔔 Headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
+      const webhookUserAgent = req.headers.get('user-agent') || null;
+      console.log('🔔 Webhook IP:', webhookClientIp, '| UA:', (webhookUserAgent || 'none').substring(0, 60));
 
       // Validate webhook secret - STRICT enforcement
       const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
@@ -510,7 +512,7 @@ Deno.serve(async (req) => {
 
       // Track Purchase event on UTMify (server-side)
       try {
-        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp);
+        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, webhookUserAgent);
       } catch (trackError) {
         console.warn('⚠️ UTMify tracking failed:', trackError);
       }
