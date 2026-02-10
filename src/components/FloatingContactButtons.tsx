@@ -2,7 +2,6 @@ import { Button } from "./ui/button";
 import { X } from "lucide-react";
 import { useState } from "react";
 import { useLocation } from "react-router-dom";
-import { SupportChat } from "./SupportChat";
 
 export const FloatingContactButtons = () => {
   const [isVisible, setIsVisible] = useState(true);
@@ -15,8 +14,6 @@ export const FloatingContactButtons = () => {
 
   return (
     <>
-      {/* Support Chat - aparece em todas as páginas */}
-      <SupportChat />
 
       {/* Discord Button - só na home */}
       {location.pathname === "/" && isVisible && (
