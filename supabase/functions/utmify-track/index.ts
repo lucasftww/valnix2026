@@ -9,7 +9,12 @@ const corsHeaders = {
 const UTMIFY_API_URL = "https://tracking.utmify.com.br/tracking/v1/events";
 const UTMIFY_PIXEL_ID = "6983b13f961e629ed63fae7a";
 
-/** In-memory rate limiter (best-effort, resets on cold start) */
+// Singleton Supabase client (reused across requests in same isolate)
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const supabase = createClient(supabaseUrl, serviceKey);
+
+/** In-memory rate limiter (best-effort) */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
@@ -25,7 +30,6 @@ function checkRateLimit(ip: string): boolean {
   return entry.count <= RATE_LIMIT_MAX;
 }
 
-// Cleanup old rate limit entries periodically
 function cleanupRateLimit() {
   const now = Date.now();
   for (const [key, val] of rateLimitMap) {
@@ -45,7 +49,6 @@ serve(async (req) => {
     || req.headers.get('x-real-ip')
     || "127.0.0.1";
 
-  // Rate limit check
   if (!checkRateLimit(clientIp)) {
     return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
       status: 429,
@@ -64,30 +67,38 @@ serve(async (req) => {
       });
     }
 
-    // Build a dedupe key: prefer explicit eventId, fallback to type+orderId
+    // Build dedupe key: prefer explicit eventId, fallback to type+orderId
     const dedupeKey = eventId || (orderId ? `${type}_${orderId}` : null);
 
-    // Persistent dedupe via DB (unique constraint on event_id)
+    // Persistent dedupe via DB with pending/sent status
     if (dedupeKey) {
-      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-      const supabase = createClient(supabaseUrl, serviceKey);
-
-      const { error: insertError } = await supabase
+      // Check if already sent
+      const { data: existing } = await supabase
         .from('utmify_event_log')
-        .insert({ event_id: dedupeKey, event_type: type, order_id: orderId || null });
+        .select('status')
+        .eq('event_id', dedupeKey)
+        .maybeSingle();
 
-      if (insertError) {
-        // Unique constraint violation = already processed
-        if (insertError.code === '23505') {
-          console.log(`⏭️ UTMify dedupe (DB): ${dedupeKey} already processed`);
-          return new Response(JSON.stringify({ success: true, deduplicated: true }), {
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          });
+      if (existing?.status === 'sent') {
+        console.log(`⏭️ UTMify dedupe: ${dedupeKey} already sent`);
+        return new Response(JSON.stringify({ success: true, deduplicated: true }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      // Insert as pending (or skip if already pending — will retry send)
+      if (!existing) {
+        const { error: insertError } = await supabase
+          .from('utmify_event_log')
+          .insert({ event_id: dedupeKey, event_type: type, order_id: orderId || null, status: 'pending' });
+
+        if (insertError && insertError.code === '23505') {
+          // Race condition: another instance inserted between select and insert — continue to send
+          console.log(`⚡ UTMify dedupe race: ${dedupeKey}, proceeding to send`);
+        } else if (insertError) {
+          console.warn('⚠️ Dedupe DB insert error:', insertError.message);
         }
-        // Other DB error — log but continue (don't block tracking)
-        console.warn('⚠️ Dedupe DB insert error:', insertError.message);
       }
     }
 
@@ -125,7 +136,16 @@ serve(async (req) => {
     const responseText = await response.text();
     console.log(`📊 UTMify API response: ${response.status}`, responseText);
 
+    // Mark as sent in DB only on success
+    if (response.ok && dedupeKey) {
+      await supabase
+        .from('utmify_event_log')
+        .update({ status: 'sent', updated_at: new Date().toISOString() })
+        .eq('event_id', dedupeKey);
+    }
+
     if (!response.ok) {
+      // UTMify failed — event stays as 'pending' in DB, allowing retry
       return new Response(JSON.stringify({
         success: false,
         status: response.status,
@@ -139,7 +159,6 @@ serve(async (req) => {
     return new Response(JSON.stringify({
       success: true,
       status: response.status,
-      response: responseText,
     }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
