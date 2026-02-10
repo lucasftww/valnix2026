@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
 import { supabase } from "@/integrations/supabase/client";
+import { supabase as supabaseHelper } from "@/lib/supabaseHelper";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -87,6 +88,28 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
             .update({ status: "paid", paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
             .eq("order_id", orderId)
             .eq("addon_type", addonType);
+
+          // UTMify Purchase for upsell (server-side via utmify-track)
+          try {
+            const upsellOrderId = `upsell-${orderId}-${addonType}`;
+            await supabaseHelper.functions.invoke('utmify-track', {
+              body: {
+                type: 'Purchase',
+                eventId: `Purchase_${upsellOrderId}`,
+                orderId: upsellOrderId,
+                value: config?.price || 0,
+                currency: 'BRL',
+                sourceUrl: window.location.href,
+                pageTitle: document.title,
+                userAgent: navigator.userAgent,
+                icCSSMatch: '.utmify-checkout',
+              },
+            });
+            console.log(`📊 UTMify Purchase sent for upsell ${upsellOrderId}`);
+          } catch (utmifyErr) {
+            console.warn('⚠️ UTMify upsell tracking failed (non-blocking):', utmifyErr);
+          }
+
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
           setTimeout(() => navigate(config?.next_route || "/", { replace: true }), 2500);
         }
