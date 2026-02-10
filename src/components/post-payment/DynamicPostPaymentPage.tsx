@@ -30,7 +30,9 @@ const iconMap: Record<string, typeof Shield> = {
 export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const orderId = searchParams.get("order_id") || "";
+  const orderIdParam = searchParams.get("order_id") || "";
+  const isStandalone = !orderIdParam;
+  const orderId = orderIdParam || `lead-${Date.now()}`;
   const { config, loading: configLoading } = usePostPaymentPage(addonType);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -40,13 +42,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10 * 60);
-
-  // If no order_id, redirect home
-  useEffect(() => {
-    if (!orderId) {
-      navigate("/");
-    }
-  }, [orderId, navigate]);
 
   // If no config after loading, redirect home
   useEffect(() => {
@@ -100,7 +95,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   }, [pixData, paymentConfirmed, timeLeft, orderId, addonType, config, navigate, toast]);
 
   const handleAccept = async () => {
-    if (!config || !orderId || purchasing) return;
+    if (!config || purchasing) return;
     setPurchasing(true);
     try {
       // Record addon attempt
@@ -163,7 +158,17 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       });
     } catch (e) { /* ignore */ }
 
-    navigate(`${config?.next_route || "/"}${config?.next_route !== "/" ? `?order_id=${orderId}` : ""}`, { replace: true });
+    if (isStandalone) {
+      // In standalone mode, skip goes to next upsell or home
+      const nextRoute = config?.next_route || "/";
+      if (nextRoute === "/") {
+        navigate("/", { replace: true });
+      } else {
+        navigate(nextRoute, { replace: true });
+      }
+    } else {
+      navigate(`${config?.next_route || "/"}${config?.next_route !== "/" ? `?order_id=${orderId}` : ""}`, { replace: true });
+    }
   };
 
   if (configLoading) {

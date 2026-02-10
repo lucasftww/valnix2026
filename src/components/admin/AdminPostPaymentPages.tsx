@@ -6,7 +6,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2, Save, Star, Zap, Shield, TrendingUp, DollarSign, Eye, SkipForward } from "lucide-react";
+import { Loader2, Save, Star, Zap, Shield, TrendingUp, DollarSign, Eye, SkipForward, Link2, Copy } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
@@ -44,6 +44,12 @@ const labelMap: Record<string, string> = {
   premium_benefits: "Benefícios Premium",
   delivery_priority: "Entrega Prioritária",
   data_swap_warranty: "Garantia Troca Dados",
+};
+
+const routeMap: Record<string, string> = {
+  premium_benefits: "/painel-pagar",
+  delivery_priority: "/painel-pagar-entrega",
+  data_swap_warranty: "/painel-pagar-trocadados",
 };
 
 export function AdminPostPaymentPages() {
@@ -254,6 +260,31 @@ export function AdminPostPaymentPages() {
                     <Label className="text-xs text-gray-400">Texto botão pular</Label>
                     <Input value={page.button_skip_text} onChange={(e) => updatePage(page.id, { button_skip_text: e.target.value })} className="bg-[#0a0a0a] border-[#222]" />
                   </div>
+                </div>
+
+                {/* Standalone Link Generator */}
+                <div className="bg-[#0a0a0a] border border-[#222] rounded-lg p-4 space-y-2">
+                  <div className="flex items-center gap-2 text-sm text-gray-400">
+                    <Link2 className="w-4 h-4" /> Link direto para leads (sem compra)
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      readOnly
+                      value={`${window.location.origin}${routeMap[page.addon_type] || "/painel-pagar"}`}
+                      className="bg-[#111] border-[#222] text-xs"
+                    />
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        navigator.clipboard.writeText(`${window.location.origin}${routeMap[page.addon_type] || "/painel-pagar"}`);
+                        toast({ title: "Link copiado!", description: "Envie para o lead." });
+                      }}
+                    >
+                      <Copy className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <p className="text-[10px] text-gray-600">O lead acessa direto a oferta sem precisar ter feito uma compra.</p>
                 </div>
 
                 {/* Save */}
