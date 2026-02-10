@@ -5,8 +5,6 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/FirebaseAuthContext";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import { SecurityHeaders } from "@/components/SecurityHeaders";
-import { CrispChat } from "@/components/CrispChat";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense } from "react";
@@ -53,8 +51,6 @@ const App = () => {
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
-          <SecurityHeaders />
-          <CrispChat />
           <AuthProvider>
             <CartProvider>
               <Toaster />
