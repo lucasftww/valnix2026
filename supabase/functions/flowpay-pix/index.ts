@@ -11,8 +11,79 @@ const FIREBASE_PROJECT_ID = 'valnix-a2755';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
 const UTMIFY_EVENTS_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
+// ── Firebase Service Account Auth ──────────────────────────────────
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt = 0;
+
+function base64url(data: Uint8Array): string {
+  let binary = '';
+  for (const byte of data) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function getFirebaseAccessToken(): Promise<string> {
+  if (cachedAccessToken && Date.now() < tokenExpiresAt - 60_000) {
+    return cachedAccessToken;
+  }
+
+  const saKeyRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
+  if (!saKeyRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY not configured');
+
+  const saKey = JSON.parse(saKeyRaw);
+  const now = Math.floor(Date.now() / 1000);
+
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: saKey.client_email,
+    sub: saKey.client_email,
+    aud: 'https://oauth2.googleapis.com/token',
+    iat: now,
+    exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/datastore',
+  };
+
+  const enc = new TextEncoder();
+  const headerB64 = base64url(enc.encode(JSON.stringify(header)));
+  const payloadB64 = base64url(enc.encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+
+  // Import RSA private key
+  const pemBody = saKey.private_key
+    .replace(/-----BEGIN PRIVATE KEY-----/, '')
+    .replace(/-----END PRIVATE KEY-----/, '')
+    .replace(/\n/g, '');
+  const keyBytes = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+
+  const cryptoKey = await crypto.subtle.importKey(
+    'pkcs8', keyBytes, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']
+  );
+
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, enc.encode(unsignedToken));
+  const jwt = `${unsignedToken}.${base64url(new Uint8Array(signature))}`;
+
+  // Exchange JWT for access token
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+
+  if (!tokenRes.ok) {
+    const err = await tokenRes.text();
+    console.error('❌ Firebase token exchange failed:', err);
+    throw new Error(`Firebase auth failed: ${tokenRes.status}`);
+  }
+
+  const tokenData = await tokenRes.json();
+  cachedAccessToken = tokenData.access_token;
+  tokenExpiresAt = Date.now() + (tokenData.expires_in * 1000);
+  console.log('🔑 Firebase access token obtained');
+  return cachedAccessToken!;
+}
+
 // Helper: Update Firestore document via REST API
 async function updateFirestoreDoc(collection: string, docId: string, fields: Record<string, unknown>) {
+  const accessToken = await getFirebaseAccessToken();
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${collection}/${docId}?updateMask.fieldPaths=${Object.keys(fields).join('&updateMask.fieldPaths=')}`;
   
   const firestoreFields: Record<string, unknown> = {};
@@ -28,7 +99,7 @@ async function updateFirestoreDoc(collection: string, docId: string, fields: Rec
 
   const response = await fetch(url, {
     method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     body: JSON.stringify({ fields: firestoreFields }),
   });
 
@@ -44,9 +115,12 @@ async function updateFirestoreDoc(collection: string, docId: string, fields: Rec
 
 // Helper: Get Firestore document
 async function getFirestoreDoc(collection: string, docId: string) {
+  const accessToken = await getFirebaseAccessToken();
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
   console.log(`🔍 Firestore GET: ${collection}/${docId}`);
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: { 'Authorization': `Bearer ${accessToken}` },
+  });
   
   if (!response.ok) {
     const errorText = await response.text();
@@ -60,10 +134,11 @@ async function getFirestoreDoc(collection: string, docId: string) {
 
 // Helper: Query Firestore collection
 async function queryFirestore(collectionId: string, fieldPath: string, op: string, value: string) {
+  const accessToken = await getFirebaseAccessToken();
   const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
   const response = await fetch(queryUrl, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
     body: JSON.stringify({
       structuredQuery: {
         from: [{ collectionId }],
