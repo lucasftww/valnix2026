@@ -36,9 +36,6 @@ const mainMenuItems = [
   { id: "categories", title: "Categorias", icon: FolderTree, badge: null },
 ];
 
-const catalogMenuItems = [
-  { id: "banners", title: "Banners", icon: Image, badge: null },
-];
 
 const systemMenuItems = [
   { id: "users", title: "Usuários", icon: Users, badge: null },
@@ -152,20 +149,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Catalog Section */}
-        <SidebarGroup className="py-2 px-2">
-          <SidebarGroupLabel className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider text-neutral-600 mb-2 px-2",
-            isCollapsed && "sr-only"
-          )}>
-            Catálogo
-          </SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu className="space-y-1">
-              {catalogMenuItems.map(renderMenuItem)}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
 
         {/* System Section */}
         <SidebarGroup className="py-2 px-2">

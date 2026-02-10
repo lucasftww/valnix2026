@@ -5,7 +5,7 @@ import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminCategories } from "@/components/admin/AdminCategories";
-import { AdminBanners } from "@/components/admin/AdminBanners";
+
 // AdminReviews disabled - causes errors (product_reviews table missing)
 import { AdminCoupons } from "@/components/admin/AdminCoupons";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
@@ -44,7 +44,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   orders: { title: "Pedidos", description: "Acompanhe e gerencie pedidos" },
   users: { title: "Usuários", description: "Gerenciar usuários cadastrados" },
   coupons: { title: "Cupons de Desconto", description: "Crie promoções e descontos" },
-  banners: { title: "Banners", description: "Banners da página inicial" },
+  
   reviews: { title: "Avaliações", description: "Gerenciar avaliações de clientes" },
   support: { title: "Suporte", description: "Atenda clientes em tempo real" },
   "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
@@ -211,7 +211,7 @@ export default function Admin() {
               {activeTab === "orders" && <AdminOrders />}
               {activeTab === "users" && <AdminUsers />}
               {activeTab === "coupons" && <AdminCoupons />}
-              {activeTab === "banners" && <AdminBanners />}
+              
               {/* reviews tab disabled */}
               {activeTab === "support" && <AdminSupport />}
               {activeTab === "post-payment" && <AdminPostPaymentPages />}
