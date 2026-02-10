@@ -1,4 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
+import { db } from "@/integrations/firebase/config";
+import { collection, query, where, getDocs, updateDoc, doc, increment } from "firebase/firestore";
+import { toast } from "sonner";
 
 export interface CartItem {
   id: string;
@@ -8,6 +11,13 @@ export interface CartItem {
   image: string;
 }
 
+interface AppliedCoupon {
+  code: string;
+  id: string;
+  discount_type: "percentage" | "fixed";
+  discount_value: number;
+}
+
 interface CartContextType {
   items: CartItem[];
   totalItems: number;
@@ -15,12 +25,12 @@ interface CartContextType {
   finalPrice: number;
   discount: number;
   couponCode: string | null;
-  appliedCoupon: { code: string } | null;
+  appliedCoupon: AppliedCoupon | null;
   addItem: (item: Omit<CartItem, "quantity"> & { [key: string]: any }) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
-  applyCoupon: (code: string, discountValue?: number) => void;
+  applyCoupon: (code: string) => Promise<void>;
   removeCoupon: () => void;
 }
 
@@ -29,7 +39,7 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
   const [discount, setDiscount] = useState(0);
-  const [couponCode, setCouponCode] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalPrice = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
@@ -61,18 +71,91 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const clearCart = useCallback(() => {
     setItems([]);
     setDiscount(0);
-    setCouponCode(null);
+    setAppliedCoupon(null);
   }, []);
 
-  const applyCoupon = useCallback((code: string, discountValue?: number) => {
-    setCouponCode(code);
-    if (discountValue !== undefined) setDiscount(discountValue);
-  }, []);
+  const applyCoupon = useCallback(async (code: string) => {
+    try {
+      const couponsRef = collection(db, "coupons");
+      const q = query(couponsRef, where("code", "==", code.toUpperCase()));
+      const snapshot = await getDocs(q);
+
+      if (snapshot.empty) {
+        toast.error("Cupom não encontrado");
+        return;
+      }
+
+      const couponDoc = snapshot.docs[0];
+      const coupon = couponDoc.data();
+
+      // Validate active
+      if (!coupon.is_active) {
+        toast.error("Este cupom está inativo");
+        return;
+      }
+
+      // Validate expiration
+      if (coupon.expires_at) {
+        const expiresDate = new Date(coupon.expires_at);
+        if (expiresDate < new Date()) {
+          toast.error("Este cupom expirou");
+          return;
+        }
+      }
+
+      // Validate max uses
+      if (coupon.max_uses && (coupon.current_uses || 0) >= coupon.max_uses) {
+        toast.error("Este cupom atingiu o limite de usos");
+        return;
+      }
+
+      // Validate min purchase
+      const currentTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+      if (coupon.min_purchase_amount && currentTotal < coupon.min_purchase_amount) {
+        toast.error(`Compra mínima de R$ ${Number(coupon.min_purchase_amount).toFixed(2)} para este cupom`);
+        return;
+      }
+
+      // Calculate discount
+      let discountAmount: number;
+      if (coupon.discount_type === "percentage") {
+        discountAmount = currentTotal * (coupon.discount_value / 100);
+      } else {
+        discountAmount = Number(coupon.discount_value);
+      }
+
+      discountAmount = Math.min(discountAmount, currentTotal);
+
+      setAppliedCoupon({
+        code: coupon.code,
+        id: couponDoc.id,
+        discount_type: coupon.discount_type,
+        discount_value: coupon.discount_value,
+      });
+      setDiscount(discountAmount);
+
+      // Increment usage counter
+      await updateDoc(doc(db, "coupons", couponDoc.id), {
+        current_uses: increment(1),
+      });
+
+      toast.success(`Cupom ${coupon.code} aplicado! -R$ ${discountAmount.toFixed(2)}`);
+    } catch (error) {
+      console.error("Error applying coupon:", error);
+      toast.error("Erro ao validar cupom");
+    }
+  }, [items]);
 
   const removeCoupon = useCallback(() => {
-    setCouponCode(null);
+    if (appliedCoupon) {
+      // Decrement usage counter
+      updateDoc(doc(db, "coupons", appliedCoupon.id), {
+        current_uses: increment(-1),
+      }).catch(err => console.warn("Failed to decrement coupon usage:", err));
+    }
+    setAppliedCoupon(null);
     setDiscount(0);
-  }, []);
+  }, [appliedCoupon]);
 
   return (
     <CartContext.Provider
@@ -82,8 +165,8 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         totalPrice,
         finalPrice,
         discount,
-        couponCode,
-        appliedCoupon: couponCode ? { code: couponCode } : null,
+        couponCode: appliedCoupon?.code || null,
+        appliedCoupon,
         addItem,
         removeItem,
         updateQuantity,

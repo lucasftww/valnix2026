@@ -1,6 +1,6 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/lib/supabaseHelper";
+import { useState, useEffect } from "react";
+import { db } from "@/integrations/firebase/config";
+import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -28,7 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Pencil, Trash2, Plus, Tag, Percent, DollarSign, Calendar, Users } from "lucide-react";
+import { Pencil, Trash2, Plus, Tag, Percent, DollarSign, Calendar, Users, Loader2 } from "lucide-react";
 import { toast } from "sonner";
 import { AdminCard } from "./AdminCard";
 import { AdminEmptyState } from "./AdminEmptyState";
@@ -52,7 +52,9 @@ interface Coupon {
 export const AdminCoupons = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
-  const queryClient = useQueryClient();
+  const [coupons, setCoupons] = useState<Coupon[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     code: "",
@@ -65,22 +67,71 @@ export const AdminCoupons = () => {
     is_active: true,
   });
 
-  const { data: coupons = [], isLoading } = useQuery({
-    queryKey: ["admin-coupons"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("coupons")
-        .select("*")
-        .order("created_at", { ascending: false });
+  const fetchCoupons = async () => {
+    try {
+      setIsLoading(true);
+      const q = query(collection(db, "coupons"), orderBy("created_at", "desc"));
+      const snapshot = await getDocs(q);
+      const data = snapshot.docs.map(d => {
+        const raw = d.data();
+        return {
+          id: d.id,
+          code: raw.code || "",
+          description: raw.description || null,
+          discount_type: raw.discount_type || "percentage",
+          discount_value: Number(raw.discount_value) || 0,
+          min_purchase_amount: Number(raw.min_purchase_amount) || 0,
+          max_uses: raw.max_uses ?? null,
+          current_uses: Number(raw.current_uses) || 0,
+          expires_at: raw.expires_at || null,
+          is_active: raw.is_active !== false,
+          created_at: raw.created_at?.toDate?.() ? raw.created_at.toDate().toISOString() : raw.created_at || new Date().toISOString(),
+        } as Coupon;
+      });
+      setCoupons(data);
+    } catch (error) {
+      console.error("Error fetching coupons:", error);
+      toast.error("Erro ao carregar cupons");
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
-      if (error) throw error;
-      return data as Coupon[];
-    },
-  });
+  useEffect(() => {
+    fetchCoupons();
+  }, []);
 
-  const createMutation = useMutation({
-    mutationFn: async (data: typeof formData) => {
-      const { error } = await supabase.from("coupons").insert({
+  const handleCreate = async (data: typeof formData) => {
+    setIsSaving(true);
+    try {
+      await addDoc(collection(db, "coupons"), {
+        code: data.code.toUpperCase(),
+        description: data.description || null,
+        discount_type: data.discount_type,
+        discount_value: parseFloat(data.discount_value),
+        min_purchase_amount: parseFloat(data.min_purchase_amount),
+        max_uses: data.max_uses ? parseInt(data.max_uses) : null,
+        current_uses: 0,
+        expires_at: data.expires_at || null,
+        is_active: data.is_active,
+        created_at: Timestamp.now(),
+      });
+      toast.success("Cupom criado com sucesso!");
+      resetForm();
+      setIsDialogOpen(false);
+      fetchCoupons();
+    } catch (error) {
+      console.error("Error creating coupon:", error);
+      toast.error("Erro ao criar cupom");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleUpdate = async (id: string, data: typeof formData) => {
+    setIsSaving(true);
+    try {
+      await updateDoc(doc(db, "coupons", id), {
         code: data.code.toUpperCase(),
         description: data.description || null,
         discount_type: data.discount_type,
@@ -90,62 +141,28 @@ export const AdminCoupons = () => {
         expires_at: data.expires_at || null,
         is_active: data.is_active,
       });
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
-      toast.success("Cupom criado com sucesso!");
-      resetForm();
-      setIsDialogOpen(false);
-    },
-    onError: () => {
-      toast.error("Erro ao criar cupom");
-    },
-  });
-
-  const updateMutation = useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: typeof formData }) => {
-      const { error } = await supabase
-        .from("coupons")
-        .update({
-          code: data.code.toUpperCase(),
-          description: data.description || null,
-          discount_type: data.discount_type,
-          discount_value: parseFloat(data.discount_value),
-          min_purchase_amount: parseFloat(data.min_purchase_amount),
-          max_uses: data.max_uses ? parseInt(data.max_uses) : null,
-          expires_at: data.expires_at || null,
-          is_active: data.is_active,
-        })
-        .eq("id", id);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
       toast.success("Cupom atualizado com sucesso!");
       resetForm();
       setIsDialogOpen(false);
-    },
-    onError: () => {
+      fetchCoupons();
+    } catch (error) {
+      console.error("Error updating coupon:", error);
       toast.error("Erro ao atualizar cupom");
-    },
-  });
+    } finally {
+      setIsSaving(false);
+    }
+  };
 
-  const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const { error } = await supabase.from("coupons").delete().eq("id", id);
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["admin-coupons"] });
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, "coupons", id));
       toast.success("Cupom excluído com sucesso!");
-    },
-    onError: () => {
+      fetchCoupons();
+    } catch (error) {
+      console.error("Error deleting coupon:", error);
       toast.error("Erro ao excluir cupom");
-    },
-  });
+    }
+  };
 
   const resetForm = () => {
     setFormData({
@@ -179,9 +196,9 @@ export const AdminCoupons = () => {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (editingCoupon) {
-      updateMutation.mutate({ id: editingCoupon.id, data: formData });
+      handleUpdate(editingCoupon.id, formData);
     } else {
-      createMutation.mutate(formData);
+      handleCreate(formData);
     }
   };
 
@@ -337,7 +354,7 @@ export const AdminCoupons = () => {
                           size="icon"
                           onClick={() => {
                             if (confirm("Tem certeza que deseja excluir este cupom?")) {
-                              deleteMutation.mutate(coupon.id);
+                              handleDelete(coupon.id);
                             }
                           }}
                           className="text-destructive hover:text-destructive"
@@ -479,7 +496,8 @@ export const AdminCoupons = () => {
             </div>
 
             <div className="flex gap-2 pt-4">
-              <Button type="submit" disabled={createMutation.isPending || updateMutation.isPending}>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
                 {editingCoupon ? "Atualizar" : "Criar"} Cupom
               </Button>
               <Button
