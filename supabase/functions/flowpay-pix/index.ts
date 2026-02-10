@@ -186,9 +186,80 @@ async function processAutoDelivery(orderId: string) {
   }
 }
 
-// Track Purchase event on UTMify (server-side fallback)
+// Track Purchase event on UTMify (server-side, with persistent dedupe)
 async function trackUTMifyPurchase(orderId: string, value: number, customerEmail?: string) {
+  const LOCK_TTL_SECONDS = 30;
+  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+  const supa = createClient(supabaseUrl, serviceRoleKey);
+
+  const dedupeKey = `Purchase_${orderId}`;
+
   try {
+    // 1. Check existing state in dedupe table
+    const { data: existing } = await supa
+      .from('utmify_event_log')
+      .select('status, locked_at, attempt_count')
+      .eq('event_id', dedupeKey)
+      .maybeSingle();
+
+    // Already sent → skip
+    if (existing?.status === 'sent') {
+      console.log(`⏭️ UTMify Purchase already sent for ${orderId}, skipping`);
+      return;
+    }
+
+    // Pending + locked recently → someone else is sending
+    if (existing?.status === 'pending' && existing.locked_at) {
+      const lockedAge = (Date.now() - new Date(existing.locked_at).getTime()) / 1000;
+      if (lockedAge < LOCK_TTL_SECONDS) {
+        console.log(`🔒 UTMify Purchase locked for ${orderId}, skipping`);
+        return;
+      }
+    }
+
+    if (!existing) {
+      // New → insert as pending + locked
+      const { error: insertError } = await supa
+        .from('utmify_event_log')
+        .insert({
+          event_id: dedupeKey,
+          event_type: 'Purchase',
+          order_id: orderId,
+          status: 'pending',
+          locked_at: new Date().toISOString(),
+          attempt_count: 1,
+        });
+      if (insertError && insertError.code !== '23505') {
+        console.warn('⚠️ Dedupe INSERT error:', insertError.message);
+      }
+      // If 23505 (unique violation), another instance already inserted — skip
+      if (insertError?.code === '23505') {
+        console.log(`⚡ UTMify dedupe race for ${orderId}, skipping`);
+        return;
+      }
+    } else {
+      // Existing pending (lock expired) → acquire lock atomically
+      const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
+      const { data: locked } = await supa
+        .from('utmify_event_log')
+        .update({
+          locked_at: new Date().toISOString(),
+          attempt_count: (existing.attempt_count || 0) + 1,
+        })
+        .eq('event_id', dedupeKey)
+        .eq('status', 'pending')
+        .or(`locked_at.is.null,locked_at.lt.${lockThreshold}`)
+        .select('event_id')
+        .maybeSingle();
+
+      if (!locked) {
+        console.log(`⚡ UTMify lock race for ${orderId}, skipping`);
+        return;
+      }
+    }
+
+    // 2. Send to UTMify API
     const payload = {
       type: 'Purchase',
       lead: {
@@ -208,7 +279,6 @@ async function trackUTMifyPurchase(orderId: string, value: number, customerEmail
         value,
         currency: 'BRL',
         orderId,
-        customerEmail: customerEmail || undefined,
       },
       tikTokPageInfo: null,
     };
@@ -219,10 +289,21 @@ async function trackUTMifyPurchase(orderId: string, value: number, customerEmail
       body: JSON.stringify(payload),
     });
 
+    const responseText = await response.text();
+
+    // 3. Update dedupe status
     if (response.ok) {
-      console.log(`📊 UTMify Purchase event sent server-side for order ${orderId}`);
+      await supa
+        .from('utmify_event_log')
+        .update({ status: 'sent', locked_at: null, updated_at: new Date().toISOString() })
+        .eq('event_id', dedupeKey);
+      console.log(`📊 UTMify Purchase sent server-side for order ${orderId}`);
     } else {
-      console.warn(`⚠️ UTMify API returned ${response.status}`);
+      await supa
+        .from('utmify_event_log')
+        .update({ locked_at: null, last_error: `HTTP ${response.status}: ${responseText.slice(0, 200)}` })
+        .eq('event_id', dedupeKey);
+      console.warn(`⚠️ UTMify API returned ${response.status}: ${responseText.slice(0, 100)}`);
     }
   } catch (error) {
     console.warn('⚠️ UTMify server-side tracking failed:', error);

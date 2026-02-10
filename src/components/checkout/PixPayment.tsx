@@ -7,7 +7,6 @@ import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { trackPurchase } from "@/lib/utmify";
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { db } from "@/integrations/firebase/config";
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
@@ -125,14 +124,8 @@ export function PixPayment({
       console.warn('⚠️ Auto-delivery processing failed:', error);
     }
 
-    // 3. Track Purchase event for UTMify → Meta
-    try {
-      console.log('📊 Sending Purchase event to UTMify...', { orderId, amount, customerEmail });
-      await trackPurchase(orderId, amount, customerEmail);
-      console.log('✅ UTMify Purchase event sent successfully');
-    } catch (error) {
-      console.warn('⚠️ UTMify Purchase tracking failed:', error);
-    }
+    // 3. UTMify Purchase → now handled server-side by FlowPay webhook (Royal-like)
+    // No frontend tracking needed for PIX payments
 
     // 4. Register Purchase in analytics_events
     trackPurchaseEvent(customerId, amount, orderId, productNames?.join(', '));
