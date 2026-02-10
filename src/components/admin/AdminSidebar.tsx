@@ -1,5 +1,5 @@
 import { 
-  Package, ShoppingCart, FolderTree, Home, Image, Star, 
+  Package, ShoppingCart, FolderTree, Home, Image, 
   BarChart3, Tag, Users, ChevronLeft, ChevronRight, LogOut,
   Zap, MessageCircle, TrendingUp
 } from "lucide-react";
@@ -38,7 +38,6 @@ const mainMenuItems = [
 
 const catalogMenuItems = [
   { id: "banners", title: "Banners", icon: Image, badge: null },
-  { id: "reviews", title: "Avaliações", icon: Star, badge: null },
 ];
 
 const systemMenuItems = [

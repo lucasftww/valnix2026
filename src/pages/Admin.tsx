@@ -6,7 +6,7 @@ import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminBanners } from "@/components/admin/AdminBanners";
-import AdminReviews from "@/components/admin/AdminReviews";
+// AdminReviews disabled - causes errors (product_reviews table missing)
 import { AdminCoupons } from "@/components/admin/AdminCoupons";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminSupport } from "@/components/admin/AdminSupport";
@@ -212,7 +212,7 @@ export default function Admin() {
               {activeTab === "users" && <AdminUsers />}
               {activeTab === "coupons" && <AdminCoupons />}
               {activeTab === "banners" && <AdminBanners />}
-              {activeTab === "reviews" && <AdminReviews />}
+              {/* reviews tab disabled */}
               {activeTab === "support" && <AdminSupport />}
               {activeTab === "post-payment" && <AdminPostPaymentPages />}
             </div>
