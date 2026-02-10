@@ -286,15 +286,15 @@ export function AdminPostPaymentPages() {
                   <div className="grid grid-cols-3 gap-2">
                     <div>
                       <Label className="text-[10px] text-gray-500">utm_source</Label>
-                      <Input placeholder="whatsapp" value={getUtm(page.addon_type).source} onChange={(e) => setUtm(page.addon_type, "source", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
+                      <Input placeholder="ex: instagram" value={getUtm(page.addon_type).source} onChange={(e) => setUtm(page.addon_type, "source", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
                     </div>
                     <div>
                       <Label className="text-[10px] text-gray-500">utm_medium</Label>
-                      <Input placeholder="link" value={getUtm(page.addon_type).medium} onChange={(e) => setUtm(page.addon_type, "medium", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
+                      <Input placeholder="ex: cpc" value={getUtm(page.addon_type).medium} onChange={(e) => setUtm(page.addon_type, "medium", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
                     </div>
                     <div>
                       <Label className="text-[10px] text-gray-500">utm_campaign</Label>
-                      <Input placeholder="lead_vip" value={getUtm(page.addon_type).campaign} onChange={(e) => setUtm(page.addon_type, "campaign", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
+                      <Input placeholder="ex: promo_fev" value={getUtm(page.addon_type).campaign} onChange={(e) => setUtm(page.addon_type, "campaign", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
                     </div>
                   </div>
                   <div className="flex gap-2">

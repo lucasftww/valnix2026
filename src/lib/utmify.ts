@@ -2,10 +2,14 @@
  * UTMify Integration Utilities
  * Uses edge function proxy to avoid CORS issues with direct API calls.
  * Also attempts SDK-native tracking when available.
+ * Includes event deduplication via unique event IDs.
  */
 
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
 const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+/** Set of already-fired event IDs to prevent duplicates */
+const firedEvents = new Set<string>();
 
 interface UTMifyWindow extends Window {
   Utmify?: {
@@ -14,6 +18,11 @@ interface UTMifyWindow extends Window {
   };
   pixelId?: string;
   utmify_loaded?: boolean;
+}
+
+/** Generate a unique event ID based on type + orderId (or random) */
+function makeEventId(eventType: string, orderId?: string): string {
+  return orderId ? `${eventType}_${orderId}` : `${eventType}_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 }
 
 /**
@@ -64,7 +73,8 @@ const sendEventViaProxy = async (
 };
 
 /**
- * Try SDK first, then fall back to server proxy
+ * Try SDK first, then fall back to server proxy.
+ * Deduplicates by event ID — same event never fires twice.
  */
 export const trackUTMifyEvent = async (
   eventType: string,
@@ -75,8 +85,17 @@ export const trackUTMifyEvent = async (
     customerEmail?: string;
   } = {}
 ): Promise<boolean> => {
+  const eventId = makeEventId(eventType, eventData.orderId);
+
+  // Dedupe: skip if already fired
+  if (firedEvents.has(eventId)) {
+    console.log(`⏭️ UTMify ${eventType} already fired (${eventId}), skipping`);
+    return true;
+  }
+  firedEvents.add(eventId);
+
   try {
-    console.log(`🔄 Tracking UTMify event: ${eventType}`);
+    console.log(`🔄 Tracking UTMify event: ${eventType} (${eventId})`);
 
     // Try SDK native tracking
     const win = window as UTMifyWindow;
@@ -84,13 +103,13 @@ export const trackUTMifyEvent = async (
       try {
         win.Utmify.track(eventType, eventData);
         console.log(`✅ UTMify ${eventType} tracked via SDK`);
-        return true;
+        return true; // SDK succeeded — do NOT fallback
       } catch (sdkError) {
         console.warn("⚠️ SDK track failed, using proxy:", sdkError);
       }
     }
 
-    // Fallback: server-side proxy (no CORS issues)
+    // Fallback: server-side proxy (only if SDK unavailable or failed)
     return sendEventViaProxy(eventType, eventData);
   } catch (error) {
     console.warn(`⚠️ UTMify ${eventType} tracking failed silently:`, error);
