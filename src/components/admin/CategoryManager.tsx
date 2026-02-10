@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
@@ -75,9 +75,9 @@ export const CategoryManager = () => {
   };
 
   // Load on mount
-  useState(() => {
+  useEffect(() => {
     loadCategories();
-  });
+  }, []);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
