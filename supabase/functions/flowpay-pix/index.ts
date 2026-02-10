@@ -187,7 +187,7 @@ async function processAutoDelivery(orderId: string) {
 }
 
 // Track Purchase event on UTMify (server-side, with persistent dedupe)
-async function trackUTMifyPurchase(orderId: string, value: number, customerEmail?: string) {
+async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null, customerEmail?: string) {
   const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -230,13 +230,57 @@ async function trackUTMifyPurchase(orderId: string, value: number, customerEmail
           locked_at: new Date().toISOString(),
           attempt_count: 1,
         });
+
       if (insertError && insertError.code !== '23505') {
         console.warn('⚠️ Dedupe INSERT error:', insertError.message);
       }
-      // If 23505 (unique violation), another instance already inserted — skip
+
+      // 23505 (unique violation) → recheck status instead of silent skip
       if (insertError?.code === '23505') {
-        console.log(`⚡ UTMify dedupe race for ${orderId}, skipping`);
-        return;
+        const { data: recheck } = await supa
+          .from('utmify_event_log')
+          .select('status, locked_at, attempt_count')
+          .eq('event_id', dedupeKey)
+          .maybeSingle();
+
+        if (recheck?.status === 'sent') {
+          console.log(`⏭️ UTMify Purchase already sent (after race) for ${orderId}`);
+          return;
+        }
+
+        // If pending with active lock → in_flight
+        if (recheck?.status === 'pending' && recheck.locked_at) {
+          const lockedAge = (Date.now() - new Date(recheck.locked_at).getTime()) / 1000;
+          if (lockedAge < LOCK_TTL_SECONDS) {
+            console.log(`🔒 UTMify Purchase in_flight (after race) for ${orderId}`);
+            return;
+          }
+        }
+
+        // Pending with expired lock → try to acquire lock and continue
+        if (recheck?.status === 'pending') {
+          const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
+          const { data: locked } = await supa
+            .from('utmify_event_log')
+            .update({
+              locked_at: new Date().toISOString(),
+              attempt_count: (recheck.attempt_count || 0) + 1,
+            })
+            .eq('event_id', dedupeKey)
+            .eq('status', 'pending')
+            .or(`locked_at.is.null,locked_at.lt.${lockThreshold}`)
+            .select('event_id')
+            .maybeSingle();
+
+          if (!locked) {
+            console.log(`⚡ UTMify lock race (after 23505) for ${orderId}, skipping`);
+            return;
+          }
+          // Lock acquired, continue to send
+        } else {
+          console.log(`⚡ UTMify dedupe race for ${orderId}, status: ${recheck?.status}, skipping`);
+          return;
+        }
       }
     } else {
       // Existing pending (lock expired) → acquire lock atomically
@@ -262,10 +306,11 @@ async function trackUTMifyPurchase(orderId: string, value: number, customerEmail
     // 2. Send to UTMify API
     const payload = {
       type: 'Purchase',
+      eventId: dedupeKey,
       lead: {
         pixelId: UTMIFY_PIXEL_ID,
         userAgent: 'server-side/webhook',
-        ip: null,
+        ip: clientIp || null,
         parameters: '',
         icTextMatch: null,
         icCSSMatch: '.utmify-checkout',
@@ -348,6 +393,12 @@ Deno.serve(async (req) => {
     // ==================== WEBHOOK (from FlowPay) ====================
     if (req.method === 'POST' && action === 'webhook') {
       console.log('🔔 FlowPay webhook received');
+      
+      // Capture client IP from webhook request for UTMify match quality
+      const webhookClientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || req.headers.get('cf-connecting-ip')
+        || req.headers.get('x-real-ip')
+        || null;
       console.log('🔔 Headers:', JSON.stringify(Object.fromEntries(req.headers.entries())));
 
       // Validate webhook secret - STRICT enforcement
@@ -457,7 +508,7 @@ Deno.serve(async (req) => {
 
       // Track Purchase event on UTMify (server-side)
       try {
-        await trackUTMifyPurchase(orderId!, orderValue, customerEmail);
+        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, customerEmail);
       } catch (trackError) {
         console.warn('⚠️ UTMify tracking failed:', trackError);
       }
