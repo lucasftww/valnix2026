@@ -170,6 +170,8 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom'],
           'ui': ['@radix-ui/react-accordion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
+          'firebase-sdk': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          'charts': ['recharts'],
         },
         assetFileNames: (assetInfo) => {
           if (!assetInfo.name) return 'assets/[name]-[hash][extname]';

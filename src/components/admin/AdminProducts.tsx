@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, lazy, Suspense } from "react";
 import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { Button } from "@/components/ui/button";
@@ -23,7 +23,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import ReactQuill from 'react-quill';
+const ReactQuill = lazy(() => import('react-quill'));
 import 'react-quill/dist/quill.snow.css';
 import { ImageUploader } from "./ImageUploader";
 import { useQueryClient } from "@tanstack/react-query";
@@ -568,24 +568,26 @@ export const AdminProducts = () => {
                       Esta é a descrição principal que aparece na aba "Descrição" do produto
                     </p>
                     <div className="border border-border/50 rounded-md bg-neutral-900 overflow-hidden">
-                      <ReactQuill
-                        theme="snow"
-                        value={formData.rich_description}
-                        onChange={(value) => setFormData({ ...formData, rich_description: value })}
-                        modules={{
-                          toolbar: [
-                            [{ 'header': [1, 2, 3, false] }],
-                            ['bold', 'italic', 'underline', 'strike'],
-                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                            ['link', 'image'],
-                            [{ 'align': [] }],
-                            [{ 'color': [] }, { 'background': [] }],
-                            ['clean']
-                          ]
-                        }}
-                        className="min-h-[250px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[200px]"
-                        placeholder="Escreva a descrição completa do produto..."
-                      />
+                      <Suspense fallback={<div className="min-h-[250px] bg-neutral-800 animate-pulse rounded" />}>
+                        <ReactQuill
+                          theme="snow"
+                          value={formData.rich_description}
+                          onChange={(value) => setFormData({ ...formData, rich_description: value })}
+                          modules={{
+                            toolbar: [
+                              [{ 'header': [1, 2, 3, false] }],
+                              ['bold', 'italic', 'underline', 'strike'],
+                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                              ['link', 'image'],
+                              [{ 'align': [] }],
+                              [{ 'color': [] }, { 'background': [] }],
+                              ['clean']
+                            ]
+                          }}
+                          className="min-h-[250px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[200px]"
+                          placeholder="Escreva a descrição completa do produto..."
+                        />
+                      </Suspense>
                     </div>
                     <p className="text-xs text-muted-foreground flex items-center gap-1">
                       <ImageIcon className="w-3 h-3" />
@@ -601,22 +603,24 @@ export const AdminProducts = () => {
                       Estas instruções aparecem na aba "Instruções" do produto
                     </p>
                     <div className="border border-border/50 rounded-md bg-neutral-900 overflow-hidden">
-                      <ReactQuill
-                        theme="snow"
-                        value={formData.instructions}
-                        onChange={(value) => setFormData({ ...formData, instructions: value })}
-                        modules={{
-                          toolbar: [
-                            [{ 'header': [1, 2, 3, false] }],
-                            ['bold', 'italic', 'underline'],
-                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                            ['link'],
-                            ['clean']
-                          ]
-                        }}
-                        className="min-h-[180px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[130px]"
-                        placeholder="Ex: 1. Acesse o site oficial. 2. Faça login na sua conta..."
-                      />
+                      <Suspense fallback={<div className="min-h-[180px] bg-neutral-800 animate-pulse rounded" />}>
+                        <ReactQuill
+                          theme="snow"
+                          value={formData.instructions}
+                          onChange={(value) => setFormData({ ...formData, instructions: value })}
+                          modules={{
+                            toolbar: [
+                              [{ 'header': [1, 2, 3, false] }],
+                              ['bold', 'italic', 'underline'],
+                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                              ['link'],
+                              ['clean']
+                            ]
+                          }}
+                          className="min-h-[180px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[130px]"
+                          placeholder="Ex: 1. Acesse o site oficial. 2. Faça login na sua conta..."
+                        />
+                      </Suspense>
                     </div>
                   </div>
 
@@ -626,22 +630,24 @@ export const AdminProducts = () => {
                       Aparece na aba "Terms conditions" do produto (opcional)
                     </p>
                     <div className="border border-border/50 rounded-md bg-neutral-900 overflow-hidden">
-                      <ReactQuill
-                        theme="snow"
-                        value={formData.terms_conditions}
-                        onChange={(value) => setFormData({ ...formData, terms_conditions: value })}
-                        modules={{
-                          toolbar: [
-                            [{ 'header': [1, 2, 3, false] }],
-                            ['bold', 'italic', 'underline'],
-                            [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                            ['link'],
-                            ['clean']
-                          ]
-                        }}
-                        className="min-h-[180px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[130px]"
-                        placeholder="Ex: Este produto é apenas para uso pessoal..."
-                      />
+                      <Suspense fallback={<div className="min-h-[180px] bg-neutral-800 animate-pulse rounded" />}>
+                        <ReactQuill
+                          theme="snow"
+                          value={formData.terms_conditions}
+                          onChange={(value) => setFormData({ ...formData, terms_conditions: value })}
+                          modules={{
+                            toolbar: [
+                              [{ 'header': [1, 2, 3, false] }],
+                              ['bold', 'italic', 'underline'],
+                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+                              ['link'],
+                              ['clean']
+                            ]
+                          }}
+                          className="min-h-[180px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[130px]"
+                          placeholder="Ex: Este produto é apenas para uso pessoal..."
+                        />
+                      </Suspense>
                     </div>
                   </div>
                 </TabsContent>
