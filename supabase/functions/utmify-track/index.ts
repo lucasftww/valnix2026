@@ -120,7 +120,7 @@ serve(async (req) => {
         }
       }
 
-      if (!existing) {
+    if (!existing) {
         // New event → insert as pending + locked
         const { error: insertError } = await supabase
           .from('utmify_event_log')
@@ -135,6 +135,62 @@ serve(async (req) => {
 
         if (insertError && insertError.code !== '23505') {
           console.warn('⚠️ Dedupe INSERT error:', insertError.message);
+        }
+
+        // 23505 (unique violation) → recheck status instead of silent skip
+        if (insertError?.code === '23505') {
+          const { data: recheck } = await supabase
+            .from('utmify_event_log')
+            .select('status, locked_at, attempt_count')
+            .eq('event_id', dedupeKey)
+            .maybeSingle();
+
+          if (recheck?.status === 'sent') {
+            return new Response(JSON.stringify({ success: true, deduplicated: true }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          // Pending with active lock → in_flight
+          if (recheck?.status === 'pending' && recheck.locked_at) {
+            const lockedAge = (Date.now() - new Date(recheck.locked_at).getTime()) / 1000;
+            if (lockedAge < LOCK_TTL_SECONDS) {
+              return new Response(JSON.stringify({ success: true, in_flight: true }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+          }
+
+          // Pending with expired lock → try to acquire and continue
+          if (recheck?.status === 'pending') {
+            const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
+            const { data: locked } = await supabase
+              .from('utmify_event_log')
+              .update({
+                locked_at: new Date().toISOString(),
+                attempt_count: (recheck.attempt_count || 0) + 1,
+              })
+              .eq('event_id', dedupeKey)
+              .eq('status', 'pending')
+              .or(`locked_at.is.null,locked_at.lt.${lockThreshold}`)
+              .select('event_id')
+              .maybeSingle();
+
+            if (!locked) {
+              return new Response(JSON.stringify({ success: true, in_flight: true }), {
+                status: 200,
+                headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+              });
+            }
+            // Lock acquired, continue to send
+          } else {
+            return new Response(JSON.stringify({ success: true, deduplicated: true }), {
+              status: 200,
+              headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
         }
       } else {
         // Existing pending (lock expired or null) → acquire lock atomically
@@ -166,6 +222,7 @@ serve(async (req) => {
 
     const payload = {
       type,
+      eventId: dedupeKey || undefined,
       lead: {
         pixelId: UTMIFY_PIXEL_ID,
         userAgent: userAgent || "server",
