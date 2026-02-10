@@ -545,9 +545,62 @@ Deno.serve(async (req) => {
       const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
       
       if (!queryResults || !queryResults[0]?.document) {
-        console.error(`❌ No order found for chargeId: ${chargeId}`);
-        return new Response(JSON.stringify({ error: 'Order not found' }), {
-          status: 404,
+        // Not a regular order — check if it's an upsell (sale_addons in Supabase)
+        console.log(`ℹ️ No order found in Firestore for chargeId: ${chargeId}, checking sale_addons...`);
+        
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supa = createClient(supabaseUrl, serviceRoleKey);
+        
+        const { data: addon, error: addonError } = await supa
+          .from('sale_addons')
+          .select('*')
+          .eq('flowpay_charge_id', chargeId)
+          .maybeSingle();
+        
+        if (addonError || !addon) {
+          console.error(`❌ No order or addon found for chargeId: ${chargeId}`);
+          return new Response(JSON.stringify({ error: 'Order not found' }), {
+            status: 404,
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // It's an upsell addon payment
+        console.log(`💰 Upsell addon payment confirmed: ${addon.addon_type} for order ${addon.order_id}, amount: ${addon.amount}`);
+        
+        // Skip if already paid
+        if (addon.status === 'paid') {
+          console.log(`ℹ️ Addon ${addon.id} already paid, skipping`);
+          return new Response(JSON.stringify({ success: true, message: 'Already processed' }), {
+            headers: { 'Content-Type': 'application/json' },
+          });
+        }
+        
+        // Update addon status to paid
+        await supa
+          .from('sale_addons')
+          .update({ status: 'paid', paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+          .eq('id', addon.id);
+        
+        console.log(`✅ Addon ${addon.id} marked as paid via webhook`);
+        
+        // Track upsell Purchase on UTMify (server-side, Royal-like)
+        const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
+        try {
+          await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), webhookClientIp, webhookUserAgent);
+        } catch (trackError) {
+          console.warn('⚠️ UTMify upsell tracking failed:', trackError);
+        }
+        
+        // Register upsell in analytics
+        try {
+          await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
+        } catch (analyticsError) {
+          console.warn('⚠️ Analytics upsell registration failed:', analyticsError);
+        }
+        
+        return new Response(JSON.stringify({ success: true, addonId: addon.id }), {
           headers: { 'Content-Type': 'application/json' },
         });
       }
@@ -572,8 +625,7 @@ Deno.serve(async (req) => {
       const customerEmail = orderFields?.customer_email?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
 
-      // Update order status to paid - determine status based on delivery type
-      // First mark as paid + processing, auto-delivery will update to completed if all items are auto-delivered
+      // Update order status to paid
       await updateFirestoreDoc('orders', orderId!, {
         payment_status: 'paid',
         status: 'processing',
@@ -587,7 +639,6 @@ Deno.serve(async (req) => {
         await processAutoDelivery(orderId!);
       } catch (deliveryError) {
         console.error(`⚠️ Auto-delivery failed for order ${orderId}:`, deliveryError);
-        // Don't fail the webhook - order is still paid
       }
 
       // Track Purchase event on UTMify (server-side)
@@ -701,8 +752,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Store the chargeId in the order for webhook lookup
-      if (orderId) {
+      // Store the chargeId in the order for webhook lookup (regular orders only)
+      if (orderId && !isUpsell) {
         try {
           await updateFirestoreDoc('orders', orderId, {
             flowpay_charge_id: data.charge.id,
