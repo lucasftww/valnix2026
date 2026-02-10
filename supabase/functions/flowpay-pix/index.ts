@@ -267,7 +267,7 @@ async function processAutoDelivery(orderId: string) {
 }
 
 // Track Purchase event on UTMify (server-side, with persistent dedupe)
-async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null, clientUserAgent?: string | null) {
+async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null, clientUserAgent?: string | null, sourceUrl?: string, pageTitle?: string) {
   const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -399,8 +399,8 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
         addToCartTextMatch: null,
       },
       event: {
-        sourceUrl: 'https://valnix2026.lovable.app/checkout',
-        pageTitle: 'Checkout - Valnix',
+        sourceUrl: sourceUrl || 'https://valnix2026.lovable.app/checkout',
+        pageTitle: pageTitle || 'Checkout - Valnix',
         value,
         currency: 'BRL',
         orderId,
@@ -587,8 +587,16 @@ Deno.serve(async (req) => {
         
         // Track upsell Purchase on UTMify (server-side, Royal-like)
         const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
+        const upsellRouteMap: Record<string, string> = {
+          premium_benefits: '/painel-pagar',
+          delivery_priority: '/painel-pagar-entrega',
+          data_swap_warranty: '/painel-pagar-trocadados',
+        };
+        const upsellPath = upsellRouteMap[addon.addon_type] || '/painel-pagar';
+        const upsellSourceUrl = `https://valnix2026.lovable.app${upsellPath}`;
+        const upsellPageTitle = `Upsell ${addon.addon_type} - Valnix`;
         try {
-          await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), webhookClientIp, webhookUserAgent);
+          await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), webhookClientIp, webhookUserAgent, upsellSourceUrl, upsellPageTitle);
         } catch (trackError) {
           console.warn('⚠️ UTMify upsell tracking failed:', trackError);
         }
