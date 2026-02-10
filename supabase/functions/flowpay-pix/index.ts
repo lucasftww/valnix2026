@@ -187,7 +187,7 @@ async function processAutoDelivery(orderId: string) {
 }
 
 // Track Purchase event on UTMify (server-side, with persistent dedupe)
-async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null, customerEmail?: string) {
+async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null) {
   const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -310,7 +310,7 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
       lead: {
         pixelId: UTMIFY_PIXEL_ID,
         userAgent: 'server-side/webhook',
-        ip: clientIp || null,
+        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
         parameters: '',
         icTextMatch: null,
         icCSSMatch: '.utmify-checkout',
@@ -508,7 +508,7 @@ Deno.serve(async (req) => {
 
       // Track Purchase event on UTMify (server-side)
       try {
-        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, customerEmail);
+        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp);
       } catch (trackError) {
         console.warn('⚠️ UTMify tracking failed:', trackError);
       }
