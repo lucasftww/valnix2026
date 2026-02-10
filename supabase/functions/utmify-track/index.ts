@@ -6,7 +6,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
-const UTMIFY_API_URL = "https://tracking.utmify.com.br/tracking/v1/events";
+const UTMIFY_EVENTS_URL = "https://tracking.utmify.com.br/tracking/v1/events";
+const UTMIFY_ORDERS_URL = "https://api-credentials.utmify.com.br/api-credentials/orders";
 const UTMIFY_PIXEL_ID = "6983b13f961e629ed63fae7a";
 const LOCK_TTL_SECONDS = 30;
 
@@ -218,37 +219,69 @@ serve(async (req) => {
       }
     }
 
-    console.log(`📊 UTMify proxy: sending ${type}`, { orderId, value, clientIp, dedupeKey });
+    // Route Purchase via api-credentials/orders (Royal-like), others via tracking/v1/events
+    const isPurchase = type === 'Purchase';
+    let response: Response;
 
-    const payload = {
-      type,
-      eventId: dedupeKey || undefined,
-      lead: {
-        pixelId: UTMIFY_PIXEL_ID,
-        userAgent: userAgent || "server",
-        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
-        parameters: parameters || "",
-        icTextMatch: null,
-        icCSSMatch: icCSSMatch || ".utmify-checkout",
-        icURLMatch: null,
-        leadTextMatch: null,
-        addToCartTextMatch: null,
-      },
-      event: {
-        sourceUrl: sourceUrl || "",
-        pageTitle: pageTitle || "",
-        value: value || undefined,
+    if (isPurchase) {
+      const utmifyToken = Deno.env.get('UTMIFY_API_TOKEN');
+      if (!utmifyToken) {
+        console.error('❌ UTMIFY_API_TOKEN not configured');
+        return new Response(JSON.stringify({ error: 'UTMify token not configured' }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
+      const payload = {
+        orderId: orderId || dedupeKey,
+        value: value || 0,
         currency: currency || "BRL",
-        orderId: orderId || undefined,
-      },
-      tikTokPageInfo: null,
-    };
+      };
 
-    const response = await fetch(UTMIFY_API_URL, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      console.log(`📊 UTMify Royal Purchase:`, JSON.stringify(payload));
+
+      response = await fetch(UTMIFY_ORDERS_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${utmifyToken}`,
+        },
+        body: JSON.stringify(payload),
+      });
+    } else {
+      const payload = {
+        type,
+        eventId: dedupeKey || undefined,
+        lead: {
+          pixelId: UTMIFY_PIXEL_ID,
+          userAgent: userAgent || "server",
+          ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
+          parameters: parameters || "",
+          icTextMatch: null,
+          icCSSMatch: icCSSMatch || ".utmify-checkout",
+          icURLMatch: null,
+          leadTextMatch: null,
+          addToCartTextMatch: null,
+        },
+        event: {
+          sourceUrl: sourceUrl || "",
+          pageTitle: pageTitle || "",
+          value: value || undefined,
+          currency: currency || "BRL",
+          orderId: orderId || undefined,
+        },
+        tikTokPageInfo: null,
+      };
+
+      console.log(`📊 UTMify proxy (non-Purchase): sending ${type}`);
+
+      response = await fetch(UTMIFY_EVENTS_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    }
 
     const responseText = await response.text();
     console.log(`📊 UTMify API response: ${response.status}`, responseText);
