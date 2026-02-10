@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
-const FIREBASE_PROJECT_ID = 'valnix-a2755';
+const FIREBASE_PROJECT_ID = 'valnix';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
 const UTMIFY_EVENTS_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
