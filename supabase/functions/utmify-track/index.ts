@@ -226,7 +226,7 @@ serve(async (req) => {
       lead: {
         pixelId: UTMIFY_PIXEL_ID,
         userAgent: userAgent || "server",
-        ip: clientIp,
+        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
         parameters: parameters || "",
         icTextMatch: null,
         icCSSMatch: icCSSMatch || ".utmify-checkout",
