@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { db } from '@/integrations/firebase/config';
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { trackPurchase } from '@/lib/utmify';
 import { supabase } from '@/lib/supabaseHelper';
 import type { Order } from './useFirebaseOrders';
 
@@ -117,12 +116,6 @@ async function confirmPayment(order: Order) {
     console.warn('⚠️ Auto-delivery processing failed:', error);
   }
 
-  // 3. Track Purchase
-  try {
-    await trackPurchase(order.id, order.total_amount, order.customer_email);
-  } catch (error) {
-    console.warn('⚠️ UTMify tracking failed:', error);
-  }
-
-  // 4. Analytics (handled server-side by webhook, skip duplicate client-side tracking)
+  // 3. UTMify Purchase → now handled server-side by FlowPay webhook (Royal-like)
+  // 4. Analytics (handled server-side by webhook)
 }

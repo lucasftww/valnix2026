@@ -15,7 +15,7 @@ import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import pixLogo from "@/assets/pix-logo.png";
-import { trackPurchase, trackInitiateCheckout } from "@/lib/utmify";
+import { trackPurchase } from "@/lib/utmify";
 import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 
@@ -181,13 +181,9 @@ export default function Checkout() {
     
     setLoading(true);
 
-    // Track InitiateCheckout for UTMify + analytics funnel
-    try {
-      await trackInitiateCheckout(finalPrice);
-      trackInitiateCheckoutEvent(user.uid, finalPrice);
-    } catch (e) {
-      console.warn('⚠️ InitiateCheckout tracking failed:', e);
-    }
+    // InitiateCheckout UTMify → handled by CSS class .utmify-checkout (pixel auto-detect)
+    // Only track internal analytics funnel
+    trackInitiateCheckoutEvent(user.uid, finalPrice);
     
     try {
       const orderAmount = finalPrice;
