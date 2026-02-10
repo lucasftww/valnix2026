@@ -161,6 +161,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         status: "skipped",
         amount: 0,
         user_id: user?.uid || null,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
       });
     } catch (e) { /* ignore */ }
 
