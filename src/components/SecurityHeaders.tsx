@@ -13,10 +13,10 @@ export function SecurityHeaders() {
       font-src 'self' https://fonts.gstatic.com https://client.crisp.chat;
       img-src 'self' data: https: blob:;
       connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.googleapis.com https://*.firebaseio.com wss://*.firebaseio.com https://*.firebaseapp.com https://api.ipify.org https://api6.ipify.org https://firestore.googleapis.com https://www.facebook.com https://connect.facebook.net https://apis.google.com https://accounts.google.com https://*.lovable.dev https://*.lovable.app https://tracking.utmify.com.br https://cdn.utmify.com.br https://viacep.com.br https://client.crisp.chat wss://client.relay.crisp.chat wss://stream.relay.crisp.chat https://*.crisp.chat wss://*.crisp.chat;
-      frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://apis.google.com https://*.lovable.dev https://game.crisp.chat;
+      frame-src 'self' https://accounts.google.com https://*.firebaseapp.com https://apis.google.com https://*.lovable.dev https://game.crisp.chat https://www.facebook.com https://connect.facebook.net;
       worker-src 'self' blob:;
       base-uri 'self';
-      form-action 'self' https://accounts.google.com;
+      form-action 'self' https://accounts.google.com https://www.facebook.com https://connect.facebook.net;
     `.replace(/\s+/g, ' ').trim();
     
     // Referrer Policy
