@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -8,24 +9,10 @@ const corsHeaders = {
 const UTMIFY_API_URL = "https://tracking.utmify.com.br/tracking/v1/events";
 const UTMIFY_PIXEL_ID = "6983b13f961e629ed63fae7a";
 
-/** Server-side dedupe: track recently processed eventIds (TTL 10 min) */
-const processedEvents = new Map<string, number>();
-const DEDUPE_TTL_MS = 10 * 60 * 1000;
-
-/** Simple IP rate limiter: max 30 requests per minute per IP */
+/** In-memory rate limiter (best-effort, resets on cold start) */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 30;
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
-
-function cleanupMaps() {
-  const now = Date.now();
-  for (const [key, ts] of processedEvents) {
-    if (now - ts > DEDUPE_TTL_MS) processedEvents.delete(key);
-  }
-  for (const [key, val] of rateLimitMap) {
-    if (now > val.resetAt) rateLimitMap.delete(key);
-  }
-}
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -38,13 +25,20 @@ function checkRateLimit(ip: string): boolean {
   return entry.count <= RATE_LIMIT_MAX;
 }
 
+// Cleanup old rate limit entries periodically
+function cleanupRateLimit() {
+  const now = Date.now();
+  for (const [key, val] of rateLimitMap) {
+    if (now > val.resetAt) rateLimitMap.delete(key);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
-  // Periodic cleanup
-  cleanupMaps();
+  cleanupRateLimit();
 
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || req.headers.get('cf-connecting-ip')
@@ -55,7 +49,7 @@ serve(async (req) => {
   if (!checkRateLimit(clientIp)) {
     return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
       status: 429,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '60' },
     });
   }
 
@@ -70,19 +64,34 @@ serve(async (req) => {
       });
     }
 
-    // Server-side dedupe by eventId
-    if (eventId) {
-      if (processedEvents.has(eventId)) {
-        console.log(`⏭️ UTMify dedupe: ${eventId} already processed, skipping`);
-        return new Response(JSON.stringify({ success: true, deduplicated: true }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+    // Build a dedupe key: prefer explicit eventId, fallback to type+orderId
+    const dedupeKey = eventId || (orderId ? `${type}_${orderId}` : null);
+
+    // Persistent dedupe via DB (unique constraint on event_id)
+    if (dedupeKey) {
+      const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+      const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+      const supabase = createClient(supabaseUrl, serviceKey);
+
+      const { error: insertError } = await supabase
+        .from('utmify_event_log')
+        .insert({ event_id: dedupeKey, event_type: type, order_id: orderId || null });
+
+      if (insertError) {
+        // Unique constraint violation = already processed
+        if (insertError.code === '23505') {
+          console.log(`⏭️ UTMify dedupe (DB): ${dedupeKey} already processed`);
+          return new Response(JSON.stringify({ success: true, deduplicated: true }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+        // Other DB error — log but continue (don't block tracking)
+        console.warn('⚠️ Dedupe DB insert error:', insertError.message);
       }
-      processedEvents.set(eventId, Date.now());
     }
 
-    console.log(`📊 UTMify proxy: sending ${type} event`, { orderId, value, clientIp, eventId });
+    console.log(`📊 UTMify proxy: sending ${type} event`, { orderId, value, clientIp, dedupeKey });
 
     const payload = {
       type,
@@ -116,8 +125,19 @@ serve(async (req) => {
     const responseText = await response.text();
     console.log(`📊 UTMify API response: ${response.status}`, responseText);
 
+    if (!response.ok) {
+      return new Response(JSON.stringify({
+        success: false,
+        status: response.status,
+        response: responseText,
+      }), {
+        status: 502,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     return new Response(JSON.stringify({
-      success: response.ok,
+      success: true,
       status: response.status,
       response: responseText,
     }), {
