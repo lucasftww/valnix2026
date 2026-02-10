@@ -9,7 +9,7 @@ const corsHeaders = {
 const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
 const FIREBASE_PROJECT_ID = 'valnix-a2755';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
-const UTMIFY_ORDERS_URL = 'https://api-credentials.utmify.com.br/api-credentials/orders';
+const UTMIFY_EVENTS_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
 // Helper: Update Firestore document via REST API
 async function updateFirestoreDoc(collection: string, docId: string, fields: Record<string, unknown>) {
@@ -303,27 +303,36 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
       }
     }
 
-    // 2. Send to UTMify via api-credentials/orders (Royal-like model)
-    const utmifyToken = Deno.env.get('UTMIFY_API_TOKEN');
-    if (!utmifyToken) {
-      console.error('❌ UTMIFY_API_TOKEN not configured');
-      return;
-    }
-
+    // 2. Send to UTMify via tracking/v1/events (no token needed)
     const payload = {
-      orderId,
-      value,
-      currency: 'BRL',
+      type: 'Purchase',
+      eventId: dedupeKey,
+      lead: {
+        pixelId: UTMIFY_PIXEL_ID,
+        userAgent: 'server',
+        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
+        parameters: '',
+        icTextMatch: null,
+        icCSSMatch: '.utmify-checkout',
+        icURLMatch: null,
+        leadTextMatch: null,
+        addToCartTextMatch: null,
+      },
+      event: {
+        sourceUrl: 'https://valnix2026.lovable.app/checkout',
+        pageTitle: 'Checkout - Valnix',
+        value,
+        currency: 'BRL',
+        orderId,
+      },
+      tikTokPageInfo: null,
     };
 
-    console.log(`📊 UTMify Royal payload:`, JSON.stringify(payload));
+    console.log(`📊 UTMify Purchase payload:`, JSON.stringify(payload));
 
-    const response = await fetch(UTMIFY_ORDERS_URL, {
+    const response = await fetch(UTMIFY_EVENTS_URL, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${utmifyToken}`,
-      },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
     });
 
