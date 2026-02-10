@@ -45,9 +45,14 @@ async function updateFirestoreDoc(collection: string, docId: string, fields: Rec
 // Helper: Get Firestore document
 async function getFirestoreDoc(collection: string, docId: string) {
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${collection}/${docId}`;
+  console.log(`🔍 Firestore GET: ${collection}/${docId}`);
   const response = await fetch(url);
   
-  if (!response.ok) return null;
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ Firestore GET failed (${response.status}): ${errorText.substring(0, 300)}`);
+    return null;
+  }
   
   const data = await response.json();
   return data.fields || null;
