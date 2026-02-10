@@ -261,29 +261,21 @@ export default function Checkout() {
           balance: increment(-orderAmount)
         });
 
-        // UTMify Purchase → server-side via utmify-track proxy
+        // UTMify Purchase → server-side via supabase.functions.invoke (handles auth/CORS automatically)
         try {
-          await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/utmify-track`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              },
-              body: JSON.stringify({
-                type: 'Purchase',
-                eventId: `Purchase_${orderId}`,
-                orderId,
-                value: orderAmount,
-                currency: 'BRL',
-                sourceUrl: window.location.href,
-                pageTitle: document.title,
-                userAgent: navigator.userAgent,
-                icCSSMatch: '.utmify-checkout',
-              }),
-            }
-          );
+          await supabase.functions.invoke('utmify-track', {
+            body: {
+              type: 'Purchase',
+              eventId: `Purchase_${orderId}`,
+              orderId,
+              value: orderAmount,
+              currency: 'BRL',
+              sourceUrl: window.location.href,
+              pageTitle: document.title,
+              userAgent: navigator.userAgent,
+              icCSSMatch: '.utmify-checkout',
+            },
+          });
           console.log(`📊 UTMify Purchase sent via utmify-track for saldo order ${orderId}`);
         } catch (utmifyError) {
           console.warn('⚠️ UTMify tracking failed (non-blocking):', utmifyError);
