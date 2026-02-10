@@ -31,6 +31,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderIdParam = searchParams.get("order_id") || "";
+  const utmSource = searchParams.get("utm_source") || null;
+  const utmMedium = searchParams.get("utm_medium") || null;
+  const utmCampaign = searchParams.get("utm_campaign") || null;
   const isStandalone = !orderIdParam;
   const orderId = orderIdParam || `lead-${Date.now()}`;
   const { config, loading: configLoading } = usePostPaymentPage(addonType);
@@ -107,6 +110,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         amount: config.price,
         customer_email: user?.email || null,
         customer_name: user?.displayName || null,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
       });
 
       // Create PIX charge

@@ -57,7 +57,23 @@ export function AdminPostPaymentPages() {
   const [stats, setStats] = useState<Record<string, AddonStats>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState<string | null>(null);
+  const [utmParams, setUtmParams] = useState<Record<string, { source: string; medium: string; campaign: string }>>({});
   const { toast } = useToast();
+
+  const getUtm = (addonType: string) => utmParams[addonType] || { source: "", medium: "", campaign: "" };
+  const setUtm = (addonType: string, field: string, value: string) => {
+    setUtmParams(prev => ({ ...prev, [addonType]: { ...getUtm(addonType), [field]: value } }));
+  };
+  const buildLink = (addonType: string) => {
+    const base = `${window.location.origin}${routeMap[addonType] || "/painel-pagar"}`;
+    const utm = getUtm(addonType);
+    const params = new URLSearchParams();
+    if (utm.source) params.set("utm_source", utm.source);
+    if (utm.medium) params.set("utm_medium", utm.medium);
+    if (utm.campaign) params.set("utm_campaign", utm.campaign);
+    const qs = params.toString();
+    return qs ? `${base}?${qs}` : base;
+  };
 
   useEffect(() => {
     fetchPages();
@@ -263,28 +279,42 @@ export function AdminPostPaymentPages() {
                 </div>
 
                 {/* Standalone Link Generator */}
-                <div className="bg-[#0a0a0a] border border-[#222] rounded-lg p-4 space-y-2">
+                <div className="bg-[#0a0a0a] border border-[#222] rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm text-gray-400">
                     <Link2 className="w-4 h-4" /> Link direto para leads (sem compra)
+                  </div>
+                  <div className="grid grid-cols-3 gap-2">
+                    <div>
+                      <Label className="text-[10px] text-gray-500">utm_source</Label>
+                      <Input placeholder="whatsapp" value={getUtm(page.addon_type).source} onChange={(e) => setUtm(page.addon_type, "source", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-gray-500">utm_medium</Label>
+                      <Input placeholder="link" value={getUtm(page.addon_type).medium} onChange={(e) => setUtm(page.addon_type, "medium", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
+                    </div>
+                    <div>
+                      <Label className="text-[10px] text-gray-500">utm_campaign</Label>
+                      <Input placeholder="lead_vip" value={getUtm(page.addon_type).campaign} onChange={(e) => setUtm(page.addon_type, "campaign", e.target.value)} className="bg-[#111] border-[#222] text-xs h-8" />
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <Input
                       readOnly
-                      value={`${window.location.origin}${routeMap[page.addon_type] || "/painel-pagar"}`}
+                      value={buildLink(page.addon_type)}
                       className="bg-[#111] border-[#222] text-xs"
                     />
                     <Button
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(`${window.location.origin}${routeMap[page.addon_type] || "/painel-pagar"}`);
+                        navigator.clipboard.writeText(buildLink(page.addon_type));
                         toast({ title: "Link copiado!", description: "Envie para o lead." });
                       }}
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-gray-600">O lead acessa direto a oferta sem precisar ter feito uma compra.</p>
+                  <p className="text-[10px] text-gray-600">Preencha os UTMs e copie o link. O lead acessa direto a oferta.</p>
                 </div>
 
                 {/* Save */}
