@@ -249,28 +249,37 @@ export type Database = {
       }
       utmify_event_log: {
         Row: {
+          attempt_count: number
           created_at: string
           event_id: string
           event_type: string
           id: string
+          last_error: string | null
+          locked_at: string | null
           order_id: string | null
           status: string
           updated_at: string
         }
         Insert: {
+          attempt_count?: number
           created_at?: string
           event_id: string
           event_type: string
           id?: string
+          last_error?: string | null
+          locked_at?: string | null
           order_id?: string | null
           status?: string
           updated_at?: string
         }
         Update: {
+          attempt_count?: number
           created_at?: string
           event_id?: string
           event_type?: string
           id?: string
+          last_error?: string | null
+          locked_at?: string | null
           order_id?: string | null
           status?: string
           updated_at?: string

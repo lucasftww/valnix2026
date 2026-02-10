@@ -8,8 +8,8 @@ const corsHeaders = {
 
 const UTMIFY_API_URL = "https://tracking.utmify.com.br/tracking/v1/events";
 const UTMIFY_PIXEL_ID = "6983b13f961e629ed63fae7a";
+const LOCK_TTL_SECONDS = 30;
 
-// Singleton Supabase client (reused across requests in same isolate)
 const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, serviceKey);
@@ -17,7 +17,7 @@ const supabase = createClient(supabaseUrl, serviceKey);
 /** In-memory rate limiter (best-effort) */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 30;
-const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const RATE_LIMIT_WINDOW_MS = 60_000;
 
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
@@ -37,12 +37,31 @@ function cleanupRateLimit() {
   }
 }
 
+/** Cleanup old pending events (>7 days) — runs occasionally */
+let lastCleanup = 0;
+async function cleanupOldPendings() {
+  const now = Date.now();
+  if (now - lastCleanup < 3600_000) return; // max once per hour
+  lastCleanup = now;
+  try {
+    await supabase
+      .from('utmify_event_log')
+      .update({ status: 'failed', last_error: 'TTL expired (7d)' })
+      .eq('status', 'pending')
+      .lt('created_at', new Date(now - 7 * 86400_000).toISOString());
+    console.log('🧹 Cleaned up old pending events');
+  } catch (e) {
+    console.warn('⚠️ Cleanup error:', e);
+  }
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   cleanupRateLimit();
+  cleanupOldPendings(); // fire-and-forget
 
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || req.headers.get('cf-connecting-ip')
@@ -67,42 +86,81 @@ serve(async (req) => {
       });
     }
 
-    // Build dedupe key: prefer explicit eventId, fallback to type+orderId
     const dedupeKey = eventId || (orderId ? `${type}_${orderId}` : null);
 
-    // Persistent dedupe via DB with pending/sent status
     if (dedupeKey) {
-      // Check if already sent
-      const { data: existing } = await supabase
+      // Check existing state
+      const { data: existing, error: selectError } = await supabase
         .from('utmify_event_log')
-        .select('status')
+        .select('status, locked_at')
         .eq('event_id', dedupeKey)
         .maybeSingle();
 
+      if (selectError) {
+        console.warn('⚠️ Dedupe SELECT error (continuing):', selectError.message);
+      }
+
+      // Already sent → dedupe
       if (existing?.status === 'sent') {
-        console.log(`⏭️ UTMify dedupe: ${dedupeKey} already sent`);
         return new Response(JSON.stringify({ success: true, deduplicated: true }), {
           status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
 
-      // Insert as pending (or skip if already pending — will retry send)
+      // Pending + locked recently → someone else is sending, skip
+      if (existing?.status === 'pending' && existing.locked_at) {
+        const lockedAge = (Date.now() - new Date(existing.locked_at).getTime()) / 1000;
+        if (lockedAge < LOCK_TTL_SECONDS) {
+          console.log(`🔒 UTMify ${dedupeKey} locked ${lockedAge.toFixed(0)}s ago, skipping`);
+          return new Response(JSON.stringify({ success: true, in_flight: true }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+      }
+
       if (!existing) {
+        // New event → insert as pending + locked
         const { error: insertError } = await supabase
           .from('utmify_event_log')
-          .insert({ event_id: dedupeKey, event_type: type, order_id: orderId || null, status: 'pending' });
+          .insert({
+            event_id: dedupeKey,
+            event_type: type,
+            order_id: orderId || null,
+            status: 'pending',
+            locked_at: new Date().toISOString(),
+            attempt_count: 1,
+          });
 
-        if (insertError && insertError.code === '23505') {
-          // Race condition: another instance inserted between select and insert — continue to send
-          console.log(`⚡ UTMify dedupe race: ${dedupeKey}, proceeding to send`);
-        } else if (insertError) {
-          console.warn('⚠️ Dedupe DB insert error:', insertError.message);
+        if (insertError && insertError.code !== '23505') {
+          console.warn('⚠️ Dedupe INSERT error:', insertError.message);
+        }
+      } else {
+        // Existing pending (lock expired) → acquire lock atomically
+        const { data: locked } = await supabase
+          .from('utmify_event_log')
+          .update({
+            locked_at: new Date().toISOString(),
+            attempt_count: (existing as any).attempt_count ? (existing as any).attempt_count + 1 : 1,
+          })
+          .eq('event_id', dedupeKey)
+          .eq('status', 'pending')
+          .select('event_id')
+          .maybeSingle();
+
+        if (!locked) {
+          // Another instance grabbed it
+          console.log(`⚡ UTMify lock race: ${dedupeKey}, skipping`);
+          return new Response(JSON.stringify({ success: true, in_flight: true }), {
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
       }
     }
 
-    console.log(`📊 UTMify proxy: sending ${type} event`, { orderId, value, clientIp, dedupeKey });
+    console.log(`📊 UTMify proxy: sending ${type}`, { orderId, value, clientIp, dedupeKey });
 
     const payload = {
       type,
@@ -136,30 +194,29 @@ serve(async (req) => {
     const responseText = await response.text();
     console.log(`📊 UTMify API response: ${response.status}`, responseText);
 
-    // Mark as sent in DB only on success
-    if (response.ok && dedupeKey) {
-      await supabase
-        .from('utmify_event_log')
-        .update({ status: 'sent', updated_at: new Date().toISOString() })
-        .eq('event_id', dedupeKey);
+    if (dedupeKey) {
+      if (response.ok) {
+        await supabase
+          .from('utmify_event_log')
+          .update({ status: 'sent', locked_at: null, updated_at: new Date().toISOString() })
+          .eq('event_id', dedupeKey);
+      } else {
+        // Release lock, keep pending for retry
+        await supabase
+          .from('utmify_event_log')
+          .update({ locked_at: null, last_error: `HTTP ${response.status}: ${responseText.slice(0, 200)}` })
+          .eq('event_id', dedupeKey);
+      }
     }
 
     if (!response.ok) {
-      // UTMify failed — event stays as 'pending' in DB, allowing retry
-      return new Response(JSON.stringify({
-        success: false,
-        status: response.status,
-        response: responseText,
-      }), {
+      return new Response(JSON.stringify({ success: false, status: response.status }), {
         status: 502,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    return new Response(JSON.stringify({
-      success: true,
-      status: response.status,
-    }), {
+    return new Response(JSON.stringify({ success: true, status: response.status }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
