@@ -50,6 +50,7 @@ const sendEventViaProxy = async (
         },
         body: JSON.stringify({
           type: eventType,
+          eventId: eventData.orderId ? `${eventType}_${eventData.orderId}` : undefined,
           sourceUrl: window.location.href,
           pageTitle: document.title,
           userAgent: navigator.userAgent,
