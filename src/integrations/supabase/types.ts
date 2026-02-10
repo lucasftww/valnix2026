@@ -254,6 +254,8 @@ export type Database = {
           event_type: string
           id: string
           order_id: string | null
+          status: string
+          updated_at: string
         }
         Insert: {
           created_at?: string
@@ -261,6 +263,8 @@ export type Database = {
           event_type: string
           id?: string
           order_id?: string | null
+          status?: string
+          updated_at?: string
         }
         Update: {
           created_at?: string
@@ -268,6 +272,8 @@ export type Database = {
           event_type?: string
           id?: string
           order_id?: string | null
+          status?: string
+          updated_at?: string
         }
         Relationships: []
       }
