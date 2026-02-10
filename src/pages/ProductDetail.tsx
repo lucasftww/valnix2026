@@ -79,6 +79,20 @@ const ProductDetail = () => {
     [id]
   );
 
+  // Memoizar HTML sanitizado para evitar re-sanitize a cada render
+  const sanitizedDescription = useMemo(() => 
+    product?.rich_description ? DOMPurify.sanitize(product.rich_description) : '',
+    [product?.rich_description]
+  );
+  const sanitizedInstructions = useMemo(() => 
+    product?.instructions ? DOMPurify.sanitize(product.instructions) : '',
+    [product?.instructions]
+  );
+  const sanitizedTerms = useMemo(() => 
+    product?.terms_conditions ? DOMPurify.sanitize(product.terms_conditions) : '',
+    [product?.terms_conditions]
+  );
+
   // Track ViewContent for analytics funnel
   useEffect(() => {
     if (product) {
@@ -148,7 +162,7 @@ const ProductDetail = () => {
   const totalPrice = (product.price * quantity).toFixed(2).replace('.', ',');
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col pb-[88px] lg:pb-0">
+    <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col pb-[88px] lg:pb-0 will-change-scroll">
       <Helmet>
         <title>{`Comprar ${product.name} Barato | VALNIX`}</title>
         <meta name="description" content={`Compre ${product.name} com entrega automática via PIX. Melhor preço: R$ ${product.price.toFixed(2).replace('.', ',')}. Entrega instantânea e segura na VALNIX.`} />
@@ -202,7 +216,7 @@ const ProductDetail = () => {
         <div className="container px-4 md:px-8 pb-6 lg:pb-12">
           <div className="flex flex-col lg:grid lg:grid-cols-[1fr_420px] gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
             {/* Imagem Mobile */}
-            <div className="relative rounded-xl overflow-hidden bg-gradient-to-b from-black/90 to-black/70 border border-border/10 lg:hidden">
+            <div className="relative rounded-xl overflow-hidden bg-black/90 border border-border/10 lg:hidden">
               <div className="relative flex items-center justify-center p-4 min-h-[280px] sm:min-h-[350px]">
                 {product.image_url && (
                   <ProductImage
@@ -220,7 +234,7 @@ const ProductDetail = () => {
 
             {/* Card de Compra Mobile */}
             <div className="lg:hidden">
-              <div className="rounded-xl overflow-hidden border border-primary/20 bg-card/95 backdrop-blur-sm shadow-xl">
+              <div className="rounded-xl overflow-hidden border border-primary/20 bg-card shadow-xl">
                 <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
                   <div className="text-center">
                     <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Produto Digital</span>
@@ -231,7 +245,7 @@ const ProductDetail = () => {
                     </p>
                   </div>
 
-                  <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-xl p-4 text-center border border-primary/20">
+                  <div className="bg-primary/10 rounded-xl p-4 text-center border border-primary/20">
                     <p className="text-xs text-muted-foreground mb-1">Valor Total</p>
                     <p className="text-3xl sm:text-4xl font-extrabold text-primary">
                       R$ {totalPrice}
@@ -291,7 +305,7 @@ const ProductDetail = () => {
                 </div>
               </div>
 
-              <div className="bg-card/50 backdrop-blur-sm border border-border/30 rounded-xl overflow-hidden">
+              <div className="bg-card border border-border/30 rounded-xl overflow-hidden">
                 <Tabs defaultValue="description" className="w-full">
                   <TabsList className="w-full justify-start bg-transparent border-b border-border/30 rounded-none h-auto p-0">
                     <TabsTrigger 
@@ -323,7 +337,7 @@ const ProductDetail = () => {
                       {product.rich_description ? (
                         <div 
                           className="prose prose-invert prose-sm max-w-none" 
-                          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.rich_description) }} 
+                          dangerouslySetInnerHTML={{ __html: sanitizedDescription }} 
                         />
                       ) : product.description ? (
                         <p className="whitespace-pre-line">{product.description}</p>
@@ -337,7 +351,7 @@ const ProductDetail = () => {
                     {product.instructions ? (
                       <div 
                         className="prose prose-invert prose-sm max-w-none text-muted-foreground" 
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.instructions) }} 
+                        dangerouslySetInnerHTML={{ __html: sanitizedInstructions }} 
                       />
                     ) : (
                       <p className="text-sm text-muted-foreground">Instruções não disponíveis.</p>
@@ -348,7 +362,7 @@ const ProductDetail = () => {
                     {product.terms_conditions ? (
                       <div 
                         className="prose prose-invert prose-sm max-w-none text-muted-foreground" 
-                        dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.terms_conditions) }} 
+                        dangerouslySetInnerHTML={{ __html: sanitizedTerms }} 
                       />
                     ) : (
                       <p className="text-sm text-muted-foreground">Termos não disponíveis.</p>
@@ -360,7 +374,7 @@ const ProductDetail = () => {
 
             {/* Card de Compra Desktop */}
             <div className="hidden lg:block">
-              <div className="sticky top-32 rounded-xl overflow-hidden border border-border/50 bg-card backdrop-blur-sm shadow-lg">
+              <div className="sticky top-32 rounded-xl overflow-hidden border border-border/50 bg-card shadow-lg">
                 <div className="p-8 space-y-8">
                   <div className="flex justify-center">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Produto Digital</span>
@@ -452,13 +466,13 @@ const ProductDetail = () => {
             </div>
 
             {/* Descrição Mobile */}
-            <div className="lg:hidden bg-card/50 backdrop-blur-sm border border-border/30 rounded-xl p-6">
+            <div className="lg:hidden bg-card border border-border/30 rounded-xl p-6">
               <h2 className="text-xl font-bold mb-4">Sobre o Produto</h2>
               <div className="description-content text-sm text-muted-foreground leading-relaxed">
                 {product.rich_description ? (
                   <div 
                     className="prose prose-invert prose-sm max-w-none" 
-                    dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(product.rich_description) }} 
+                    dangerouslySetInnerHTML={{ __html: sanitizedDescription }} 
                   />
                 ) : product.description ? (
                   <p className="whitespace-pre-line">{product.description}</p>
@@ -479,7 +493,7 @@ const ProductDetail = () => {
       </main>
 
       {/* Sticky CTA Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-gradient-to-t from-black via-black/98 to-black/95 border-t border-primary/30 shadow-[0_-4px_30px_rgba(0,0,0,0.8)]">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-black border-t border-primary/30 shadow-lg">
         <div className="px-4 py-3 safe-area-inset-bottom">
           <div className="flex items-center justify-between mb-2">
             <div>

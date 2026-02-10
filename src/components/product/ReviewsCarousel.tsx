@@ -27,7 +27,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
 
   return (
     <div className="mt-6 max-w-7xl mx-auto">
-      <div className="relative rounded-2xl border-2 border-primary/30 bg-black/40 backdrop-blur-sm p-6">
+      <div className="relative rounded-2xl border-2 border-primary/30 bg-card p-6">
         <h2 className="text-2xl font-bold mb-6">Últimas avaliações</h2>
         <Carousel
           opts={{
@@ -40,7 +40,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           <CarouselContent className="-ml-2 md:-ml-4">
             {reviews.map((review) => (
               <CarouselItem key={review.id} className="pl-2 md:pl-4 basis-full md:basis-1/2 lg:basis-1/3">
-                <div className="relative rounded-xl border-2 border-primary/20 bg-black/30 backdrop-blur-sm p-4 h-full">
+                <div className="relative rounded-xl border-2 border-primary/20 bg-muted/30 p-4 h-full">
                   <div className="flex items-center justify-between mb-3">
                     <span className="font-bold text-sm">{review.customer_name}</span>
                     <div className="flex gap-0.5">
