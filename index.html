@@ -202,6 +202,40 @@
       a.setAttribute("src", "https://cdn.utmify.com.br/scripts/pixel/pixel.js");
       document.head.appendChild(a);
     </script>
+
+    <!-- Suppress UTMify pixel errors (POST 400, TypeError _id) -->
+    <script>
+      (function() {
+        // Intercept fetch to suppress UTMify POST 400 errors
+        var origFetch = window.fetch;
+        window.fetch = function() {
+          var url = arguments[0];
+          if (typeof url === 'string' && url.indexOf('utmify.com') !== -1) {
+            return origFetch.apply(this, arguments).catch(function() {
+              return new Response('{}', { status: 200 });
+            });
+          }
+          return origFetch.apply(this, arguments);
+        };
+        // Suppress uncaught errors from UTMify pixel (TypeError _id etc)
+        window.addEventListener('error', function(e) {
+          if (e.filename && e.filename.indexOf('utmify') !== -1) {
+            e.preventDefault();
+            return true;
+          }
+          if (e.message && (e.message.indexOf('_id') !== -1 || e.message.indexOf('utmify') !== -1)) {
+            e.preventDefault();
+            return true;
+          }
+        });
+        window.addEventListener('unhandledrejection', function(e) {
+          var reason = e.reason ? (e.reason.message || String(e.reason)) : '';
+          if (reason.indexOf('utmify') !== -1 || reason.indexOf('_id') !== -1) {
+            e.preventDefault();
+          }
+        });
+      })();
+    </script>
     
   
   
