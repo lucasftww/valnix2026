@@ -57,6 +57,13 @@ export default function Admin() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Strip UTM and other query params from admin URLs
+  useEffect(() => {
+    if (window.location.search) {
+      window.history.replaceState({}, "", window.location.pathname);
+    }
+  }, []);
+
   useEffect(() => {
     if (!loading) {
       if (!user) {
