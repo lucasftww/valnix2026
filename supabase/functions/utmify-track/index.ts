@@ -227,6 +227,7 @@ serve(async (req) => {
 
     // ── Build enriched payload ──
     const contentIdsArray = Array.isArray(contentIds) ? contentIds : undefined;
+    const utmParams = body.parameters || "";
     const payload: Record<string, unknown> = {
       type,
       eventId: dedupeKey || undefined,
@@ -234,7 +235,7 @@ serve(async (req) => {
         pixelId: UTMIFY_PIXEL_ID,
         userAgent: clientUserAgent,
         ip: clientIp.trim() || null,
-        parameters: parameters || "",
+        parameters: utmParams,
         icTextMatch: null,
         icCSSMatch: icCSSMatch || ".utmify-checkout",
         icURLMatch: null,
