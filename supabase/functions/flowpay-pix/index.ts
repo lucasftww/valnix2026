@@ -663,6 +663,11 @@ Deno.serve(async (req) => {
       const customerPhone = orderFields?.customer_phone?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
       const storedUtmParams = orderFields?.utm_parameters?.stringValue || '';
+      
+      // Use REAL client IP/UA stored at PIX creation time (not webhook server IP)
+      const realClientIp = orderFields?.client_ip?.stringValue || webhookClientIp;
+      const realClientUa = orderFields?.client_ua?.stringValue || webhookUserAgent;
+      console.log(`📊 EQM data: using ${orderFields?.client_ip?.stringValue ? 'stored client' : 'webhook'} IP: ${realClientIp}`);
 
       // Fetch order items for content enrichment
       let contentIds: string[] | undefined;
@@ -696,7 +701,7 @@ Deno.serve(async (req) => {
 
       // Track Purchase event on UTMify (server-side, enriched with PII + content)
       try {
-        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, webhookUserAgent, undefined, undefined, customerEmail, customerPhone, userId, contentIds, contentNames, numItems, storedUtmParams);
+        await trackUTMifyPurchase(orderId!, orderValue, realClientIp, realClientUa, undefined, undefined, customerEmail, customerPhone, userId, contentIds, contentNames, numItems, storedUtmParams);
       } catch (trackError) {
         console.warn('⚠️ UTMify tracking failed:', trackError);
       }
@@ -722,6 +727,13 @@ Deno.serve(async (req) => {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
+
+      // Capture REAL client IP/UA at PIX creation time (for webhook EQM later)
+      const clientIpAtCreate = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+        || req.headers.get('cf-connecting-ip')
+        || req.headers.get('x-real-ip')
+        || null;
+      const clientUaAtCreate = req.headers.get('user-agent') || null;
 
       const body = await req.json();
       const { orderId, customer, utmParameters } = body;
@@ -805,14 +817,16 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Store the chargeId in the order for webhook lookup (regular orders only)
+      // Store the chargeId + client IP/UA in the order for webhook lookup (regular orders only)
       if (orderId && !isUpsell) {
         try {
           await updateFirestoreDoc('orders', orderId, {
             flowpay_charge_id: data.charge.id,
             ...(utmParameters ? { utm_parameters: utmParameters } : {}),
+            ...(clientIpAtCreate ? { client_ip: clientIpAtCreate } : {}),
+            ...(clientUaAtCreate ? { client_ua: clientUaAtCreate } : {}),
           });
-          console.log(`✅ Stored chargeId ${data.charge.id} in order ${orderId}${utmParameters ? ' (with UTMs)' : ''}`);
+          console.log(`✅ Stored chargeId ${data.charge.id} in order ${orderId} (IP: ${clientIpAtCreate}, UA: ${(clientUaAtCreate || '').substring(0, 40)})`);
         } catch (err) {
           console.warn('⚠️ Failed to store chargeId in order:', err);
         }

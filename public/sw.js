@@ -1,4 +1,4 @@
-// Service Worker para notificações push
+// Service Worker para notificações push + UTMify event filtering
 
 self.addEventListener('install', (event) => {
   console.log('Service Worker instalado');
@@ -11,7 +11,10 @@ self.addEventListener('activate', (event) => {
 });
 
 // Block unwanted UTMify events (Lead, ViewContent, AddToCart, PageView)
+// Supports both single-event and batch-event payloads
 // IMPORTANT: Only intercepts specific UTMify tracking endpoints, never other requests
+const BLOCKED_EVENTS = ['ViewContent', 'Lead', 'AddToCart', 'PageView'];
+
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
@@ -26,21 +29,64 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method === 'POST') {
     event.respondWith(
       event.request.clone().text().then((body) => {
-        const blockedEvents = ['"ViewContent"', '"Lead"', '"AddToCart"', '"PageView"'];
-        const shouldBlock = blockedEvents.some((ev) => body.includes(ev));
+        // Try to parse as JSON for intelligent filtering
+        try {
+          const parsed = JSON.parse(body);
 
-        if (shouldBlock) {
-          console.debug('[SW] Blocked UTMify event:', body.substring(0, 60));
-          return new Response(JSON.stringify({ success: true }), {
-            status: 200,
-            headers: {
-              'Content-Type': 'application/json',
-              'Access-Control-Allow-Origin': '*',
-            },
-          });
+          // Case 1: Array of events (batch) — filter individually
+          if (Array.isArray(parsed)) {
+            const allowed = parsed.filter((ev) => {
+              const eventType = ev.type || ev.event || ev.eventName;
+              return !BLOCKED_EVENTS.includes(eventType);
+            });
+
+            if (allowed.length === 0) {
+              console.debug('[SW] Blocked entire batch:', parsed.length, 'events');
+              return new Response(JSON.stringify({ success: true }), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+              });
+            }
+
+            if (allowed.length < parsed.length) {
+              console.debug('[SW] Filtered batch:', parsed.length - allowed.length, 'blocked,', allowed.length, 'allowed');
+              // Re-send only allowed events
+              const newReq = new Request(event.request.url, {
+                method: 'POST',
+                headers: event.request.headers,
+                body: JSON.stringify(allowed),
+              });
+              return fetch(newReq);
+            }
+
+            // All events allowed — pass through
+            return fetch(event.request);
+          }
+
+          // Case 2: Single event object
+          const eventType = parsed.type || parsed.event || parsed.eventName;
+          if (eventType && BLOCKED_EVENTS.includes(eventType)) {
+            console.debug('[SW] Blocked UTMify event:', eventType);
+            return new Response(JSON.stringify({ success: true }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+
+          // Allowed event — pass through
+          return fetch(event.request);
+        } catch (e) {
+          // JSON parse failed — fallback to string matching
+          const shouldBlock = BLOCKED_EVENTS.some((ev) => body.includes('"' + ev + '"'));
+          if (shouldBlock) {
+            console.debug('[SW] Blocked UTMify event (string match):', body.substring(0, 60));
+            return new Response(JSON.stringify({ success: true }), {
+              status: 200,
+              headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+            });
+          }
+          return fetch(event.request);
         }
-        // Allow legitimate events (InitiateCheckout, Purchase) through
-        return fetch(event.request);
       }).catch(() => fetch(event.request))
     );
     return;
@@ -94,14 +140,12 @@ self.addEventListener('notificationclick', (event) => {
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true })
       .then((clientList) => {
-        // Verificar se já existe uma janela aberta
         for (let i = 0; i < clientList.length; i++) {
           const client = clientList[i];
           if (client.url === urlToOpen && 'focus' in client) {
             return client.focus();
           }
         }
-        // Se não, abrir nova janela
         if (clients.openWindow) {
           return clients.openWindow(urlToOpen);
         }
