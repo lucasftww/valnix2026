@@ -10,6 +10,34 @@ self.addEventListener('activate', (event) => {
   event.waitUntil(clients.claim());
 });
 
+// Block unwanted UTMify events (Lead, ViewContent, AddToCart, PageView)
+self.addEventListener('fetch', (event) => {
+  const url = event.request.url;
+
+  if (url.includes('utmify') && (url.includes('/lead') || url.includes('/events'))) {
+    if (event.request.method === 'POST') {
+      event.respondWith(
+        event.request.clone().text().then((body) => {
+          if (body.includes('"ViewContent"') ||
+              body.includes('"Lead"') ||
+              body.includes('"AddToCart"') ||
+              body.includes('"PageView"')) {
+            console.debug('[SW] Blocked UTMify event:', body.substring(0, 60));
+            return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
+          }
+          return fetch(event.request);
+        }).catch(() => fetch(event.request))
+      );
+      return;
+    }
+    // Block preflight-like GETs to these endpoints too
+    if (event.request.method === 'OPTIONS') {
+      event.respondWith(new Response(null, { status: 204 }));
+      return;
+    }
+  }
+});
+
 self.addEventListener('push', (event) => {
   console.log('Push notification recebida');
 
