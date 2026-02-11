@@ -184,17 +184,6 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                 <ul className="space-y-3">
                   <li>
                     <a 
-                      href="https://wa.me/5513982057182" 
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-sm text-foreground hover:text-primary transition-colors flex items-center gap-2"
-                    >
-                      <MessageCircle className="w-4 h-4" />
-                      WhatsApp
-                    </a>
-                  </li>
-                  <li>
-                    <a 
                       href="https://discord.gg/ZYdz9xYdq5" 
                       target="_blank"
                       rel="noopener noreferrer"
@@ -345,17 +334,6 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
               Atendimento ao Cliente
             </h3>
             <ul className="space-y-3">
-              <li>
-                <a 
-                  href="https://wa.me/5513982057182" 
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-2"
-                >
-                  <MessageCircle className="w-4 h-4" />
-                  WhatsApp
-                </a>
-              </li>
               <li>
                 <a 
                   href="https://discord.gg/ZYdz9xYdq5" 

@@ -118,12 +118,6 @@ export default function Terms() {
               </p>
               <ul className="space-y-2">
                 <li>
-                  <strong className="text-foreground">WhatsApp:</strong>{" "}
-                  <a href="https://wa.me/5513982057182" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
-                    Clique aqui para conversar
-                  </a>
-                </li>
-                <li>
                   <strong className="text-foreground">Discord:</strong>{" "}
                   <a href="https://discord.gg/ZYdz9xYdq5" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     Entre em contato através do nosso servidor
