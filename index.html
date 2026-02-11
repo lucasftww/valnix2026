@@ -184,6 +184,42 @@
   
   
   
+    <!-- Auto-detect referrer source and inject UTMs before UTMify pixel -->
+    <script>
+      (function(){
+        var params = new URLSearchParams(window.location.search);
+        if (params.get('utm_source')) return;
+
+        var ref = (document.referrer || '').toLowerCase();
+        var utm = null;
+
+        if (ref.indexOf('discord.com') !== -1 || ref.indexOf('discord.gg') !== -1 || ref.indexOf('discordapp.com') !== -1) {
+          utm = { utm_source: 'discord', utm_medium: 'social', utm_campaign: 'community' };
+        } else if (ref.indexOf('instagram.com') !== -1 || ref.indexOf('l.instagram.com') !== -1) {
+          utm = { utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'bio_link' };
+        } else if (ref.indexOf('tiktok.com') !== -1) {
+          utm = { utm_source: 'tiktok', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('twitter.com') !== -1 || ref.indexOf('t.co') !== -1 || ref.indexOf('x.com') !== -1) {
+          utm = { utm_source: 'twitter', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('youtube.com') !== -1 || ref.indexOf('youtu.be') !== -1) {
+          utm = { utm_source: 'youtube', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('whatsapp.com') !== -1 || ref.indexOf('wa.me') !== -1) {
+          utm = { utm_source: 'whatsapp', utm_medium: 'social', utm_campaign: 'referral' };
+        } else if (ref.indexOf('telegram.org') !== -1 || ref.indexOf('t.me') !== -1) {
+          utm = { utm_source: 'telegram', utm_medium: 'social', utm_campaign: 'referral' };
+        } else if (ref.indexOf('google.com') !== -1 || ref.indexOf('google.com.br') !== -1) {
+          utm = { utm_source: 'google', utm_medium: 'organic', utm_campaign: 'seo' };
+        }
+
+        if (utm) {
+          var url = new URL(window.location.href);
+          for (var key in utm) { url.searchParams.set(key, utm[key]); }
+          window.history.replaceState(null, '', url.toString());
+          try { sessionStorage.setItem('valnix_utm_params', JSON.stringify(utm)); } catch(e){}
+        }
+      })();
+    </script>
+
     <!-- UTMify Tracking -->
     <script
       src="https://cdn.utmify.com.br/scripts/utms/latest.js"
