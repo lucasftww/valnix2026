@@ -1,7 +1,7 @@
 import { 
   Package, ShoppingCart, FolderTree, Home, 
   BarChart3, Tag, Users, ChevronLeft, ChevronRight, LogOut,
-  Zap, MessageCircle, TrendingUp
+  Zap, TrendingUp
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
@@ -41,7 +41,6 @@ const systemMenuItems = [
   { id: "users", title: "Usuários", icon: Users, badge: null },
   { id: "coupons", title: "Cupons", icon: Tag, badge: null },
   { id: "post-payment", title: "Pós-Venda", icon: TrendingUp, badge: "new" },
-  { id: "support", title: "Suporte", icon: MessageCircle, badge: "hot" },
 ];
 
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {

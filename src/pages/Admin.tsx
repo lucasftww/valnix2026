@@ -6,13 +6,11 @@ import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminUsers } from "@/components/admin/AdminUsers";
 import { AdminCategories } from "@/components/admin/AdminCategories";
 
-// AdminReviews disabled - causes errors (product_reviews table missing)
 import { AdminCoupons } from "@/components/admin/AdminCoupons";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
-import { AdminSupport } from "@/components/admin/AdminSupport";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
-import { Loader2, Search, Bell, Settings, ChevronRight, Menu } from "lucide-react";
+import { Search, Bell, Settings, ChevronRight } from "lucide-react";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Input } from "@/components/ui/input";
@@ -45,8 +43,6 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   users: { title: "Usuários", description: "Gerenciar usuários cadastrados" },
   coupons: { title: "Cupons de Desconto", description: "Crie promoções e descontos" },
   
-  reviews: { title: "Avaliações", description: "Gerenciar avaliações de clientes" },
-  support: { title: "Suporte", description: "Atenda clientes em tempo real" },
   "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
 };
 
@@ -218,9 +214,6 @@ export default function Admin() {
               {activeTab === "orders" && <AdminOrders />}
               {activeTab === "users" && <AdminUsers />}
               {activeTab === "coupons" && <AdminCoupons />}
-              
-              {/* reviews tab disabled */}
-              {activeTab === "support" && <AdminSupport />}
               {activeTab === "post-payment" && <AdminPostPaymentPages />}
             </div>
           </main>
