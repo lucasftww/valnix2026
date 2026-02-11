@@ -203,78 +203,66 @@
       document.head.appendChild(a);
     </script>
 
-    <!-- Surgical UTMify pixel error suppression (third-party noise only) -->
+    <!-- Surgical UTMify pixel error suppression (error/unhandledrejection only — NO fetch wrapper) -->
     <script>
       (function() {
-        var UTMIFY_DOMAINS = ['utmify.com.br', 'utmify.com'];
+        // Rate-limit: max 1 debug log per 10s
+        var _lastLog = 0;
+        function debugLog(msg) {
+          var now = Date.now();
+          if (now - _lastLog < 10000) return;
+          _lastLog = now;
+          console.debug('[UTMify suppressed]', msg);
+        }
 
-        // Helper: check if a string contains a UTMify domain
+        // Precise origin check: cdn.utmify.com.br, utmify.com.br, or /pixel.js
         function isUtmifyOrigin(str) {
           if (!str) return false;
-          for (var i = 0; i < UTMIFY_DOMAINS.length; i++) {
-            if (str.indexOf(UTMIFY_DOMAINS[i]) !== -1) return true;
-          }
-          return false;
+          return str.indexOf('cdn.utmify.com.br') !== -1
+              || str.indexOf('utmify.com.br') !== -1
+              || str.indexOf('/pixel.js') !== -1;
         }
 
-        // Helper: check if error stack trace originates from UTMify scripts
-        function isUtmifyStack(stack) {
-          if (!stack) return false;
-          return isUtmifyOrigin(stack);
+        // Known UTMify error messages
+        function isUtmifyMessage(msg) {
+          if (!msg) return false;
+          return msg.indexOf('ALREADY_SAVED') !== -1
+              || (msg.indexOf('TypeError') !== -1 && msg.indexOf('_id') !== -1)
+              || (msg.indexOf('Cannot read properties') !== -1 && msg.indexOf('_id') !== -1);
         }
 
-        // 1. Suppress synchronous errors thrown by UTMify scripts
-        //    Filters by filename (script source) OR stack trace origin
+        // 1. Synchronous errors from UTMify scripts only
         window.addEventListener('error', function(e) {
-          // Only suppress if error comes from a UTMify script file
           if (e.filename && isUtmifyOrigin(e.filename)) {
-            console.debug('[UTMify suppressed] sync error from', e.filename, ':', e.message);
+            debugLog('sync error from ' + e.filename);
             e.preventDefault();
             return true;
           }
-          // Fallback: check stack trace for UTMify origin (covers inline evals)
-          if (e.error && isUtmifyStack(e.error.stack)) {
-            console.debug('[UTMify suppressed] sync error (stack match):', e.message);
+          if (e.error && e.error.stack && isUtmifyOrigin(e.error.stack)) {
+            debugLog('sync error (stack): ' + e.message);
             e.preventDefault();
             return true;
           }
-          // Do NOT suppress anything else — real bugs stay visible
+          if (e.message && isUtmifyMessage(e.message)) {
+            debugLog('sync error (msg): ' + e.message);
+            e.preventDefault();
+            return true;
+          }
+          // Real errors pass through untouched
         });
 
-        // 2. Suppress unhandled promise rejections from UTMify
-        //    Only catches rejections whose stack/message traces back to UTMify
+        // 2. Unhandled promise rejections from UTMify only
         window.addEventListener('unhandledrejection', function(e) {
           var reason = e.reason;
           if (!reason) return;
           var msg = reason.message || String(reason);
           var stack = reason.stack || '';
-          if (isUtmifyOrigin(msg) || isUtmifyStack(stack)) {
-            console.debug('[UTMify suppressed] promise rejection:', msg);
+          if (isUtmifyOrigin(msg) || isUtmifyOrigin(stack) || isUtmifyMessage(msg)) {
+            debugLog('promise rejection: ' + msg);
             e.preventDefault();
           }
-          // Do NOT suppress other rejections
+          // All other rejections pass through untouched
         });
-
-        // 3. Targeted fetch wrapper — ONLY wraps UTMify-bound requests
-        //    All other fetch calls pass through 100% untouched
-        var _origFetch = window.fetch;
-        window.fetch = function(input) {
-          var url = (typeof input === 'string') ? input : (input && input.url ? input.url : '');
-          if (isUtmifyOrigin(url)) {
-            return _origFetch.apply(this, arguments).then(function(resp) {
-              // UTMify 400s are expected dedup responses (ALREADY_SAVED etc) — suppress
-              if (!resp.ok) {
-                console.debug('[UTMify suppressed] HTTP', resp.status, 'from', url);
-              }
-              return resp;
-            }).catch(function(err) {
-              console.debug('[UTMify suppressed] network error to', url, ':', err.message);
-              return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-            });
-          }
-          // All non-UTMify requests: ZERO interference
-          return _origFetch.apply(this, arguments);
-        };
       })();
     </script>
     
