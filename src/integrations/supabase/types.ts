@@ -340,10 +340,10 @@ export type Database = {
           p_order_id?: string
         }
         Returns: {
-          attempt_count: number
-          event_id: string
-          lock_acquired: boolean
-          status: string
+          out_attempt_count: number
+          out_event_id: string
+          out_lock_acquired: boolean
+          out_status: string
         }[]
       }
     }

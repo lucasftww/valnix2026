@@ -399,17 +399,17 @@ async function trackUTMifyPurchase(
       return;
     }
 
-    if (row.status === 'sent') {
+    if (row.out_status === 'sent') {
       console.log(`⏭️ UTMify Purchase already sent for ${orderId}, skipping`);
       return;
     }
 
-    if (!row.lock_acquired) {
+    if (!row.out_lock_acquired) {
       console.log(`🔒 UTMify Purchase locked by another process for ${orderId}, skipping`);
       return;
     }
 
-    console.log(`🔑 UTMify lock acquired for ${orderId} (attempt ${row.attempt_count})`);
+    console.log(`🔑 UTMify lock acquired for ${orderId} (attempt ${row.out_attempt_count})`);
 
     // 2. Build PII hashes directly on lead (em/ph/external_id for UTMify/Meta EQM)
     const piiKeys: string[] = [];

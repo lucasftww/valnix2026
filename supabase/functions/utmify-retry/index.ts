@@ -126,8 +126,8 @@ Deno.serve(async (req) => {
         });
 
         const row = Array.isArray(lockResult) ? lockResult[0] : lockResult;
-        if (!row?.lock_acquired || row.status === 'sent') {
-          console.log(`⏭️ Skip ${event.event_id}: lock=${row?.lock_acquired}, status=${row?.status}`);
+        if (!row?.out_lock_acquired || row.out_status === 'sent') {
+          console.log(`⏭️ Skip ${event.event_id}: lock=${row?.out_lock_acquired}, status=${row?.out_status}`);
           continue;
         }
 
@@ -212,7 +212,7 @@ Deno.serve(async (req) => {
           tikTokPageInfo: null,
         };
 
-        console.log(`📊 Retry UTMify | ${event.event_id} | attempt=${row.attempt_count} | value=${value}`);
+        console.log(`📊 Retry UTMify | ${event.event_id} | attempt=${row.out_attempt_count} | value=${value}`);
 
         const response = await fetch(UTMIFY_EVENTS_URL, {
           method: 'POST',
