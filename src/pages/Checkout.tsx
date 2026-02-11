@@ -182,7 +182,6 @@ export default function Checkout() {
 
     // Track internal analytics funnel
     trackInitiateCheckoutEvent(user.uid, finalPrice);
-    trackInitiateCheckoutEvent(user.uid, finalPrice);
     
     try {
       const orderAmount = finalPrice;
