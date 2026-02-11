@@ -46,7 +46,7 @@ const NavigationComponent = () => {
   if (categories.length === 0) return null;
 
   return (
-    <nav className="hidden md:block sticky top-14 md:top-16 w-full border-b border-border bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/95 z-40 shadow-sm">
+    <nav className="hidden md:block sticky top-16 md:top-[72px] w-full border-b border-border bg-background/98 backdrop-blur-md supports-[backdrop-filter]:bg-background/95 z-40 shadow-sm">
       <div className="container px-4 md:px-8">
         <div className="flex items-center justify-center gap-2 py-2 flex-wrap">
           {categories.map((category) => {
