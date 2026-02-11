@@ -278,41 +278,12 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           </div>
 
           {/* Security Badges - Mobile */}
-          <div className="px-6 py-8 space-y-6 border-t border-border/30">
-            <div className="flex flex-wrap items-center justify-center gap-6">
-              <img 
-                src={nortonSecured} 
-                alt="Norton Secured" 
-                className="h-16 w-[108px] object-contain"
-                width={108}
-                height={64}
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'brightness(1.1) contrast(1.2)'
-                }}
-              />
-              <img 
-                src={reclameAqui} 
-                alt="Reclame Aqui" 
-                className="h-12 w-[218px] object-contain"
-                width={218}
-                height={48}
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'brightness(1.1) contrast(1.2)'
-                }}
-              />
-              <img 
-                src={googleSafe} 
-                alt="Google Safe Browsing" 
-                className="h-16 w-[133px] object-contain"
-                width={133}
-                height={64}
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'brightness(1.1) contrast(1.2)'
-                }}
-              />
+          <div className="px-6 py-6 border-t border-border/30">
+            <p className="text-[10px] text-muted-foreground text-center uppercase tracking-wider mb-4">Segurança verificada</p>
+            <div className="flex items-center justify-center gap-5">
+              <img src={nortonSecured} alt="Norton Secured" className="h-8 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
+              <img src={reclameAqui} alt="Reclame Aqui" className="h-6 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
+              <img src={googleSafe} alt="Google Safe Browsing" className="h-8 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
             </div>
           </div>
 
@@ -422,41 +393,12 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           </div>
 
           {/* Security Badges */}
-          <div className="space-y-6 mb-8 pb-8 border-b border-border/30">
-            <div className="flex flex-wrap items-center justify-center gap-6 md:gap-8">
-              <img 
-                src={nortonSecured} 
-                alt="Norton Secured" 
-                className="h-20 w-[135px] object-contain opacity-80"
-                width={135}
-                height={80}
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'brightness(1.1) contrast(1.2)'
-                }}
-              />
-              <img 
-                src={reclameAqui} 
-                alt="Reclame Aqui" 
-                className="h-16 w-[290px] object-contain opacity-80"
-                width={290}
-                height={64}
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'brightness(1.1) contrast(1.2)'
-                }}
-              />
-              <img 
-                src={googleSafe} 
-                alt="Google Safe Browsing" 
-                className="h-20 w-[166px] object-contain opacity-80"
-                width={166}
-                height={80}
-                style={{ 
-                  mixBlendMode: 'lighten',
-                  filter: 'brightness(1.1) contrast(1.2)'
-                }}
-              />
+          <div className="mb-8 pb-8 border-b border-border/30">
+            <p className="text-[10px] text-muted-foreground text-center uppercase tracking-wider mb-4">Segurança verificada</p>
+            <div className="flex items-center justify-center gap-8">
+              <img src={nortonSecured} alt="Norton Secured" className="h-10 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
+              <img src={reclameAqui} alt="Reclame Aqui" className="h-8 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
+              <img src={googleSafe} alt="Google Safe Browsing" className="h-10 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
             </div>
           </div>
 
