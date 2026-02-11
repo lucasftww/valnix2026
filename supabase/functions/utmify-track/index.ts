@@ -14,6 +14,13 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
 const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const supabase = createClient(supabaseUrl, serviceKey);
 
+/** SHA-256 hash helper (returns lowercase hex) */
+async function sha256(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input.trim().toLowerCase());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 /** In-memory rate limiter (best-effort) */
 const rateLimitMap = new Map<string, { count: number; resetAt: number }>();
 const RATE_LIMIT_MAX = 30;
@@ -41,7 +48,7 @@ function cleanupRateLimit() {
 let lastCleanup = 0;
 async function cleanupOldPendings() {
   const now = Date.now();
-  if (now - lastCleanup < 3600_000) return; // max once per hour
+  if (now - lastCleanup < 3600_000) return;
   lastCleanup = now;
   try {
     await supabase
@@ -61,12 +68,14 @@ serve(async (req) => {
   }
 
   cleanupRateLimit();
-  void cleanupOldPendings(); // detached, non-blocking
+  void cleanupOldPendings();
 
+  // ── EQM FIX: Always use IP/UA from request headers, never trust body ──
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
     || req.headers.get('cf-connecting-ip')
     || req.headers.get('x-real-ip')
     || "127.0.0.1";
+  const clientUserAgent = req.headers.get('user-agent') || 'server';
 
   if (!checkRateLimit(clientIp)) {
     return new Response(JSON.stringify({ error: 'Rate limit exceeded' }), {
@@ -77,7 +86,8 @@ serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { type, eventId, sourceUrl, pageTitle, value, currency, orderId, userAgent, parameters, icCSSMatch } = body;
+    const { type, eventId, sourceUrl, pageTitle, value, currency, orderId, parameters, icCSSMatch,
+      customerEmail, customerPhone, externalId, contentIds, contentNames, numItems } = body;
 
     if (!type) {
       return new Response(JSON.stringify({ error: 'Missing event type' }), {
@@ -100,7 +110,6 @@ serve(async (req) => {
         console.warn('⚠️ Dedupe SELECT error (continuing):', selectError.message);
       }
 
-      // Already sent → dedupe
       if (existing?.status === 'sent') {
         return new Response(JSON.stringify({ success: true, deduplicated: true }), {
           status: 200,
@@ -108,11 +117,9 @@ serve(async (req) => {
         });
       }
 
-      // Pending + locked recently → someone else is sending, skip
       if (existing?.status === 'pending' && existing.locked_at) {
         const lockedAge = (Date.now() - new Date(existing.locked_at).getTime()) / 1000;
         if (lockedAge < LOCK_TTL_SECONDS) {
-          console.log(`🔒 UTMify ${dedupeKey} locked ${lockedAge.toFixed(0)}s ago, skipping`);
           return new Response(JSON.stringify({ success: true, in_flight: true }), {
             status: 200,
             headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -120,8 +127,7 @@ serve(async (req) => {
         }
       }
 
-    if (!existing) {
-        // New event → insert as pending + locked
+      if (!existing) {
         const { error: insertError } = await supabase
           .from('utmify_event_log')
           .insert({
@@ -137,7 +143,6 @@ serve(async (req) => {
           console.warn('⚠️ Dedupe INSERT error:', insertError.message);
         }
 
-        // 23505 (unique violation) → recheck status instead of silent skip
         if (insertError?.code === '23505') {
           const { data: recheck } = await supabase
             .from('utmify_event_log')
@@ -152,7 +157,6 @@ serve(async (req) => {
             });
           }
 
-          // Pending with active lock → in_flight
           if (recheck?.status === 'pending' && recheck.locked_at) {
             const lockedAge = (Date.now() - new Date(recheck.locked_at).getTime()) / 1000;
             if (lockedAge < LOCK_TTL_SECONDS) {
@@ -163,7 +167,6 @@ serve(async (req) => {
             }
           }
 
-          // Pending with expired lock → try to acquire and continue
           if (recheck?.status === 'pending') {
             const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
             const { data: locked } = await supabase
@@ -184,7 +187,6 @@ serve(async (req) => {
                 headers: { ...corsHeaders, 'Content-Type': 'application/json' },
               });
             }
-            // Lock acquired, continue to send
           } else {
             return new Response(JSON.stringify({ success: true, deduplicated: true }), {
               status: 200,
@@ -193,7 +195,6 @@ serve(async (req) => {
           }
         }
       } else {
-        // Existing pending (lock expired or null) → acquire lock atomically
         const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
         const { data: locked } = await supabase
           .from('utmify_event_log')
@@ -208,7 +209,6 @@ serve(async (req) => {
           .maybeSingle();
 
         if (!locked) {
-          // Another instance grabbed it
           console.log(`⚡ UTMify lock race: ${dedupeKey}, skipping`);
           return new Response(JSON.stringify({ success: true, in_flight: true }), {
             status: 200,
@@ -218,14 +218,20 @@ serve(async (req) => {
       }
     }
 
-    // All events (including Purchase) go via tracking/v1/events — no token needed
-    const payload = {
+    // ── Build customer identifiers (hashed PII for EQM) ──
+    const customer: Record<string, string> = {};
+    if (customerEmail) customer.email = await sha256(customerEmail);
+    if (customerPhone) customer.phone = await sha256(customerPhone.replace(/\D/g, ''));
+    if (externalId) customer.externalId = await sha256(externalId);
+
+    // ── Build enriched payload ──
+    const payload: Record<string, unknown> = {
       type,
       eventId: dedupeKey || undefined,
       lead: {
         pixelId: UTMIFY_PIXEL_ID,
-        userAgent: userAgent || "server",
-        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
+        userAgent: clientUserAgent,
+        ip: clientIp.trim() || null,
         parameters: parameters || "",
         icTextMatch: null,
         icCSSMatch: icCSSMatch || ".utmify-checkout",
@@ -239,11 +245,20 @@ serve(async (req) => {
         value: value || undefined,
         currency: currency || "BRL",
         orderId: orderId || undefined,
+        // Content enrichment for Meta ROAS optimization
+        ...(contentIds ? { contentIds } : {}),
+        ...(contentNames ? { contentName: contentNames } : {}),
+        ...(numItems ? { numItems } : {}),
       },
       tikTokPageInfo: null,
     };
 
-    console.log(`📊 UTMify proxy: sending ${type}`);
+    // Add customer PII if available (hashed, never logged raw)
+    if (Object.keys(customer).length > 0) {
+      (payload.lead as Record<string, unknown>).customer = customer;
+    }
+
+    console.log(`📊 UTMify proxy: ${type} | orderId=${orderId || 'none'} | ip=${clientIp} | ua=${clientUserAgent.substring(0, 50)} | pii=${Object.keys(customer).join(',') || 'none'} | content=${contentIds ? 'yes' : 'no'}`);
 
     const response = await fetch(UTMIFY_EVENTS_URL, {
       method: "POST",
@@ -261,7 +276,6 @@ serve(async (req) => {
           .update({ status: 'sent', locked_at: null, updated_at: new Date().toISOString() })
           .eq('event_id', dedupeKey);
       } else {
-        // Release lock, keep pending for retry
         await supabase
           .from('utmify_event_log')
           .update({ locked_at: null, last_error: `HTTP ${response.status}: ${responseText.slice(0, 200)}` })

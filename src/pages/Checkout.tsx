@@ -261,7 +261,7 @@ export default function Checkout() {
           balance: increment(-orderAmount)
         });
 
-        // UTMify Purchase → server-side via supabase.functions.invoke (handles auth/CORS automatically)
+        // UTMify Purchase → server-side via utmify-track (enriched with PII + content for EQM)
         try {
           await supabase.functions.invoke('utmify-track', {
             body: {
@@ -272,8 +272,14 @@ export default function Checkout() {
               currency: 'BRL',
               sourceUrl: window.location.href,
               pageTitle: document.title,
-              userAgent: navigator.userAgent,
               icCSSMatch: '.utmify-checkout',
+              // Customer PII (will be SHA-256 hashed server-side)
+              customerEmail: user.email || undefined,
+              externalId: user.uid,
+              // Content enrichment for Meta ROAS
+              contentIds: items.map(i => i.id),
+              contentNames: items.map(i => i.name).join(', '),
+              numItems: items.reduce((sum, i) => sum + i.quantity, 0),
             },
           });
           console.log(`📊 UTMify Purchase sent via utmify-track for saldo order ${orderId}`);
