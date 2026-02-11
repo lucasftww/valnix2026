@@ -34,9 +34,9 @@
     <!-- Preconnect to critical domains -->
     <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link rel="preconnect" href="https://hswmwkjijpywnazorusc.supabase.co" crossorigin />
+    <link rel="preconnect" href="https://tiupdhnjdcmgbqifwkrd.supabase.co" crossorigin />
     <link rel="preconnect" href="https://media.discordapp.net" crossorigin />
-    <link rel="dns-prefetch" href="https://hswmwkjijpywnazorusc.supabase.co" />
+    <link rel="dns-prefetch" href="https://tiupdhnjdcmgbqifwkrd.supabase.co" />
     <link rel="dns-prefetch" href="https://media.discordapp.net" />
     
     <!-- UTMify Pixel CDN preconnect + preload -->
@@ -181,21 +181,12 @@
     
     <!-- Manifest -->
     <link rel="manifest" href="/manifest.json" />
-  
-  
-  
-  
-  
-    
-  
-  
-  
+
     <!-- Strip sensitive tokens from URL before any tracking scripts load -->
     <script>
       (function(){
         var url = new URL(window.location.href);
         var dirty = false;
-        // Remove __lovable_token and other sensitive params
         ['__lovable_token', '__dev_token'].forEach(function(key) {
           if (url.searchParams.has(key)) { url.searchParams.delete(key); dirty = true; }
         });
@@ -207,8 +198,6 @@
     <script>
       (function(){
         var params = new URLSearchParams(window.location.search);
-
-        // 1. If URL already has utm_source, just persist and return
         if (params.get('utm_source')) {
           try {
             var existing = {};
@@ -219,18 +208,13 @@
           } catch(e){}
           return;
         }
-
         var ref = (document.referrer || '').toLowerCase();
         var utm = null;
-
-        // 2. Paid click IDs take priority (gclid = Google Ads, fbclid = Facebook Ads)
         if (params.get('gclid')) {
           utm = { utm_source: 'google', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'google_ads' };
         } else if (params.get('fbclid')) {
           utm = { utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'facebook_ads' };
-        }
-        // 3. Referrer-based detection (organic/social)
-        else if (ref.indexOf('discord.com') !== -1 || ref.indexOf('discord.gg') !== -1 || ref.indexOf('discordapp.com') !== -1) {
+        } else if (ref.indexOf('discord.com') !== -1 || ref.indexOf('discord.gg') !== -1 || ref.indexOf('discordapp.com') !== -1) {
           utm = { utm_source: 'discord', utm_medium: 'social', utm_campaign: 'community' };
         } else if (ref.indexOf('facebook.com') !== -1 || ref.indexOf('fb.com') !== -1 || ref.indexOf('m.facebook.com') !== -1 || ref.indexOf('l.facebook.com') !== -1 || ref.indexOf('lm.facebook.com') !== -1) {
           utm = { utm_source: 'facebook', utm_medium: 'social', utm_campaign: 'organic' };
@@ -260,12 +244,9 @@
           utm = { utm_source: 'google', utm_medium: 'organic', utm_campaign: 'seo' };
         } else if (ref.indexOf('bing.com') !== -1) {
           utm = { utm_source: 'bing', utm_medium: 'organic', utm_campaign: 'seo' };
-        }
-        // 4. Direct traffic (no referrer, no UTMs)
-        else if (!ref) {
+        } else if (!ref) {
           utm = { utm_source: 'direct', utm_medium: '(none)', utm_campaign: 'direct' };
         }
-
         if (utm) {
           var url = new URL(window.location.href);
           for (var key in utm) { url.searchParams.set(key, utm[key]); }
@@ -275,8 +256,6 @@
       })();
     </script>
 
-    <!-- UTMify utms/latest.js REMOVED — custom UTM capture in inline script above is more reliable -->
-    
     <!-- UTMify Pixel (multi-CDN fallback with timeout) -->
     <script>
       window.pixelId = "6983b13f961e629ed63fae7a";
@@ -287,14 +266,9 @@
           'https://pixel.utmify.com.br/pixel.js'
         ];
         function loadPixel(i) {
-          if (i >= sources.length) {
-            console.warn('[Valnix] Pixel falhou em todas CDNs');
-            return;
-          }
+          if (i >= sources.length) { console.warn('[Valnix] Pixel falhou em todas CDNs'); return; }
           var s = document.createElement('script');
-          s.type = 'text/javascript';
-          s.async = true;
-          s.src = sources[i];
+          s.type = 'text/javascript'; s.async = true; s.src = sources[i];
           var timeout = setTimeout(function() {
             try { document.head.removeChild(s); } catch(e){}
             loadPixel(i + 1);
@@ -307,20 +281,11 @@
       })();
     </script>
 
-    <!-- Service Worker handles UTMify event blocking — no error suppression needed -->
-    
-  
-  
-  
-  
-  
-  
-  
-  <meta property="og:title" content="VALNIX">
-  <meta name="twitter:title" content="VALNIX">
-  <meta property="og:description" content="Na VALNIX, nosso objetivo é que você compre seus giftcards de forma fácil e segura, com as principais formas de pagamento! O que está esperando? Compre agora!">
-  <meta name="twitter:description" content="Na VALNIX, nosso objetivo é que você compre seus giftcards de forma fácil e segura, com as principais formas de pagamento! O que está esperando? Compre agora!">
-</head>
+    <meta property="og:title" content="VALNIX">
+    <meta name="twitter:title" content="VALNIX">
+    <meta property="og:description" content="Na VALNIX, nosso objetivo é que você compre seus giftcards de forma fácil e segura, com as principais formas de pagamento! O que está esperando? Compre agora!">
+    <meta name="twitter:description" content="Na VALNIX, nosso objetivo é que você compre seus giftcards de forma fácil e segura, com as principais formas de pagamento! O que está esperando? Compre agora!">
+  </head>
 
   <body>
     
