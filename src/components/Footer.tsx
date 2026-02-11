@@ -116,8 +116,8 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                       </CarouselItem>
                     </CarouselContent>
                     <div className="flex justify-center gap-3 mt-6">
-                      <CarouselPrevious className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground" aria-label="Ver benefício anterior" />
-                      <CarouselNext className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground" aria-label="Ver próximo benefício" />
+                      <CarouselPrevious className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-8 w-8" aria-label="Ver benefício anterior" />
+                      <CarouselNext className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-8 w-8" aria-label="Ver próximo benefício" />
                     </div>
                   </Carousel>
                 </div>
