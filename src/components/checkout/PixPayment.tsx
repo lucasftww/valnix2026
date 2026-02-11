@@ -279,10 +279,18 @@ export function PixPayment({
             {formatTime(timeLeft)}
           </span>
         </div>
-        <Progress 
-          value={progressPercentage} 
-          className="h-1.5"
-        />
+        <div className="w-full h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+          <div 
+            className={`h-full rounded-full transition-all duration-1000 ease-linear ${
+              isExpired 
+                ? 'bg-red-500' 
+                : isExpiring 
+                  ? 'bg-yellow-500' 
+                  : 'bg-primary'
+            }`}
+            style={{ width: `${progressPercentage}%` }}
+          />
+        </div>
         {isExpired && (
           <Button 
             onClick={() => window.location.reload()} 
