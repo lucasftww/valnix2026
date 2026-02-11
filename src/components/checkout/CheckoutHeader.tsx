@@ -11,7 +11,7 @@ export function CheckoutHeader({ currentStep = 1 }: CheckoutHeaderProps) {
     <header className="border-b border-[#1f1f1f]">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
         <Link to="/">
-          <img src={vLogo} alt="Valnix" className="h-7" />
+          <img src={vLogo} alt="Valnix" className="h-9 md:h-10" />
         </Link>
         
         {/* Steps - Desktop */}
