@@ -50,10 +50,8 @@ self.addEventListener('fetch', (event) => {
 
             if (allowed.length < parsed.length) {
               console.debug('[SW] Filtered batch:', parsed.length - allowed.length, 'blocked,', allowed.length, 'allowed');
-              // Re-send only allowed events
-              const newReq = new Request(event.request.url, {
-                method: 'POST',
-                headers: event.request.headers,
+              // Clone original request preserving credentials, mode, referrer, etc. — only replace body
+              const newReq = new Request(event.request, {
                 body: JSON.stringify(allowed),
               });
               return fetch(newReq);
@@ -76,10 +74,17 @@ self.addEventListener('fetch', (event) => {
           // Allowed event — pass through
           return fetch(event.request);
         } catch (e) {
-          // JSON parse failed — fallback to string matching
-          const shouldBlock = BLOCKED_EVENTS.some((ev) => body.includes('"' + ev + '"'));
+          // JSON parse failed — fallback to contextual string matching (more specific than plain includes)
+          const shouldBlock = BLOCKED_EVENTS.some((ev) =>
+            body.includes('"type":"' + ev + '"') ||
+            body.includes('"type": "' + ev + '"') ||
+            body.includes('"event":"' + ev + '"') ||
+            body.includes('"event": "' + ev + '"') ||
+            body.includes('"eventName":"' + ev + '"') ||
+            body.includes('"eventName": "' + ev + '"')
+          );
           if (shouldBlock) {
-            console.debug('[SW] Blocked UTMify event (string match):', body.substring(0, 60));
+            console.debug('[SW] Blocked UTMify event (string match):', body.substring(0, 80));
             return new Response(JSON.stringify({ success: true }), {
               status: 200,
               headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
