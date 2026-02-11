@@ -36,7 +36,7 @@ export const FloatingContactButtons = () => {
           >
             <Button
               size="icon"
-              className="h-12 w-12 md:h-14 md:w-14 rounded-full bg-discord hover:bg-discord/90 shadow-lg hover:shadow-xl transition-all hover:scale-105"
+              className="h-12 w-12 md:h-14 md:w-14 rounded-full bg-discord hover:bg-discord/90 shadow-lg transition-colors"
             >
               <svg
                 className="h-6 w-6 text-white"

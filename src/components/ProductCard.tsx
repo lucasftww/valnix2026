@@ -95,7 +95,7 @@ const ProductCardComponent = ({
       onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
-      <Card className="relative overflow-hidden border border-primary/20 md:border-2 hover:border-primary active:border-primary transition-colors duration-200 bg-card cursor-pointer h-full hover:shadow-lg md:hover:shadow-2xl hover:shadow-primary/20 active:scale-[0.98] rounded-xl md:rounded-2xl">
+      <Card className="relative overflow-hidden border border-primary/20 md:border-2 hover:border-primary active:border-primary transition-colors duration-200 bg-card cursor-pointer h-full md:hover:shadow-2xl md:hover:shadow-primary/20 active:scale-[0.98] rounded-xl md:rounded-2xl">
         {/* Badge de desconto - mais visível no mobile */}
         {hasDiscount && (
           <Badge className="absolute top-2 left-2 md:top-3 md:left-3 z-10 bg-green-600 text-white font-bold text-[10px] md:text-sm px-2 py-0.5 md:px-3 md:py-1 rounded-md shadow-lg">
@@ -104,7 +104,7 @@ const ProductCardComponent = ({
         )}
         
         {/* Imagem com lazy loading otimizado */}
-        <div className="relative w-full aspect-[4/5] bg-gradient-to-b from-muted to-muted/80 overflow-hidden">
+        <div className="relative w-full aspect-[4/5] bg-muted overflow-hidden">
           {isVisible ? (
             <img
               src={image}
@@ -115,7 +115,7 @@ const ProductCardComponent = ({
               decoding="async"
               fetchPriority={priority ? "high" : "auto"}
               onLoad={() => setImageLoaded(true)}
-              className={`w-full h-full object-cover transition-opacity duration-300 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             />
           ) : (
             <div className="w-full h-full bg-muted animate-pulse" />
@@ -123,7 +123,7 @@ const ProductCardComponent = ({
         </div>
 
         {/* Área de informações - melhor espaçamento mobile */}
-        <div className="bg-gradient-to-b from-black/95 to-black p-3 md:p-4">
+        <div className="bg-black p-3 md:p-4">
           <h3 className="text-white font-bold text-sm sm:text-base md:text-lg line-clamp-2 leading-tight min-h-[2.5rem] sm:min-h-0">
             {title}
           </h3>
