@@ -219,8 +219,13 @@ const ProductDetail = () => {
             <div className="lg:hidden space-y-3">
               {/* Hero: Imagem + Nome + Preço — tudo num bloco só */}
               <div className="rounded-2xl overflow-hidden border border-border/20 bg-card">
+                {/* Badge vendidos */}
+                <div className="flex items-center gap-1.5 px-4 py-2.5">
+                  <Zap className="w-3 h-3 text-primary shrink-0" />
+                  <span className="text-[11px] font-semibold text-foreground">+{productStats.sold.toLocaleString('pt-BR')} vendidos</span>
+                </div>
                 {/* Imagem */}
-                <div className="relative bg-gradient-to-b from-muted/20 to-background flex items-center justify-center px-10 py-6">
+                <div className="flex items-center justify-center px-10 py-4 bg-gradient-to-b from-muted/20 to-background">
                   {product.image_url && (
                     <img
                       src={product.image_url}
@@ -230,10 +235,6 @@ const ProductDetail = () => {
                       className="w-full max-h-[300px] object-contain drop-shadow-2xl"
                     />
                   )}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-full px-2.5 py-1">
-                    <Zap className="w-3 h-3 text-primary shrink-0" />
-                    <span className="text-[11px] font-semibold text-white">+{productStats.sold.toLocaleString('pt-BR')} vendidos</span>
-                  </div>
                 </div>
 
                 {/* Info */}
