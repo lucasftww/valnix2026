@@ -11,6 +11,13 @@ const FIREBASE_PROJECT_ID = 'valnix';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
 const UTMIFY_EVENTS_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
+/** SHA-256 hash helper for PII (returns lowercase hex) */
+async function sha256(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input.trim().toLowerCase());
+  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
 // ── Firebase Service Account Auth ──────────────────────────────────
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -267,7 +274,13 @@ async function processAutoDelivery(orderId: string) {
 }
 
 // Track Purchase event on UTMify (server-side, with persistent dedupe)
-async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: string | null, clientUserAgent?: string | null, sourceUrl?: string, pageTitle?: string) {
+async function trackUTMifyPurchase(
+  orderId: string, value: number, 
+  clientIp?: string | null, clientUserAgent?: string | null, 
+  sourceUrl?: string, pageTitle?: string,
+  customerEmail?: string | null, customerPhone?: string | null,
+  externalId?: string | null, contentIds?: string[], contentNames?: string, numItems?: number
+) {
   const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -383,32 +396,44 @@ async function trackUTMifyPurchase(orderId: string, value: number, clientIp?: st
       }
     }
 
-    // 2. Send to UTMify via tracking/v1/events (no token needed)
+    // 2. Build customer PII (hashed SHA-256 for EQM)
+    const customer: Record<string, string> = {};
+    if (customerEmail) customer.email = await sha256(customerEmail);
+    if (customerPhone) customer.phone = await sha256(customerPhone.replace(/\D/g, ''));
+    if (externalId) customer.externalId = await sha256(externalId);
+
+    // 3. Send to UTMify via tracking/v1/events (no token needed)
+    const leadObj: Record<string, unknown> = {
+      pixelId: UTMIFY_PIXEL_ID,
+      userAgent: clientUserAgent || 'server',
+      ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
+      parameters: '',
+      icTextMatch: null,
+      icCSSMatch: '.utmify-checkout',
+      icURLMatch: null,
+      leadTextMatch: null,
+      addToCartTextMatch: null,
+    };
+    if (Object.keys(customer).length > 0) leadObj.customer = customer;
+
     const payload = {
       type: 'Purchase',
       eventId: dedupeKey,
-      lead: {
-        pixelId: UTMIFY_PIXEL_ID,
-        userAgent: clientUserAgent || 'server',
-        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
-        parameters: '',
-        icTextMatch: null,
-        icCSSMatch: '.utmify-checkout',
-        icURLMatch: null,
-        leadTextMatch: null,
-        addToCartTextMatch: null,
-      },
+      lead: leadObj,
       event: {
         sourceUrl: sourceUrl || 'https://valnix2026.lovable.app/checkout',
         pageTitle: pageTitle || 'Checkout - Valnix',
         value,
         currency: 'BRL',
         orderId,
+        ...(contentIds ? { contentIds } : {}),
+        ...(contentNames ? { contentName: contentNames } : {}),
+        ...(numItems ? { numItems } : {}),
       },
       tikTokPageInfo: null,
     };
 
-    console.log(`📊 UTMify Purchase | orderId=${orderId} | eventId=${dedupeKey} | value=${value} | ip=${clientIp || 'none'} | ua=${(clientUserAgent || 'server').substring(0, 50)}`);
+    console.log(`📊 UTMify Purchase | orderId=${orderId} | eventId=${dedupeKey} | value=${value} | ip=${clientIp || 'none'} | pii=${Object.keys(customer).join(',') || 'none'} | content=${contentIds ? 'yes' : 'no'}`);
 
     const response = await fetch(UTMIFY_EVENTS_URL, {
       method: 'POST',
@@ -596,7 +621,7 @@ Deno.serve(async (req) => {
         const upsellSourceUrl = `https://valnix2026.lovable.app${upsellPath}`;
         const upsellPageTitle = `Upsell ${addon.addon_type} - Valnix`;
         try {
-          await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), webhookClientIp, webhookUserAgent, upsellSourceUrl, upsellPageTitle);
+          await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), webhookClientIp, webhookUserAgent, upsellSourceUrl, upsellPageTitle, addon.customer_email, null, addon.user_id);
         } catch (trackError) {
           console.warn('⚠️ UTMify upsell tracking failed:', trackError);
         }
@@ -631,7 +656,22 @@ Deno.serve(async (req) => {
       // Extract order data for tracking
       const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || (paidValue ? paidValue / 100 : 0);
       const customerEmail = orderFields?.customer_email?.stringValue;
+      const customerPhone = orderFields?.customer_phone?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
+
+      // Fetch order items for content enrichment
+      let contentIds: string[] | undefined;
+      let contentNames: string | undefined;
+      let numItems: number | undefined;
+      try {
+        const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId!);
+        if (itemsResults && Array.isArray(itemsResults)) {
+          const items = itemsResults.filter((r: any) => r.document);
+          contentIds = items.map((r: any) => r.document.fields?.product_id?.stringValue).filter(Boolean);
+          contentNames = items.map((r: any) => r.document.fields?.product_name?.stringValue).filter(Boolean).join(', ');
+          numItems = items.reduce((sum: number, r: any) => sum + (parseInt(r.document.fields?.quantity?.integerValue || '1')), 0);
+        }
+      } catch (e) { console.warn('⚠️ Content enrichment failed:', e); }
 
       // Update order status to paid
       await updateFirestoreDoc('orders', orderId!, {
@@ -649,9 +689,9 @@ Deno.serve(async (req) => {
         console.error(`⚠️ Auto-delivery failed for order ${orderId}:`, deliveryError);
       }
 
-      // Track Purchase event on UTMify (server-side)
+      // Track Purchase event on UTMify (server-side, enriched with PII + content)
       try {
-        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, webhookUserAgent);
+        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, webhookUserAgent, undefined, undefined, customerEmail, customerPhone, userId, contentIds, contentNames, numItems);
       } catch (trackError) {
         console.warn('⚠️ UTMify tracking failed:', trackError);
       }
@@ -853,12 +893,13 @@ Deno.serve(async (req) => {
 
             if (!existing || (existing.status !== 'sent')) {
               console.log(`🔄 FALLBACK: Webhook missed for order ${fbOrderId}, dispatching Purchase via polling`);
-              await trackUTMifyPurchase(fbOrderId, Number(orderValue), pollingIp, pollingUa);
+              const fbEmail = orderFields?.customer_email?.stringValue;
+              const fbPhone = orderFields?.customer_phone?.stringValue;
+              const fbUserId = orderFields?.user_id?.stringValue;
+              await trackUTMifyPurchase(fbOrderId, Number(orderValue), pollingIp, pollingUa, undefined, undefined, fbEmail, fbPhone, fbUserId);
               
               // Also register analytics if not done
-              const userId = orderFields?.user_id?.stringValue;
-              const customerEmail = orderFields?.customer_email?.stringValue;
-              await registerAnalyticsEvent(fbOrderId, Number(orderValue), userId, customerEmail);
+              await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
             }
           } else {
             // Check if it's an upsell addon
@@ -899,7 +940,7 @@ Deno.serve(async (req) => {
                 .maybeSingle();
 
               if (!existing || existing.status !== 'sent') {
-                await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), pollingIp, pollingUa, upsellSourceUrl, `Upsell ${addon.addon_type} - Valnix`);
+                await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), pollingIp, pollingUa, upsellSourceUrl, `Upsell ${addon.addon_type} - Valnix`, addon.customer_email, null, addon.user_id);
                 await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
               }
             }
