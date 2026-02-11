@@ -15,10 +15,8 @@ import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import pixLogo from "@/assets/pix-logo.png";
-// trackPurchase is a no-op; saldo Purchase is sent via utmify-track edge function directly
 import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
-import { getUtmQueryString } from "@/lib/utmCapture";
 
 interface FormData {
   name: string;
@@ -182,8 +180,8 @@ export default function Checkout() {
     
     setLoading(true);
 
-    // InitiateCheckout UTMify → handled by CSS class .utmify-checkout (pixel auto-detect)
-    // Only track internal analytics funnel
+    // Track internal analytics funnel
+    trackInitiateCheckoutEvent(user.uid, finalPrice);
     trackInitiateCheckoutEvent(user.uid, finalPrice);
     
     try {
@@ -274,32 +272,6 @@ export default function Checkout() {
           balance: increment(-orderAmount)
         });
 
-        // UTMify Purchase → server-side via utmify-track (enriched with PII + content for EQM)
-        try {
-          await supabase.functions.invoke('utmify-track', {
-            body: {
-              type: 'Purchase',
-              eventId: `Purchase_${orderId}`,
-              orderId,
-              value: orderAmount,
-              currency: 'BRL',
-              sourceUrl: window.location.href,
-              pageTitle: document.title,
-              icCSSMatch: '.utmify-checkout',
-              parameters: getUtmQueryString(),
-              // Customer PII (will be SHA-256 hashed server-side)
-              customerEmail: user.email || undefined,
-              externalId: user.uid,
-              // Content enrichment for Meta ROAS
-              contentIds: items.map(i => i.id),
-              contentNames: items.map(i => i.name).join(', '),
-              numItems: items.reduce((sum, i) => sum + i.quantity, 0),
-            },
-          });
-          console.log(`📊 UTMify Purchase sent via utmify-track for saldo order ${orderId}`);
-        } catch (utmifyError) {
-          console.warn('⚠️ UTMify tracking failed (non-blocking):', utmifyError);
-        }
         trackPurchaseEvent(user.uid, orderAmount, orderId, items.map(i => i.name).join(', '));
 
         clearCart();
@@ -352,7 +324,7 @@ export default function Checkout() {
             amount: Math.round(orderAmount * 100),
             orderId,
             description: `Pedido ${orderId.substring(0, 8)}`,
-            utmParameters: getUtmQueryString(),
+            
             customer: {
               name: formData.name,
               email: user.email || undefined,
@@ -427,7 +399,7 @@ export default function Checkout() {
   // Payment screen
   if (paymentData) {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] utmify-checkout">
+      <div className="min-h-screen bg-[#0d0d0d]">
         <CheckoutHeader currentStep={2} />
         <main className="max-w-xl mx-auto px-4 py-8">
           <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-6">
@@ -467,7 +439,7 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] utmify-checkout">
+    <div className="min-h-screen bg-[#0d0d0d]">
       <CheckoutHeader currentStep={1} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-10">

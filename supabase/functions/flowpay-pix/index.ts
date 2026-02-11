@@ -9,8 +9,6 @@ const corsHeaders = {
 
 const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
 const FIREBASE_PROJECT_ID = 'valnix';
-const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
-const UTMIFY_EVENTS_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
 // ── Firebase ID Token Verification ─────────────────────────────────
 // Verifies Firebase Auth ID tokens using Google's public keys (RSA)
@@ -100,12 +98,6 @@ function getFirebaseWebApiKey(): string {
   return 'AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw';
 }
 
-/** SHA-256 hash helper for PII (returns lowercase hex) */
-async function sha256(input: string): Promise<string> {
-  const data = new TextEncoder().encode(input.trim().toLowerCase());
-  const hashBuffer = await crypto.subtle.digest('SHA-256', data);
-  return Array.from(new Uint8Array(hashBuffer)).map(b => b.toString(16).padStart(2, '0')).join('');
-}
 
 // ── Firebase Service Account Auth ──────────────────────────────────
 let cachedAccessToken: string | null = null;
@@ -362,123 +354,6 @@ async function processAutoDelivery(orderId: string) {
   }
 }
 
-// Track Purchase event on UTMify (server-side, with persistent dedupe)
-async function trackUTMifyPurchase(
-  orderId: string, value: number, 
-  clientIp?: string | null, clientUserAgent?: string | null, 
-  sourceUrl?: string, pageTitle?: string,
-  customerEmail?: string | null, customerPhone?: string | null,
-  externalId?: string | null, contentIds?: string[], contentNames?: string, numItems?: number,
-  utmParameters?: string
-) {
-  const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-  const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-  const supa = createClient(supabaseUrl, serviceRoleKey);
-
-  const dedupeKey = `Purchase_${orderId}`;
-
-  try {
-    // Atomic lock acquisition via DB function (eliminates race conditions)
-    const { data: lockResult, error: lockError } = await supa
-      .rpc('acquire_utmify_lock', {
-        p_event_id: dedupeKey,
-        p_event_type: 'Purchase',
-        p_order_id: orderId,
-        p_lock_ttl_seconds: 30,
-      });
-
-    if (lockError) {
-      console.warn('⚠️ Atomic lock RPC error:', lockError.message);
-      return;
-    }
-
-    const row = Array.isArray(lockResult) ? lockResult[0] : lockResult;
-
-    if (!row) {
-      console.log(`⚠️ UTMify lock: no result for ${orderId}`);
-      return;
-    }
-
-    if (row.out_status === 'sent') {
-      console.log(`⏭️ UTMify Purchase already sent for ${orderId}, skipping`);
-      return;
-    }
-
-    if (!row.out_lock_acquired) {
-      console.log(`🔒 UTMify Purchase locked by another process for ${orderId}, skipping`);
-      return;
-    }
-
-    console.log(`🔑 UTMify lock acquired for ${orderId} (attempt ${row.out_attempt_count})`);
-
-    // 2. Build PII hashes directly on lead (em/ph/external_id for UTMify/Meta EQM)
-    const piiKeys: string[] = [];
-    const leadPii: Record<string, string> = {};
-    if (customerEmail) { leadPii.em = await sha256(customerEmail); piiKeys.push('em'); }
-    if (customerPhone) { leadPii.ph = await sha256(customerPhone.replace(/\D/g, '')); piiKeys.push('ph'); }
-    if (externalId) { leadPii.external_id = await sha256(externalId); piiKeys.push('external_id'); }
-
-    // 3. Send to UTMify via tracking/v1/events (no token needed)
-    const contentIdsArray = Array.isArray(contentIds) ? contentIds : undefined;
-    const payload = {
-      type: 'Purchase',
-      eventId: dedupeKey,
-      lead: {
-        pixelId: UTMIFY_PIXEL_ID,
-        userAgent: clientUserAgent || 'server',
-        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
-        parameters: utmParameters || '',
-        icTextMatch: null,
-        icCSSMatch: '.utmify-checkout',
-        icURLMatch: null,
-        leadTextMatch: null,
-        addToCartTextMatch: null,
-        // PII hashed directly on lead (UTMify/Meta format)
-        ...leadPii,
-      },
-      event: {
-        sourceUrl: sourceUrl || 'https://valnix2026.lovable.app/checkout',
-        pageTitle: pageTitle || 'Checkout - Valnix',
-        value,
-        currency: 'BRL',
-        orderId,
-        // Content enrichment — both camelCase and snake_case for compatibility
-        ...(contentIdsArray ? { contentIds: contentIdsArray, content_ids: contentIdsArray } : {}),
-        ...(contentNames ? { contentName: contentNames, content_name: contentNames } : {}),
-        ...(numItems != null ? { numItems: Number(numItems), num_items: Number(numItems) } : {}),
-      },
-      tikTokPageInfo: null,
-    };
-
-    console.log(`📊 UTMify Purchase | orderId=${orderId} | eventId=${dedupeKey} | value=${value} | ip=${clientIp || 'none'} | pii=${piiKeys.join(',') || 'none'} | content=${contentIdsArray ? 'yes' : 'no'}`);
-
-    const response = await fetch(UTMIFY_EVENTS_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    const responseText = await response.text();
-
-    // 3. Update dedupe status + structured log
-    if (response.ok) {
-      await supa
-        .from('utmify_event_log')
-        .update({ status: 'sent', locked_at: null, updated_at: new Date().toISOString() })
-        .eq('event_id', dedupeKey);
-      console.log(`📊 UTMify RESULT | orderId=${orderId} | eventId=${dedupeKey} | status=sent | httpStatus=${response.status}`);
-    } else {
-      const errorMsg = `HTTP ${response.status}: ${responseText.slice(0, 200)}`;
-      await supa
-        .from('utmify_event_log')
-        .update({ locked_at: null, last_error: errorMsg })
-        .eq('event_id', dedupeKey);
-      console.warn(`📊 UTMify RESULT | orderId=${orderId} | eventId=${dedupeKey} | status=failed | httpStatus=${response.status} | error=${responseText.slice(0, 100)}`);
-    }
-  } catch (error) {
-    console.warn('⚠️ UTMify server-side tracking failed:', error);
-  }
-}
 
 // Register Purchase event in Supabase analytics_events table
 async function registerAnalyticsEvent(orderId: string, value: number, userId?: string, customerEmail?: string) {
@@ -519,13 +394,6 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'webhook') {
       console.log('🔔 FlowPay webhook received');
       
-      // Capture client IP and User-Agent from webhook request for UTMify match quality
-      const webhookClientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-        || req.headers.get('cf-connecting-ip')
-        || req.headers.get('x-real-ip')
-        || null;
-      const webhookUserAgent = req.headers.get('user-agent') || null;
-      console.log('🔔 Webhook IP:', webhookClientIp, '| UA:', (webhookUserAgent || 'none').substring(0, 60));
 
       // Validate webhook secret - STRICT enforcement
       const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
@@ -627,21 +495,6 @@ Deno.serve(async (req) => {
         
         console.log(`✅ Addon ${addon.id} marked as paid via webhook`);
         
-        // Track upsell Purchase on UTMify (server-side, Royal-like)
-        const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
-        const upsellRouteMap: Record<string, string> = {
-          premium_benefits: '/painel-pagar',
-          delivery_priority: '/painel-pagar-entrega',
-          data_swap_warranty: '/painel-pagar-trocadados',
-        };
-        const upsellPath = upsellRouteMap[addon.addon_type] || '/painel-pagar';
-        const upsellSourceUrl = `https://valnix2026.lovable.app${upsellPath}`;
-        const upsellPageTitle = `Upsell ${addon.addon_type} - Valnix`;
-        try {
-          await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), webhookClientIp, webhookUserAgent, upsellSourceUrl, upsellPageTitle, addon.customer_email, null, addon.user_id);
-        } catch (trackError) {
-          console.warn('⚠️ UTMify upsell tracking failed:', trackError);
-        }
         
         // Register upsell in analytics
         try {
@@ -670,31 +523,10 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Extract order data for tracking
+      // Extract order data for analytics
       const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || (paidValue ? paidValue / 100 : 0);
       const customerEmail = orderFields?.customer_email?.stringValue;
-      const customerPhone = orderFields?.customer_phone?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
-      const storedUtmParams = orderFields?.utm_parameters?.stringValue || '';
-      
-      // Use REAL client IP/UA stored at PIX creation time (not webhook server IP)
-      const realClientIp = orderFields?.client_ip?.stringValue || webhookClientIp;
-      const realClientUa = orderFields?.client_ua?.stringValue || webhookUserAgent;
-      console.log(`📊 EQM data: using ${orderFields?.client_ip?.stringValue ? 'stored client' : 'webhook'} IP: ${realClientIp}`);
-
-      // Fetch order items for content enrichment
-      let contentIds: string[] | undefined;
-      let contentNames: string | undefined;
-      let numItems: number | undefined;
-      try {
-        const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId!);
-        if (itemsResults && Array.isArray(itemsResults)) {
-          const items = itemsResults.filter((r: any) => r.document);
-          contentIds = items.map((r: any) => r.document.fields?.product_id?.stringValue).filter(Boolean);
-          contentNames = items.map((r: any) => r.document.fields?.product_name?.stringValue).filter(Boolean).join(', ');
-          numItems = items.reduce((sum: number, r: any) => sum + (parseInt(r.document.fields?.quantity?.integerValue || '1')), 0);
-        }
-      } catch (e) { console.warn('⚠️ Content enrichment failed:', e); }
 
       // Update order status to paid
       await updateFirestoreDoc('orders', orderId!, {
@@ -712,12 +544,6 @@ Deno.serve(async (req) => {
         console.error(`⚠️ Auto-delivery failed for order ${orderId}:`, deliveryError);
       }
 
-      // Track Purchase event on UTMify (server-side, enriched with PII + content)
-      try {
-        await trackUTMifyPurchase(orderId!, orderValue, realClientIp, realClientUa, undefined, undefined, customerEmail, customerPhone, userId, contentIds, contentNames, numItems, storedUtmParams);
-      } catch (trackError) {
-        console.warn('⚠️ UTMify tracking failed:', trackError);
-      }
 
       // Register Purchase in analytics_events (Supabase)
       try {
@@ -924,16 +750,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── FALLBACK: If COMPLETED, ensure Purchase was tracked on UTMify ──
+      // ── FALLBACK: If COMPLETED, ensure analytics was registered ──
       if (data.charge?.status === 'COMPLETED') {
-        // Capture IP/UA from this polling request (best-effort for match quality)
-        const pollingIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-          || req.headers.get('cf-connecting-ip')
-          || req.headers.get('x-real-ip')
-          || null;
-        const pollingUa = req.headers.get('user-agent') || null;
-
-        // Find order by chargeId in Firestore
         try {
           const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
           
@@ -942,30 +760,10 @@ Deno.serve(async (req) => {
             const fbOrderId = orderDoc.name.split('/').pop()!;
             const orderFields = orderDoc.fields;
             const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0;
+            const fbUserId = orderFields?.user_id?.stringValue;
+            const fbEmail = orderFields?.customer_email?.stringValue;
 
-            // Check dedupe table — only dispatch if NOT already sent
-            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-            const supa = createClient(supabaseUrl, serviceRoleKey);
-
-            const dedupeKey = `Purchase_${fbOrderId}`;
-            const { data: existing } = await supa
-              .from('utmify_event_log')
-              .select('status')
-              .eq('event_id', dedupeKey)
-              .maybeSingle();
-
-            if (!existing || (existing.status !== 'sent')) {
-              console.log(`🔄 FALLBACK: Webhook missed for order ${fbOrderId}, dispatching Purchase via polling`);
-              const fbEmail = orderFields?.customer_email?.stringValue;
-              const fbPhone = orderFields?.customer_phone?.stringValue;
-              const fbUserId = orderFields?.user_id?.stringValue;
-              const fbUtmParams = orderFields?.utm_parameters?.stringValue || '';
-              await trackUTMifyPurchase(fbOrderId, Number(orderValue), pollingIp, pollingUa, undefined, undefined, fbEmail, fbPhone, fbUserId, undefined, undefined, undefined, fbUtmParams);
-              
-              // Also register analytics if not done
-              await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
-            }
+            await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
           } else {
             // Check if it's an upsell addon
             const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -981,37 +779,17 @@ Deno.serve(async (req) => {
             if (addon && addon.status !== 'paid') {
               console.log(`🔄 FALLBACK: Webhook missed for upsell addon ${addon.id}, processing via polling`);
               
-              // Mark as paid
               await supa
                 .from('sale_addons')
                 .update({ status: 'paid', paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
                 .eq('id', addon.id);
 
-              // Track on UTMify
               const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
-              const upsellRouteMap: Record<string, string> = {
-                premium_benefits: '/painel-pagar',
-                delivery_priority: '/painel-pagar-entrega',
-                data_swap_warranty: '/painel-pagar-trocadados',
-              };
-              const upsellPath = upsellRouteMap[addon.addon_type] || '/painel-pagar';
-              const upsellSourceUrl = `https://valnix2026.lovable.app${upsellPath}`;
-
-              const dedupeKey = `Purchase_${upsellOrderId}`;
-              const { data: existing } = await supa
-                .from('utmify_event_log')
-                .select('status')
-                .eq('event_id', dedupeKey)
-                .maybeSingle();
-
-              if (!existing || existing.status !== 'sent') {
-                await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), pollingIp, pollingUa, upsellSourceUrl, `Upsell ${addon.addon_type} - Valnix`, addon.customer_email, null, addon.user_id);
-                await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
-              }
+              await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
             }
           }
         } catch (fallbackError) {
-          console.warn('⚠️ Purchase fallback error (non-blocking):', fallbackError);
+          console.warn('⚠️ Analytics fallback error (non-blocking):', fallbackError);
         }
       }
 

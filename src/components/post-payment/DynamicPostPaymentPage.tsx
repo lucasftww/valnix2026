@@ -81,7 +81,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         if (data.success && data.status === "COMPLETED") {
           clearInterval(poll);
           setPaymentConfirmed(true);
-          // sale_addons update + UTMify Purchase now handled 100% by webhook (Royal-like)
+          // sale_addons update handled by webhook
           // Frontend only needs to update UI
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
           setTimeout(() => navigate(config?.next_route || "/", { replace: true }), 2500);

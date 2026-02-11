@@ -124,8 +124,6 @@ export function PixPayment({
       console.warn('⚠️ Auto-delivery processing failed:', error);
     }
 
-    // 3. UTMify Purchase → now handled server-side by FlowPay webhook (Royal-like)
-    // No frontend tracking needed for PIX payments
 
     // 4. Register Purchase in analytics_events
     trackPurchaseEvent(customerId, amount, orderId, productNames?.join(', '));
