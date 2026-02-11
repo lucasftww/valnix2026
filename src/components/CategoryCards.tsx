@@ -92,6 +92,14 @@ const CategoryCardsComponent = () => {
 
   return (
     <section className="container px-4 md:px-8 py-8 md:py-12">
+      <div className="mb-6 md:mb-10">
+        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
+          CATEGORIAS
+        </h2>
+        <p className="text-muted-foreground mt-2 md:mt-3 text-xs md:text-sm">
+          Explore nossos produtos por categoria
+        </p>
+      </div>
       <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
         {categories.map((category) => (
           <CategoryCardItem key={category.id} category={category} />
