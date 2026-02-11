@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
-import { createOrder, createOrderItems } from "@/hooks/firebase";
+import { createOrder, createOrderItems, updateOrderStatus } from "@/hooks/firebase";
 import { Loader2, Zap, Lock, Check, AlertCircle, Wallet } from "lucide-react";
 import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
@@ -255,6 +255,18 @@ export default function Checkout() {
         });
 
         await createOrderItems(orderItemsData, true);
+
+        // Check if all items got auto-delivered, if so mark order as completed
+        try {
+          const orderItemsSnap = await getDocs(query(collection(db, "order_items"), where('order_id', '==', orderId)));
+          const allDelivered = orderItemsSnap.size > 0 && orderItemsSnap.docs.every(d => d.data().delivery_code);
+          if (allDelivered) {
+            await updateOrderStatus(orderId, 'completed', 'paid');
+            console.log(`✅ Balance order ${orderId} auto-completed`);
+          }
+        } catch (err) {
+          console.warn('⚠️ Failed to auto-complete balance order:', err);
+        }
 
         const profileRef = doc(db, "profiles", user.uid);
         await updateDoc(profileRef, {
