@@ -227,12 +227,13 @@ const ProductDetail = () => {
                   />
                 )}
               </div>
-              <div className="flex items-center justify-between px-4 py-2.5 bg-black/80 border-t border-border/10">
+              <div className="flex items-center justify-center gap-4 px-4 py-3 bg-black border-t border-white/10">
                 <div className="flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
-                  <span className="text-xs text-white/60">{productStats.reviewCount.toLocaleString('pt-BR')} avaliações</span>
+                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 shrink-0" />
+                  <span className="text-xs text-white/70 whitespace-nowrap">{productStats.reviewCount.toLocaleString('pt-BR')} avaliações</span>
                 </div>
-                <span className="text-xs font-bold text-primary">
+                <div className="w-px h-3.5 bg-white/20" />
+                <span className="text-xs font-bold text-primary whitespace-nowrap">
                   +{productStats.sold.toLocaleString('pt-BR')} vendidos
                 </span>
               </div>
