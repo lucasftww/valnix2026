@@ -5,7 +5,7 @@ import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
-import { Minus, Plus, Star } from "lucide-react";
+import { Minus, Plus, Star, ShieldCheck, Zap, ChevronRight } from "lucide-react";
 import { useState, useMemo, useEffect, lazy, Suspense, memo, useCallback } from "react";
 import { useProductById, useProductReviews } from "@/hooks/firebase";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
@@ -215,83 +215,124 @@ const ProductDetail = () => {
         {/* Product Content */}
         <div className="container px-4 md:px-8 pb-6 lg:pb-12">
           <div className="flex flex-col lg:grid lg:grid-cols-[1fr_420px] gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
-            {/* Imagem Mobile */}
-            <div className="rounded-xl overflow-hidden border border-border/10 lg:hidden bg-black">
-              <div className="flex items-center justify-center p-6 bg-gradient-to-b from-black/60 to-black/90">
-                {product.image_url && (
-                  <ProductImage
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-auto h-auto max-h-[260px] sm:max-h-[320px] object-contain"
-                    priority={true}
-                  />
-                )}
-              </div>
-              <div className="flex items-center justify-center gap-4 px-4 py-2.5 border-t border-white/10">
-                <div className="flex items-center gap-1.5">
-                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 shrink-0" />
-                  <span className="text-xs text-white/70 whitespace-nowrap">{productStats.reviewCount.toLocaleString('pt-BR')} avaliações</span>
+            {/* === MOBILE LAYOUT === */}
+            <div className="lg:hidden space-y-3">
+              {/* Hero: Imagem + Nome + Preço — tudo num bloco só */}
+              <div className="rounded-2xl overflow-hidden border border-border/20 bg-card">
+                {/* Imagem — fundo escuro, imagem centralizada e contida */}
+                <div className="relative bg-gradient-to-b from-muted/30 to-background aspect-square flex items-center justify-center p-8">
+                  {product.image_url && (
+                    <img
+                      src={product.image_url}
+                      alt={product.name}
+                      loading="eager"
+                      decoding="async"
+                      className="max-w-full max-h-full w-auto h-auto object-contain drop-shadow-2xl"
+                    />
+                  )}
+                  {/* Badge de vendidos */}
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-full px-3 py-1.5">
+                    <Zap className="w-3 h-3 text-primary shrink-0" />
+                    <span className="text-[11px] font-semibold text-white">+{productStats.sold.toLocaleString('pt-BR')} vendidos</span>
+                  </div>
                 </div>
-                <div className="w-px h-3.5 bg-white/20" />
-                <span className="text-xs font-bold text-primary whitespace-nowrap">
-                  +{productStats.sold.toLocaleString('pt-BR')} vendidos
-                </span>
-              </div>
-            </div>
 
-            {/* Card de Compra Mobile */}
-            <div className="lg:hidden">
-              <div className="rounded-xl overflow-hidden border border-primary/20 bg-card shadow-xl">
-                <div className="p-4 sm:p-6 space-y-4 sm:space-y-5">
-                  <div className="text-center">
-                    <span className="text-[10px] font-medium text-muted-foreground uppercase tracking-wider">Produto Digital</span>
-                    <h1 className="text-2xl sm:text-3xl font-bold leading-tight mt-1 mb-1">{product.name}</h1>
-                    <p className="text-[10px] sm:text-xs text-muted-foreground flex items-center justify-center gap-1">
-                      <span>🇧🇷</span>
-                      <span>Ativável apenas no Brasil</span>
-                    </p>
+                {/* Info do produto */}
+                <div className="p-4 space-y-3">
+                  <div>
+                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-1">Produto Digital</p>
+                    <h1 className="text-xl font-bold leading-tight">{product.name}</h1>
                   </div>
 
-                  <div className="bg-primary/10 rounded-xl p-4 text-center border border-primary/20">
-                    <p className="text-xs text-muted-foreground mb-1">Valor Total</p>
-                    <p className="text-3xl sm:text-4xl font-extrabold text-primary">
-                      R$ {totalPrice}
-                    </p>
-                  </div>
-
-                  <div className="flex items-center justify-center gap-4">
-                    <span className="text-sm text-muted-foreground">Qtd:</span>
-                    <div className="flex items-center gap-2">
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={decreaseQuantity} 
-                        disabled={quantity <= 1}
-                        className="h-10 w-10 rounded-lg"
-                        aria-label="Diminuir quantidade"
-                      >
-                        <Minus className="h-4 w-4" />
-                      </Button>
-                      <span className="w-12 text-center text-lg font-bold">{quantity}</span>
-                      <Button 
-                        variant="outline" 
-                        size="icon" 
-                        onClick={increaseQuantity} 
-                        className="h-10 w-10 rounded-lg"
-                        aria-label="Aumentar quantidade"
-                      >
-                        <Plus className="h-4 w-4" />
-                      </Button>
+                  {/* Avaliações */}
+                  <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-0.5">
+                      {[1,2,3,4,5].map(s => (
+                        <Star key={s} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                      ))}
                     </div>
+                    <span className="text-xs text-muted-foreground">
+                      {productStats.reviewCount.toLocaleString('pt-BR')} avaliações
+                    </span>
                   </div>
 
-                  <div className="flex items-center justify-center gap-4 text-xs text-muted-foreground">
+                  {/* Preço */}
+                  <div className="flex items-baseline gap-2">
+                    {product.old_price && product.old_price > product.price && (
+                      <span className="text-sm text-muted-foreground line-through">
+                        R$ {product.old_price.toFixed(2).replace('.', ',')}
+                      </span>
+                    )}
+                    <span className="text-3xl font-extrabold text-primary">
+                      R$ {totalPrice}
+                    </span>
+                  </div>
+
+                  {/* Trust badges inline */}
+                  <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
                     <span className="flex items-center gap-1">
-                      <span className="text-green-500">✓</span> Entrega automática
+                      <Zap className="w-3.5 h-3.5 text-primary" /> Entrega automática
                     </span>
                     <span className="flex items-center gap-1">
                       <img src={pixLogo} alt="PIX" className="w-4 h-4" loading="lazy" /> PIX
                     </span>
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Seguro
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Quantidade */}
+              <div className="rounded-2xl border border-border/20 bg-card p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-medium">Quantidade</span>
+                  <div className="flex items-center gap-3">
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={decreaseQuantity} 
+                      disabled={quantity <= 1}
+                      className="h-9 w-9 rounded-lg"
+                      aria-label="Diminuir quantidade"
+                    >
+                      <Minus className="h-4 w-4" />
+                    </Button>
+                    <span className="w-8 text-center text-lg font-bold">{quantity}</span>
+                    <Button 
+                      variant="outline" 
+                      size="icon" 
+                      onClick={increaseQuantity} 
+                      className="h-9 w-9 rounded-lg"
+                      aria-label="Aumentar quantidade"
+                    >
+                      <Plus className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Garantias */}
+              <div className="rounded-2xl border border-border/20 bg-card p-4 space-y-2.5">
+                <div className="flex items-center gap-3">
+                  <Zap className="w-4 h-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Entrega Instantânea</p>
+                    <p className="text-[11px] text-muted-foreground">Receba na hora após o pagamento</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
+                  <div>
+                    <p className="text-sm font-medium">Compra 100% Segura</p>
+                    <p className="text-[11px] text-muted-foreground">Dados protegidos e criptografados</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-3">
+                  <img src={pixLogo} alt="PIX" className="w-4 h-4 shrink-0" loading="lazy" />
+                  <div>
+                    <p className="text-sm font-medium">Pagamento via PIX</p>
+                    <p className="text-[11px] text-muted-foreground">Aprovação instantânea</p>
                   </div>
                 </div>
               </div>
@@ -473,7 +514,7 @@ const ProductDetail = () => {
             </div>
 
             {/* Descrição Mobile */}
-            <div className="lg:hidden bg-card border border-border/30 rounded-xl p-6">
+            <div className="lg:hidden bg-card border border-border/20 rounded-2xl p-5">
               <h2 className="text-xl font-bold mb-4">Sobre o Produto</h2>
               <div className="description-content text-sm text-muted-foreground leading-relaxed">
                 {product.rich_description ? (
@@ -499,36 +540,27 @@ const ProductDetail = () => {
         </div>
       </main>
 
-      {/* Sticky CTA Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-black border-t border-primary/30" style={{ transform: 'translateZ(0)' }}>
-        <div className="px-4 py-3 safe-area-inset-bottom">
-          <div className="flex items-center justify-between mb-2">
-            <div>
-              <span className="text-xs text-muted-foreground">Total:</span>
-              <span className="text-xl font-extrabold text-primary ml-2">R$ {totalPrice}</span>
-            </div>
-            <div className="flex items-center gap-2 text-xs text-green-500">
-              <span>✓</span>
-              <span>Entrega imediata</span>
-            </div>
+      {/* Sticky CTA Mobile — redesenhado */}
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-blur-md border-t border-border/30" style={{ transform: 'translateZ(0)' }}>
+        <div className="px-4 py-3 safe-area-inset-bottom flex items-center gap-3">
+          <div className="flex-1 min-w-0">
+            <span className="text-[11px] text-muted-foreground block">Total</span>
+            <span className="text-xl font-extrabold text-primary">R$ {totalPrice}</span>
           </div>
-          
-          <div className="flex gap-2">
-            <Button 
-              onClick={handleAddToCart}
-              variant="outline"
-              className="flex-shrink-0 h-14 w-14 rounded-xl border-2 border-primary/50 bg-primary/10 hover:bg-primary/20"
-              aria-label="Adicionar ao carrinho"
-            >
-              <Plus className="h-6 w-6 text-primary" />
-            </Button>
-            <Button 
-              onClick={handleBuyNow} 
-              className="flex-1 h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
-            >
-              Comprar Agora
-            </Button>
-          </div>
+          <Button 
+            onClick={handleAddToCart}
+            variant="outline"
+            className="shrink-0 h-12 w-12 rounded-xl border border-border/50"
+            aria-label="Adicionar ao carrinho"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
+          <Button 
+            onClick={handleBuyNow} 
+            className="shrink-0 h-12 px-6 text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
+          >
+            Comprar <ChevronRight className="w-4 h-4 ml-1" />
+          </Button>
         </div>
       </div>
 
