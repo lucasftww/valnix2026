@@ -784,7 +784,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    // ==================== CHECK STATUS ====================
+    // ==================== CHECK STATUS (with Purchase fallback) ====================
     if (req.method === 'GET' && action === 'status') {
       if (!apiKey) {
         console.error('❌ FLOWPAY_API_KEY not configured');
@@ -818,6 +818,95 @@ Deno.serve(async (req) => {
           status: response.status,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
+      }
+
+      // ── FALLBACK: If COMPLETED, ensure Purchase was tracked on UTMify ──
+      if (data.charge?.status === 'COMPLETED') {
+        // Capture IP/UA from this polling request (best-effort for match quality)
+        const pollingIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+          || req.headers.get('cf-connecting-ip')
+          || req.headers.get('x-real-ip')
+          || null;
+        const pollingUa = req.headers.get('user-agent') || null;
+
+        // Find order by chargeId in Firestore
+        try {
+          const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+          
+          if (queryResults?.[0]?.document) {
+            const orderDoc = queryResults[0].document;
+            const fbOrderId = orderDoc.name.split('/').pop()!;
+            const orderFields = orderDoc.fields;
+            const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0;
+
+            // Check dedupe table — only dispatch if NOT already sent
+            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const supa = createClient(supabaseUrl, serviceRoleKey);
+
+            const dedupeKey = `Purchase_${fbOrderId}`;
+            const { data: existing } = await supa
+              .from('utmify_event_log')
+              .select('status')
+              .eq('event_id', dedupeKey)
+              .maybeSingle();
+
+            if (!existing || (existing.status !== 'sent')) {
+              console.log(`🔄 FALLBACK: Webhook missed for order ${fbOrderId}, dispatching Purchase via polling`);
+              await trackUTMifyPurchase(fbOrderId, Number(orderValue), pollingIp, pollingUa);
+              
+              // Also register analytics if not done
+              const userId = orderFields?.user_id?.stringValue;
+              const customerEmail = orderFields?.customer_email?.stringValue;
+              await registerAnalyticsEvent(fbOrderId, Number(orderValue), userId, customerEmail);
+            }
+          } else {
+            // Check if it's an upsell addon
+            const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+            const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+            const supa = createClient(supabaseUrl, serviceRoleKey);
+
+            const { data: addon } = await supa
+              .from('sale_addons')
+              .select('*')
+              .eq('flowpay_charge_id', chargeId)
+              .maybeSingle();
+
+            if (addon && addon.status !== 'paid') {
+              console.log(`🔄 FALLBACK: Webhook missed for upsell addon ${addon.id}, processing via polling`);
+              
+              // Mark as paid
+              await supa
+                .from('sale_addons')
+                .update({ status: 'paid', paid_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+                .eq('id', addon.id);
+
+              // Track on UTMify
+              const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
+              const upsellRouteMap: Record<string, string> = {
+                premium_benefits: '/painel-pagar',
+                delivery_priority: '/painel-pagar-entrega',
+                data_swap_warranty: '/painel-pagar-trocadados',
+              };
+              const upsellPath = upsellRouteMap[addon.addon_type] || '/painel-pagar';
+              const upsellSourceUrl = `https://valnix2026.lovable.app${upsellPath}`;
+
+              const dedupeKey = `Purchase_${upsellOrderId}`;
+              const { data: existing } = await supa
+                .from('utmify_event_log')
+                .select('status')
+                .eq('event_id', dedupeKey)
+                .maybeSingle();
+
+              if (!existing || existing.status !== 'sent') {
+                await trackUTMifyPurchase(upsellOrderId, Number(addon.amount), pollingIp, pollingUa, upsellSourceUrl, `Upsell ${addon.addon_type} - Valnix`);
+                await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
+              }
+            }
+          }
+        } catch (fallbackError) {
+          console.warn('⚠️ Purchase fallback error (non-blocking):', fallbackError);
+        }
       }
 
       return new Response(JSON.stringify({
