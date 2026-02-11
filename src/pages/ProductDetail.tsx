@@ -216,7 +216,7 @@ const ProductDetail = () => {
         <div className="container px-4 md:px-8 pb-6 lg:pb-12">
           <div className="flex flex-col lg:grid lg:grid-cols-[1fr_420px] gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
             {/* Imagem Mobile */}
-            <div className="relative rounded-xl overflow-hidden bg-black/90 border border-border/10 lg:hidden">
+            <div className="rounded-xl overflow-hidden bg-black/90 border border-border/10 lg:hidden">
               <div className="relative flex items-center justify-center p-4 min-h-[280px] sm:min-h-[350px]">
                 {product.image_url && (
                   <ProductImage
@@ -227,8 +227,14 @@ const ProductDetail = () => {
                   />
                 )}
               </div>
-              <div className="absolute bottom-3 right-3 bg-primary text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">
-                +{productStats.sold.toLocaleString('pt-BR')} vendidos
+              <div className="flex items-center justify-between px-4 py-2.5 bg-black/80 border-t border-border/10">
+                <div className="flex items-center gap-1.5">
+                  <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                  <span className="text-xs text-white/60">{productStats.reviewCount.toLocaleString('pt-BR')} avaliações</span>
+                </div>
+                <span className="text-xs font-bold text-primary">
+                  +{productStats.sold.toLocaleString('pt-BR')} vendidos
+                </span>
               </div>
             </div>
 
