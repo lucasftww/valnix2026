@@ -1,5 +1,5 @@
 import { memo, useRef, useState, useEffect } from "react";
-import { Loader2 } from "lucide-react";
+
 import {
   Carousel,
   CarouselContent,
@@ -53,17 +53,8 @@ const HeroBannerComponent = () => {
     return () => clearTimeout(timeout);
   }, [banners]);
 
-  if (isLoading) {
-    return (
-      <section className="container px-0 md:px-8 py-0 md:py-8">
-        <div className="relative w-full aspect-[16/7] md:aspect-[21/6] flex items-center justify-center md:rounded-2xl border-0 md:border-2 border-primary/50 bg-gradient-to-r from-secondary/30 to-secondary/60 animate-pulse">
-          <div className="text-center">
-            <Loader2 className="w-10 h-10 animate-spin text-primary mx-auto mb-2" />
-            <p className="text-sm text-muted-foreground">Carregando ofertas...</p>
-          </div>
-        </div>
-      </section>
-    );
+  if (isLoading || banners.length === 0) {
+    return null;
   }
 
   if (banners.length === 0) {
