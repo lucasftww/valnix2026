@@ -324,7 +324,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      acquire_utmify_lock: {
+        Args: {
+          p_event_id: string
+          p_event_type: string
+          p_lock_ttl_seconds?: number
+          p_order_id?: string
+        }
+        Returns: {
+          attempt_count: number
+          event_id: string
+          lock_acquired: boolean
+          status: string
+        }[]
+      }
     }
     Enums: {
       [_ in never]: never

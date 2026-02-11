@@ -283,7 +283,6 @@ async function trackUTMifyPurchase(
   externalId?: string | null, contentIds?: string[], contentNames?: string, numItems?: number,
   utmParameters?: string
 ) {
-  const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const supa = createClient(supabaseUrl, serviceRoleKey);
@@ -291,112 +290,38 @@ async function trackUTMifyPurchase(
   const dedupeKey = `Purchase_${orderId}`;
 
   try {
-    // 1. Check existing state in dedupe table
-    const { data: existing } = await supa
-      .from('utmify_event_log')
-      .select('status, locked_at, attempt_count')
-      .eq('event_id', dedupeKey)
-      .maybeSingle();
+    // Atomic lock acquisition via DB function (eliminates race conditions)
+    const { data: lockResult, error: lockError } = await supa
+      .rpc('acquire_utmify_lock', {
+        p_event_id: dedupeKey,
+        p_event_type: 'Purchase',
+        p_order_id: orderId,
+        p_lock_ttl_seconds: 30,
+      });
 
-    // Already sent → skip
-    if (existing?.status === 'sent') {
+    if (lockError) {
+      console.warn('⚠️ Atomic lock RPC error:', lockError.message);
+      return;
+    }
+
+    const row = Array.isArray(lockResult) ? lockResult[0] : lockResult;
+
+    if (!row) {
+      console.log(`⚠️ UTMify lock: no result for ${orderId}`);
+      return;
+    }
+
+    if (row.status === 'sent') {
       console.log(`⏭️ UTMify Purchase already sent for ${orderId}, skipping`);
       return;
     }
 
-    // Pending + locked recently → someone else is sending
-    if (existing?.status === 'pending' && existing.locked_at) {
-      const lockedAge = (Date.now() - new Date(existing.locked_at).getTime()) / 1000;
-      if (lockedAge < LOCK_TTL_SECONDS) {
-        console.log(`🔒 UTMify Purchase locked for ${orderId}, skipping`);
-        return;
-      }
+    if (!row.lock_acquired) {
+      console.log(`🔒 UTMify Purchase locked by another process for ${orderId}, skipping`);
+      return;
     }
 
-    if (!existing) {
-      // New → insert as pending + locked
-      const { error: insertError } = await supa
-        .from('utmify_event_log')
-        .insert({
-          event_id: dedupeKey,
-          event_type: 'Purchase',
-          order_id: orderId,
-          status: 'pending',
-          locked_at: new Date().toISOString(),
-          attempt_count: 1,
-        });
-
-      if (insertError && insertError.code !== '23505') {
-        console.warn('⚠️ Dedupe INSERT error:', insertError.message);
-      }
-
-      // 23505 (unique violation) → recheck status instead of silent skip
-      if (insertError?.code === '23505') {
-        const { data: recheck } = await supa
-          .from('utmify_event_log')
-          .select('status, locked_at, attempt_count')
-          .eq('event_id', dedupeKey)
-          .maybeSingle();
-
-        if (recheck?.status === 'sent') {
-          console.log(`⏭️ UTMify Purchase already sent (after race) for ${orderId}`);
-          return;
-        }
-
-        // If pending with active lock → in_flight
-        if (recheck?.status === 'pending' && recheck.locked_at) {
-          const lockedAge = (Date.now() - new Date(recheck.locked_at).getTime()) / 1000;
-          if (lockedAge < LOCK_TTL_SECONDS) {
-            console.log(`🔒 UTMify Purchase in_flight (after race) for ${orderId}`);
-            return;
-          }
-        }
-
-        // Pending with expired lock → try to acquire lock and continue
-        if (recheck?.status === 'pending') {
-          const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
-          const { data: locked } = await supa
-            .from('utmify_event_log')
-            .update({
-              locked_at: new Date().toISOString(),
-              attempt_count: (recheck.attempt_count || 0) + 1,
-            })
-            .eq('event_id', dedupeKey)
-            .eq('status', 'pending')
-            .or(`locked_at.is.null,locked_at.lt.${lockThreshold}`)
-            .select('event_id')
-            .maybeSingle();
-
-          if (!locked) {
-            console.log(`⚡ UTMify lock race (after 23505) for ${orderId}, skipping`);
-            return;
-          }
-          // Lock acquired, continue to send
-        } else {
-          console.log(`⚡ UTMify dedupe race for ${orderId}, status: ${recheck?.status}, skipping`);
-          return;
-        }
-      }
-    } else {
-      // Existing pending (lock expired) → acquire lock atomically
-      const lockThreshold = new Date(Date.now() - LOCK_TTL_SECONDS * 1000).toISOString();
-      const { data: locked } = await supa
-        .from('utmify_event_log')
-        .update({
-          locked_at: new Date().toISOString(),
-          attempt_count: (existing.attempt_count || 0) + 1,
-        })
-        .eq('event_id', dedupeKey)
-        .eq('status', 'pending')
-        .or(`locked_at.is.null,locked_at.lt.${lockThreshold}`)
-        .select('event_id')
-        .maybeSingle();
-
-      if (!locked) {
-        console.log(`⚡ UTMify lock race for ${orderId}, skipping`);
-        return;
-      }
-    }
+    console.log(`🔑 UTMify lock acquired for ${orderId} (attempt ${row.attempt_count})`);
 
     // 2. Build PII hashes directly on lead (em/ph/external_id for UTMify/Meta EQM)
     const piiKeys: string[] = [];
