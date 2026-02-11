@@ -25,7 +25,7 @@ const faqs = [
   },
   {
     question: "E se eu precisar de ajuda?",
-    answer: "Nossa equipe de suporte está disponível das 10h às 23h diariamente. Entre em contato através do nosso Discord ou WhatsApp e responderemos o mais rápido possível."
+    answer: "Nossa equipe de suporte está disponível das 10h às 23h diariamente. Entre em contato através do nosso Discord e responderemos o mais rápido possível."
   }
 ] as const;
 

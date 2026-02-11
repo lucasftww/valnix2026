@@ -73,7 +73,6 @@ export const ROUTES = {
 } as const;
 
 export const EXTERNAL_LINKS = {
-  WHATSAPP: 'https://wa.me/5513982057182',
   DISCORD: 'https://discord.gg/ZYdz9xYdq5',
 } as const;
 
