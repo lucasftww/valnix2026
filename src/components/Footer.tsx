@@ -1,7 +1,6 @@
 import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import logo from "@/assets/valnix-logo.png";
 import pixLogo from "@/assets/pix-logo.png";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
