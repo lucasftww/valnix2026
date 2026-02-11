@@ -30,48 +30,44 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
   }, []);
   
   return (
-    <div 
-      ref={cardRef}
-      className="relative group overflow-hidden rounded-xl md:rounded-2xl border border-primary/30 md:border-2 hover:border-primary transition-colors shadow-md md:shadow-lg hover:shadow-xl md:hover:shadow-2xl"
+    <Link 
+      to={`/${category.slug}`} 
+      aria-label={`Ver produtos de ${category.name}`}
+      className="block group"
     >
-      <div className="aspect-square md:aspect-[16/9] relative bg-muted">
-        {isVisible && category.image_url ? (
-          <img
-            src={imageUrl}
-            alt={category.name}
-            loading="lazy"
-            decoding="async"
-            width={400}
-            height={300}
-            className="w-full h-full object-cover md:object-contain"
-          />
-        ) : (
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
-            <span className="text-2xl md:text-4xl font-bold text-primary/40">{category.name.charAt(0)}</span>
-          </div>
-        )}
-        <div className="absolute inset-0 bg-gradient-to-t from-background via-background/60 to-transparent" />
+      <div 
+        ref={cardRef}
+        className="relative overflow-hidden rounded-2xl border border-border/20 hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10"
+      >
+        <div className="aspect-[4/3] relative bg-muted">
+          {isVisible && category.image_url ? (
+            <img
+              src={imageUrl}
+              alt={category.name}
+              loading="lazy"
+              decoding="async"
+              width={400}
+              height={300}
+              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+            />
+          ) : (
+            <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
+              <span className="text-3xl font-bold text-primary/40">{category.name.charAt(0)}</span>
+            </div>
+          )}
+          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent" />
+        </div>
+        
+        <div className="absolute bottom-0 left-0 right-0 p-4">
+          <h3 className="text-base md:text-xl font-bold text-white leading-tight mb-2">
+            {category.name}
+          </h3>
+          <span className="inline-flex items-center text-xs font-semibold text-primary group-hover:underline">
+            Ver produtos →
+          </span>
+        </div>
       </div>
-      
-      <div className="absolute bottom-0 left-0 right-0 p-3 md:p-6 space-y-1 md:space-y-3">
-        <h3 className="text-sm md:text-2xl font-bold text-foreground leading-tight">
-          {category.name}
-        </h3>
-        {category.description && (
-          <p className="hidden md:block text-sm text-muted-foreground line-clamp-2">
-            {category.description}
-          </p>
-        )}
-        <Link to={`/${category.slug}`} aria-label={`Ver produtos de ${category.name}`}>
-          <Button 
-            size="sm"
-            className="bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs md:text-sm h-8 md:h-10 px-4 min-w-[48px]"
-          >
-            VER
-          </Button>
-        </Link>
-      </div>
-    </div>
+    </Link>
   );
 });
 
