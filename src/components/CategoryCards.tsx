@@ -4,12 +4,12 @@ import { Link } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 import { useHomeCategories } from "@/hooks/firebase";
 import type { Category } from "@/types";
-import { optimizeSupabaseImage, imagePresets } from "@/lib/imageOptimization";
+
 
 const CategoryCardItem = memo(({ category }: { category: Category }) => {
   const cardRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
-  const optimizedImageUrl = optimizeSupabaseImage(category.image_url, imagePresets.categoryIcon);
+  const imageUrl = category.image_url || '';
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -37,7 +37,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
       <div className="aspect-square md:aspect-[16/9] relative bg-muted">
         {isVisible && category.image_url ? (
           <img
-            src={optimizedImageUrl}
+            src={imageUrl}
             alt={category.name}
             loading="lazy"
             decoding="async"
