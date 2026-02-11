@@ -331,12 +331,11 @@ export default function Checkout() {
         total_price: item.price * item.quantity,
       }));
 
-      await createOrderItems(orderItemsData);
-
-      const amountInCents = Math.round(orderAmount * 100);
       const cpfDigits = formData.document.replace(/\D/g, '');
 
-      const pixResponse = await fetch(
+      // Run PIX charge creation and order items creation in parallel
+      // Order items are NOT needed for PIX generation, so don't block on them
+      const pixPromise = fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
         {
           method: 'POST',
@@ -345,7 +344,7 @@ export default function Checkout() {
             'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
           },
           body: JSON.stringify({
-            amount: amountInCents,
+            amount: Math.round(orderAmount * 100),
             orderId,
             description: `Pedido ${orderId.substring(0, 8)}`,
             customer: {
@@ -357,11 +356,36 @@ export default function Checkout() {
         }
       );
 
-      const pixData = await pixResponse.json();
+      // Fire order items creation in parallel (don't await before PIX)
+      const itemsPromise = createOrderItems(orderItemsData).catch(err => {
+        console.warn('⚠️ Order items creation failed (non-blocking):', err);
+      });
+
+      // Await PIX response (critical path)
+      const pixResponse = await pixPromise;
+
+      // Defensive response parsing
+      const contentType = pixResponse.headers.get('content-type');
+      if (!contentType?.includes('application/json')) {
+        const textResponse = await pixResponse.text();
+        console.error('Gateway returned non-JSON:', textResponse.substring(0, 200));
+        throw new Error('Erro no gateway de pagamento. Tente novamente.');
+      }
+
+      let pixData;
+      try {
+        pixData = await pixResponse.json();
+      } catch (parseError) {
+        console.error('Failed to parse PIX response:', parseError);
+        throw new Error('Resposta inválida do gateway. Tente novamente.');
+      }
 
       if (!pixResponse.ok || !pixData.success) {
         throw new Error(pixData.error || 'Erro ao gerar cobrança PIX');
       }
+
+      // Ensure order items are saved before showing payment screen
+      await itemsPromise;
 
       setPaymentData({
         qrCodeText: pixData.brCode,
