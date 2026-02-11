@@ -529,21 +529,13 @@ const ProductDetail = () => {
         <div className="px-4 py-3 safe-area-inset-bottom flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <span className="text-[11px] text-muted-foreground block">Total</span>
-            <span className="text-xl font-extrabold text-primary">R$ {totalPrice}</span>
+            <span className="text-2xl font-extrabold text-primary">R$ {totalPrice}</span>
           </div>
           <Button 
-            onClick={handleAddToCart}
-            variant="outline"
-            className="shrink-0 h-12 w-12 rounded-xl border border-border/50"
-            aria-label="Adicionar ao carrinho"
-          >
-            <Plus className="h-5 w-5" />
-          </Button>
-          <Button 
             onClick={handleBuyNow} 
-            className="shrink-0 h-12 px-6 text-base font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
+            className="shrink-0 h-14 px-8 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
           >
-            Comprar <ChevronRight className="w-4 h-4 ml-1" />
+            Comprar Agora
           </Button>
         </div>
       </div>
