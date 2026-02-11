@@ -206,62 +206,26 @@
     <!-- Surgical UTMify pixel error suppression (error/unhandledrejection only — NO fetch wrapper) -->
     <script>
       (function() {
-        // Rate-limit: max 1 debug log per 10s
-        var _lastLog = 0;
-        function debugLog(msg) {
-          var now = Date.now();
-          if (now - _lastLog < 10000) return;
-          _lastLog = now;
-          console.debug('[UTMify suppressed]', msg);
-        }
-
-        // Precise origin check: cdn.utmify.com.br, utmify.com.br, or /pixel.js
-        function isUtmifyOrigin(str) {
+        function isUtmify(str) {
           if (!str) return false;
-          return str.indexOf('cdn.utmify.com.br') !== -1
-              || str.indexOf('utmify.com.br') !== -1
-              || str.indexOf('/pixel.js') !== -1;
+          return str.indexOf('utmify') !== -1 || str.indexOf('pixel.js') !== -1;
         }
-
-        // Known UTMify error messages
-        function isUtmifyMessage(msg) {
+        function isUtmifyError(msg) {
           if (!msg) return false;
-          return msg.indexOf('ALREADY_SAVED') !== -1
-              || (msg.indexOf('TypeError') !== -1 && msg.indexOf('_id') !== -1)
-              || (msg.indexOf('Cannot read properties') !== -1 && msg.indexOf('_id') !== -1);
+          return msg.indexOf('_id') !== -1
+              || msg.indexOf('ALREADY_SAVED') !== -1
+              || msg.indexOf('tracking.utmify') !== -1;
         }
-
-        // 1. Synchronous errors from UTMify scripts only
         window.addEventListener('error', function(e) {
-          if (e.filename && isUtmifyOrigin(e.filename)) {
-            debugLog('sync error from ' + e.filename);
-            e.preventDefault();
-            return true;
-          }
-          if (e.error && e.error.stack && isUtmifyOrigin(e.error.stack)) {
-            debugLog('sync error (stack): ' + e.message);
-            e.preventDefault();
-            return true;
-          }
-          if (e.message && isUtmifyMessage(e.message)) {
-            debugLog('sync error (msg): ' + e.message);
-            e.preventDefault();
-            return true;
-          }
-          // Real errors pass through untouched
+          var dominated = (e.filename && isUtmify(e.filename))
+            || (e.message && isUtmifyError(e.message))
+            || (e.error && e.error.stack && isUtmify(e.error.stack));
+          if (dominated) { e.preventDefault(); return true; }
         });
-
-        // 2. Unhandled promise rejections from UTMify only
         window.addEventListener('unhandledrejection', function(e) {
-          var reason = e.reason;
-          if (!reason) return;
-          var msg = reason.message || String(reason);
-          var stack = reason.stack || '';
-          if (isUtmifyOrigin(msg) || isUtmifyOrigin(stack) || isUtmifyMessage(msg)) {
-            debugLog('promise rejection: ' + msg);
-            e.preventDefault();
-          }
-          // All other rejections pass through untouched
+          if (!e.reason) return;
+          var msg = (e.reason.message || '') + (e.reason.stack || '') + String(e.reason);
+          if (isUtmify(msg) || isUtmifyError(msg)) { e.preventDefault(); }
         });
       })();
     </script>
