@@ -37,6 +37,24 @@ const ProductCardComponent = ({
   const [isVisible, setIsVisible] = useState(priority);
   const [imageLoaded, setImageLoaded] = useState(false);
 
+  // Prefetch otimizado - triggers on hover (desktop) and touchstart (mobile)
+  const prefetchTriggered = useRef(false);
+  const triggerPrefetch = useCallback(() => {
+    if (prefetchTriggered.current) return;
+    prefetchTriggered.current = true;
+    queryClient.prefetchQuery({
+      queryKey: [QUERY_KEYS.PRODUCT, productId],
+      queryFn: async () => {
+        const snap = await getDoc(doc(db, "products", productId));
+        if (!snap.exists()) return null;
+        const data = snap.data();
+        if (data?.is_active === false) return null;
+        return { id: snap.id, ...data };
+      },
+      ...CACHE_TIMES.MODERATE,
+    });
+  }, [queryClient, productId]);
+
   // Intersection Observer para lazy loading
   useEffect(() => {
     if (priority) return;
@@ -58,20 +76,12 @@ const ProductCardComponent = ({
     return () => observer.disconnect();
   }, [priority]);
 
-  // Prefetch otimizado
-  const handleMouseEnter = useCallback(() => {
-    queryClient.prefetchQuery({
-      queryKey: [QUERY_KEYS.PRODUCT, productId],
-      queryFn: async () => {
-        const snap = await getDoc(doc(db, "products", productId));
-        if (!snap.exists()) return null;
-        const data = snap.data();
-        if (data?.is_active === false) return null;
-        return { id: snap.id, ...data };
-      },
-      ...CACHE_TIMES.MODERATE,
-    });
-  }, [queryClient, productId]);
+  // Prefetch product data when card becomes visible on screen (mobile optimization)
+  useEffect(() => {
+    if (!isVisible) return;
+    const timer = setTimeout(() => triggerPrefetch(), 300);
+    return () => clearTimeout(timer);
+  }, [isVisible, triggerPrefetch]);
 
   const hasDiscount = discount && discount > 0;
   const hasOriginalPrice = originalPrice && originalPrice > price;
@@ -81,7 +91,8 @@ const ProductCardComponent = ({
       ref={cardRef}
       to={ROUTES.PRODUCT(productId)} 
       className="group block touch-manipulation" 
-      onMouseEnter={handleMouseEnter} 
+      onMouseEnter={triggerPrefetch}
+      onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
       <Card className="relative overflow-hidden border border-primary/20 md:border-2 hover:border-primary active:border-primary transition-colors duration-200 bg-card cursor-pointer h-full hover:shadow-lg md:hover:shadow-2xl hover:shadow-primary/20 active:scale-[0.98] rounded-xl md:rounded-2xl">
