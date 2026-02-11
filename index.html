@@ -314,34 +314,7 @@
       })();
     </script>
 
-    <!-- Surgical UTMify pixel error suppression (error/unhandledrejection only — NO fetch wrapper) -->
-    <script>
-      (function() {
-        function isUtmify(str) {
-          if (!str) return false;
-          return str.indexOf('utmify') !== -1 || str.indexOf('pixel.js') !== -1;
-        }
-        function isUtmifyError(msg) {
-          if (!msg) return false;
-          return msg.indexOf('_id') !== -1
-              || msg.indexOf('ALREADY_SAVED') !== -1
-              || msg.indexOf('tracking.utmify') !== -1
-              || msg.indexOf('Cannot read properties of undefined') !== -1;
-        }
-        window.addEventListener('error', function(e) {
-          var dominated = (e.filename && isUtmify(e.filename))
-            || (e.message && isUtmifyError(e.message))
-            || (e.message && isUtmify(e.message))
-            || (e.error && e.error.stack && isUtmify(e.error.stack));
-          if (dominated) { e.preventDefault(); e.stopImmediatePropagation(); return true; }
-        }, true);
-        window.addEventListener('unhandledrejection', function(e) {
-          if (!e.reason) return;
-          var msg = (e.reason.message || '') + (e.reason.stack || '') + String(e.reason);
-          if (isUtmify(msg) || isUtmifyError(msg)) { e.preventDefault(); e.stopImmediatePropagation(); }
-        }, true);
-      })();
-    </script>
+    <!-- Service Worker handles UTMify event blocking — no error suppression needed -->
     
   
   
