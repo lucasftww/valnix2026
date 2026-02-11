@@ -39,6 +39,12 @@
     <link rel="dns-prefetch" href="https://hswmwkjijpywnazorusc.supabase.co" />
     <link rel="dns-prefetch" href="https://media.discordapp.net" />
     
+    <!-- UTMify Pixel CDN preconnect + preload -->
+    <link rel="preconnect" href="https://cdn.utmify.com.br" crossorigin />
+    <link rel="dns-prefetch" href="https://cdn.utmify.com.br" />
+    <link rel="dns-prefetch" href="https://tracking.utmify.com.br" />
+    <link rel="preload" href="https://cdn.utmify.com.br/scripts/pixel/pixel.js" as="script" crossorigin />
+    
     
     <!-- Prefetch páginas principais -->
     <link rel="prefetch" href="/valorant" as="document" />
@@ -278,14 +284,34 @@
       defer
     ></script>
     
-    <!-- UTMify Pixel -->
+    <!-- UTMify Pixel (multi-CDN fallback with timeout) -->
     <script>
       window.pixelId = "6983b13f961e629ed63fae7a";
-      var a = document.createElement("script");
-      a.setAttribute("async", "");
-      a.setAttribute("defer", "");
-      a.setAttribute("src", "https://cdn.utmify.com.br/scripts/pixel/pixel.js");
-      document.head.appendChild(a);
+      (function(){
+        var sources = [
+          'https://cdn.utmify.com.br/scripts/pixel/pixel.js',
+          'https://tracking.utmify.com.br/pixel.js',
+          'https://pixel.utmify.com.br/pixel.js'
+        ];
+        function loadPixel(i) {
+          if (i >= sources.length) {
+            console.warn('[Valnix] Pixel falhou em todas CDNs');
+            return;
+          }
+          var s = document.createElement('script');
+          s.type = 'text/javascript';
+          s.async = true;
+          s.src = sources[i];
+          var timeout = setTimeout(function() {
+            try { document.head.removeChild(s); } catch(e){}
+            loadPixel(i + 1);
+          }, 2500);
+          s.onload = function() { clearTimeout(timeout); };
+          s.onerror = function() { clearTimeout(timeout); loadPixel(i + 1); };
+          document.head.appendChild(s);
+        }
+        loadPixel(0);
+      })();
     </script>
 
     <!-- Surgical UTMify pixel error suppression (error/unhandledrejection only — NO fetch wrapper) -->
