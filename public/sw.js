@@ -11,31 +11,42 @@ self.addEventListener('activate', (event) => {
 });
 
 // Block unwanted UTMify events (Lead, ViewContent, AddToCart, PageView)
+// IMPORTANT: Only intercepts specific UTMify tracking endpoints, never other requests
 self.addEventListener('fetch', (event) => {
   const url = event.request.url;
 
-  if (url.includes('utmify') && (url.includes('/lead') || url.includes('/events'))) {
-    if (event.request.method === 'POST') {
-      event.respondWith(
-        event.request.clone().text().then((body) => {
-          if (body.includes('"ViewContent"') ||
-              body.includes('"Lead"') ||
-              body.includes('"AddToCart"') ||
-              body.includes('"PageView"')) {
-            console.debug('[SW] Blocked UTMify event:', body.substring(0, 60));
-            return new Response('{}', { status: 200, headers: { 'Content-Type': 'application/json' } });
-          }
-          return fetch(event.request);
-        }).catch(() => fetch(event.request))
-      );
-      return;
-    }
-    // Block preflight-like GETs to these endpoints too
-    if (event.request.method === 'OPTIONS') {
-      event.respondWith(new Response(null, { status: 204 }));
-      return;
-    }
+  // Only target UTMify tracking API endpoints — never block pixel.js, SDKs, Supabase, etc.
+  const isUtmifyTrackingEndpoint =
+    (url.includes('track.utmify.com') || url.includes('tracking.utmify.com.br') || url.includes('api.utmify.com')) &&
+    (url.includes('/lead') || url.includes('/events'));
+
+  if (!isUtmifyTrackingEndpoint) return; // Let everything else pass through untouched
+
+  // Only intercept POST requests with unwanted event types
+  if (event.request.method === 'POST') {
+    event.respondWith(
+      event.request.clone().text().then((body) => {
+        const blockedEvents = ['"ViewContent"', '"Lead"', '"AddToCart"', '"PageView"'];
+        const shouldBlock = blockedEvents.some((ev) => body.includes(ev));
+
+        if (shouldBlock) {
+          console.debug('[SW] Blocked UTMify event:', body.substring(0, 60));
+          return new Response(JSON.stringify({ success: true }), {
+            status: 200,
+            headers: {
+              'Content-Type': 'application/json',
+              'Access-Control-Allow-Origin': '*',
+            },
+          });
+        }
+        // Allow legitimate events (InitiateCheckout, Purchase) through
+        return fetch(event.request);
+      }).catch(() => fetch(event.request))
+    );
+    return;
   }
+
+  // Let OPTIONS (CORS preflight) pass through to avoid breaking CORS
 });
 
 self.addEventListener('push', (event) => {
