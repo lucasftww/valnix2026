@@ -75,6 +75,7 @@ export const AdminOrders = () => {
   const [filterType, setFilterType] = useState<string>("all");
   const [refreshing, setRefreshing] = useState(false);
   const [cleaning, setCleaning] = useState(false);
+  const [cleaningProcessing, setCleaningProcessing] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
@@ -187,6 +188,39 @@ export const AdminOrders = () => {
       });
     } finally {
       setCleaning(false);
+    }
+  };
+
+  const handleCleanProcessing = async () => {
+    setCleaningProcessing(true);
+    try {
+      const processingOrders = orders.filter(o => o.status === 'processing');
+      let deleted = 0;
+
+      for (const order of processingOrders) {
+        const itemsRef = collection(db, "order_items");
+        const itemsSnapshot = await getDocs(itemsRef);
+        const items = itemsSnapshot.docs.filter(d => d.data().order_id === order.id);
+        for (const item of items) {
+          await deleteDoc(doc(db, "order_items", item.id));
+        }
+        await deleteDoc(doc(db, "orders", order.id));
+        deleted++;
+      }
+
+      toast({
+        title: "Limpeza concluída!",
+        description: `${deleted} pedido(s) processando removido(s).`,
+      });
+      fetchOrders();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao limpar pedidos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCleaningProcessing(false);
     }
   };
 
@@ -436,8 +470,37 @@ export const AdminOrders = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                disabled={cleaningProcessing || orders.filter(o => o.status === 'processing').length === 0}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Limpar processando ({orders.filter(o => o.status === 'processing').length})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Limpar pedidos processando?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso vai excluir permanentemente {orders.filter(o => o.status === 'processing').length} pedido(s) 
+                  com status "Processando". Essa ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCleanProcessing} disabled={cleaningProcessing}>
+                  {cleaningProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Confirmar exclusão
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
-        
         <div className="flex items-center gap-2">
           <Label className="text-sm whitespace-nowrap">Filtrar por:</Label>
           <Select value={filterType} onValueChange={setFilterType}>
