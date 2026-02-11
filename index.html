@@ -197,19 +197,39 @@
       })();
     </script>
 
-    <!-- Auto-detect referrer source and inject UTMs before UTMify pixel -->
+    <!-- Auto-detect referrer/click IDs and inject UTMs before UTMify pixel -->
     <script>
       (function(){
         var params = new URLSearchParams(window.location.search);
-        if (params.get('utm_source')) return;
+
+        // 1. If URL already has utm_source, just persist and return
+        if (params.get('utm_source')) {
+          try {
+            var existing = {};
+            ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
+              var v = params.get(k); if(v) existing[k] = v;
+            });
+            sessionStorage.setItem('valnix_utm_params', JSON.stringify(existing));
+          } catch(e){}
+          return;
+        }
 
         var ref = (document.referrer || '').toLowerCase();
         var utm = null;
 
-        if (ref.indexOf('discord.com') !== -1 || ref.indexOf('discord.gg') !== -1 || ref.indexOf('discordapp.com') !== -1) {
+        // 2. Paid click IDs take priority (gclid = Google Ads, fbclid = Facebook Ads)
+        if (params.get('gclid')) {
+          utm = { utm_source: 'google', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'google_ads' };
+        } else if (params.get('fbclid')) {
+          utm = { utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'facebook_ads' };
+        }
+        // 3. Referrer-based detection (organic/social)
+        else if (ref.indexOf('discord.com') !== -1 || ref.indexOf('discord.gg') !== -1 || ref.indexOf('discordapp.com') !== -1) {
           utm = { utm_source: 'discord', utm_medium: 'social', utm_campaign: 'community' };
+        } else if (ref.indexOf('facebook.com') !== -1 || ref.indexOf('fb.com') !== -1 || ref.indexOf('m.facebook.com') !== -1 || ref.indexOf('l.facebook.com') !== -1 || ref.indexOf('lm.facebook.com') !== -1) {
+          utm = { utm_source: 'facebook', utm_medium: 'social', utm_campaign: 'organic' };
         } else if (ref.indexOf('instagram.com') !== -1 || ref.indexOf('l.instagram.com') !== -1) {
-          utm = { utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'bio_link' };
+          utm = { utm_source: 'instagram', utm_medium: 'social', utm_campaign: 'organic' };
         } else if (ref.indexOf('tiktok.com') !== -1) {
           utm = { utm_source: 'tiktok', utm_medium: 'social', utm_campaign: 'organic' };
         } else if (ref.indexOf('twitter.com') !== -1 || ref.indexOf('t.co') !== -1 || ref.indexOf('x.com') !== -1) {
@@ -220,8 +240,24 @@
           utm = { utm_source: 'whatsapp', utm_medium: 'social', utm_campaign: 'referral' };
         } else if (ref.indexOf('telegram.org') !== -1 || ref.indexOf('t.me') !== -1) {
           utm = { utm_source: 'telegram', utm_medium: 'social', utm_campaign: 'referral' };
-        } else if (ref.indexOf('google.com') !== -1 || ref.indexOf('google.com.br') !== -1) {
+        } else if (ref.indexOf('linkedin.com') !== -1 || ref.indexOf('lnkd.in') !== -1) {
+          utm = { utm_source: 'linkedin', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('reddit.com') !== -1) {
+          utm = { utm_source: 'reddit', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('twitch.tv') !== -1) {
+          utm = { utm_source: 'twitch', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('pinterest.com') !== -1 || ref.indexOf('pin.it') !== -1) {
+          utm = { utm_source: 'pinterest', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('snapchat.com') !== -1) {
+          utm = { utm_source: 'snapchat', utm_medium: 'social', utm_campaign: 'organic' };
+        } else if (ref.indexOf('google.') !== -1) {
           utm = { utm_source: 'google', utm_medium: 'organic', utm_campaign: 'seo' };
+        } else if (ref.indexOf('bing.com') !== -1) {
+          utm = { utm_source: 'bing', utm_medium: 'organic', utm_campaign: 'seo' };
+        }
+        // 4. Direct traffic (no referrer, no UTMs)
+        else if (!ref) {
+          utm = { utm_source: 'direct', utm_medium: '(none)', utm_campaign: 'direct' };
         }
 
         if (utm) {
