@@ -337,13 +337,16 @@ export default function Checkout() {
 
       // Run PIX charge creation and order items creation in parallel
       // Order items are NOT needed for PIX generation, so don't block on them
+      // Get Firebase ID token for authenticated edge function calls
+      const firebaseIdToken = await user.getIdToken();
+
       const pixPromise = fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            'Authorization': `Bearer ${firebaseIdToken}`,
           },
           body: JSON.stringify({
             amount: Math.round(orderAmount * 100),

@@ -111,15 +111,16 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         utm_campaign: utmCampaign,
       });
 
-      // Create PIX charge
+      // Create PIX charge with Firebase auth
       const amountInCents = Math.round(config.price * 100);
+      const firebaseIdToken = await user?.getIdToken();
       const pixResponse = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+            Authorization: `Bearer ${firebaseIdToken}`,
           },
           body: JSON.stringify({
             amount: amountInCents,
