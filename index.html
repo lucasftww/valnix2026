@@ -325,19 +325,21 @@
           if (!msg) return false;
           return msg.indexOf('_id') !== -1
               || msg.indexOf('ALREADY_SAVED') !== -1
-              || msg.indexOf('tracking.utmify') !== -1;
+              || msg.indexOf('tracking.utmify') !== -1
+              || msg.indexOf('Cannot read properties of undefined') !== -1;
         }
         window.addEventListener('error', function(e) {
           var dominated = (e.filename && isUtmify(e.filename))
             || (e.message && isUtmifyError(e.message))
+            || (e.message && isUtmify(e.message))
             || (e.error && e.error.stack && isUtmify(e.error.stack));
-          if (dominated) { e.preventDefault(); return true; }
-        });
+          if (dominated) { e.preventDefault(); e.stopImmediatePropagation(); return true; }
+        }, true);
         window.addEventListener('unhandledrejection', function(e) {
           if (!e.reason) return;
           var msg = (e.reason.message || '') + (e.reason.stack || '') + String(e.reason);
-          if (isUtmify(msg) || isUtmifyError(msg)) { e.preventDefault(); }
-        });
+          if (isUtmify(msg) || isUtmifyError(msg)) { e.preventDefault(); e.stopImmediatePropagation(); }
+        }, true);
       })();
     </script>
     
