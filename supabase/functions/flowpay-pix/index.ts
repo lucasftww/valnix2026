@@ -396,44 +396,46 @@ async function trackUTMifyPurchase(
       }
     }
 
-    // 2. Build customer PII (hashed SHA-256 for EQM)
-    const customer: Record<string, string> = {};
-    if (customerEmail) customer.email = await sha256(customerEmail);
-    if (customerPhone) customer.phone = await sha256(customerPhone.replace(/\D/g, ''));
-    if (externalId) customer.externalId = await sha256(externalId);
+    // 2. Build PII hashes directly on lead (em/ph/external_id for UTMify/Meta EQM)
+    const piiKeys: string[] = [];
+    const leadPii: Record<string, string> = {};
+    if (customerEmail) { leadPii.em = await sha256(customerEmail); piiKeys.push('em'); }
+    if (customerPhone) { leadPii.ph = await sha256(customerPhone.replace(/\D/g, '')); piiKeys.push('ph'); }
+    if (externalId) { leadPii.external_id = await sha256(externalId); piiKeys.push('external_id'); }
 
     // 3. Send to UTMify via tracking/v1/events (no token needed)
-    const leadObj: Record<string, unknown> = {
-      pixelId: UTMIFY_PIXEL_ID,
-      userAgent: clientUserAgent || 'server',
-      ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
-      parameters: '',
-      icTextMatch: null,
-      icCSSMatch: '.utmify-checkout',
-      icURLMatch: null,
-      leadTextMatch: null,
-      addToCartTextMatch: null,
-    };
-    if (Object.keys(customer).length > 0) leadObj.customer = customer;
-
+    const contentIdsArray = Array.isArray(contentIds) ? contentIds : undefined;
     const payload = {
       type: 'Purchase',
       eventId: dedupeKey,
-      lead: leadObj,
+      lead: {
+        pixelId: UTMIFY_PIXEL_ID,
+        userAgent: clientUserAgent || 'server',
+        ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
+        parameters: '',
+        icTextMatch: null,
+        icCSSMatch: '.utmify-checkout',
+        icURLMatch: null,
+        leadTextMatch: null,
+        addToCartTextMatch: null,
+        // PII hashed directly on lead (UTMify/Meta format)
+        ...leadPii,
+      },
       event: {
         sourceUrl: sourceUrl || 'https://valnix2026.lovable.app/checkout',
         pageTitle: pageTitle || 'Checkout - Valnix',
         value,
         currency: 'BRL',
         orderId,
-        ...(contentIds ? { contentIds } : {}),
-        ...(contentNames ? { contentName: contentNames } : {}),
-        ...(numItems ? { numItems } : {}),
+        // Content enrichment — both camelCase and snake_case for compatibility
+        ...(contentIdsArray ? { contentIds: contentIdsArray, content_ids: contentIdsArray } : {}),
+        ...(contentNames ? { contentName: contentNames, content_name: contentNames } : {}),
+        ...(numItems != null ? { numItems: Number(numItems), num_items: Number(numItems) } : {}),
       },
       tikTokPageInfo: null,
     };
 
-    console.log(`📊 UTMify Purchase | orderId=${orderId} | eventId=${dedupeKey} | value=${value} | ip=${clientIp || 'none'} | pii=${Object.keys(customer).join(',') || 'none'} | content=${contentIds ? 'yes' : 'no'}`);
+    console.log(`📊 UTMify Purchase | orderId=${orderId} | eventId=${dedupeKey} | value=${value} | ip=${clientIp || 'none'} | pii=${piiKeys.join(',') || 'none'} | content=${contentIdsArray ? 'yes' : 'no'}`);
 
     const response = await fetch(UTMIFY_EVENTS_URL, {
       method: 'POST',
