@@ -5,9 +5,16 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/FirebaseAuthContext";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense } from "react";
+
+// Componente interno para usar hooks dentro do BrowserRouter
+const AppContent = () => {
+  useBackRedirect("/");
+  return null;
+};
 
 // Carregamento prioritário das páginas principais
 import Index from "./pages/Index";
@@ -55,6 +62,7 @@ const App = () => {
             <CartProvider>
               <Toaster />
                 <BrowserRouter>
+                  <AppContent />
                   <ScrollToTop />
                   
                   <Suspense fallback={
