@@ -218,13 +218,15 @@ serve(async (req) => {
       }
     }
 
-    // ── Build customer identifiers (hashed PII for EQM) ──
-    const customer: Record<string, string> = {};
-    if (customerEmail) customer.email = await sha256(customerEmail);
-    if (customerPhone) customer.phone = await sha256(customerPhone.replace(/\D/g, ''));
-    if (externalId) customer.externalId = await sha256(externalId);
+    // ── Build PII hashes directly on lead (em/ph/external_id for UTMify/Meta EQM) ──
+    const piiKeys: string[] = [];
+    const leadPii: Record<string, string> = {};
+    if (customerEmail) { leadPii.em = await sha256(customerEmail); piiKeys.push('em'); }
+    if (customerPhone) { leadPii.ph = await sha256(customerPhone.replace(/\D/g, '')); piiKeys.push('ph'); }
+    if (externalId) { leadPii.external_id = await sha256(externalId); piiKeys.push('external_id'); }
 
     // ── Build enriched payload ──
+    const contentIdsArray = Array.isArray(contentIds) ? contentIds : undefined;
     const payload: Record<string, unknown> = {
       type,
       eventId: dedupeKey || undefined,
@@ -238,6 +240,8 @@ serve(async (req) => {
         icURLMatch: null,
         leadTextMatch: null,
         addToCartTextMatch: null,
+        // PII hashed directly on lead (UTMify/Meta format)
+        ...leadPii,
       },
       event: {
         sourceUrl: sourceUrl || "",
@@ -245,20 +249,15 @@ serve(async (req) => {
         value: value || undefined,
         currency: currency || "BRL",
         orderId: orderId || undefined,
-        // Content enrichment for Meta ROAS optimization
-        ...(contentIds ? { contentIds } : {}),
-        ...(contentNames ? { contentName: contentNames } : {}),
-        ...(numItems ? { numItems } : {}),
+        // Content enrichment — both camelCase and snake_case for compatibility
+        ...(contentIdsArray ? { contentIds: contentIdsArray, content_ids: contentIdsArray } : {}),
+        ...(contentNames ? { contentName: contentNames, content_name: contentNames } : {}),
+        ...(numItems != null ? { numItems: Number(numItems), num_items: Number(numItems) } : {}),
       },
       tikTokPageInfo: null,
     };
 
-    // Add customer PII if available (hashed, never logged raw)
-    if (Object.keys(customer).length > 0) {
-      (payload.lead as Record<string, unknown>).customer = customer;
-    }
-
-    console.log(`📊 UTMify proxy: ${type} | orderId=${orderId || 'none'} | ip=${clientIp} | ua=${clientUserAgent.substring(0, 50)} | pii=${Object.keys(customer).join(',') || 'none'} | content=${contentIds ? 'yes' : 'no'}`);
+    console.log(`📊 UTMify proxy: ${type} | orderId=${orderId || 'none'} | ip=${clientIp} | ua=${clientUserAgent.substring(0, 50)} | pii=${piiKeys.join(',') || 'none'} | content=${contentIdsArray ? 'yes' : 'no'}`);
 
     const response = await fetch(UTMIFY_EVENTS_URL, {
       method: "POST",
