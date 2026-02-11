@@ -321,7 +321,15 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      utmify_success_rate: {
+        Row: {
+          avg_attempts: number | null
+          day: string | null
+          event_count: number | null
+          status: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       acquire_utmify_lock: {
