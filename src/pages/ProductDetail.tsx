@@ -216,18 +216,18 @@ const ProductDetail = () => {
         <div className="container px-4 md:px-8 pb-6 lg:pb-12">
           <div className="flex flex-col lg:grid lg:grid-cols-[1fr_420px] gap-4 sm:gap-6 lg:gap-8 max-w-7xl mx-auto">
             {/* Imagem Mobile */}
-            <div className="rounded-xl overflow-hidden bg-black/90 border border-border/10 lg:hidden">
-              <div className="relative flex items-center justify-center p-4 min-h-[280px] sm:min-h-[350px]">
+            <div className="rounded-xl overflow-hidden border border-border/10 lg:hidden bg-black">
+              <div className="flex items-center justify-center p-6 bg-gradient-to-b from-black/60 to-black/90">
                 {product.image_url && (
                   <ProductImage
                     src={product.image_url}
                     alt={product.name}
-                    className="max-w-[75%] sm:max-w-[65%] max-h-[260px] sm:max-h-[330px] w-auto h-auto"
+                    className="w-auto h-auto max-h-[260px] sm:max-h-[320px] object-contain"
                     priority={true}
                   />
                 )}
               </div>
-              <div className="flex items-center justify-center gap-4 px-4 py-3 bg-black border-t border-white/10">
+              <div className="flex items-center justify-center gap-4 px-4 py-2.5 border-t border-white/10">
                 <div className="flex items-center gap-1.5">
                   <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400 shrink-0" />
                   <span className="text-xs text-white/70 whitespace-nowrap">{productStats.reviewCount.toLocaleString('pt-BR')} avaliações</span>
