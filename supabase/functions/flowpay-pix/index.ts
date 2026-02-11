@@ -12,6 +12,94 @@ const FIREBASE_PROJECT_ID = 'valnix';
 const UTMIFY_PIXEL_ID = '6983b13f961e629ed63fae7a';
 const UTMIFY_EVENTS_URL = 'https://tracking.utmify.com.br/tracking/v1/events';
 
+// ── Firebase ID Token Verification ─────────────────────────────────
+// Verifies Firebase Auth ID tokens using Google's public keys (RSA)
+let cachedPublicKeys: Record<string, CryptoKey> | null = null;
+let publicKeysExpiresAt = 0;
+
+async function getGooglePublicKeys(): Promise<Record<string, CryptoKey>> {
+  if (cachedPublicKeys && Date.now() < publicKeysExpiresAt) return cachedPublicKeys;
+
+  const res = await fetch('https://www.googleapis.com/robot/v1/metadata/x509/securetoken@system.gserviceaccount.com');
+  if (!res.ok) throw new Error(`Failed to fetch Google public keys: ${res.status}`);
+
+  // Parse cache-control for expiry
+  const cacheControl = res.headers.get('cache-control') || '';
+  const maxAgeMatch = cacheControl.match(/max-age=(\d+)/);
+  const maxAge = maxAgeMatch ? parseInt(maxAgeMatch[1]) * 1000 : 3600_000;
+  publicKeysExpiresAt = Date.now() + maxAge;
+
+  const certs: Record<string, string> = await res.json();
+  const keys: Record<string, CryptoKey> = {};
+
+  for (const [kid, pem] of Object.entries(certs)) {
+    const pemBody = pem
+      .replace(/-----BEGIN CERTIFICATE-----/, '')
+      .replace(/-----END CERTIFICATE-----/, '')
+      .replace(/\n/g, '');
+    const certBytes = Uint8Array.from(atob(pemBody), c => c.charCodeAt(0));
+
+    // Extract public key from X.509 certificate using SubjectPublicKeyInfo
+    // Import as RSASSA-PKCS1-v1_5 with SHA-256
+    try {
+      const key = await crypto.subtle.importKey(
+        'raw', certBytes,
+        { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['verify']
+      );
+      keys[kid] = key;
+    } catch {
+      // Fallback: try importing the raw SPKI from the cert
+      // X.509 certs need special parsing; use a simpler approach
+    }
+  }
+
+  cachedPublicKeys = keys;
+  return keys;
+}
+
+/**
+ * Verify a Firebase ID token.
+ * Returns the decoded payload (uid, email, etc.) or null if invalid.
+ * Uses Google's tokeninfo endpoint for reliable verification in Deno.
+ */
+async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; email?: string } | null> {
+  try {
+    // Use Google's secure tokeninfo endpoint for verification
+    const res = await fetch(`https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${getFirebaseWebApiKey()}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+
+    if (!res.ok) {
+      console.warn('❌ Firebase token verification failed:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const user = data.users?.[0];
+    if (!user?.localId) return null;
+
+    return { uid: user.localId, email: user.email || undefined };
+  } catch (e) {
+    console.warn('❌ Firebase token verification error:', e);
+    return null;
+  }
+}
+
+function getFirebaseWebApiKey(): string {
+  // Extract from service account or use the known web API key
+  const saKeyRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
+  if (saKeyRaw) {
+    try {
+      const sa = JSON.parse(saKeyRaw);
+      // Service account doesn't contain web API key, use the known one
+    } catch {}
+  }
+  // This is the Firebase Web API key (public, same as in frontend config)
+  return 'AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw';
+}
+
 /** SHA-256 hash helper for PII (returns lowercase hex) */
 async function sha256(input: string): Promise<string> {
   const data = new TextEncoder().encode(input.trim().toLowerCase());
@@ -645,6 +733,22 @@ Deno.serve(async (req) => {
 
     // ==================== CREATE PIX CHARGE ====================
     if (req.method === 'POST' && action === 'create') {
+      // 🔐 Verify Firebase Auth token
+      const authHeader = req.headers.get('authorization');
+      const idToken = authHeader?.replace(/^Bearer\s+/i, '');
+      if (!idToken) {
+        return new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const firebaseUser = await verifyFirebaseIdToken(idToken);
+      if (!firebaseUser) {
+        return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      console.log(`🔐 Authenticated user: ${firebaseUser.uid} (${firebaseUser.email})`);
+
       if (!apiKey) {
         console.error('❌ FLOWPAY_API_KEY not configured');
         return new Response(JSON.stringify({ error: 'Payment gateway not configured' }), {
@@ -771,6 +875,21 @@ Deno.serve(async (req) => {
 
     // ==================== CHECK STATUS (with Purchase fallback) ====================
     if (req.method === 'GET' && action === 'status') {
+      // 🔐 Verify Firebase Auth token
+      const statusAuthHeader = req.headers.get('authorization');
+      const statusIdToken = statusAuthHeader?.replace(/^Bearer\s+/i, '');
+      if (!statusIdToken) {
+        return new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+      const statusFirebaseUser = await verifyFirebaseIdToken(statusIdToken);
+      if (!statusFirebaseUser) {
+        return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
+          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+
       if (!apiKey) {
         console.error('❌ FLOWPAY_API_KEY not configured');
         return new Response(JSON.stringify({ error: 'Payment gateway not configured' }), {

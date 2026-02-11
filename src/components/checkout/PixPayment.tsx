@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { trackPurchaseEvent } from "@/lib/analytics";
-import { db } from "@/integrations/firebase/config";
+import { db, auth } from "@/integrations/firebase/config";
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 
 
@@ -148,11 +148,19 @@ export function PixPayment({
 
     const pollInterval = setInterval(async () => {
       try {
+        // Get fresh Firebase ID token for each poll
+        const currentUser = auth.currentUser;
+        const idToken = currentUser ? await currentUser.getIdToken() : null;
+        if (!idToken) {
+          console.warn('⚠️ No Firebase auth for status poll');
+          return;
+        }
+
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${transactionId}`,
           {
             headers: {
-              'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
+              'Authorization': `Bearer ${idToken}`,
             },
           }
         );
