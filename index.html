@@ -256,6 +256,17 @@
       })();
     </script>
 
+    <!-- Protect MutationObserver against UTMify pixel passing invalid targets -->
+    <script>
+      (function(){
+        var orig = MutationObserver.prototype.observe;
+        MutationObserver.prototype.observe = function(target, opts) {
+          if (!target || typeof target.nodeType === 'undefined') return;
+          return orig.call(this, target, opts);
+        };
+      })();
+    </script>
+
     <!-- UTMify Pixel (multi-CDN fallback with timeout) -->
     <script>
       window.pixelId = "6983b13f961e629ed63fae7a";
