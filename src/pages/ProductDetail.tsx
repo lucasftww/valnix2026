@@ -44,7 +44,7 @@ const ProductImage = memo(({ src, alt, className, priority = false }: {
         loading={priority ? "eager" : "lazy"}
         decoding="async"
         onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-contain transition-opacity duration-200 ${loaded ? 'opacity-100' : 'opacity-0'}`}
+        className={`w-full h-full object-contain ${loaded ? 'opacity-100' : 'opacity-0'}`}
       />
     </div>
   );
@@ -162,7 +162,7 @@ const ProductDetail = () => {
   const totalPrice = (product.price * quantity).toFixed(2).replace('.', ',');
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col pb-[88px] lg:pb-0 will-change-scroll">
+    <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col pb-[88px] lg:pb-0">
       <Helmet>
         <title>{`Comprar ${product.name} Barato | VALNIX`}</title>
         <meta name="description" content={`Compre ${product.name} com entrega automática via PIX. Melhor preço: R$ ${product.price.toFixed(2).replace('.', ',')}. Entrega instantânea e segura na VALNIX.`} />
@@ -227,7 +227,7 @@ const ProductDetail = () => {
                   />
                 )}
               </div>
-              <div className="absolute bottom-3 right-3 bg-primary/90 backdrop-blur-sm text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">
+              <div className="absolute bottom-3 right-3 bg-primary text-primary-foreground text-xs font-bold px-2.5 py-1 rounded-full">
                 +{productStats.sold.toLocaleString('pt-BR')} vendidos
               </div>
             </div>
@@ -493,7 +493,7 @@ const ProductDetail = () => {
       </main>
 
       {/* Sticky CTA Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-black border-t border-primary/30 shadow-lg">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-black border-t border-primary/30" style={{ transform: 'translateZ(0)' }}>
         <div className="px-4 py-3 safe-area-inset-bottom">
           <div className="flex items-center justify-between mb-2">
             <div>
@@ -517,7 +517,7 @@ const ProductDetail = () => {
             </Button>
             <Button 
               onClick={handleBuyNow} 
-              className="flex-1 h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl shadow-lg shadow-primary/30 active:scale-[0.98] transition-transform"
+              className="flex-1 h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
             >
               Comprar Agora
             </Button>
