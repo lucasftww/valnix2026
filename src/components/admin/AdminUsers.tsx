@@ -60,10 +60,14 @@ type SortField = "email" | "total_orders" | "total_spent" | "created_at" | "last
 type SortOrder = "asc" | "desc";
 type FilterType = "all" | "with_orders" | "without_orders" | "vip";
 
-// Safe date parser to prevent "Invalid time value" crashes
-const safeDate = (dateStr: string | undefined | null): Date => {
+// Safe date parser that handles Firestore Timestamps, ISO strings, and invalid values
+const safeDate = (dateStr: string | undefined | null | { seconds: number; nanoseconds: number }): Date => {
   if (!dateStr) return new Date(0);
-  const d = new Date(dateStr);
+  // Handle Firestore Timestamp objects
+  if (typeof dateStr === 'object' && 'seconds' in dateStr) {
+    return new Date(dateStr.seconds * 1000);
+  }
+  const d = new Date(dateStr as string);
   return isNaN(d.getTime()) ? new Date(0) : d;
 };
 

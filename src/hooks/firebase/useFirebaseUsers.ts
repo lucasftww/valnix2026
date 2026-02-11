@@ -1,6 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy, where, doc, getDoc, updateDoc, deleteDoc, setDoc } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, where, doc, getDoc, updateDoc, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
+
+// Convert Firestore Timestamp or string to ISO string
+function toISOString(val: any): string {
+  if (!val) return new Date().toISOString();
+  if (val instanceof Timestamp) return val.toDate().toISOString();
+  if (typeof val === 'object' && 'seconds' in val) return new Date(val.seconds * 1000).toISOString();
+  if (typeof val === 'string') {
+    const d = new Date(val);
+    return isNaN(d.getTime()) ? new Date().toISOString() : val;
+  }
+  return new Date().toISOString();
+}
 
 export interface FirebaseUser {
   id: string;
@@ -67,7 +79,7 @@ export const useAdminUsers = () => {
           existing.total_orders += 1;
           existing.total_spent += Number(order.total_amount) || 0;
           
-          const orderDate = order.created_at;
+          const orderDate = toISOString(order.created_at);
           if (!existing.last_order_date || orderDate > existing.last_order_date) {
             existing.last_order_date = orderDate;
           }
@@ -87,7 +99,7 @@ export const useAdminUsers = () => {
         userMap.set(userId, {
           id: userId,
           email: profile.email || "",
-          created_at: profile.created_at || new Date().toISOString(),
+          created_at: toISOString(profile.created_at),
           phone: profile.phone,
           full_name: profile.full_name,
           nickname: profile.nickname,
@@ -109,7 +121,7 @@ export const useAdminUsers = () => {
           userMap.set(userId, {
             id: userId,
             email: userData.email || "",
-            created_at: userData.created_at || new Date().toISOString(),
+            created_at: toISOString(userData.created_at),
             phone: undefined,
             full_name: undefined,
             nickname: undefined,
@@ -151,7 +163,7 @@ export const useUserOrders = (userId: string | null) => {
         const data = doc.data();
         return {
           id: doc.id,
-          created_at: data.created_at,
+          created_at: toISOString(data.created_at),
           total_amount: Number(data.total_amount) || 0,
           status: data.status || "pending",
           payment_status: data.payment_status || "pending",
