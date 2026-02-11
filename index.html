@@ -184,6 +184,19 @@
   
   
   
+    <!-- Strip sensitive tokens from URL before any tracking scripts load -->
+    <script>
+      (function(){
+        var url = new URL(window.location.href);
+        var dirty = false;
+        // Remove __lovable_token and other sensitive params
+        ['__lovable_token', '__dev_token'].forEach(function(key) {
+          if (url.searchParams.has(key)) { url.searchParams.delete(key); dirty = true; }
+        });
+        if (dirty) window.history.replaceState(null, '', url.toString());
+      })();
+    </script>
+
     <!-- Auto-detect referrer source and inject UTMs before UTMify pixel -->
     <script>
       (function(){
