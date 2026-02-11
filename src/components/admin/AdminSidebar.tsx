@@ -120,7 +120,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         </div>
 
         {/* Main Navigation */}
-        <SidebarGroup className="flex-1 py-4 px-2">
+        <SidebarGroup className="py-4 px-2">
           <SidebarGroupLabel className={cn(
             "text-[10px] font-semibold uppercase tracking-wider text-neutral-600 mb-2 px-2",
             isCollapsed && "sr-only"

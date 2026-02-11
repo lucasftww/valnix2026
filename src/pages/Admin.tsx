@@ -129,8 +129,11 @@ export default function Admin() {
               {/* Search */}
               <div className="flex-1 flex justify-center max-w-md mx-auto">
                 <div className="relative w-full">
+                  <label htmlFor="admin-search" className="sr-only">Buscar</label>
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                   <Input
+                    id="admin-search"
+                    name="admin-search"
                     placeholder="Buscar..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
@@ -221,8 +224,8 @@ export default function Admin() {
           {/* Footer */}
           <footer className="border-t border-border/40 bg-background/50 px-6 py-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>© 2024 Admin Panel. Todos os direitos reservados.</span>
-              <span>v1.0.0</span>
+              <span>© 2025 VALNIX. Todos os direitos reservados.</span>
+              <span>v2.0</span>
             </div>
           </footer>
         </div>
