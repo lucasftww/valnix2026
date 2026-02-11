@@ -18,17 +18,17 @@ export const FloatingContactButtons = () => {
   if (!shouldShow || !isVisible) return null;
 
   return (
-    <div className="fixed right-5 bottom-20 z-40 flex items-center gap-2">
-      {/* Botão fechar */}
-      <button
-        onClick={() => setIsVisible(false)}
-        className="h-7 w-7 rounded-full bg-muted/90 hover:bg-muted flex items-center justify-center transition-colors"
-        aria-label="Fechar botão de contato"
-      >
-        <X className="h-3.5 w-3.5 text-foreground" />
-      </button>
-
+    <div className="fixed right-5 bottom-20 z-40">
       {/* Discord Button */}
+      <div className="relative">
+        {/* Botão fechar */}
+        <button
+          onClick={() => setIsVisible(false)}
+          className="absolute -top-1.5 -right-1.5 h-5 w-5 rounded-full bg-muted/90 hover:bg-muted flex items-center justify-center z-10 transition-colors shadow-sm"
+          aria-label="Fechar botão de contato"
+        >
+          <X className="h-3 w-3 text-foreground" />
+        </button>
       <a
         href="https://discord.gg/ZYdz9xYdq5"
         target="_blank"
@@ -48,6 +48,7 @@ export const FloatingContactButtons = () => {
           </svg>
         </Button>
       </a>
+      </div>
     </div>
   );
 };
