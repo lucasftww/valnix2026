@@ -17,7 +17,7 @@ export const FloatingContactButtons = () => {
 
       {/* Discord Button - só na home */}
       {location.pathname === "/" && isVisible && (
-        <div className="fixed right-6 bottom-[190px] md:bottom-[210px] z-40 flex flex-col gap-3">
+        <div className="fixed right-6 bottom-6 md:bottom-8 z-40 flex flex-col gap-3">
           {/* Botão fechar */}
           <button
             onClick={() => setIsVisible(false)}
