@@ -545,7 +545,7 @@ const ProductDetail = () => {
         <CategoryCards />
       </Suspense>
       <Suspense fallback={<div className="h-20" />}>
-        <FAQ />
+        <FAQ productName={product.name} productCategory={product.category} />
       </Suspense>
       <Suspense fallback={null}>
         <Footer />

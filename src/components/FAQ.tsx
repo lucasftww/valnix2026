@@ -1,4 +1,4 @@
-import { memo } from "react";
+import { memo, useMemo } from "react";
 import {
   Accordion,
   AccordionContent,
@@ -6,30 +6,57 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 
-const faqs = [
-  {
-    question: "Como comprar Valorant Points (VP) na VALNIX?",
-    answer: "Basta escolher o gift card de Valorant Points desejado, adicionar ao carrinho e pagar via PIX. A entrega é automática e instantânea após a confirmação do pagamento."
-  },
-  {
-    question: "É seguro comprar gift cards na VALNIX?",
-    answer: "Sim! Priorizamos a segurança de nossos clientes em todas as etapas da compra. Utilizamos criptografia SSL no site, garantindo que suas informações e dados pessoais estejam protegidos durante a transação. Mais de 1250 clientes satisfeitos com avaliação média de 4.8 estrelas."
-  },
-  {
-    question: "Como recebo o produto (VP, Robux, RP)?",
-    answer: "Após a confirmação do pagamento via PIX, você receberá o código do gift card automaticamente. A entrega é instantânea para todos os produtos digitais como Valorant Points, Robux e Riot Points."
-  },
-  {
-    question: "Quais formas de pagamento são aceitas?",
-    answer: "Aceitamos PIX com confirmação instantânea. Após o pagamento ser confirmado, a entrega do gift card é automática e imediata."
-  },
-  {
-    question: "E se eu precisar de ajuda?",
-    answer: "Nossa equipe de suporte está disponível das 10h às 23h diariamente. Entre em contato através do nosso Discord e responderemos o mais rápido possível."
-  }
-] as const;
+interface FAQProps {
+  productName?: string;
+  productCategory?: string;
+}
 
-const FAQComponent = () => {
+function getProductLabel(productName?: string, productCategory?: string): string {
+  const name = (productName || productCategory || "").toLowerCase();
+  
+  if (name.includes("robux") || name.includes("roblox")) return "Robux";
+  if (name.includes("valorant") || name.includes("vp")) return "Valorant Points (VP)";
+  if (name.includes("riot") || name.includes("rp") || name.includes("league") || name.includes("lol")) return "Riot Points (RP)";
+  if (name.includes("free fire") || name.includes("freefire") || name.includes("diamante")) return "Diamantes Free Fire";
+  if (name.includes("playstation") || name.includes("psn")) return "PlayStation Store";
+  if (name.includes("xbox") || name.includes("game pass")) return "Xbox / Game Pass";
+  if (name.includes("steam")) return "Steam";
+  if (name.includes("google") || name.includes("play")) return "Google Play";
+  if (name.includes("netflix")) return "Netflix";
+  if (name.includes("spotify")) return "Spotify";
+  
+  return "gift cards";
+}
+
+function buildFaqs(label: string) {
+  return [
+    {
+      question: `Como comprar ${label} na VALNIX?`,
+      answer: `Basta escolher o ${label} desejado, adicionar ao carrinho e pagar via PIX. A entrega é automática e instantânea após a confirmação do pagamento.`,
+    },
+    {
+      question: "É seguro comprar na VALNIX?",
+      answer: "Sim! Priorizamos a segurança de nossos clientes em todas as etapas da compra. Utilizamos criptografia SSL no site, garantindo que suas informações e dados pessoais estejam protegidos durante a transação. Mais de 1250 clientes satisfeitos com avaliação média de 4.8 estrelas.",
+    },
+    {
+      question: `Como recebo o ${label}?`,
+      answer: `Após a confirmação do pagamento via PIX, você receberá o código do gift card automaticamente. A entrega é instantânea — sem espera.`,
+    },
+    {
+      question: "Quais formas de pagamento são aceitas?",
+      answer: "Aceitamos PIX com confirmação instantânea. Após o pagamento ser confirmado, a entrega do gift card é automática e imediata.",
+    },
+    {
+      question: "E se eu precisar de ajuda?",
+      answer: "Nossa equipe de suporte está disponível das 10h às 23h diariamente. Entre em contato através do nosso Discord e responderemos o mais rápido possível.",
+    },
+  ];
+}
+
+const FAQComponent = ({ productName, productCategory }: FAQProps) => {
+  const label = useMemo(() => getProductLabel(productName, productCategory), [productName, productCategory]);
+  const faqs = useMemo(() => buildFaqs(label), [label]);
+
   return (
     <section className="container px-4 md:px-8 py-8 md:py-12">
       <div className="max-w-4xl mx-auto">
