@@ -138,12 +138,3 @@ export interface CartItem {
   quantity: number;
   image_url: string | null;
 }
-
-// Auth types
-export interface AuthUser {
-  id: string;
-  email: string;
-  user_metadata: {
-    full_name?: string;
-  };
-}

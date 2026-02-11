@@ -7,7 +7,3 @@ import { supabase as _supabase } from "@/integrations/supabase/client";
  * for edge functions and some legacy tables.
  */
 export const supabase = _supabase as any;
-
-export function supabaseFrom(table: string) {
-  return (_supabase as any).from(table);
-}
