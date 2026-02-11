@@ -219,66 +219,50 @@ const ProductDetail = () => {
             <div className="lg:hidden space-y-3">
               {/* Hero: Imagem + Nome + Preço — tudo num bloco só */}
               <div className="rounded-2xl overflow-hidden border border-border/20 bg-card">
-                {/* Imagem — fundo escuro, imagem centralizada e contida */}
-                <div className="relative bg-gradient-to-b from-muted/30 to-background aspect-square flex items-center justify-center p-8">
+                {/* Imagem */}
+                <div className="relative bg-gradient-to-b from-muted/20 to-background flex items-center justify-center px-10 py-6">
                   {product.image_url && (
                     <img
                       src={product.image_url}
                       alt={product.name}
                       loading="eager"
                       decoding="async"
-                      className="max-w-full max-h-full w-auto h-auto object-contain drop-shadow-2xl"
+                      className="w-full max-h-[300px] object-contain drop-shadow-2xl"
                     />
                   )}
-                  {/* Badge de vendidos */}
-                  <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-full px-3 py-1.5">
+                  <div className="absolute top-3 left-3 flex items-center gap-1.5 bg-black/70 backdrop-blur-sm rounded-full px-2.5 py-1">
                     <Zap className="w-3 h-3 text-primary shrink-0" />
                     <span className="text-[11px] font-semibold text-white">+{productStats.sold.toLocaleString('pt-BR')} vendidos</span>
                   </div>
                 </div>
 
-                {/* Info do produto */}
-                <div className="p-4 space-y-3">
-                  <div>
-                    <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest mb-1">Produto Digital</p>
-                    <h1 className="text-xl font-bold leading-tight">{product.name}</h1>
-                  </div>
+                {/* Info */}
+                <div className="px-5 pb-5 pt-3 space-y-2.5">
+                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Produto Digital</p>
+                  <h1 className="text-xl font-bold leading-snug">{product.name}</h1>
 
-                  {/* Avaliações */}
-                  <div className="flex items-center gap-2">
-                    <div className="flex items-center gap-0.5">
+                  <div className="flex items-center gap-1.5">
+                    <div className="flex gap-0.5">
                       {[1,2,3,4,5].map(s => (
-                        <Star key={s} className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
+                        <Star key={s} className="w-3 h-3 fill-yellow-400 text-yellow-400" />
                       ))}
                     </div>
-                    <span className="text-xs text-muted-foreground">
-                      {productStats.reviewCount.toLocaleString('pt-BR')} avaliações
-                    </span>
+                    <span className="text-[11px] text-muted-foreground">{productStats.reviewCount.toLocaleString('pt-BR')} avaliações</span>
                   </div>
 
-                  {/* Preço */}
-                  <div className="flex items-baseline gap-2">
+                  <div className="flex items-baseline gap-2 pt-0.5">
                     {product.old_price && product.old_price > product.price && (
                       <span className="text-sm text-muted-foreground line-through">
                         R$ {product.old_price.toFixed(2).replace('.', ',')}
                       </span>
                     )}
-                    <span className="text-3xl font-extrabold text-primary">
-                      R$ {totalPrice}
-                    </span>
+                    <span className="text-2xl font-extrabold text-primary">R$ {totalPrice}</span>
                   </div>
 
-                  {/* Trust badges inline */}
-                  <div className="flex items-center gap-3 text-xs text-muted-foreground pt-1">
-                    <span className="flex items-center gap-1">
-                      <Zap className="w-3.5 h-3.5 text-primary" /> Entrega automática
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <img src={pixLogo} alt="PIX" className="w-4 h-4" loading="lazy" /> PIX
-                    </span>
-                    <span className="flex items-center gap-1">
-                      <ShieldCheck className="w-3.5 h-3.5 text-primary" /> Seguro
-                    </span>
+                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1 border-t border-border/10 mt-1">
+                    <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-primary" /> Entrega automática</span>
+                    <span className="flex items-center gap-1"><img src={pixLogo} alt="PIX" className="w-3.5 h-3.5" loading="lazy" /> PIX</span>
+                    <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-primary" /> Seguro</span>
                   </div>
                 </div>
               </div>
