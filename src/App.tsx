@@ -5,9 +5,13 @@ import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { AuthProvider } from "@/contexts/FirebaseAuthContext";
 import { ScrollToTop } from "@/components/ScrollToTop";
+import { captureUtmParams } from "@/lib/utmCapture";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense } from "react";
+
+// Capture UTM params from URL on app load (before any navigation)
+captureUtmParams();
 
 // Carregamento prioritário das páginas principais
 import Index from "./pages/Index";

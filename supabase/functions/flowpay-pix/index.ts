@@ -280,7 +280,8 @@ async function trackUTMifyPurchase(
   clientIp?: string | null, clientUserAgent?: string | null, 
   sourceUrl?: string, pageTitle?: string,
   customerEmail?: string | null, customerPhone?: string | null,
-  externalId?: string | null, contentIds?: string[], contentNames?: string, numItems?: number
+  externalId?: string | null, contentIds?: string[], contentNames?: string, numItems?: number,
+  utmParameters?: string
 ) {
   const LOCK_TTL_SECONDS = 30;
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -413,7 +414,7 @@ async function trackUTMifyPurchase(
         pixelId: UTMIFY_PIXEL_ID,
         userAgent: clientUserAgent || 'server',
         ip: clientIp && clientIp.trim() ? clientIp.trim() : null,
-        parameters: '',
+        parameters: utmParameters || '',
         icTextMatch: null,
         icCSSMatch: '.utmify-checkout',
         icURLMatch: null,
@@ -661,6 +662,7 @@ Deno.serve(async (req) => {
       const customerEmail = orderFields?.customer_email?.stringValue;
       const customerPhone = orderFields?.customer_phone?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
+      const storedUtmParams = orderFields?.utm_parameters?.stringValue || '';
 
       // Fetch order items for content enrichment
       let contentIds: string[] | undefined;
@@ -694,7 +696,7 @@ Deno.serve(async (req) => {
 
       // Track Purchase event on UTMify (server-side, enriched with PII + content)
       try {
-        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, webhookUserAgent, undefined, undefined, customerEmail, customerPhone, userId, contentIds, contentNames, numItems);
+        await trackUTMifyPurchase(orderId!, orderValue, webhookClientIp, webhookUserAgent, undefined, undefined, customerEmail, customerPhone, userId, contentIds, contentNames, numItems, storedUtmParams);
       } catch (trackError) {
         console.warn('⚠️ UTMify tracking failed:', trackError);
       }
@@ -722,7 +724,7 @@ Deno.serve(async (req) => {
       }
 
       const body = await req.json();
-      const { orderId, customer } = body;
+      const { orderId, customer, utmParameters } = body;
       let { amount } = body;
 
       if (!orderId) {
@@ -808,8 +810,9 @@ Deno.serve(async (req) => {
         try {
           await updateFirestoreDoc('orders', orderId, {
             flowpay_charge_id: data.charge.id,
+            ...(utmParameters ? { utm_parameters: utmParameters } : {}),
           });
-          console.log(`✅ Stored chargeId ${data.charge.id} in order ${orderId}`);
+          console.log(`✅ Stored chargeId ${data.charge.id} in order ${orderId}${utmParameters ? ' (with UTMs)' : ''}`);
         } catch (err) {
           console.warn('⚠️ Failed to store chargeId in order:', err);
         }
@@ -899,7 +902,8 @@ Deno.serve(async (req) => {
               const fbEmail = orderFields?.customer_email?.stringValue;
               const fbPhone = orderFields?.customer_phone?.stringValue;
               const fbUserId = orderFields?.user_id?.stringValue;
-              await trackUTMifyPurchase(fbOrderId, Number(orderValue), pollingIp, pollingUa, undefined, undefined, fbEmail, fbPhone, fbUserId);
+              const fbUtmParams = orderFields?.utm_parameters?.stringValue || '';
+              await trackUTMifyPurchase(fbOrderId, Number(orderValue), pollingIp, pollingUa, undefined, undefined, fbEmail, fbPhone, fbUserId, undefined, undefined, undefined, fbUtmParams);
               
               // Also register analytics if not done
               await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);

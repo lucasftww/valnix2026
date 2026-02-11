@@ -18,6 +18,7 @@ import pixLogo from "@/assets/pix-logo.png";
 // trackPurchase is a no-op; saldo Purchase is sent via utmify-track edge function directly
 import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
+import { getUtmQueryString } from "@/lib/utmCapture";
 
 interface FormData {
   name: string;
@@ -285,6 +286,7 @@ export default function Checkout() {
               sourceUrl: window.location.href,
               pageTitle: document.title,
               icCSSMatch: '.utmify-checkout',
+              parameters: getUtmQueryString(),
               // Customer PII (will be SHA-256 hashed server-side)
               customerEmail: user.email || undefined,
               externalId: user.uid,
@@ -347,6 +349,7 @@ export default function Checkout() {
             amount: Math.round(orderAmount * 100),
             orderId,
             description: `Pedido ${orderId.substring(0, 8)}`,
+            utmParameters: getUtmQueryString(),
             customer: {
               name: formData.name,
               email: user.email || undefined,
