@@ -101,6 +101,51 @@ export type Database = {
         }
         Relationships: []
       }
+      guest_orders: {
+        Row: {
+          created_at: string
+          customer_name: string | null
+          customer_phone: string | null
+          email: string
+          expires_at: string
+          guest_session_id: string | null
+          hash: string
+          id: string
+          linked: boolean
+          order_data: Json
+          order_id: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          email: string
+          expires_at?: string
+          guest_session_id?: string | null
+          hash: string
+          id?: string
+          linked?: boolean
+          order_data?: Json
+          order_id: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          customer_name?: string | null
+          customer_phone?: string | null
+          email?: string
+          expires_at?: string
+          guest_session_id?: string | null
+          hash?: string
+          id?: string
+          linked?: boolean
+          order_data?: Json
+          order_id?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       post_payment_pages: {
         Row: {
           addon_type: string

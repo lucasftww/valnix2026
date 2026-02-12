@@ -784,20 +784,18 @@ Deno.serve(async (req) => {
 
     // ==================== CHECK STATUS (with Purchase fallback) ====================
     if (req.method === 'GET' && action === 'status') {
-      // 🔐 Verify Firebase Auth token
+      // 🔐 Verify Firebase Auth token (optional for guest checkout)
       const statusAuthHeader = req.headers.get('authorization');
       const statusIdToken = statusAuthHeader?.replace(/^Bearer\s+/i, '');
-      if (!statusIdToken) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      if (statusIdToken) {
+        const statusFirebaseUser = await verifyFirebaseIdToken(statusIdToken);
+        if (!statusFirebaseUser) {
+          return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
+            status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
       }
-      const statusFirebaseUser = await verifyFirebaseIdToken(statusIdToken);
-      if (!statusFirebaseUser) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
+      // Allow unauthenticated status checks for guest checkout
 
       if (!apiKey) {
         console.error('❌ FLOWPAY_API_KEY not configured');
