@@ -283,6 +283,45 @@ export default function Checkout() {
 
         trackPurchaseEvent(user.uid, orderAmount, orderId, items.map(i => i.name).join(', '));
 
+        // Send Purchase to Meta CAPI (server-side via edge function)
+        try {
+          const nameParts = formData.name.split(' ');
+          supabase.functions.invoke('meta-capi', {
+            body: {
+              event_name: 'Purchase',
+              event_id: `purchase_${orderId}_${Date.now()}`,
+              order_id: orderId,
+              value: orderAmount,
+              currency: 'BRL',
+              content_name: items.map(i => i.name).join(', '),
+              email: user.email,
+              first_name: nameParts[0] || undefined,
+              last_name: nameParts.slice(1).join(' ') || undefined,
+              external_id: user.uid,
+            },
+          }).then(({ error }) => {
+            if (error) console.warn('⚠️ Meta CAPI balance Purchase failed:', error);
+            else console.log('📡 Meta CAPI Purchase sent (balance payment)');
+          });
+        } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
+
+        // Send Purchase to UTMify (server-side via edge function)
+        try {
+          supabase.functions.invoke('utmify-event', {
+            body: {
+              order_id: orderId,
+              event_type: 'Purchase',
+              value: orderAmount,
+              customer_name: formData.name,
+              customer_email: user.email,
+              product_name: items.map(i => i.name).join(', '),
+            },
+          }).then(({ error }) => {
+            if (error) console.warn('⚠️ UTMify balance Purchase failed:', error);
+            else console.log('📡 UTMify Purchase sent (balance payment)');
+          });
+        } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
+
         clearCart();
         toast({
           title: "Pagamento confirmado!",
