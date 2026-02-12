@@ -22,27 +22,33 @@ interface UtmifyOrderPayload {
   customer: {
     name?: string;
     email?: string;
-    phone?: string;
-    document?: string;
+    phone: string | null;
+    document: string | null;
   };
   product: {
     id?: string;
     name?: string;
-    planName?: string;
+    planId: string;
+    planName: string;
+    quantity: number;
     price: number;
+    priceInCents: number;
   };
-  trackingParameters?: {
+  trackingParameters: {
     src?: string;
     sck?: string;
-    utm_source?: string;
-    utm_medium?: string;
-    utm_campaign?: string;
-    utm_content?: string;
-    utm_term?: string;
+    utm_source: string | null;
+    utm_medium: string | null;
+    utm_campaign: string | null;
+    utm_content: string | null;
+    utm_term: string | null;
   };
-  commission?: {
+  commission: {
     amount?: number;
     currency?: string;
+    totalPriceInCents: number;
+    gatewayFeeInCents: number;
+    userCommissionInCents: number;
   };
 }
 
@@ -175,6 +181,8 @@ Deno.serve(async (req) => {
 
     const now = new Date().toISOString();
 
+    const priceInCents = Math.round((Number(value) || 0) * 100);
+
     const payload: UtmifyOrderPayload = {
       orderId: order_id,
       platform: 'valnix',
@@ -186,26 +194,33 @@ Deno.serve(async (req) => {
       customer: {
         name: customer_name || undefined,
         email: customer_email || undefined,
-        phone: customer_phone || undefined,
-        document: customer_document || undefined,
+        phone: customer_phone || null,
+        document: customer_document || null,
       },
       product: {
         id: product_id || order_id,
         name: product_name || 'Pedido VALNIX',
+        planId: product_id || order_id,
+        planName: product_name || 'Pedido VALNIX',
+        quantity: 1,
         price: Number(value) || 0,
+        priceInCents,
       },
       trackingParameters: {
         src: src || undefined,
         sck: sck || undefined,
-        utm_source: utm_source || undefined,
-        utm_medium: utm_medium || undefined,
-        utm_campaign: utm_campaign || undefined,
-        utm_content: utm_content || undefined,
-        utm_term: utm_term || undefined,
+        utm_source: utm_source || null,
+        utm_medium: utm_medium || null,
+        utm_campaign: utm_campaign || null,
+        utm_content: utm_content || null,
+        utm_term: utm_term || null,
       },
       commission: {
         amount: Number(value) || 0,
         currency: 'BRL',
+        totalPriceInCents: priceInCents,
+        gatewayFeeInCents: 0,
+        userCommissionInCents: priceInCents,
       },
     };
 
