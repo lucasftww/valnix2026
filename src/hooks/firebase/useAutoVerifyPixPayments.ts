@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
-import { db } from '@/integrations/firebase/config';
+import { db, auth } from '@/integrations/firebase/config';
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from 'firebase/firestore';
-import { supabase } from '@/lib/supabaseHelper';
 import type { Order } from './useFirebaseOrders';
 
 /**
@@ -29,13 +28,18 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
         verifiedRef.current.add(order.id);
         
         try {
+          // Get Firebase ID token for auth
+          const currentUser = auth.currentUser;
+          const idToken = currentUser ? await currentUser.getIdToken() : null;
+          
+          const headers: Record<string, string> = {};
+          if (idToken) {
+            headers['Authorization'] = `Bearer ${idToken}`;
+          }
+
           const response = await fetch(
             `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${order.flowpay_charge_id}`,
-            {
-              headers: {
-                'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}`,
-              },
-            }
+            { headers },
           );
           const data = await response.json();
 
