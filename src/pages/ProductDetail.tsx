@@ -103,11 +103,6 @@ const ProductDetail = () => {
 
   // Memoizar handlers para evitar re-renders
   const handleAddToCart = useCallback(() => {
-    if (!user) {
-      navigate('/auth?redirect=' + encodeURIComponent(`/product/${id}`));
-      return;
-    }
-    
     if (!product) return;
     
     for (let i = 0; i < quantity; i++) {
@@ -121,18 +116,15 @@ const ProductDetail = () => {
     }
     
     // Track AddToCart for analytics funnel
-    trackAddToCartEvent(user.uid, Number(product.price) * quantity, product.name);
-  }, [user, product, quantity, navigate, id, addItem]);
+    if (user) {
+      trackAddToCartEvent(user.uid, Number(product.price) * quantity, product.name);
+    }
+  }, [user, product, quantity, addItem]);
   
   const handleBuyNow = useCallback(() => {
-    if (!user) {
-      navigate('/auth?redirect=/cart');
-      return;
-    }
-    
     handleAddToCart();
     navigate('/cart');
-  }, [user, navigate, handleAddToCart]);
+  }, [navigate, handleAddToCart]);
 
   const decreaseQuantity = useCallback(() => setQuantity(q => Math.max(1, q - 1)), []);
   const increaseQuantity = useCallback(() => setQuantity(q => q + 1), []);
