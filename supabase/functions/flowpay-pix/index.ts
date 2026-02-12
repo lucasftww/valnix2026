@@ -502,6 +502,30 @@ Deno.serve(async (req) => {
         } catch (analyticsError) {
           console.warn('⚠️ Analytics upsell registration failed:', analyticsError);
         }
+
+        // Send upsell Purchase to UTMify
+        try {
+          const supabaseUrl3 = Deno.env.get("SUPABASE_URL")!;
+          const serviceRoleKey3 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+          const supa3 = createClient(supabaseUrl3, serviceRoleKey3);
+
+          await supa3.functions.invoke('utmify-event', {
+            body: {
+              order_id: `${addon.order_id}_${addon.addon_type}`,
+              event_type: 'Purchase',
+              value: Number(addon.amount),
+              customer_name: addon.customer_name || undefined,
+              customer_email: addon.customer_email || undefined,
+              product_name: `Upsell ${addon.addon_type}`,
+              utm_source: addon.utm_source || undefined,
+              utm_medium: addon.utm_medium || undefined,
+              utm_campaign: addon.utm_campaign || undefined,
+            },
+          });
+          console.log(`📡 UTMify upsell Purchase sent for addon ${addon.id}`);
+        } catch (utmifyErr) {
+          console.warn('⚠️ UTMify upsell failed:', utmifyErr);
+        }
         
         return new Response(JSON.stringify({ success: true, addonId: addon.id }), {
           headers: { 'Content-Type': 'application/json' },
@@ -580,6 +604,31 @@ Deno.serve(async (req) => {
         console.log(`📡 Meta CAPI Purchase sent for order ${orderId}`);
       } catch (capiError) {
         console.warn('⚠️ Meta CAPI Purchase failed:', capiError);
+      }
+
+      // Send Purchase event to UTMify (server-side attribution)
+      try {
+        const supabaseUrl2 = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey2 = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supa2 = createClient(supabaseUrl2, serviceRoleKey2);
+
+        const customerName2 = orderFields?.customer_name?.stringValue || '';
+        const customerPhone2 = orderFields?.customer_phone?.stringValue || '';
+
+        await supa2.functions.invoke('utmify-event', {
+          body: {
+            order_id: orderId,
+            event_type: 'Purchase',
+            value: orderValue,
+            customer_name: customerName2,
+            customer_email: customerEmail,
+            customer_phone: customerPhone2 || undefined,
+            product_name: `Pedido #${orderId!.substring(0, 8)}`,
+          },
+        });
+        console.log(`📡 UTMify Purchase sent for order ${orderId}`);
+      } catch (utmifyError) {
+        console.warn('⚠️ UTMify Purchase failed:', utmifyError);
       }
 
       return new Response(JSON.stringify({ success: true, orderId }), {
