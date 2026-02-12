@@ -18,6 +18,7 @@ import pixLogo from "@/assets/pix-logo.png";
 import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 import { sendInitiateCheckout } from "@/lib/metaCapi";
+import { saveGuestOrder } from "@/lib/guestOrders";
 
 // Read Facebook cookies for CAPI match quality
 function getCookie(name: string): string | null {
@@ -369,11 +370,41 @@ export default function Checkout() {
         } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
 
         clearCart();
+
+        // Save guest order for /order/:hash access
+        let orderHash: string | null = null;
+        try {
+          orderHash = await saveGuestOrder({
+            orderId,
+            email: formData.email || user?.email || "",
+            customerName: formData.name,
+            customerPhone: formData.phone || undefined,
+            guestSessionId: guestId,
+            items: orderItemsData.map(i => ({
+              product_name: i.product_name,
+              product_image: i.product_image || null,
+              quantity: i.quantity,
+              unit_price: i.unit_price,
+              total_price: i.total_price,
+              delivery_code: null, // will be updated after auto-delivery
+            })),
+            totalAmount: orderAmount,
+            paymentMethod: "balance",
+          });
+        } catch (err) {
+          console.warn("⚠️ Failed to save guest order:", err);
+        }
+
         toast({
           title: "Pagamento confirmado!",
           description: `Pedido #${orderId.substring(0, 8)} pago com saldo. R$ ${orderAmount.toFixed(2)} debitados.`,
         });
-        navigate(`/painel-pagar?order_id=${orderId}`);
+        
+        if (orderHash) {
+          navigate(`/order/${orderHash}?upsell=1&order_id=${orderId}`);
+        } else {
+          navigate(`/painel-pagar?order_id=${orderId}`);
+        }
         return;
       }
 

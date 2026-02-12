@@ -9,6 +9,7 @@ import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { db, auth } from "@/integrations/firebase/config";
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { saveGuestOrder, updateGuestOrderDelivery } from "@/lib/guestOrders";
 
 
 interface PixPaymentProps {
@@ -127,6 +128,39 @@ export function PixPayment({
     // Purchase tracking (analytics, Meta CAPI, UTMify) is handled
     // exclusively by the FlowPay webhook to avoid duplicates and
     // ensure only truly approved payments are tracked.
+
+    // Save guest order for /order/:hash access
+    let orderHash: string | null = null;
+    try {
+      // Collect order items with delivery codes
+      const itemsRef2 = collection(db, "order_items");
+      const q2 = query(itemsRef2, where('order_id', '==', orderId));
+      const itemsSnap = await getDocs(q2);
+      const orderItems = itemsSnap.docs.map(d => {
+        const data = d.data();
+        return {
+          product_name: data.product_name || '',
+          product_image: data.product_image || null,
+          quantity: data.quantity || 1,
+          unit_price: data.unit_price || 0,
+          total_price: data.total_price || 0,
+          delivery_code: data.delivery_code || null,
+        };
+      });
+
+      orderHash = await saveGuestOrder({
+        orderId,
+        email: customerEmail || '',
+        customerName: customerName || undefined,
+        guestSessionId: customerId?.startsWith('guest_') ? customerId : null,
+        items: orderItems,
+        totalAmount: amount,
+        paymentMethod: 'pix',
+      });
+      console.log(`✅ Guest order saved, hash: ${orderHash}`);
+    } catch (err) {
+      console.warn('⚠️ Failed to save guest order:', err);
+    }
     
     onPaymentConfirmed?.();
     
@@ -136,7 +170,12 @@ export function PixPayment({
     });
     
     setTimeout(() => {
-      navigate(`/painel-pagar?order_id=${orderId}`);
+      // Redirect to order delivery page first, then upsell is accessible from there
+      if (orderHash) {
+        navigate(`/order/${orderHash}?upsell=1&order_id=${orderId}`);
+      } else {
+        navigate(`/painel-pagar?order_id=${orderId}`);
+      }
     }, 3000);
   };
 
@@ -146,21 +185,18 @@ export function PixPayment({
 
     const pollInterval = setInterval(async () => {
       try {
-        // Get fresh Firebase ID token for each poll
+        // Get fresh Firebase ID token for each poll (optional for guests)
         const currentUser = auth.currentUser;
         const idToken = currentUser ? await currentUser.getIdToken() : null;
-        if (!idToken) {
-          console.warn('⚠️ No Firebase auth for status poll');
-          return;
+
+        const headers: Record<string, string> = {};
+        if (idToken) {
+          headers['Authorization'] = `Bearer ${idToken}`;
         }
 
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${transactionId}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${idToken}`,
-            },
-          }
+          { headers },
         );
         const data = await response.json();
         
