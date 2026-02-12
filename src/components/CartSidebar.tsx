@@ -26,8 +26,8 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
 
   const handleCheckout = useCallback(() => {
     onOpenChange?.(false);
-    navigate(user ? "/checkout" : "/auth?redirect=/checkout");
-  }, [onOpenChange, navigate, user]);
+    navigate("/checkout");
+  }, [onOpenChange, navigate]);
 
   const handleClose = useCallback(() => {
     onOpenChange?.(false);

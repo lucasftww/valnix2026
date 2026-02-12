@@ -76,7 +76,6 @@ export default function Checkout() {
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
-  const [initializing, setInitializing] = useState(true);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance">("pix");
@@ -90,20 +89,38 @@ export default function Checkout() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Auth check and redirect
+  // Generate a stable guest ID for non-logged users
+  const guestId = useMemo(() => {
+    if (user) return null;
+    const stored = sessionStorage.getItem('valnix_guest_id');
+    if (stored) return stored;
+    const id = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+    sessionStorage.setItem('valnix_guest_id', id);
+    return id;
+  }, [user]);
+
+  const effectiveUserId = user?.uid || guestId || 'guest';
+
+  // Redirect if cart is empty (and not on payment screen)
   useEffect(() => {
-    if (authLoading) return;
-    setInitializing(false);
-    
-    if (!user) {
-      navigate("/auth?redirect=/checkout");
-      return;
-    }
-    
     if (items.length === 0 && !paymentData) {
       navigate("/");
     }
-  }, [user, authLoading, items.length, paymentData, navigate]);
+  }, [items.length, paymentData, navigate]);
+
+  // Track InitiateCheckout when entering checkout
+  useEffect(() => {
+    if (items.length > 0) {
+      trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
+      sendInitiateCheckout({
+        userId: effectiveUserId,
+        email: formData.email || user?.email || undefined,
+        name: formData.name || undefined,
+        value: finalPrice,
+        productNames: items.map(i => i.name),
+      });
+    }
+  }, []); // fire once on mount
 
   // Load user profile
   useEffect(() => {
@@ -182,7 +199,7 @@ export default function Checkout() {
   }, [couponCode, applyCoupon]);
 
   const handleSubmit = useCallback(async () => {
-    if (!user || loading) return;
+    if (loading) return;
     
     setTouched({ name: true, document: true, email: true });
     
@@ -203,12 +220,12 @@ export default function Checkout() {
     setLoading(true);
 
     // Track internal analytics funnel
-    trackInitiateCheckoutEvent(user.uid, finalPrice);
+    trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
 
     // Send InitiateCheckout to Meta CAPI
     sendInitiateCheckout({
-      userId: user.uid,
-      email: formData.email || user.email || undefined,
+      userId: effectiveUserId,
+      email: formData.email || user?.email || undefined,
       name: formData.name,
       value: finalPrice,
       productNames: items.map(i => i.name),
@@ -238,9 +255,9 @@ export default function Checkout() {
         }
 
         const orderId = await createOrder({
-          user_id: user.uid,
+          user_id: effectiveUserId,
           customer_name: formData.name,
-          customer_email: formData.email || user.email || "",
+          customer_email: formData.email || user?.email || "",
           customer_phone: formData.phone || "",
           total_amount: orderAmount,
           notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Pago com saldo` : "Pago com saldo",
@@ -299,12 +316,14 @@ export default function Checkout() {
           console.warn('⚠️ Failed to auto-complete balance order:', err);
         }
 
-        const profileRef = doc(db, "profiles", user.uid);
-        await updateDoc(profileRef, {
-          balance: increment(-orderAmount)
-        });
+        if (user) {
+          const profileRef = doc(db, "profiles", user.uid);
+          await updateDoc(profileRef, {
+            balance: increment(-orderAmount)
+          });
+        }
 
-        trackPurchaseEvent(user.uid, orderAmount, orderId, items.map(i => i.name).join(', '));
+        trackPurchaseEvent(effectiveUserId, orderAmount, orderId, items.map(i => i.name).join(', '));
 
         // Send Purchase to Meta CAPI (server-side via edge function)
         try {
@@ -317,11 +336,11 @@ export default function Checkout() {
               value: orderAmount,
               currency: 'BRL',
               content_name: items.map(i => i.name).join(', '),
-              email: formData.email || user.email,
+              email: formData.email || user?.email,
               phone: formData.phone || undefined,
               first_name: nameParts[0] || undefined,
               last_name: nameParts.slice(1).join(' ') || undefined,
-              external_id: user.uid,
+              external_id: effectiveUserId,
               fbc: getCookie('_fbc') || undefined,
               fbp: getCookie('_fbp') || undefined,
             },
@@ -339,7 +358,7 @@ export default function Checkout() {
               event_type: 'Purchase',
               value: orderAmount,
               customer_name: formData.name,
-              customer_email: formData.email || user.email,
+              customer_email: formData.email || user?.email,
               customer_phone: formData.phone || undefined,
               product_name: items.map(i => i.name).join(', '),
             },
@@ -360,9 +379,9 @@ export default function Checkout() {
 
       // PIX payment flow
       const orderId = await createOrder({
-        user_id: user.uid,
+        user_id: effectiveUserId,
         customer_name: formData.name,
-        customer_email: formData.email || user.email || "",
+        customer_email: formData.email || user?.email || "",
         customer_phone: formData.phone || "",
         total_amount: orderAmount,
         notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
@@ -384,19 +403,21 @@ export default function Checkout() {
 
       const cpfDigits = formData.document.replace(/\D/g, '');
 
-      // Run PIX charge creation and order items creation in parallel
-      // Order items are NOT needed for PIX generation, so don't block on them
-      // Get Firebase ID token for authenticated edge function calls
-      const firebaseIdToken = await user.getIdToken();
+      // Get Firebase ID token if logged in, otherwise use guest mode
+      const firebaseIdToken = user ? await user.getIdToken() : null;
+
+      const pixHeaders: Record<string, string> = {
+        'Content-Type': 'application/json',
+      };
+      if (firebaseIdToken) {
+        pixHeaders['Authorization'] = `Bearer ${firebaseIdToken}`;
+      }
 
       const pixPromise = fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${firebaseIdToken}`,
-          },
+          headers: pixHeaders,
           body: JSON.stringify({
             amount: Math.round(orderAmount * 100),
             orderId,
@@ -461,18 +482,7 @@ export default function Checkout() {
     } finally {
       setLoading(false);
     }
-  }, [user, loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, userBalance, clearCart, navigate]);
-
-  // Loading state
-  if (initializing || authLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0d0d0d]">
-        <Loader2 className="w-10 h-10 animate-spin text-primary" />
-      </div>
-    );
-  }
-
-  if (!user) return null;
+  }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, userBalance, clearCart, navigate, user, effectiveUserId]);
 
   // Payment screen
   if (paymentData) {
@@ -486,9 +496,9 @@ export default function Checkout() {
               transactionId={paymentData.transactionId}
               amount={paymentData.amount}
               orderId={paymentData.orderId}
-              customerEmail={user.email || undefined}
+              customerEmail={formData.email || user?.email || undefined}
               customerName={formData.name || undefined}
-              customerId={user.uid}
+              customerId={effectiveUserId}
               productNames={items.map(item => item.name)}
               productIds={items.map(item => item.id)}
               onPaymentConfirmed={clearCart}

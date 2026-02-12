@@ -642,21 +642,21 @@ Deno.serve(async (req) => {
 
     // ==================== CREATE PIX CHARGE ====================
     if (req.method === 'POST' && action === 'create') {
-      // 🔐 Verify Firebase Auth token
+      // 🔐 Verify Firebase Auth token (optional for guest checkout)
       const authHeader = req.headers.get('authorization');
       const idToken = authHeader?.replace(/^Bearer\s+/i, '');
-      if (!idToken) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: missing token' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
+      let firebaseUser: { uid: string; email?: string } | null = null;
+      
+      if (idToken) {
+        firebaseUser = await verifyFirebaseIdToken(idToken);
+        if (firebaseUser) {
+          console.log(`🔐 Authenticated user: ${firebaseUser.uid} (${firebaseUser.email})`);
+        } else {
+          console.warn('⚠️ Invalid Firebase token provided, proceeding as guest');
+        }
+      } else {
+        console.log('👤 Guest checkout (no auth token)');
       }
-      const firebaseUser = await verifyFirebaseIdToken(idToken);
-      if (!firebaseUser) {
-        return new Response(JSON.stringify({ error: 'Unauthorized: invalid token' }), {
-          status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-      console.log(`🔐 Authenticated user: ${firebaseUser.uid} (${firebaseUser.email})`);
 
       if (!apiKey) {
         console.error('❌ FLOWPAY_API_KEY not configured');
