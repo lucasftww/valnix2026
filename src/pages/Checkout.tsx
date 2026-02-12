@@ -80,11 +80,12 @@ export default function Checkout() {
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance">("pix");
-  const [formData, setFormData] = useState<FormData>({
-    name: "",
-    document: "",
-    email: "",
-    phone: "",
+  const [formData, setFormData] = useState<FormData>(() => {
+    try {
+      const saved = sessionStorage.getItem('valnix_checkout_form');
+      if (saved) return JSON.parse(saved);
+    } catch {}
+    return { name: "", document: "", email: "", phone: "" };
   });
   const [couponCode, setCouponCode] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
@@ -135,12 +136,16 @@ export default function Checkout() {
         const profileData = profileSnap.exists() ? profileSnap.data() : null;
 
         if (mounted) {
-          setFormData(prev => ({
-            ...prev,
-            name: user.displayName || profileData?.full_name || "",
-            email: user.email || profileData?.email || "",
-            phone: profileData?.phone || "",
-          }));
+          setFormData(prev => {
+            const updated = {
+              ...prev,
+              name: prev.name || user.displayName || profileData?.full_name || "",
+              email: prev.email || user.email || profileData?.email || "",
+              phone: prev.phone || profileData?.phone || "",
+            };
+            try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
+            return updated;
+          });
           setUserBalance(profileData?.balance || 0);
         }
       } catch (err) {
@@ -185,7 +190,11 @@ export default function Checkout() {
     if (field === 'document') {
       formattedValue = formatCPF(value);
     }
-    setFormData(prev => ({ ...prev, [field]: formattedValue }));
+    setFormData(prev => {
+      const updated = { ...prev, [field]: formattedValue };
+      try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   }, []);
 
   const handleBlur = useCallback((field: string) => {
