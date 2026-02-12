@@ -200,7 +200,8 @@
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
       fbq('init', '1939179866693535');
-      fbq('track', 'PageView');
+      // No PageView here — pixel is only for _fbc/_fbp cookie generation
+      // All conversion events are sent server-side via CAPI
     </script>
     
 
@@ -358,7 +359,7 @@
         </p>
       </div>
     </noscript>
-    <noscript><img height="1" width="1" style="display:none" src="https://www.facebook.com/tr?id=1939179866693535&ev=PageView&noscript=1"/></noscript>
+    <!-- noscript pixel removed — no PageView event needed -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
     <!-- UTMify: click tracking & link attribution only (conversions handled by CAPI) -->
