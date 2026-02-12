@@ -14,3 +14,9 @@ verify_jwt = false
 
 [functions.utmify-retry]
 verify_jwt = false
+
+[functions.utmify-event]
+verify_jwt = false
+
+[functions.meta-capi]
+verify_jwt = false
