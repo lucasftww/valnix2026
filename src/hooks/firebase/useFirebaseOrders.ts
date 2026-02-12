@@ -75,6 +75,8 @@ export interface CreateOrderData {
   status?: string;
   payment_status?: string;
   payment_method?: string | null;
+  fbc?: string | null;
+  fbp?: string | null;
 }
 
 export interface CreateOrderItemData {
@@ -252,6 +254,8 @@ export async function createOrder(orderData: CreateOrderData): Promise<string> {
     status: orderData.status || 'pending',
     payment_status: orderData.payment_status || 'pending',
     payment_method: orderData.payment_method || null,
+    fbc: orderData.fbc || null,
+    fbp: orderData.fbp || null,
     shipping_address: null,
     shipping_method: null,
     tracking_code: null,
