@@ -513,10 +513,10 @@ export const AdminUsers = () => {
                     const tier = getUserTier(user.total_spent);
                     
                     return (
-                      <TableRow key={user.id} className="hover:bg-muted/30">
+                      <TableRow key={user.id} className="hover:bg-muted/30 group">
                         <TableCell>
                           <div className="flex items-center gap-3">
-                            <div className="relative">
+                            <div className="relative shrink-0">
                               <Avatar className="h-10 w-10 border-2 border-primary/20">
                                 <AvatarImage src={user.avatar_url || ""} alt="Avatar" />
                                 <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
@@ -534,14 +534,14 @@ export const AdminUsers = () => {
                             </div>
                             <div className="min-w-0">
                               <div className="flex items-center gap-2">
-                                <p className="font-medium truncate">{getDisplayName(user)}</p>
+                                <p className="font-medium select-text">{getDisplayName(user)}</p>
                                 {tier && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 hidden sm:inline-flex">
+                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 hidden sm:inline-flex shrink-0">
                                     {tier.label}
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground truncate max-w-[180px]">{user.email}</p>
+                              <p className="text-xs text-muted-foreground select-all cursor-text">{user.email}</p>
                             </div>
                           </div>
                         </TableCell>
@@ -549,8 +549,8 @@ export const AdminUsers = () => {
                           <div className="space-y-1">
                             {user.phone ? (
                               <div className="flex items-center gap-2 text-sm">
-                                <Phone className="h-3.5 w-3.5 text-muted-foreground" />
-                                <span className="truncate">{user.phone}</span>
+                                <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                                <span className="select-all cursor-text">{user.phone}</span>
                               </div>
                             ) : (
                               <span className="text-xs text-muted-foreground">Sem telefone</span>
@@ -572,7 +572,7 @@ export const AdminUsers = () => {
                         </TableCell>
                         <TableCell className="text-right">
                           <span className={cn(
-                            "font-bold",
+                            "font-bold select-text",
                             user.total_spent > 0 && "text-primary",
                             user.total_spent >= 500 && "text-amber-500"
                           )}>
@@ -592,7 +592,7 @@ export const AdminUsers = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1">
+                          <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
                             <Button
                               variant="ghost"
                               size="icon"
@@ -644,8 +644,8 @@ export const AdminUsers = () => {
                 </AvatarFallback>
               </Avatar>
               <div>
-                <p className="text-lg">{selectedUser && getDisplayName(selectedUser)}</p>
-                <p className="text-sm font-normal text-muted-foreground">{selectedUser?.email}</p>
+                <p className="text-lg select-text">{selectedUser && getDisplayName(selectedUser)}</p>
+                <p className="text-sm font-normal text-muted-foreground select-all cursor-text">{selectedUser?.email}</p>
               </div>
             </DialogTitle>
           </DialogHeader>
@@ -701,13 +701,13 @@ export const AdminUsers = () => {
                 <p className="text-sm font-medium">Informações de Contato</p>
                 <div className="space-y-2 text-sm">
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Mail className="h-4 w-4" />
-                    <span>{selectedUser.email}</span>
+                    <Mail className="h-4 w-4 shrink-0" />
+                    <span className="select-all cursor-text">{selectedUser.email}</span>
                   </div>
                   {selectedUser.phone && (
                     <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4" />
-                      <span>{selectedUser.phone}</span>
+                      <Phone className="h-4 w-4 shrink-0" />
+                      <span className="select-all cursor-text">{selectedUser.phone}</span>
                     </div>
                   )}
                   <div className="flex items-center gap-2 text-muted-foreground">
