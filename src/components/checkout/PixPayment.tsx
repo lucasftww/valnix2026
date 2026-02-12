@@ -179,13 +179,20 @@ export function PixPayment({
     }, 3000);
   };
 
-  // Poll FlowPay for payment status
+  // Track expiry via ref so polling effect doesn't re-run every second
+  const expiredRef = useRef(false);
+  useEffect(() => { expiredRef.current = timeLeft === 0; }, [timeLeft]);
+
+  // Poll FlowPay for payment status (stable interval, not affected by timer)
   useEffect(() => {
-    if (paymentConfirmed || timeLeft === 0 || !transactionId) return;
+    if (paymentConfirmed || !transactionId) return;
 
     const pollInterval = setInterval(async () => {
+      if (expiredRef.current) {
+        clearInterval(pollInterval);
+        return;
+      }
       try {
-        // Get fresh Firebase ID token for each poll (optional for guests)
         const currentUser = auth.currentUser;
         const idToken = currentUser ? await currentUser.getIdToken() : null;
 
@@ -208,10 +215,10 @@ export function PixPayment({
       } catch (error) {
         console.warn('⚠️ Status poll error:', error);
       }
-    }, 5000); // Poll every 5 seconds
+    }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [paymentConfirmed, timeLeft, transactionId]);
+  }, [paymentConfirmed, transactionId]);
 
   useEffect(() => {
     const timer = setInterval(() => {
