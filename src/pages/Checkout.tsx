@@ -19,6 +19,12 @@ import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 import { sendInitiateCheckout } from "@/lib/metaCapi";
 
+// Read Facebook cookies for CAPI match quality
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 interface FormData {
   name: string;
   document: string;
@@ -226,6 +232,8 @@ export default function Checkout() {
           status: "processing",
           payment_status: "paid",
           payment_method: "balance",
+          fbc: getCookie('_fbc'),
+          fbp: getCookie('_fbp'),
         });
 
         const productIds = items.map(i => i.id);
@@ -298,6 +306,8 @@ export default function Checkout() {
               first_name: nameParts[0] || undefined,
               last_name: nameParts.slice(1).join(' ') || undefined,
               external_id: user.uid,
+              fbc: getCookie('_fbc') || undefined,
+              fbp: getCookie('_fbp') || undefined,
             },
           }).then(({ error }) => {
             if (error) console.warn('⚠️ Meta CAPI balance Purchase failed:', error);
@@ -341,6 +351,8 @@ export default function Checkout() {
         notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
         status: "pending",
         payment_status: "pending",
+        fbc: getCookie('_fbc'),
+        fbp: getCookie('_fbp'),
       });
 
       const orderItemsData = items.map(item => ({

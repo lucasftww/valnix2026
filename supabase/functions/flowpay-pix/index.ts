@@ -584,6 +584,8 @@ Deno.serve(async (req) => {
         
         const customerName = orderFields?.customer_name?.stringValue || '';
         const customerPhone = orderFields?.customer_phone?.stringValue || '';
+        const orderFbc = orderFields?.fbc?.stringValue || undefined;
+        const orderFbp = orderFields?.fbp?.stringValue || undefined;
         const nameParts = customerName.split(' ');
 
         await supa.functions.invoke('meta-capi', {
@@ -599,6 +601,8 @@ Deno.serve(async (req) => {
             first_name: nameParts[0] || undefined,
             last_name: nameParts.slice(1).join(' ') || undefined,
             external_id: userId,
+            fbc: orderFbc,
+            fbp: orderFbp,
           },
         });
         console.log(`📡 Meta CAPI Purchase sent for order ${orderId}`);
@@ -845,6 +849,8 @@ Deno.serve(async (req) => {
             const fbEmail = orderFields?.customer_email?.stringValue;
             const fbName = orderFields?.customer_name?.stringValue || '';
             const fbPhone = orderFields?.customer_phone?.stringValue || '';
+            const fbFbc = orderFields?.fbc?.stringValue || undefined;
+            const fbFbp = orderFields?.fbp?.stringValue || undefined;
 
             // Only fire Purchase events if order wasn't already marked as paid (avoid duplicates)
             if (currentPaymentStatus !== 'paid') {
@@ -882,6 +888,8 @@ Deno.serve(async (req) => {
                     first_name: nameParts[0] || undefined,
                     last_name: nameParts.slice(1).join(' ') || undefined,
                     external_id: fbUserId,
+                    fbc: fbFbc,
+                    fbp: fbFbp,
                   },
                 });
                 console.log(`📡 FALLBACK: Meta CAPI Purchase sent for order ${fbOrderId}`);
