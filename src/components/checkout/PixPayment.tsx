@@ -260,8 +260,8 @@ export function PixPayment({
     }
   };
 
-  const qrSize = isMobile ? 220 : 280;
-  const logoSize = isMobile ? 40 : 50;
+  const qrSize = isMobile ? 230 : 280;
+  const logoSize = isMobile ? 30 : 36;
 
   return (
     <div className="space-y-4">
@@ -339,13 +339,13 @@ export function PixPayment({
 
       {/* QR Code */}
       <div className={`flex justify-center transition-opacity ${isExpired ? 'opacity-30' : ''}`}>
-        <div className="bg-white p-4 rounded-xl shadow-lg relative">
+        <div className="relative bg-white p-5 rounded-2xl shadow-[0_0_30px_rgba(239,68,68,0.15)]">
           <QRCodeSVG
             value={qrCodeText}
             size={qrSize}
             level="H"
             includeMargin={false}
-            fgColor="#000000"
+            fgColor="#1a1a1a"
             bgColor="#FFFFFF"
             imageSettings={{
               src: vIcon,
@@ -354,6 +354,11 @@ export function PixPayment({
               excavate: true,
             }}
           />
+          {/* Corner accents */}
+          <div className="absolute top-0 left-0 w-4 h-4 border-t-2 border-l-2 border-primary rounded-tl-2xl" />
+          <div className="absolute top-0 right-0 w-4 h-4 border-t-2 border-r-2 border-primary rounded-tr-2xl" />
+          <div className="absolute bottom-0 left-0 w-4 h-4 border-b-2 border-l-2 border-primary rounded-bl-2xl" />
+          <div className="absolute bottom-0 right-0 w-4 h-4 border-b-2 border-r-2 border-primary rounded-br-2xl" />
         </div>
       </div>
 
