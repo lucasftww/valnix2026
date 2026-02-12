@@ -150,25 +150,35 @@ export const useUserOrders = (userId: string | null) => {
     queryFn: async () => {
       if (!userId) return [];
       
-      const ordersRef = collection(db, "orders");
-      const ordersQuery = query(
-        ordersRef, 
-        where("user_id", "==", userId),
-        orderBy("created_at", "desc")
-      );
-      
-      const snapshot = await getDocs(ordersQuery);
-      
-      return snapshot.docs.map((doc) => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          created_at: toISOString(data.created_at),
-          total_amount: Number(data.total_amount) || 0,
-          status: data.status || "pending",
-          payment_status: data.payment_status || "pending",
-        } as FirebaseOrder;
-      }).slice(0, 10); // Limit to 10 orders
+      try {
+        const ordersRef = collection(db, "orders");
+        // Only use where() without orderBy() to avoid requiring a composite index
+        const ordersQuery = query(
+          ordersRef, 
+          where("user_id", "==", userId)
+        );
+        
+        const snapshot = await getDocs(ordersQuery);
+        
+        const orders = snapshot.docs.map((doc) => {
+          const data = doc.data();
+          return {
+            id: doc.id,
+            created_at: toISOString(data.created_at),
+            total_amount: Number(data.total_amount) || 0,
+            status: data.status || "pending",
+            payment_status: data.payment_status || "pending",
+          } as FirebaseOrder;
+        });
+
+        // Sort in JS instead of Firestore to avoid composite index requirement
+        orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+        
+        return orders.slice(0, 10);
+      } catch (error) {
+        console.error("Error fetching user orders:", error);
+        return [];
+      }
     },
     enabled: !!userId,
   });
