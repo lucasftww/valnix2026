@@ -552,6 +552,36 @@ Deno.serve(async (req) => {
         console.warn('⚠️ Analytics registration failed:', analyticsError);
       }
 
+      // Send Purchase event to Meta CAPI (server-side, enriched)
+      try {
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supa = createClient(supabaseUrl, serviceRoleKey);
+        
+        const customerName = orderFields?.customer_name?.stringValue || '';
+        const customerPhone = orderFields?.customer_phone?.stringValue || '';
+        const nameParts = customerName.split(' ');
+
+        await supa.functions.invoke('meta-capi', {
+          body: {
+            event_name: 'Purchase',
+            event_id: `purchase_${orderId}_${Date.now()}`,
+            order_id: orderId,
+            value: orderValue,
+            currency: 'BRL',
+            content_name: `Pedido #${orderId!.substring(0, 8)}`,
+            email: customerEmail,
+            phone: customerPhone || undefined,
+            first_name: nameParts[0] || undefined,
+            last_name: nameParts.slice(1).join(' ') || undefined,
+            external_id: userId,
+          },
+        });
+        console.log(`📡 Meta CAPI Purchase sent for order ${orderId}`);
+      } catch (capiError) {
+        console.warn('⚠️ Meta CAPI Purchase failed:', capiError);
+      }
+
       return new Response(JSON.stringify({ success: true, orderId }), {
         headers: { 'Content-Type': 'application/json' },
       });

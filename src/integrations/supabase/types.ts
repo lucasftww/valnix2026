@@ -68,6 +68,39 @@ export type Database = {
         }
         Relationships: []
       }
+      capi_event_log: {
+        Row: {
+          created_at: string
+          error_message: string | null
+          event_id: string
+          event_name: string
+          id: string
+          order_id: string | null
+          status: string
+          status_code: number | null
+        }
+        Insert: {
+          created_at?: string
+          error_message?: string | null
+          event_id: string
+          event_name: string
+          id?: string
+          order_id?: string | null
+          status?: string
+          status_code?: number | null
+        }
+        Update: {
+          created_at?: string
+          error_message?: string | null
+          event_id?: string
+          event_name?: string
+          id?: string
+          order_id?: string | null
+          status?: string
+          status_code?: number | null
+        }
+        Relationships: []
+      }
       post_payment_pages: {
         Row: {
           addon_type: string
