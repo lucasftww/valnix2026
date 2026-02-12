@@ -1,13 +1,13 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock, X } from "lucide-react";
+import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
-import { usePostPaymentPage, PostPaymentPageConfig } from "@/hooks/usePostPaymentPage";
+import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
 import { QRCodeSVG } from "qrcode.react";
 import { Progress } from "@/components/ui/progress";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -41,21 +41,49 @@ interface GuestOrderData {
   expires_at: string;
 }
 
-// Inline upsell component
-function InlineUpsell({ orderId, config, userEmail, userName, userId }: {
+// Upsell sequence manager
+const UPSELL_SEQUENCE = ["premium_benefits", "delivery_priority", "data_swap_warranty"];
+
+function UpsellSequence({ orderId, userEmail, userName, userId }: {
   orderId: string;
-  config: PostPaymentPageConfig;
   userEmail?: string;
   userName?: string;
   userId?: string;
 }) {
+  const [currentIndex, setCurrentIndex] = useState(0);
+  const currentType = UPSELL_SEQUENCE[currentIndex];
+  
+  if (!currentType) return null; // All upsells done
+
+  return (
+    <InlineUpsell
+      key={currentType}
+      orderId={orderId}
+      addonType={currentType}
+      userEmail={userEmail}
+      userName={userName}
+      userId={userId}
+      onSkip={() => setCurrentIndex(prev => prev + 1)}
+    />
+  );
+}
+
+// Inline upsell component
+function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip }: {
+  orderId: string;
+  addonType: string;
+  userEmail?: string;
+  userName?: string;
+  userId?: string;
+  onSkip: () => void;
+}) {
+  const { config, loading: configLoading } = usePostPaymentPage(addonType);
   const { toast } = useToast();
   const isMobile = useIsMobile();
   const [purchasing, setPurchasing] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10 * 60);
-  const [dismissed, setDismissed] = useState(false);
 
   // Timer
   useEffect(() => {
@@ -82,15 +110,27 @@ function InlineUpsell({ orderId, config, userEmail, userName, userId }: {
           clearInterval(poll);
           setPaymentConfirmed(true);
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
+          // After payment confirmed, advance to next upsell after delay
+          setTimeout(() => onSkip(), 2500);
         }
       } catch (err) {
         console.warn("Poll error:", err);
       }
     }, 5000);
     return () => clearInterval(poll);
-  }, [pixData, paymentConfirmed, timeLeft, toast]);
+  }, [pixData, paymentConfirmed, timeLeft, toast, onSkip]);
 
-  if (dismissed) return null;
+  if (configLoading) {
+    return (
+      <Card className="bg-[#111] border-[#1f1f1f]">
+        <CardContent className="p-5 flex justify-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!config) return null;
 
   const handleAccept = async () => {
     if (purchasing) return;
@@ -141,6 +181,19 @@ function InlineUpsell({ orderId, config, userEmail, userName, userId }: {
     } finally {
       setPurchasing(false);
     }
+  };
+
+  const handleSkip = async () => {
+    try {
+      await supabase.from("sale_addons").insert({
+        order_id: orderId,
+        addon_type: config.addon_type,
+        status: "skipped",
+        amount: 0,
+        user_id: userId || null,
+      });
+    } catch (e) { /* ignore */ }
+    onSkip();
   };
 
   const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
@@ -202,21 +255,16 @@ function InlineUpsell({ orderId, config, userEmail, userName, userId }: {
     );
   }
 
-  // Offer view (inline)
+  // Offer view (inline) — NO X button
   return (
     <Card className="bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border-yellow-500/20 overflow-hidden">
       <CardContent className="p-5 space-y-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            {config.badge_text && (
-              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
-                {config.badge_text}
-              </span>
-            )}
-          </div>
-          <button onClick={() => setDismissed(true)} className="text-gray-600 hover:text-gray-400">
-            <X className="w-4 h-4" />
-          </button>
+        <div className="flex items-center gap-2">
+          {config.badge_text && (
+            <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
+              {config.badge_text}
+            </span>
+          )}
         </div>
 
         <div className="text-center space-y-2">
@@ -263,7 +311,7 @@ function InlineUpsell({ orderId, config, userEmail, userName, userId }: {
         </Button>
 
         <button
-          onClick={() => setDismissed(true)}
+          onClick={handleSkip}
           className="w-full text-center text-gray-600 hover:text-gray-400 text-xs py-1 transition-colors"
         >
           {config.button_skip_text}
@@ -288,8 +336,7 @@ export default function OrderDelivery() {
   const upsellParam = searchParams.get("upsell");
   const orderIdParam = searchParams.get("order_id");
 
-  // Load first upsell config
-  const { config: upsellConfig, loading: upsellLoading } = usePostPaymentPage("premium_benefits");
+  // No longer need single upsell config — UpsellSequence handles it
 
   useEffect(() => {
     if (!hash) { setNotFound(true); setLoading(false); return; }
@@ -547,10 +594,9 @@ export default function OrderDelivery() {
         </Card>
 
         {/* INLINE UPSELL - shown directly on the page */}
-        {upsellParam === "1" && upsellConfig && (
-          <InlineUpsell
+        {upsellParam === "1" && (
+          <UpsellSequence
             orderId={effectiveOrderId}
-            config={upsellConfig}
             userEmail={order.email}
             userName={order.customer_name || undefined}
             userId={user?.uid || sessionStorage.getItem('valnix_guest_id') || undefined}
