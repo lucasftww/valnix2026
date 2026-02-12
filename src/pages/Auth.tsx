@@ -18,31 +18,20 @@ export default function Auth() {
   const [loginPassword, setLoginPassword] = useState("");
   const [signupEmail, setSignupEmail] = useState("");
   const [signupPassword, setSignupPassword] = useState("");
-  const [resetEmail, setResetEmail] = useState("");
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState("login");
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
   
-  const { signIn, signUp, signInWithGoogle, resetPassword, user } = useAuth();
+  const { signIn, signUp, signInWithGoogle, user } = useAuth();
   const { toast } = useToast();
   const navigate = useNavigate();
   
-  const isResetMode = searchParams.get("mode") === "reset";
   const redirectTo = searchParams.get("redirect") || "/";
 
   useEffect(() => {
-    if (user && !isResetMode) {
+    if (user) {
       navigate(redirectTo, { replace: true });
     }
-  }, [user, navigate, isResetMode, redirectTo]);
-
-  useEffect(() => {
-    if (isResetMode) {
-      setActiveTab("reset");
-    }
-  }, [isResetMode]);
+  }, [user, navigate, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,114 +71,6 @@ export default function Auth() {
     setLoading(false);
   };
 
-  const handleForgotPassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setLoading(true);
-    
-    try {
-      const { data, error } = await supabase.functions.invoke('request-password-reset', {
-        body: { 
-          email: resetEmail,
-          siteUrl: window.location.origin 
-        },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Email enviado!",
-        description: "Se o email existir, você receberá instruções para redefinir sua senha.",
-      });
-
-      setResetEmail("");
-      setShowForgotPassword(false);
-    } catch (error: any) {
-      toast({
-        title: "Erro",
-        description: error.message || "Erro ao solicitar recuperação de senha",
-        variant: "destructive",
-      });
-    }
-    
-    setLoading(false);
-  };
-
-  const handleUpdatePassword = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (newPassword !== confirmPassword) {
-      toast({
-        title: "Erro",
-        description: "As senhas não coincidem",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (newPassword.length < 8) {
-      toast({
-        title: "Erro",
-        description: "A senha deve ter no mínimo 8 caracteres",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    const hasLetter = /[a-zA-Z]/.test(newPassword);
-    const hasNumber = /[0-9]/.test(newPassword);
-    
-    if (!hasLetter || !hasNumber) {
-      toast({
-        title: "Erro",
-        description: "Use uma combinação de letras e números",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setLoading(true);
-    
-    const token = searchParams.get("token");
-    
-    if (!token) {
-      toast({
-        title: "Erro",
-        description: "Token inválido",
-        variant: "destructive",
-      });
-      setLoading(false);
-      return;
-    }
-
-    try {
-      const { data, error } = await supabase.functions.invoke('verify-reset-token', {
-        body: { 
-          token,
-          newPassword 
-        },
-      });
-
-      if (error) throw error;
-
-      toast({
-        title: "Senha atualizada!",
-        description: "Sua senha foi alterada com sucesso.",
-      });
-      
-      setTimeout(() => {
-        navigate("/auth");
-      }, 1000);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao atualizar senha",
-        description: error.message || "Token inválido ou expirado",
-        variant: "destructive",
-      });
-    }
-    
-    setLoading(false);
-  };
-
   return (
     <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-b from-background via-background to-background/95 overflow-x-hidden px-4 py-6">
         {/* Logo com link para home */}
@@ -200,90 +81,14 @@ export default function Auth() {
         <Card className="w-full max-w-md shadow-2xl border-primary/20 bg-card/95 backdrop-blur-sm">
           <CardHeader className="space-y-1.5 px-5 sm:px-6 pt-6 pb-4 sm:pt-7 sm:pb-5 text-center">
             <CardTitle className="text-2xl sm:text-3xl font-bold">
-              {isResetMode ? "Redefinir Senha" : "Bem-vindo"}
+              Bem-vindo
             </CardTitle>
             <CardDescription className="text-sm sm:text-base">
-              {isResetMode ? "Digite sua nova senha" : "Entre ou crie sua conta para continuar"}
+              Entre ou crie sua conta para continuar
             </CardDescription>
           </CardHeader>
           <CardContent className="px-5 sm:px-6 pb-6 sm:pb-7">
-            {isResetMode ? (
-              <form onSubmit={handleUpdatePassword} className="space-y-5">
-                <div className="space-y-2.5">
-                  <Label htmlFor="new-password" className="text-sm font-medium">Nova Senha</Label>
-                  <Input
-                    id="new-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={newPassword}
-                    onChange={(e) => setNewPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    className="h-12 sm:h-14 text-base rounded-xl border-2 focus:border-primary transition-colors"
-                    autoComplete="new-password"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Use no mínimo 8 caracteres com letras e números
-                  </p>
-                </div>
-                <div className="space-y-2.5">
-                  <Label htmlFor="confirm-password" className="text-sm font-medium">Confirmar Nova Senha</Label>
-                  <Input
-                    id="confirm-password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={confirmPassword}
-                    onChange={(e) => setConfirmPassword(e.target.value)}
-                    required
-                    minLength={8}
-                    className="h-12 sm:h-14 text-base rounded-xl border-2 focus:border-primary transition-colors"
-                    autoComplete="new-password"
-                  />
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full h-14 text-base font-bold rounded-xl shadow-lg hover:shadow-xl transition-all" 
-                  disabled={loading}
-                >
-                  {loading ? "Atualizando..." : "Atualizar Senha"}
-                </Button>
-              </form>
-            ) : showForgotPassword ? (
-              <form onSubmit={handleForgotPassword} className="space-y-5">
-                <div className="space-y-2.5">
-                  <Label htmlFor="reset-email" className="text-sm font-medium">Email</Label>
-                  <Input
-                    id="reset-email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={resetEmail}
-                    onChange={(e) => setResetEmail(e.target.value)}
-                    required
-                    className="h-12 sm:h-14 text-base rounded-xl border-2 focus:border-primary transition-colors"
-                    autoComplete="email"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    Enviaremos um link para redefinir sua senha
-                  </p>
-                </div>
-                <Button 
-                  type="submit" 
-                  className="w-full h-14 text-base font-bold rounded-xl shadow-lg" 
-                  disabled={loading}
-                >
-                  {loading ? "Enviando..." : "Enviar Link de Recuperação"}
-                </Button>
-                <Button 
-                  type="button" 
-                  variant="ghost" 
-                  className="w-full h-12 text-sm"
-                  onClick={() => setShowForgotPassword(false)}
-                >
-                  Voltar para login
-                </Button>
-              </form>
-            ) : (
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
                 <TabsList className="grid w-full grid-cols-2 mb-5 sm:mb-6 h-12 sm:h-14 p-1 rounded-xl bg-muted/50">
                   <TabsTrigger 
                     value="login" 
@@ -327,15 +132,6 @@ export default function Auth() {
                         autoComplete="current-password"
                       />
                     </div>
-                    <Button 
-                      type="button" 
-                      variant="link" 
-                      className="p-0 h-auto text-sm text-primary font-medium"
-                      onClick={() => setShowForgotPassword(true)}
-                    >
-                      Esqueceu a senha?
-                    </Button>
-                    
                     <Button 
                       type="submit" 
                       className="w-full h-14 text-base font-bold rounded-xl shadow-lg hover:shadow-xl transition-all bg-primary hover:bg-primary/90" 
@@ -489,7 +285,6 @@ export default function Auth() {
                   </form>
                 </TabsContent>
               </Tabs>
-            )}
           </CardContent>
         </Card>
 
