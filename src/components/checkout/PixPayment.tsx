@@ -8,6 +8,7 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { trackPurchaseEvent } from "@/lib/analytics";
+import { sendPurchaseFromClient } from "@/lib/metaCapi";
 import { db, auth } from "@/integrations/firebase/config";
 import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 
@@ -127,6 +128,16 @@ export function PixPayment({
 
     // 4. Register Purchase in analytics_events
     trackPurchaseEvent(customerId, amount, orderId, productNames?.join(', '));
+
+    // 5. Send Purchase to Meta CAPI (client-side fallback with fbc/fbp)
+    sendPurchaseFromClient({
+      orderId,
+      value: amount,
+      userId: customerId,
+      email: customerEmail,
+      name: customerName,
+      productNames,
+    });
     
     onPaymentConfirmed?.();
     

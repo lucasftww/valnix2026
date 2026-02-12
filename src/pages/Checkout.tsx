@@ -17,6 +17,7 @@ import { OrderSummary } from "@/components/checkout/OrderSummary";
 import pixLogo from "@/assets/pix-logo.png";
 import { supabase } from "@/lib/supabaseHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
+import { sendInitiateCheckout } from "@/lib/metaCapi";
 
 interface FormData {
   name: string;
@@ -182,6 +183,15 @@ export default function Checkout() {
 
     // Track internal analytics funnel
     trackInitiateCheckoutEvent(user.uid, finalPrice);
+
+    // Send InitiateCheckout to Meta CAPI
+    sendInitiateCheckout({
+      userId: user.uid,
+      email: user.email || undefined,
+      name: formData.name,
+      value: finalPrice,
+      productNames: items.map(i => i.name),
+    });
     
     try {
       const orderAmount = finalPrice;
