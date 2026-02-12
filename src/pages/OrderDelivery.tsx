@@ -1,13 +1,18 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
-import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight } from "lucide-react";
+import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { usePostPaymentPage, PostPaymentPageConfig } from "@/hooks/usePostPaymentPage";
+import { QRCodeSVG } from "qrcode.react";
+import { Progress } from "@/components/ui/progress";
+import { useIsMobile } from "@/hooks/use-mobile";
 import vLogo from "@/assets/v-logo-red.png";
+import vIcon from "@/assets/v-icon.png";
 
 interface OrderItemData {
   product_name: string;
@@ -36,6 +41,238 @@ interface GuestOrderData {
   expires_at: string;
 }
 
+// Inline upsell component
+function InlineUpsell({ orderId, config, userEmail, userName, userId }: {
+  orderId: string;
+  config: PostPaymentPageConfig;
+  userEmail?: string;
+  userName?: string;
+  userId?: string;
+}) {
+  const { toast } = useToast();
+  const isMobile = useIsMobile();
+  const [purchasing, setPurchasing] = useState(false);
+  const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
+  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(10 * 60);
+  const [dismissed, setDismissed] = useState(false);
+
+  // Timer
+  useEffect(() => {
+    if (!pixData || paymentConfirmed) return;
+    const timer = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) { clearInterval(timer); return 0; }
+        return prev - 1;
+      });
+    }, 1000);
+    return () => clearInterval(timer);
+  }, [pixData, paymentConfirmed]);
+
+  // Poll payment
+  useEffect(() => {
+    if (!pixData || paymentConfirmed || timeLeft === 0) return;
+    const poll = setInterval(async () => {
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${pixData.chargeId}`
+        );
+        const data = await response.json();
+        if (data.success && data.status === "COMPLETED") {
+          clearInterval(poll);
+          setPaymentConfirmed(true);
+          toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
+        }
+      } catch (err) {
+        console.warn("Poll error:", err);
+      }
+    }, 5000);
+    return () => clearInterval(poll);
+  }, [pixData, paymentConfirmed, timeLeft, toast]);
+
+  if (dismissed) return null;
+
+  const handleAccept = async () => {
+    if (purchasing) return;
+    setPurchasing(true);
+    try {
+      const utmParams = JSON.parse(sessionStorage.getItem('valnix_utm_params') || '{}');
+      
+      await supabase.from("sale_addons").insert({
+        order_id: orderId,
+        user_id: userId || null,
+        addon_type: config.addon_type,
+        status: "pending",
+        amount: config.price,
+        customer_email: userEmail || null,
+        customer_name: userName || null,
+        utm_source: utmParams.utm_source || null,
+        utm_medium: utmParams.utm_medium || null,
+        utm_campaign: utmParams.utm_campaign || null,
+      });
+
+      const amountInCents = Math.round(config.price * 100);
+      const pixResponse = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            amount: amountInCents,
+            orderId: `upsell-${orderId}-${config.addon_type}`,
+            description: `Upsell ${config.title}`,
+            customer: { name: userName || "Cliente", email: userEmail || undefined },
+          }),
+        }
+      );
+      const data = await pixResponse.json();
+      if (!pixResponse.ok || !data.success) throw new Error(data.error || "Erro ao gerar PIX");
+
+      await supabase
+        .from("sale_addons")
+        .update({ pix_code: data.brCode, flowpay_charge_id: data.chargeId, updated_at: new Date().toISOString() })
+        .eq("order_id", orderId)
+        .eq("addon_type", config.addon_type);
+
+      setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
+    } catch (err: any) {
+      console.error("Upsell error:", err);
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+  const iconMap: Record<string, typeof Shield> = { premium_benefits: Star, delivery_priority: Zap, data_swap_warranty: Shield };
+  const Icon = iconMap[config.addon_type] || Star;
+  const badgeColorMap: Record<string, string> = { yellow: "bg-yellow-500 text-black", orange: "bg-orange-500 text-white", green: "bg-green-500 text-white" };
+  const badgeClass = badgeColorMap[config.badge_color] || badgeColorMap.yellow;
+
+  // PIX payment view (inline)
+  if (pixData) {
+    return (
+      <Card className="bg-[#111] border-[#1f1f1f] overflow-hidden">
+        <CardContent className="p-5 space-y-4">
+          {paymentConfirmed ? (
+            <div className="text-center space-y-3 py-6">
+              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-8 h-8 text-green-500" />
+              </div>
+              <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
+              <p className="text-sm text-gray-400">Benefício ativado com sucesso. 🎉</p>
+            </div>
+          ) : (
+            <>
+              <div className="text-center">
+                <h2 className="text-lg font-bold text-white">{config.title}</h2>
+                <p className="text-2xl font-bold text-primary mt-1">
+                  R$ {config.price.toFixed(2).replace(".", ",")}
+                </p>
+              </div>
+
+              <div className="flex items-center justify-between text-sm text-gray-400">
+                <span><Clock className="w-4 h-4 inline mr-1" />Expira em</span>
+                <span className="font-mono text-primary font-bold">{formatTime(timeLeft)}</span>
+              </div>
+              <Progress value={(timeLeft / (10 * 60)) * 100} className="h-1" />
+
+              <div className="flex justify-center">
+                <div className="bg-white p-3 rounded-xl">
+                  <QRCodeSVG
+                    value={pixData.qrCode}
+                    size={isMobile ? 180 : 220}
+                    level="H"
+                    imageSettings={{ src: vIcon, height: 30, width: 30, excavate: true }}
+                  />
+                </div>
+              </div>
+
+              <Button
+                className="w-full"
+                onClick={() => { navigator.clipboard.writeText(pixData.qrCode); toast({ title: "Copiado!" }); }}
+              >
+                <Copy className="w-4 h-4 mr-2" />
+                Copiar Código PIX
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    );
+  }
+
+  // Offer view (inline)
+  return (
+    <Card className="bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border-yellow-500/20 overflow-hidden">
+      <CardContent className="p-5 space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            {config.badge_text && (
+              <span className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ${badgeClass}`}>
+                {config.badge_text}
+              </span>
+            )}
+          </div>
+          <button onClick={() => setDismissed(true)} className="text-gray-600 hover:text-gray-400">
+            <X className="w-4 h-4" />
+          </button>
+        </div>
+
+        <div className="text-center space-y-2">
+          <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mx-auto">
+            <Icon className="w-6 h-6 text-primary" />
+          </div>
+          <h3 className="text-lg font-bold text-white">{config.title}</h3>
+          {config.subtitle && <p className="text-xs text-gray-400">{config.subtitle}</p>}
+        </div>
+
+        {/* Benefits */}
+        <div className="space-y-2">
+          {config.benefits.map((benefit, i) => (
+            <div key={i} className="flex items-start gap-2">
+              <div className="w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center mt-0.5 shrink-0">
+                <Check className="w-2.5 h-2.5 text-green-500" />
+              </div>
+              <span className="text-xs text-gray-300">{benefit}</span>
+            </div>
+          ))}
+        </div>
+
+        {/* Price */}
+        <div className="text-center space-y-0.5">
+          {config.original_price && (
+            <p className="text-gray-500 line-through text-xs">
+              De R$ {config.original_price.toFixed(2).replace(".", ",")}
+            </p>
+          )}
+          <p className="text-2xl font-bold text-primary">
+            R$ {config.price.toFixed(2).replace(".", ",")}
+          </p>
+          <p className="text-[10px] text-gray-500">Pagamento único via PIX</p>
+        </div>
+
+        <Button
+          size="lg"
+          className="w-full h-12 text-sm font-bold rounded-xl bg-primary hover:bg-primary/90 animate-pulse"
+          onClick={handleAccept}
+          disabled={purchasing}
+        >
+          {purchasing && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+          {config.button_accept_text}
+        </Button>
+
+        <button
+          onClick={() => setDismissed(true)}
+          className="w-full text-center text-gray-600 hover:text-gray-400 text-xs py-1 transition-colors"
+        >
+          {config.button_skip_text}
+        </button>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function OrderDelivery() {
   const { hash } = useParams<{ hash: string }>();
   const [searchParams] = useSearchParams();
@@ -47,10 +284,12 @@ export default function OrderDelivery() {
   const [notFound, setNotFound] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [bookmarked, setBookmarked] = useState(false);
-  const [showUpsell, setShowUpsell] = useState(false);
 
   const upsellParam = searchParams.get("upsell");
   const orderIdParam = searchParams.get("order_id");
+
+  // Load first upsell config
+  const { config: upsellConfig, loading: upsellLoading } = usePostPaymentPage("premium_benefits");
 
   useEffect(() => {
     if (!hash) { setNotFound(true); setLoading(false); return; }
@@ -66,7 +305,6 @@ export default function OrderDelivery() {
         if (error || !data) {
           setNotFound(true);
         } else {
-          // Check expiry
           if (new Date(data.expires_at) < new Date()) {
             setNotFound(true);
           } else {
@@ -139,6 +377,7 @@ export default function OrderDelivery() {
   const orderData = order.order_data;
   const items = orderData.items || [];
   const hasAnyCodes = items.some(i => i.delivery_code);
+  const effectiveOrderId = orderIdParam || order.order_id;
 
   return (
     <div className="min-h-screen bg-[#0a0a0a]">
@@ -182,7 +421,7 @@ export default function OrderDelivery() {
           </div>
         </div>
 
-        {/* Save Link Button */}
+        {/* Save Link Buttons */}
         <div className="flex gap-3">
           <Button
             variant="outline"
@@ -196,7 +435,7 @@ export default function OrderDelivery() {
             variant="outline"
             className="flex-1 h-11 border-[#2a2a2a] text-gray-300 hover:text-white"
             onClick={() => {
-              navigator.clipboard.writeText(window.location.href);
+              navigator.clipboard.writeText(window.location.href.split("?")[0]);
               toast({ title: "Link copiado!", description: "Cole em algum lugar seguro." });
             }}
           >
@@ -218,7 +457,6 @@ export default function OrderDelivery() {
 
                 return (
                   <div key={itemIndex} className="rounded-xl border border-[#1f1f1f] overflow-hidden">
-                    {/* Product Info */}
                     <div className="flex items-center gap-4 p-4 bg-[#0d0d0d]">
                       {item.product_image && (
                         <img
@@ -238,7 +476,6 @@ export default function OrderDelivery() {
                       </p>
                     </div>
 
-                    {/* Delivery Codes */}
                     {codes.length > 0 ? (
                       <div className="border-t border-[#1f1f1f] bg-green-500/5 p-4">
                         <div className="flex items-center justify-between mb-3">
@@ -309,6 +546,17 @@ export default function OrderDelivery() {
           </CardContent>
         </Card>
 
+        {/* INLINE UPSELL - shown directly on the page */}
+        {upsellParam === "1" && upsellConfig && (
+          <InlineUpsell
+            orderId={effectiveOrderId}
+            config={upsellConfig}
+            userEmail={order.email}
+            userName={order.customer_name || undefined}
+            userId={user?.uid || sessionStorage.getItem('valnix_guest_id') || undefined}
+          />
+        )}
+
         {/* Order Summary */}
         <Card className="bg-[#111] border-[#1f1f1f]">
           <CardContent className="p-5">
@@ -343,26 +591,6 @@ export default function OrderDelivery() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Upsell CTA - shown after payment */}
-        {upsellParam === "1" && orderIdParam && (
-          <Card className="bg-gradient-to-br from-yellow-500/10 to-orange-500/5 border-yellow-500/20">
-            <CardContent className="p-5 text-center space-y-3">
-              <div className="text-3xl">🎁</div>
-              <h3 className="font-bold text-white">Oferta Especial!</h3>
-              <p className="text-xs text-gray-400">
-                Aproveite uma oferta exclusiva disponível apenas agora.
-              </p>
-              <Button
-                className="w-full h-11 bg-yellow-500 hover:bg-yellow-600 text-black font-bold"
-                onClick={() => navigate(`/painel-pagar?order_id=${orderIdParam}`)}
-              >
-                Ver Oferta Especial
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </CardContent>
-          </Card>
-        )}
 
         {/* CTA: Create account */}
         {!user && !order.linked && (

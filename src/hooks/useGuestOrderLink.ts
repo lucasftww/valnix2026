@@ -2,66 +2,65 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 
 /**
- * On login/signup, checks for unlinked guest orders matching user email
- * and offers to link them.
+ * On login/signup, AUTOMATICALLY links guest orders by email.
+ * Returns the count of linked orders for an informational banner (no user action needed).
  */
 export function useGuestOrderLinking(userId: string | undefined, userEmail: string | undefined) {
-  const [pendingOrders, setPendingOrders] = useState<Array<{ id: string; order_id: string; hash: string }>>([]);
+  const [linkedCount, setLinkedCount] = useState(0);
+  const [linkedHashes, setLinkedHashes] = useState<string[]>([]);
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
     if (!userId || !userEmail) return;
     
-    // Only check once per session
-    const sessionKey = `valnix_guest_link_checked_${userId}`;
+    // Only run once per session per user
+    const sessionKey = `valnix_guest_linked_${userId}`;
     if (sessionStorage.getItem(sessionKey)) {
       setChecked(true);
       return;
     }
 
-    const checkPending = async () => {
+    const autoLink = async () => {
       try {
+        // Find unlinked guest orders for this email
         const { data, error } = await supabase
           .from("guest_orders")
           .select("id, order_id, hash")
           .eq("email", userEmail.toLowerCase())
           .eq("linked", false);
 
-        if (!error && data && data.length > 0) {
-          setPendingOrders(data);
+        if (error || !data || data.length === 0) {
+          setChecked(true);
+          sessionStorage.setItem(sessionKey, "true");
+          return;
         }
+
+        // AUTO-LINK all of them immediately (no user action needed)
+        for (const order of data) {
+          await supabase
+            .from("guest_orders")
+            .update({ linked: true, user_id: userId })
+            .eq("id", order.id);
+        }
+
+        console.log(`✅ Auto-linked ${data.length} guest order(s) for ${userEmail}`);
+        setLinkedCount(data.length);
+        setLinkedHashes(data.map(o => o.hash));
       } catch (err) {
-        console.error("Error checking guest orders:", err);
+        console.error("Error auto-linking guest orders:", err);
       } finally {
         setChecked(true);
         sessionStorage.setItem(sessionKey, "true");
       }
     };
 
-    checkPending();
+    autoLink();
   }, [userId, userEmail]);
 
-  const linkOrders = async () => {
-    if (!userId || pendingOrders.length === 0) return;
-
-    try {
-      for (const order of pendingOrders) {
-        await supabase
-          .from("guest_orders")
-          .update({ linked: true, user_id: userId })
-          .eq("id", order.id);
-      }
-      setPendingOrders([]);
-      return true;
-    } catch (err) {
-      console.error("Error linking guest orders:", err);
-      return false;
-    }
+  const dismiss = () => {
+    setLinkedCount(0);
+    setLinkedHashes([]);
   };
 
-  const dismissLinking = () => {
-    setPendingOrders([]);
-  };
-
-  return { pendingOrders, checked, linkOrders, dismissLinking };
+  return { linkedCount, linkedHashes, checked, dismiss };
 }
