@@ -25,7 +25,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Package, Send, Loader2, RefreshCw, Trash2, Search } from "lucide-react";
+import { Package, Send, Loader2, RefreshCw, Trash2, Search, ChevronDown } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -79,6 +87,7 @@ export const AdminOrders = () => {
   const [cleaningPending, setCleaningPending] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [cleanType, setCleanType] = useState<string | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -257,6 +266,41 @@ export const AdminOrders = () => {
     } finally {
       setCleaningPending(false);
     }
+  };
+
+  const handleCleanCancelled = async () => {
+    setCleaning(true);
+    try {
+      const cancelledOrders = orders.filter(o => o.status === 'cancelled');
+      let deleted = 0;
+      for (const order of cancelledOrders) {
+        const itemsRef = collection(db, "order_items");
+        const itemsSnapshot = await getDocs(itemsRef);
+        const items = itemsSnapshot.docs.filter(d => d.data().order_id === order.id);
+        for (const item of items) {
+          await deleteDoc(doc(db, "order_items", item.id));
+        }
+        await deleteDoc(doc(db, "orders", order.id));
+        deleted++;
+      }
+      toast({
+        title: "Limpeza concluída!",
+        description: `${deleted} pedido(s) cancelado(s) removido(s).`,
+      });
+      fetchOrders();
+    } catch (error: any) {
+      toast({ title: "Erro ao limpar pedidos", description: error.message, variant: "destructive" });
+    } finally {
+      setCleaning(false);
+    }
+  };
+
+  const handleCleanByType = async () => {
+    if (cleanType === "unpaid") await handleCleanUnpaid();
+    else if (cleanType === "processing") await handleCleanProcessing();
+    else if (cleanType === "pending") await handleCleanPending();
+    else if (cleanType === "cancelled") await handleCleanCancelled();
+    setCleanType(null);
   };
 
   const handleVerifyPayment = async (order: Order) => {
@@ -489,94 +533,57 @@ export const AdminOrders = () => {
             Atualizar
           </Button>
           
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
+
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
               <Button 
                 variant="destructive" 
                 size="sm"
+                disabled={cleaning || cleaningProcessing || cleaningPending}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Limpar pedidos
+                <ChevronDown className="w-3 h-3 ml-1" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="start" className="w-64">
+              <DropdownMenuLabel>Remover pedidos por status</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
                 disabled={cleaning || orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length === 0}
+                onSelect={(e) => { e.preventDefault(); setCleanType("unpaid"); }}
+                className="text-red-500 focus:text-red-500"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Limpar não pagos ({orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length})
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Limpar pedidos não pagos?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Isso vai excluir permanentemente {orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length} pedido(s) 
-                  que não foram pagos e não estão cancelados. Essa ação não pode ser desfeita.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleCleanUnpaid} disabled={cleaning}>
-                  {cleaning ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Confirmar exclusão
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-blue-500/50 text-blue-400 hover:bg-blue-500/10"
+                Não pagos ({orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length})
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 disabled={cleaningProcessing || orders.filter(o => o.status === 'processing').length === 0}
+                onSelect={(e) => { e.preventDefault(); setCleanType("processing"); }}
+                className="text-blue-400 focus:text-blue-400"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Limpar processando ({orders.filter(o => o.status === 'processing').length})
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Limpar pedidos processando?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Isso vai excluir permanentemente {orders.filter(o => o.status === 'processing').length} pedido(s) 
-                  com status "Processando". Essa ação não pode ser desfeita.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleCleanProcessing} disabled={cleaningProcessing}>
-                  {cleaningProcessing ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Confirmar exclusão
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button 
-                variant="outline" 
-                size="sm"
-                className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                Processando ({orders.filter(o => o.status === 'processing').length})
+              </DropdownMenuItem>
+              <DropdownMenuItem
                 disabled={cleaningPending || orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length === 0}
+                onSelect={(e) => { e.preventDefault(); setCleanType("pending"); }}
+                className="text-yellow-500 focus:text-yellow-500"
               >
                 <Trash2 className="w-4 h-4 mr-2" />
-                Limpar pendentes ({orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length})
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>Limpar pedidos pendentes?</AlertDialogTitle>
-                <AlertDialogDescription>
-                  Isso vai excluir permanentemente {orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length} pedido(s) 
-                  com status e pagamento "Pendente". Essa ação não pode ser desfeita.
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                <AlertDialogAction onClick={handleCleanPending} disabled={cleaningPending}>
-                  {cleaningPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
-                  Confirmar exclusão
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+                Pendentes ({orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length})
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                disabled={orders.filter(o => o.status === 'cancelled').length === 0}
+                onSelect={(e) => { e.preventDefault(); setCleanType("cancelled"); }}
+                className="text-muted-foreground"
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Cancelados ({orders.filter(o => o.status === 'cancelled').length})
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
         <div className="flex items-center gap-2">
           <div className="relative flex-1 min-w-[200px]">
@@ -605,6 +612,34 @@ export const AdminOrders = () => {
           </Select>
         </div>
       </div>
+
+      {/* Clean Confirmation Dialog */}
+      <AlertDialog open={!!cleanType} onOpenChange={() => setCleanType(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {cleanType === "unpaid" && "Limpar pedidos não pagos?"}
+              {cleanType === "processing" && "Limpar pedidos processando?"}
+              {cleanType === "pending" && "Limpar pedidos pendentes?"}
+              {cleanType === "cancelled" && "Limpar pedidos cancelados?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {cleanType === "unpaid" && `Isso vai excluir permanentemente ${orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length} pedido(s) que não foram pagos.`}
+              {cleanType === "processing" && `Isso vai excluir permanentemente ${orders.filter(o => o.status === 'processing').length} pedido(s) com status "Processando".`}
+              {cleanType === "pending" && `Isso vai excluir permanentemente ${orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length} pedido(s) pendentes.`}
+              {cleanType === "cancelled" && `Isso vai excluir permanentemente ${orders.filter(o => o.status === 'cancelled').length} pedido(s) cancelados.`}
+              {" "}Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleCleanByType} disabled={cleaning || cleaningProcessing || cleaningPending}>
+              {(cleaning || cleaningProcessing || cleaningPending) ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Confirmar exclusão
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {filteredOrders.length === 0 ? (
         <Card>
