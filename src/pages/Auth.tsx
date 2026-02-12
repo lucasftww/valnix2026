@@ -192,12 +192,10 @@ export default function Auth() {
   };
 
   return (
-    <div className="min-h-screen min-h-[100dvh] flex flex-col bg-gradient-to-b from-background via-background to-background/95 overflow-x-hidden">
-      {/* Mobile-optimized container */}
-      <div className="flex-1 flex flex-col items-center justify-center px-4 py-8 sm:py-12 safe-area-inset">
+    <div className="min-h-screen min-h-[100dvh] flex flex-col items-center justify-center bg-gradient-to-b from-background via-background to-background/95 overflow-x-hidden px-4 py-6">
         {/* Logo com link para home */}
-        <Link to="/" className="flex items-center justify-center mb-8 sm:mb-10 hover:opacity-90 transition-opacity">
-          <img src={vLogo} alt="Valnix Logo" className="h-20 sm:h-28 md:h-36 w-auto drop-shadow-lg" />
+        <Link to="/" className="flex items-center justify-center mb-6 sm:mb-8 hover:opacity-90 transition-opacity">
+          <img src={vLogo} alt="Valnix Logo" className="h-16 sm:h-20 md:h-24 w-auto drop-shadow-lg" />
         </Link>
         
         <Card className="w-full max-w-md shadow-2xl border-primary/20 bg-card/95 backdrop-blur-sm">
@@ -500,7 +498,6 @@ export default function Auth() {
         <p className="text-xs text-muted-foreground text-center mt-5 sm:mt-6 max-w-xs">
           Seus dados estão protegidos e nunca serão compartilhados
         </p>
-      </div>
     </div>
   );
 }
