@@ -110,17 +110,10 @@ export default function Checkout() {
     }
   }, [items.length, paymentData, navigate]);
 
-  // Track InitiateCheckout when entering checkout
+  // Track InitiateCheckout once on mount (analytics only, CAPI sent on submit)
   useEffect(() => {
     if (items.length > 0) {
       trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
-      sendInitiateCheckout({
-        userId: effectiveUserId,
-        email: formData.email || user?.email || undefined,
-        name: formData.name || undefined,
-        value: finalPrice,
-        productNames: items.map(i => i.name),
-      });
     }
   }, []); // fire once on mount
 
@@ -229,10 +222,7 @@ export default function Checkout() {
     
     setLoading(true);
 
-    // Track internal analytics funnel
-    trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
-
-    // Send InitiateCheckout to Meta CAPI
+    // Send InitiateCheckout to Meta CAPI (with enriched user data from form)
     sendInitiateCheckout({
       userId: effectiveUserId,
       email: formData.email || user?.email || undefined,

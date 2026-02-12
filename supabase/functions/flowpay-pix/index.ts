@@ -321,9 +321,10 @@ async function processAutoDelivery(orderId: string) {
         // Remove used codes from product (update remaining codes)
         const remainingCodes = autoCodesArray.slice(neededCodes);
         const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products/${productId}?updateMask.fieldPaths=auto_delivery_codes`;
+        const accessTokenForUpdate = await getFirebaseAccessToken();
         await fetch(updateUrl, {
           method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessTokenForUpdate}` },
           body: JSON.stringify({
             fields: {
               auto_delivery_codes: {
@@ -497,6 +498,7 @@ Deno.serve(async (req) => {
         
         
         // Register upsell in analytics
+        const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
         try {
           await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
         } catch (analyticsError) {
