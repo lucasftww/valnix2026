@@ -208,7 +208,7 @@ export function useRecentOrders(userId: string | undefined) {
   return { orders, loading };
 }
 
-// Hook para buscar itens de um pedido
+// Hook para buscar itens de um pedido (realtime)
 export function useOrderItems(orderId: string | undefined) {
   const [items, setItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(false);
@@ -219,27 +219,26 @@ export function useOrderItems(orderId: string | undefined) {
       return;
     }
 
-    const fetchItems = async () => {
-      setLoading(true);
-      try {
-        const itemsRef = collection(db, 'order_items');
-        const q = query(itemsRef, where('order_id', '==', orderId));
-        const snapshot = await getDocs(q);
-        
-        const itemsData = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data()
+    setLoading(true);
+    const itemsRef = collection(db, 'order_items');
+    const q = query(itemsRef, where('order_id', '==', orderId));
+
+    const unsubscribe = onSnapshot(q,
+      (snapshot) => {
+        const itemsData = snapshot.docs.map(d => ({
+          id: d.id,
+          ...d.data()
         } as OrderItem));
-        
         setItems(itemsData);
-      } catch (err) {
+        setLoading(false);
+      },
+      (err) => {
         console.error('Error fetching order items:', err);
-      } finally {
         setLoading(false);
       }
-    };
+    );
 
-    fetchItems();
+    return () => unsubscribe();
   }, [orderId]);
 
   return { items, loading };
