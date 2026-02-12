@@ -318,12 +318,12 @@ const ProductDetail = () => {
             {/* Desktop: Imagem + Tabs */}
             <div className="hidden lg:block space-y-6">
               <div className="relative rounded-xl overflow-hidden bg-black/80 border border-border/10">
-                <div className="relative flex items-center justify-center p-12 min-h-[650px]">
+                <div className="relative flex items-center justify-center p-8 min-h-[450px]">
                   {product.image_url && (
                     <ProductImage
                       src={product.image_url}
                       alt={product.name}
-                      className="max-w-[60%] max-h-[630px] w-auto h-auto"
+                      className="max-w-[55%] max-h-[420px] w-auto h-auto"
                       priority={true}
                     />
                   )}
@@ -399,24 +399,24 @@ const ProductDetail = () => {
 
             {/* Card de Compra Desktop */}
             <div className="hidden lg:block">
-              <div className="sticky top-32 rounded-xl overflow-hidden border border-border/50 bg-card shadow-lg">
-                <div className="p-8 space-y-8">
+              <div className="sticky top-28 rounded-xl overflow-hidden border border-border/50 bg-card shadow-lg">
+                <div className="p-6 space-y-5">
                   <div className="flex justify-center">
                     <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Produto Digital</span>
                   </div>
 
                   <div className="flex flex-col items-center text-center">
-                    <h1 className="text-4xl font-bold leading-tight mb-3">{product.name}</h1>
+                    <h1 className="text-2xl font-bold leading-tight mb-2">{product.name}</h1>
                     <p className="text-sm text-muted-foreground flex items-center gap-1">
                       <span>⚠️</span>
                       <span>Ativável apenas no Brasil</span>
                     </p>
                   </div>
 
-                  <div className="bg-muted/30 rounded-lg p-6 space-y-6">
+                  <div className="bg-muted/30 rounded-lg p-4 space-y-4">
                     <div className="flex flex-col items-center">
-                      <p className="text-sm text-muted-foreground mb-2">Valor Total</p>
-                      <p className="text-4xl font-bold text-center">R$ {totalPrice}</p>
+                      <p className="text-sm text-muted-foreground mb-1">Valor Total</p>
+                      <p className="text-3xl font-bold text-center">R$ {totalPrice}</p>
                     </div>
 
                     <div className="flex flex-col items-center">
@@ -427,7 +427,7 @@ const ProductDetail = () => {
                           size="icon" 
                           onClick={decreaseQuantity} 
                           disabled={quantity <= 1}
-                          className="h-12 w-12 rounded-lg flex items-center justify-center"
+                          className="h-10 w-10 rounded-lg flex items-center justify-center"
                           aria-label="Diminuir quantidade"
                         >
                           <Minus className="h-5 w-5" />
@@ -438,14 +438,14 @@ const ProductDetail = () => {
                             readOnly 
                             value={quantity}
                             aria-label="Quantidade do produto"
-                            className="w-20 h-12 text-center text-xl font-bold bg-background border border-border rounded-lg outline-none"
+                            className="w-16 h-10 text-center text-lg font-bold bg-background border border-border rounded-lg outline-none"
                           />
                         </div>
                         <Button 
                           variant="outline" 
                           size="icon" 
                           onClick={increaseQuantity} 
-                          className="h-12 w-12 rounded-lg flex items-center justify-center"
+                          className="h-10 w-10 rounded-lg flex items-center justify-center"
                           aria-label="Aumentar quantidade"
                         >
                           <Plus className="h-5 w-5" />
