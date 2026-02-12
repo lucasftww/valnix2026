@@ -84,6 +84,12 @@ async function sendToMeta(eventPayload: Record<string, unknown>, testEventCode?:
 
   if (testEventCode) {
     body.test_event_code = testEventCode;
+  } else {
+    // Fallback to environment variable if set
+    const envTestCode = Deno.env.get('META_TEST_EVENT_CODE');
+    if (envTestCode) {
+      body.test_event_code = envTestCode;
+    }
   }
 
   const url = `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events?access_token=${accessToken}`;
