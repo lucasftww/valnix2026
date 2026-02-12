@@ -28,6 +28,8 @@ function getCookie(name: string): string | null {
 interface FormData {
   name: string;
   document: string;
+  email: string;
+  phone: string;
 }
 
 interface PaymentData {
@@ -81,6 +83,8 @@ export default function Checkout() {
   const [formData, setFormData] = useState<FormData>({
     name: "",
     document: "",
+    email: "",
+    phone: "",
   });
   const [couponCode, setCouponCode] = useState("");
   const [applyingCoupon, setApplyingCoupon] = useState(false);
@@ -116,6 +120,8 @@ export default function Checkout() {
           setFormData(prev => ({
             ...prev,
             name: user.displayName || profileData?.full_name || "",
+            email: user.email || profileData?.email || "",
+            phone: profileData?.phone || "",
           }));
           setUserBalance(profileData?.balance || 0);
         }
@@ -129,6 +135,8 @@ export default function Checkout() {
   }, [user]);
 
   // Form validation
+  const isValidEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+
   const validation = useMemo(() => {
     return {
       name: formData.name.trim().length >= 3 && formData.name.trim().split(' ').length >= 2,
@@ -143,10 +151,16 @@ export default function Checkout() {
         : formData.document.replace(/\D/g, '').length < 11
           ? 'CPF incompleto'
           : undefined,
+      email: isValidEmail(formData.email),
+      emailError: formData.email.trim().length > 0 && !isValidEmail(formData.email)
+        ? 'E-mail inválido'
+        : formData.email.trim().length === 0
+          ? 'E-mail é obrigatório'
+          : undefined,
     };
   }, [formData]);
 
-  const isFormValid = validation.name && validation.document;
+  const isFormValid = validation.name && validation.document && validation.email;
 
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     let formattedValue = value;
@@ -170,11 +184,12 @@ export default function Checkout() {
   const handleSubmit = useCallback(async () => {
     if (!user || loading) return;
     
-    setTouched({ name: true, document: true });
+    setTouched({ name: true, document: true, email: true });
     
     if (!isFormValid) {
       const errors: string[] = [];
       if (!validation.name) errors.push(validation.nameError || 'Nome inválido');
+      if (!validation.email) errors.push(validation.emailError || 'E-mail inválido');
       if (!validation.document) errors.push(validation.documentError || 'CPF inválido');
       
       toast({
@@ -193,7 +208,7 @@ export default function Checkout() {
     // Send InitiateCheckout to Meta CAPI
     sendInitiateCheckout({
       userId: user.uid,
-      email: user.email || undefined,
+      email: formData.email || user.email || undefined,
       name: formData.name,
       value: finalPrice,
       productNames: items.map(i => i.name),
@@ -225,8 +240,8 @@ export default function Checkout() {
         const orderId = await createOrder({
           user_id: user.uid,
           customer_name: formData.name,
-          customer_email: user.email || "",
-          customer_phone: "",
+          customer_email: formData.email || user.email || "",
+          customer_phone: formData.phone || "",
           total_amount: orderAmount,
           notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Pago com saldo` : "Pago com saldo",
           status: "processing",
@@ -302,7 +317,8 @@ export default function Checkout() {
               value: orderAmount,
               currency: 'BRL',
               content_name: items.map(i => i.name).join(', '),
-              email: user.email,
+              email: formData.email || user.email,
+              phone: formData.phone || undefined,
               first_name: nameParts[0] || undefined,
               last_name: nameParts.slice(1).join(' ') || undefined,
               external_id: user.uid,
@@ -323,7 +339,8 @@ export default function Checkout() {
               event_type: 'Purchase',
               value: orderAmount,
               customer_name: formData.name,
-              customer_email: user.email,
+              customer_email: formData.email || user.email,
+              customer_phone: formData.phone || undefined,
               product_name: items.map(i => i.name).join(', '),
             },
           }).then(({ error }) => {
@@ -345,8 +362,8 @@ export default function Checkout() {
       const orderId = await createOrder({
         user_id: user.uid,
         customer_name: formData.name,
-        customer_email: user.email || "",
-        customer_phone: "",
+        customer_email: formData.email || user.email || "",
+        customer_phone: formData.phone || "",
         total_amount: orderAmount,
         notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
         status: "pending",
@@ -387,7 +404,8 @@ export default function Checkout() {
             
             customer: {
               name: formData.name,
-              email: user.email || undefined,
+              email: formData.email || user.email || undefined,
+              phone: formData.phone || undefined,
               taxId: cpfDigits,
             },
           }),
@@ -491,7 +509,7 @@ export default function Checkout() {
     );
   };
 
-  const getInputClassName = (field: 'name' | 'document', baseClass: string) => {
+  const getInputClassName = (field: 'name' | 'document' | 'email', baseClass: string) => {
     if (!touched[field]) return baseClass;
     return validation[field] 
       ? `${baseClass} border-green-500/50 pr-10` 
@@ -594,66 +612,109 @@ export default function Checkout() {
               </div>
             </div>
 
-            {/* Personal Info Card - Simplified */}
+            {/* Personal Info Card */}
             <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                <div className="flex items-center gap-3">
-                  <h2 className="text-[15px] font-semibold text-white">Informações Pessoais</h2>
-                  <div className="flex items-center gap-1.5 text-[#666] text-[12px]">
-                    <Lock className="w-3.5 h-3.5" />
-                    <span>Dados protegidos</span>
-                  </div>
-                </div>
+                <h2 className="text-[15px] font-semibold text-white">Informações do comprador</h2>
                 <div className="flex items-center gap-1.5 text-cyan-400 text-[13px] font-medium">
                   <Zap className="w-4 h-4" />
                   <span>Entrega imediata</span>
                 </div>
               </div>
 
-              {/* Name + CPF */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                {/* Name */}
-                <div>
-                  <label className="block text-[13px] text-[#888] mb-2">
-                    Nome completo <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={formData.name}
-                      onChange={(e) => handleInputChange('name', e.target.value)}
-                      onBlur={() => handleBlur('name')}
-                      placeholder="NOME SOBRENOME"
-                      autoComplete="name"
-                      className={getInputClassName('name', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px] uppercase")}
-                    />
-                    <ValidationIcon isValid={validation.name} show={touched.name || false} />
+              <div className="space-y-4">
+                {/* Name + CPF */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Name */}
+                  <div>
+                    <label className="block text-[13px] text-[#888] mb-2">
+                      Nome completo <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Input
+                        value={formData.name}
+                        onChange={(e) => handleInputChange('name', e.target.value)}
+                        onBlur={() => handleBlur('name')}
+                        placeholder="NOME SOBRENOME"
+                        autoComplete="name"
+                        className={getInputClassName('name', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px] uppercase")}
+                      />
+                      <ValidationIcon isValid={validation.name} show={touched.name || false} />
+                    </div>
+                    {touched.name && !validation.name && (
+                      <p className="text-red-400 text-[11px] mt-1.5">{validation.nameError || 'Nome inválido'}</p>
+                    )}
                   </div>
-                  {touched.name && !validation.name && (
-                    <p className="text-red-400 text-[11px] mt-1.5">{validation.nameError || 'Nome inválido'}</p>
-                  )}
-                </div>
-                
-                {/* CPF */}
-                <div>
-                  <label className="block text-[13px] text-[#888] mb-2">
-                    CPF <span className="text-red-500">*</span>
-                  </label>
-                  <div className="relative">
-                    <Input
-                      value={formData.document}
-                      onChange={(e) => handleInputChange('document', e.target.value)}
-                      onBlur={() => handleBlur('document')}
-                      placeholder="000.000.000-00"
-                      inputMode="numeric"
-                      autoComplete="off"
-                      className={getInputClassName('document', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]")}
-                    />
-                    <ValidationIcon isValid={validation.document} show={touched.document || false} />
+                  
+                  {/* CPF */}
+                  <div>
+                    <label className="block text-[13px] text-[#888] mb-2">
+                      CPF <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Input
+                        value={formData.document}
+                        onChange={(e) => handleInputChange('document', e.target.value)}
+                        onBlur={() => handleBlur('document')}
+                        placeholder="000.000.000-00"
+                        inputMode="numeric"
+                        autoComplete="off"
+                        className={getInputClassName('document', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]")}
+                      />
+                      <ValidationIcon isValid={validation.document} show={touched.document || false} />
+                    </div>
+                    {touched.document && !validation.document && (
+                      <p className="text-red-400 text-[11px] mt-1.5">{validation.documentError || 'CPF inválido'}</p>
+                    )}
                   </div>
-                  {touched.document && !validation.document && (
-                    <p className="text-red-400 text-[11px] mt-1.5">{validation.documentError || 'CPF inválido'}</p>
-                  )}
                 </div>
+
+                {/* Email + Phone */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {/* Email */}
+                  <div>
+                    <label className="block text-[13px] text-[#888] mb-2">
+                      E-mail <span className="text-red-500">*</span>
+                    </label>
+                    <div className="relative">
+                      <Input
+                        value={formData.email}
+                        onChange={(e) => handleInputChange('email', e.target.value)}
+                        onBlur={() => handleBlur('email')}
+                        placeholder="seuemail@exemplo.com"
+                        type="email"
+                        autoComplete="email"
+                        className={getInputClassName('email', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]")}
+                      />
+                      <ValidationIcon isValid={validation.email} show={touched.email || false} />
+                    </div>
+                    {touched.email && !validation.email && (
+                      <p className="text-red-400 text-[11px] mt-1.5">{validation.emailError || 'E-mail inválido'}</p>
+                    )}
+                  </div>
+
+                  {/* Phone (optional) */}
+                  <div>
+                    <label className="block text-[13px] text-[#888] mb-2">
+                      Telefone <span className="text-[#555]">(opcional)</span>
+                    </label>
+                    <Input
+                      value={formData.phone}
+                      onChange={(e) => handleInputChange('phone', e.target.value)}
+                      placeholder="(DDD) 99999-9999"
+                      type="tel"
+                      inputMode="tel"
+                      autoComplete="tel"
+                      className="h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]"
+                    />
+                  </div>
+                </div>
+
+                {/* Security microcopy */}
+                <p className="text-[12px] text-[#555] flex items-center gap-1.5 mt-1">
+                  <Lock className="w-3.5 h-3.5 flex-shrink-0" />
+                  Seus dados são seguros e usados apenas para processar seu pedido.
+                </p>
               </div>
 
               {/* Mobile Submit Button */}
