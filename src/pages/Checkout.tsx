@@ -408,19 +408,25 @@ export default function Checkout() {
         return;
       }
 
-      // PIX payment flow
-      const orderId = await createOrder({
-        user_id: effectiveUserId,
-        customer_name: formData.name,
-        customer_email: formData.email || user?.email || "",
-        customer_phone: formData.phone || "",
-        total_amount: orderAmount,
-        notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
-        status: "pending",
-        payment_status: "pending",
-        fbc: getCookie('_fbc'),
-        fbp: getCookie('_fbp'),
-      });
+      // PIX payment flow — parallelize order creation + token fetch
+      const cpfDigits = formData.document.replace(/\D/g, '');
+      const tokenPromise = user ? user.getIdToken() : Promise.resolve(null);
+
+      const [orderId, firebaseIdToken] = await Promise.all([
+        createOrder({
+          user_id: effectiveUserId,
+          customer_name: formData.name,
+          customer_email: formData.email || user?.email || "",
+          customer_phone: formData.phone || "",
+          total_amount: orderAmount,
+          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
+          status: "pending",
+          payment_status: "pending",
+          fbc: getCookie('_fbc'),
+          fbp: getCookie('_fbp'),
+        }),
+        tokenPromise,
+      ]);
 
       const orderItemsData = items.map(item => ({
         order_id: orderId,
@@ -432,11 +438,6 @@ export default function Checkout() {
         total_price: item.price * item.quantity,
       }));
 
-      const cpfDigits = formData.document.replace(/\D/g, '');
-
-      // Get Firebase ID token if logged in, otherwise use guest mode
-      const firebaseIdToken = user ? await user.getIdToken() : null;
-
       const pixHeaders: Record<string, string> = {
         'Content-Type': 'application/json',
       };
@@ -444,6 +445,7 @@ export default function Checkout() {
         pixHeaders['Authorization'] = `Bearer ${firebaseIdToken}`;
       }
 
+      // Fire PIX + order items in parallel
       const pixPromise = fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
         {
@@ -453,10 +455,9 @@ export default function Checkout() {
             amount: Math.round(orderAmount * 100),
             orderId,
             description: `Pedido ${orderId.substring(0, 8)}`,
-            
             customer: {
               name: formData.name,
-              email: formData.email || user.email || undefined,
+              email: formData.email || user?.email || undefined,
               phone: formData.phone || undefined,
               taxId: cpfDigits,
             },
@@ -766,7 +767,10 @@ export default function Checkout() {
                   className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl text-base shadow-lg shadow-primary/20 active:scale-[0.98] transition-transform"
                 >
                   {loading ? (
-                    <Loader2 className="w-5 h-5 animate-spin" />
+                    <span className="flex items-center gap-2">
+                      <Loader2 className="w-5 h-5 animate-spin" />
+                      Gerando PIX...
+                    </span>
                   ) : paymentMethod === "balance" ? (
                     "Pagar com Saldo →"
                   ) : (
