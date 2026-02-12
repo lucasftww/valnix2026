@@ -68,6 +68,33 @@ export type Database = {
         }
         Relationships: []
       }
+      api_rate_limit: {
+        Row: {
+          created_at: string
+          endpoint: string
+          id: string
+          ip_address: string
+          request_count: number
+          window_start: string
+        }
+        Insert: {
+          created_at?: string
+          endpoint: string
+          id?: string
+          ip_address: string
+          request_count?: number
+          window_start?: string
+        }
+        Update: {
+          created_at?: string
+          endpoint?: string
+          id?: string
+          ip_address?: string
+          request_count?: number
+          window_start?: string
+        }
+        Relationships: []
+      }
       capi_event_log: {
         Row: {
           created_at: string
@@ -143,6 +170,33 @@ export type Database = {
           order_data?: Json
           order_id?: string
           user_id?: string | null
+        }
+        Relationships: []
+      }
+      password_reset_tokens: {
+        Row: {
+          created_at: string
+          expires_at: string
+          id: string
+          token: string
+          used: boolean
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          expires_at: string
+          id?: string
+          token: string
+          used?: boolean
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          expires_at?: string
+          id?: string
+          token?: string
+          used?: boolean
+          user_id?: string
         }
         Relationships: []
       }
@@ -424,6 +478,7 @@ export type Database = {
           out_status: string
         }[]
       }
+      cleanup_expired_reset_data: { Args: never; Returns: undefined }
     }
     Enums: {
       [_ in never]: never
