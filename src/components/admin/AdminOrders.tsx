@@ -76,7 +76,9 @@ export const AdminOrders = () => {
   const [refreshing, setRefreshing] = useState(false);
   const [cleaning, setCleaning] = useState(false);
   const [cleaningProcessing, setCleaningProcessing] = useState(false);
+  const [cleaningPending, setCleaningPending] = useState(false);
   const [verifyingPayment, setVerifyingPayment] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -97,7 +99,7 @@ export const AdminOrders = () => {
 
   useEffect(() => {
     applyFilter();
-  }, [orders, filterType]);
+  }, [orders, filterType, searchTerm]);
 
   const fetchOrders = async () => {
     try {
@@ -224,6 +226,39 @@ export const AdminOrders = () => {
     }
   };
 
+  const handleCleanPending = async () => {
+    setCleaningPending(true);
+    try {
+      const pendingOrders = orders.filter(o => o.status === 'pending' && o.payment_status === 'pending');
+      let deleted = 0;
+
+      for (const order of pendingOrders) {
+        const itemsRef = collection(db, "order_items");
+        const itemsSnapshot = await getDocs(itemsRef);
+        const items = itemsSnapshot.docs.filter(d => d.data().order_id === order.id);
+        for (const item of items) {
+          await deleteDoc(doc(db, "order_items", item.id));
+        }
+        await deleteDoc(doc(db, "orders", order.id));
+        deleted++;
+      }
+
+      toast({
+        title: "Limpeza concluída!",
+        description: `${deleted} pedido(s) pendente(s) removido(s).`,
+      });
+      fetchOrders();
+    } catch (error: any) {
+      toast({
+        title: "Erro ao limpar pedidos",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setCleaningPending(false);
+    }
+  };
+
   const handleVerifyPayment = async (order: Order) => {
     if (!order.flowpay_charge_id) {
       toast({
@@ -278,16 +313,28 @@ export const AdminOrders = () => {
   };
 
   const applyFilter = async () => {
+    let result = orders;
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(o => 
+        o.customer_name.toLowerCase().includes(term) ||
+        o.customer_email.toLowerCase().includes(term) ||
+        o.customer_phone?.includes(term) ||
+        o.id.toLowerCase().includes(term)
+      );
+    }
+
     if (filterType === "all") {
-      setFilteredOrders(orders);
+      setFilteredOrders(result);
       return;
     }
 
     if (filterType === "pending_delivery") {
-      // Fetch order items from Firestore to check for pending delivery
       const pendingOrders = [];
       
-      for (const order of orders) {
+      for (const order of result) {
         if (order.payment_status === 'paid' && order.status !== 'completed' && order.status !== 'cancelled') {
           try {
             const itemsRef = collection(db, "order_items");
@@ -500,9 +547,48 @@ export const AdminOrders = () => {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
+
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button 
+                variant="outline" 
+                size="sm"
+                className="border-yellow-500/50 text-yellow-500 hover:bg-yellow-500/10"
+                disabled={cleaningPending || orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length === 0}
+              >
+                <Trash2 className="w-4 h-4 mr-2" />
+                Limpar pendentes ({orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length})
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Limpar pedidos pendentes?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso vai excluir permanentemente {orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length} pedido(s) 
+                  com status e pagamento "Pendente". Essa ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCleanPending} disabled={cleaningPending}>
+                  {cleaningPending ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                  Confirmar exclusão
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
         <div className="flex items-center gap-2">
-          <Label className="text-sm whitespace-nowrap">Filtrar por:</Label>
+          <div className="relative flex-1 min-w-[200px]">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, email..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9"
+            />
+          </div>
+          <Label className="text-sm whitespace-nowrap">Filtrar:</Label>
           <Select value={filterType} onValueChange={setFilterType}>
             <SelectTrigger className="w-[200px]">
               <SelectValue />
@@ -538,10 +624,10 @@ export const AdminOrders = () => {
               <CardHeader className="pb-3">
                 <div className="flex justify-between items-start gap-4">
                   <div className="flex-1 min-w-0">
-                    <CardTitle className="text-base font-semibold">{order.customer_name}</CardTitle>
-                    <p className="text-sm text-muted-foreground truncate mt-0.5">{order.customer_email}</p>
+                    <CardTitle className="text-base font-semibold select-text">{order.customer_name}</CardTitle>
+                    <p className="text-sm text-muted-foreground mt-0.5 select-all cursor-text">{order.customer_email}</p>
                     {order.customer_phone && (
-                      <p className="text-sm text-muted-foreground mt-0.5">{order.customer_phone}</p>
+                      <p className="text-sm text-muted-foreground mt-0.5 select-all cursor-text">{order.customer_phone}</p>
                     )}
                   </div>
                   {getStatusBadge(order.status)}
