@@ -829,7 +829,8 @@ Deno.serve(async (req) => {
         });
       }
 
-      // ── FALLBACK: If COMPLETED, ensure analytics was registered ──
+      // ── FALLBACK: If COMPLETED, ensure Purchase events were sent ──
+      // This covers cases where the FlowPay webhook didn't fire
       if (data.charge?.status === 'COMPLETED') {
         try {
           const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
@@ -838,11 +839,75 @@ Deno.serve(async (req) => {
             const orderDoc = queryResults[0].document;
             const fbOrderId = orderDoc.name.split('/').pop()!;
             const orderFields = orderDoc.fields;
+            const currentPaymentStatus = orderFields?.payment_status?.stringValue;
             const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0;
             const fbUserId = orderFields?.user_id?.stringValue;
             const fbEmail = orderFields?.customer_email?.stringValue;
+            const fbName = orderFields?.customer_name?.stringValue || '';
+            const fbPhone = orderFields?.customer_phone?.stringValue || '';
 
-            await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
+            // Only fire Purchase events if order wasn't already marked as paid (avoid duplicates)
+            if (currentPaymentStatus !== 'paid') {
+              console.log(`🔄 FALLBACK: Webhook missed for order ${fbOrderId}, processing via polling`);
+
+              // Update order status
+              await updateFirestoreDoc('orders', fbOrderId, {
+                payment_status: 'paid',
+                status: 'processing',
+                updated_at: new Date().toISOString(),
+              });
+
+              // Auto-delivery
+              try { await processAutoDelivery(fbOrderId); } catch (e) { console.warn('⚠️ Fallback auto-delivery error:', e); }
+
+              // Analytics
+              await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
+
+              // Meta CAPI Purchase
+              try {
+                const supabaseUrlFb = Deno.env.get("SUPABASE_URL")!;
+                const serviceRoleKeyFb = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+                const supaFb = createClient(supabaseUrlFb, serviceRoleKeyFb);
+                const nameParts = fbName.split(' ');
+                await supaFb.functions.invoke('meta-capi', {
+                  body: {
+                    event_name: 'Purchase',
+                    event_id: `purchase_${fbOrderId}_${Date.now()}`,
+                    order_id: fbOrderId,
+                    value: Number(orderValue),
+                    currency: 'BRL',
+                    content_name: `Pedido #${fbOrderId.substring(0, 8)}`,
+                    email: fbEmail,
+                    phone: fbPhone || undefined,
+                    first_name: nameParts[0] || undefined,
+                    last_name: nameParts.slice(1).join(' ') || undefined,
+                    external_id: fbUserId,
+                  },
+                });
+                console.log(`📡 FALLBACK: Meta CAPI Purchase sent for order ${fbOrderId}`);
+              } catch (capiErr) { console.warn('⚠️ Fallback Meta CAPI error:', capiErr); }
+
+              // UTMify Purchase
+              try {
+                const supabaseUrlUt = Deno.env.get("SUPABASE_URL")!;
+                const serviceRoleKeyUt = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+                const supaUt = createClient(supabaseUrlUt, serviceRoleKeyUt);
+                await supaUt.functions.invoke('utmify-event', {
+                  body: {
+                    order_id: fbOrderId,
+                    event_type: 'Purchase',
+                    value: Number(orderValue),
+                    customer_name: fbName,
+                    customer_email: fbEmail,
+                    customer_phone: fbPhone || undefined,
+                    product_name: `Pedido #${fbOrderId.substring(0, 8)}`,
+                  },
+                });
+                console.log(`📡 FALLBACK: UTMify Purchase sent for order ${fbOrderId}`);
+              } catch (utmErr) { console.warn('⚠️ Fallback UTMify error:', utmErr); }
+            } else {
+              console.log(`ℹ️ Order ${fbOrderId} already paid, skipping fallback`);
+            }
           } else {
             // Check if it's an upsell addon
             const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
@@ -865,10 +930,46 @@ Deno.serve(async (req) => {
 
               const upsellOrderId = `upsell-${addon.order_id}-${addon.addon_type}`;
               await registerAnalyticsEvent(upsellOrderId, Number(addon.amount), addon.user_id || undefined, addon.customer_email || undefined);
+
+              // Meta CAPI for upsell
+              try {
+                const nameParts2 = (addon.customer_name || '').split(' ');
+                await supa.functions.invoke('meta-capi', {
+                  body: {
+                    event_name: 'Purchase',
+                    event_id: `purchase_${upsellOrderId}_${Date.now()}`,
+                    order_id: upsellOrderId,
+                    value: Number(addon.amount),
+                    currency: 'BRL',
+                    content_name: `Upsell ${addon.addon_type}`,
+                    email: addon.customer_email,
+                    first_name: nameParts2[0] || undefined,
+                    last_name: nameParts2.slice(1).join(' ') || undefined,
+                    external_id: addon.user_id,
+                  },
+                });
+              } catch (e) { console.warn('⚠️ Fallback upsell CAPI error:', e); }
+
+              // UTMify for upsell
+              try {
+                await supa.functions.invoke('utmify-event', {
+                  body: {
+                    order_id: `${addon.order_id}_${addon.addon_type}`,
+                    event_type: 'Purchase',
+                    value: Number(addon.amount),
+                    customer_name: addon.customer_name,
+                    customer_email: addon.customer_email,
+                    product_name: `Upsell ${addon.addon_type}`,
+                    utm_source: addon.utm_source || undefined,
+                    utm_medium: addon.utm_medium || undefined,
+                    utm_campaign: addon.utm_campaign || undefined,
+                  },
+                });
+              } catch (e) { console.warn('⚠️ Fallback upsell UTMify error:', e); }
             }
           }
         } catch (fallbackError) {
-          console.warn('⚠️ Analytics fallback error (non-blocking):', fallbackError);
+          console.warn('⚠️ Purchase fallback error (non-blocking):', fallbackError);
         }
       }
 
