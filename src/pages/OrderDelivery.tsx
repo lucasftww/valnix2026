@@ -1,6 +1,8 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -332,6 +334,7 @@ export default function OrderDelivery() {
   const [notFound, setNotFound] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
   const [bookmarked, setBookmarked] = useState(false);
+  const [liveItems, setLiveItems] = useState<OrderItemData[] | null>(null);
 
   const upsellParam = searchParams.get("upsell");
   const orderIdParam = searchParams.get("order_id");
@@ -368,6 +371,36 @@ export default function OrderDelivery() {
 
     fetchOrder();
   }, [hash]);
+
+  // Listen to Firebase order_items in realtime for delivery code updates
+  useEffect(() => {
+    if (!order) return;
+    const firebaseOrderId = orderIdParam || order.order_id;
+    if (!firebaseOrderId) return;
+
+    const itemsRef = collection(db, 'order_items');
+    const q = query(itemsRef, where('order_id', '==', firebaseOrderId));
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      if (snapshot.empty) return;
+      const firebaseItems: OrderItemData[] = snapshot.docs.map(d => {
+        const data = d.data();
+        return {
+          product_name: data.product_name || '',
+          product_image: data.product_image || null,
+          quantity: data.quantity || 1,
+          unit_price: data.unit_price || 0,
+          total_price: data.total_price || 0,
+          delivery_code: data.delivery_code || null,
+        };
+      });
+      setLiveItems(firebaseItems);
+    }, (err) => {
+      console.warn('⚠️ Firebase order_items listener error:', err);
+    });
+
+    return () => unsubscribe();
+  }, [order, orderIdParam]);
 
   const copyCode = (code: string, index: number) => {
     navigator.clipboard.writeText(code.trim());
@@ -422,7 +455,8 @@ export default function OrderDelivery() {
   if (!order) return null;
 
   const orderData = order.order_data;
-  const items = orderData.items || [];
+  // Use live Firebase data if available, fallback to static snapshot
+  const items = liveItems || orderData.items || [];
   const hasAnyCodes = items.some(i => i.delivery_code);
   const effectiveOrderId = orderIdParam || order.order_id;
 
