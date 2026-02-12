@@ -41,6 +41,20 @@ export default function Auth() {
     
     if (!error) {
       navigate(redirectTo, { replace: true });
+    } else {
+      const code = (error as any)?.code || '';
+      const msg = code === 'auth/wrong-password' || code === 'auth/invalid-credential'
+        ? 'Email ou senha incorretos.'
+        : code === 'auth/user-not-found'
+          ? 'Nenhuma conta encontrada com este email.'
+          : code === 'auth/too-many-requests'
+            ? 'Muitas tentativas. Tente novamente em alguns minutos.'
+            : 'Erro ao entrar. Verifique suas credenciais.';
+      toast({
+        title: "Erro ao entrar",
+        description: msg,
+        variant: "destructive",
+      });
     }
     
     setLoading(false);
