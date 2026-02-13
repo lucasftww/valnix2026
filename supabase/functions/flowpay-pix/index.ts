@@ -505,6 +505,21 @@ Deno.serve(async (req) => {
           console.warn('⚠️ Analytics upsell registration failed:', analyticsError);
         }
 
+        // Fetch parent order data for fbc/fbp/phone enrichment
+        let parentFbc: string | undefined;
+        let parentFbp: string | undefined;
+        let parentPhone: string | undefined;
+        try {
+          const parentOrder = await getFirestoreDoc('orders', addon.order_id);
+          if (parentOrder) {
+            parentFbc = parentOrder.fbc?.stringValue || undefined;
+            parentFbp = parentOrder.fbp?.stringValue || undefined;
+            parentPhone = parentOrder.customer_phone?.stringValue || undefined;
+          }
+        } catch (e) {
+          console.warn('⚠️ Failed to fetch parent order for upsell enrichment:', e);
+        }
+
         // Send upsell Purchase to Meta CAPI
         try {
           const supabaseUrlCapi = Deno.env.get("SUPABASE_URL")!;
@@ -522,9 +537,12 @@ Deno.serve(async (req) => {
               currency: 'BRL',
               content_name: `Upsell ${addon.addon_type}`,
               email: addon.customer_email || undefined,
+              phone: parentPhone || undefined,
               first_name: addonNameParts[0] || undefined,
               last_name: addonNameParts.slice(1).join(' ') || undefined,
               external_id: addon.user_id || undefined,
+              fbc: parentFbc,
+              fbp: parentFbp,
             },
           });
           console.log(`📡 Meta CAPI upsell Purchase sent for addon ${addon.id}`);
