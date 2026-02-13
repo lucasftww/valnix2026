@@ -199,8 +199,9 @@
       t.src=v;s=b.getElementsByTagName(e)[0];
       s.parentNode.insertBefore(t,s)}(window, document,'script',
       'https://connect.facebook.net/en_US/fbevents.js');
+      fbq('set', 'autoConfig', false, '1939179866693535');
       fbq('init', '1939179866693535');
-      // No PageView here — pixel is only for _fbc/_fbp cookie generation
+      // No PageView, no automatic events — pixel exists only for _fbc/_fbp cookie generation
       // All conversion events are sent server-side via CAPI
     </script>
     
