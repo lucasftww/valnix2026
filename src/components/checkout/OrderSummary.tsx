@@ -21,7 +21,7 @@ interface OrderSummaryProps {
   loading: boolean;
   isFormValid: boolean;
   onSubmit: () => void;
-  paymentMethod?: "pix" | "balance";
+  paymentMethod?: "pix" | "balance" | "card";
 }
 
 export const OrderSummary = memo(function OrderSummary({
@@ -180,6 +180,8 @@ export const OrderSummary = memo(function OrderSummary({
             <Loader2 className="w-5 h-5 animate-spin" />
           ) : paymentMethod === "balance" ? (
             "Pagar com Saldo →"
+          ) : paymentMethod === "card" ? (
+            "Pagar com Cartão →"
           ) : (
             "Pagar com PIX →"
           )}

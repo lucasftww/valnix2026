@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
 import { createOrder, createOrderItems, updateOrderStatus } from "@/hooks/firebase";
-import { Loader2, Zap, Lock, Check, AlertCircle, Wallet } from "lucide-react";
+import { Loader2, Zap, Lock, Check, AlertCircle, Wallet, CreditCard } from "lucide-react";
 import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
@@ -79,7 +79,7 @@ export default function Checkout() {
   const [loading, setLoading] = useState(false);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance">("pix");
+  const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance" | "card">("pix");
   const [formData, setFormData] = useState<FormData>(() => {
     try {
       const saved = sessionStorage.getItem('valnix_checkout_form');
@@ -427,6 +427,81 @@ export default function Checkout() {
         return;
       }
 
+      // CARD payment flow — create order, then redirect to FlowPay checkout
+      if (paymentMethod === "card") {
+        const cpfDigits = formData.document.replace(/\D/g, '');
+
+        const orderId = await createOrder({
+          user_id: effectiveUserId,
+          customer_name: formData.name,
+          customer_email: formData.email || user?.email || "",
+          customer_phone: formData.phone || "",
+          total_amount: orderAmount,
+          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Cartão` : "Cartão",
+          status: "pending",
+          payment_status: "pending",
+          payment_method: "card",
+          fbc: getCookie('_fbc'),
+          fbp: getCookie('_fbp'),
+          utm_source: utmParams.utm_source || null,
+          utm_medium: utmParams.utm_medium || null,
+          utm_campaign: utmParams.utm_campaign || null,
+          utm_content: utmParams.utm_content || null,
+          utm_term: utmParams.utm_term || null,
+        });
+
+        // Create order items
+        const orderItemsData = items.map(item => ({
+          order_id: orderId,
+          product_id: item.id,
+          product_name: item.name,
+          product_image: item.image,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+        }));
+        createOrderItems(orderItemsData).catch(err => console.warn('⚠️ Order items failed:', err));
+
+        // Create card charge via edge function
+        const cardResponse = await fetch(
+          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-card?action=create`,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              amount: Math.round(orderAmount * 100),
+              orderId,
+              description: `Pedido ${orderId.substring(0, 8)}`,
+              customer: {
+                name: formData.name,
+                email: formData.email || user?.email || undefined,
+                phone: formData.phone || undefined,
+                taxId: cpfDigits,
+              },
+            }),
+          }
+        );
+
+        const cardData = await cardResponse.json();
+
+        if (!cardResponse.ok || !cardData.success) {
+          throw new Error(cardData.error || 'Erro ao criar cobrança de cartão');
+        }
+
+        // Store card payment info for callback
+        sessionStorage.setItem('valnix_card_payment', JSON.stringify({
+          orderId,
+          paymentId: cardData.paymentId,
+        }));
+
+        clearCart();
+
+        // Open FlowPay checkout in new tab and navigate to callback page
+        window.open(cardData.paymentUrl, '_blank');
+        navigate(`/card-callback?order_id=${orderId}&payment_id=${cardData.paymentId}`);
+        return;
+      }
+
       // PIX payment flow — parallelize order creation + token fetch
       const cpfDigits = formData.document.replace(/\D/g, '');
       const tokenPromise = user ? user.getIdToken() : Promise.resolve(null);
@@ -596,7 +671,7 @@ export default function Checkout() {
               
               <RadioGroup 
                 value={paymentMethod} 
-                onValueChange={(value) => setPaymentMethod(value as "pix" | "balance")}
+                onValueChange={(value) => setPaymentMethod(value as "pix" | "balance" | "card")}
                 className="space-y-3"
               >
                 {/* PIX Option */}
@@ -614,6 +689,27 @@ export default function Checkout() {
                     <div>
                       <p className="text-[14px] font-medium text-white">PIX</p>
                       <p className="text-[12px] text-[#888]">Pagamento instantâneo</p>
+                    </div>
+                  </Label>
+                </div>
+
+                {/* Card Option */}
+                <div 
+                  className={`relative flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    paymentMethod === "card" 
+                      ? "border-primary bg-primary/5" 
+                      : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
+                  }`}
+                  onClick={() => setPaymentMethod("card")}
+                >
+                  <RadioGroupItem value="card" id="card" className="shrink-0" />
+                  <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
+                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
+                      <CreditCard className="w-4 h-4 text-blue-500" />
+                    </div>
+                    <div>
+                      <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
+                      <p className="text-[12px] text-[#888]">Checkout seguro</p>
                     </div>
                   </Label>
                 </div>
@@ -664,6 +760,13 @@ export default function Checkout() {
                     <p className="text-[13px] text-[#888] leading-relaxed">
                       Ao confirmar o pedido, você receberá um QR Code para realizar o pagamento. 
                       Utilize o aplicativo do seu banco para escanear o QR Code ou copie o código.
+                    </p>
+                  </>
+                ) : paymentMethod === "card" ? (
+                  <>
+                    <h3 className="text-[14px] font-semibold text-white mb-2">Pagamento com Cartão</h3>
+                    <p className="text-[13px] text-[#888] leading-relaxed">
+                      Você será redirecionado para uma página de checkout segura para inserir os dados do cartão de crédito.
                     </p>
                   </>
                 ) : (
@@ -793,10 +896,12 @@ export default function Checkout() {
                   {loading ? (
                     <span className="flex items-center gap-2">
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      Gerando PIX...
+                      {paymentMethod === "card" ? "Gerando link..." : "Gerando PIX..."}
                     </span>
                   ) : paymentMethod === "balance" ? (
                     "Pagar com Saldo →"
+                  ) : paymentMethod === "card" ? (
+                    "Pagar com Cartão →"
                   ) : (
                     "Pagar com PIX →"
                   )}
