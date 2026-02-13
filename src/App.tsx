@@ -37,6 +37,7 @@ const PainelPagar = lazy(() => import("./pages/PainelPagar"));
 const PainelPagarEntrega = lazy(() => import("./pages/PainelPagarEntrega"));
 const PainelPagarTrocaDados = lazy(() => import("./pages/PainelPagarTrocaDados"));
 const OrderDelivery = lazy(() => import("./pages/OrderDelivery"));
+const CardPaymentCallback = lazy(() => import("./pages/CardPaymentCallback"));
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -86,6 +87,7 @@ const App = () => {
                       <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
                       <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
 
+                      <Route path="/card-callback" element={<CardPaymentCallback />} />
                       <Route path="/order/:hash" element={<OrderDelivery />} />
                       <Route path="/product/:id" element={<ProductDetail />} />
                       {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
