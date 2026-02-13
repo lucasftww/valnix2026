@@ -314,7 +314,7 @@ export const AdminDashboard = () => {
         />
         <StatCard
           title="Ticket Médio"
-          value={`R$ ${stats?.avgTicket?.toLocaleString('pt-BR', { minimumFractionDigits: 2 }) || '0,00'}`}
+          value={`R$ ${stats?.avgTicket?.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }) || '0,00'}`}
           subtitle="Por pedido pago"
           icon={<TrendingUp className="h-5 w-5 text-white" />}
           gradient="from-purple-500 to-purple-700"
