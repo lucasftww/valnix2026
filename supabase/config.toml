@@ -14,3 +14,6 @@ verify_jwt = false
 
 [functions.meta-capi]
 verify_jwt = false
+
+[functions.flowpay-card]
+verify_jwt = false
