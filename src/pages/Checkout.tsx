@@ -101,6 +101,15 @@ export default function Checkout() {
     return id;
   }, [user]);
 
+  // Read UTM params from sessionStorage (set by index.html script)
+  const utmParams = useMemo(() => {
+    try {
+      const raw = sessionStorage.getItem('valnix_utm_params');
+      if (raw) return JSON.parse(raw) as Record<string, string>;
+    } catch {}
+    return {} as Record<string, string>;
+  }, []);
+
   const effectiveUserId = user?.uid || guestId || 'guest';
 
   // Redirect if cart is empty (and not on payment screen)
@@ -267,6 +276,11 @@ export default function Checkout() {
           payment_method: "balance",
           fbc: getCookie('_fbc'),
           fbp: getCookie('_fbp'),
+          utm_source: utmParams.utm_source || null,
+          utm_medium: utmParams.utm_medium || null,
+          utm_campaign: utmParams.utm_campaign || null,
+          utm_content: utmParams.utm_content || null,
+          utm_term: utmParams.utm_term || null,
         });
 
         const productIds = items.map(i => i.id);
@@ -362,6 +376,11 @@ export default function Checkout() {
               customer_email: formData.email || user?.email,
               customer_phone: formData.phone || undefined,
               product_name: items.map(i => i.name).join(', '),
+              utm_source: utmParams.utm_source || undefined,
+              utm_medium: utmParams.utm_medium || undefined,
+              utm_campaign: utmParams.utm_campaign || undefined,
+              utm_content: utmParams.utm_content || undefined,
+              utm_term: utmParams.utm_term || undefined,
             },
           }).then(({ error }) => {
             if (error) console.warn('⚠️ UTMify balance Purchase failed:', error);
@@ -424,6 +443,11 @@ export default function Checkout() {
           payment_status: "pending",
           fbc: getCookie('_fbc'),
           fbp: getCookie('_fbp'),
+          utm_source: utmParams.utm_source || null,
+          utm_medium: utmParams.utm_medium || null,
+          utm_campaign: utmParams.utm_campaign || null,
+          utm_content: utmParams.utm_content || null,
+          utm_term: utmParams.utm_term || null,
         }),
         tokenPromise,
       ]);

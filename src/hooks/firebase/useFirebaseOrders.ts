@@ -77,6 +77,11 @@ export interface CreateOrderData {
   payment_method?: string | null;
   fbc?: string | null;
   fbp?: string | null;
+  utm_source?: string | null;
+  utm_medium?: string | null;
+  utm_campaign?: string | null;
+  utm_content?: string | null;
+  utm_term?: string | null;
 }
 
 export interface CreateOrderItemData {
@@ -255,6 +260,11 @@ export async function createOrder(orderData: CreateOrderData): Promise<string> {
     payment_method: orderData.payment_method || null,
     fbc: orderData.fbc || null,
     fbp: orderData.fbp || null,
+    utm_source: orderData.utm_source || null,
+    utm_medium: orderData.utm_medium || null,
+    utm_campaign: orderData.utm_campaign || null,
+    utm_content: orderData.utm_content || null,
+    utm_term: orderData.utm_term || null,
     shipping_address: null,
     shipping_method: null,
     tracking_code: null,
