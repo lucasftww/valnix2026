@@ -666,6 +666,13 @@ Deno.serve(async (req) => {
         const customerName2 = orderFields?.customer_name?.stringValue || '';
         const customerPhone2 = orderFields?.customer_phone?.stringValue || '';
 
+        // Read UTM params from order document
+        const utmSource = orderFields?.utm_source?.stringValue || undefined;
+        const utmMedium = orderFields?.utm_medium?.stringValue || undefined;
+        const utmCampaign = orderFields?.utm_campaign?.stringValue || undefined;
+        const utmContent = orderFields?.utm_content?.stringValue || undefined;
+        const utmTerm = orderFields?.utm_term?.stringValue || undefined;
+
         await supa2.functions.invoke('utmify-event', {
           body: {
             order_id: orderId,
@@ -675,6 +682,11 @@ Deno.serve(async (req) => {
             customer_email: customerEmail,
             customer_phone: customerPhone2 || undefined,
             product_name: `Pedido #${orderId!.substring(0, 8)}`,
+            utm_source: utmSource,
+            utm_medium: utmMedium,
+            utm_campaign: utmCampaign,
+            utm_content: utmContent,
+            utm_term: utmTerm,
           },
         });
         console.log(`📡 UTMify Purchase sent for order ${orderId}`);
@@ -945,6 +957,12 @@ Deno.serve(async (req) => {
                 const supabaseUrlUt = Deno.env.get("SUPABASE_URL")!;
                 const serviceRoleKeyUt = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
                 const supaUt = createClient(supabaseUrlUt, serviceRoleKeyUt);
+                // Read UTMs from order
+                const fbUtmSource = orderFields?.utm_source?.stringValue || undefined;
+                const fbUtmMedium = orderFields?.utm_medium?.stringValue || undefined;
+                const fbUtmCampaign = orderFields?.utm_campaign?.stringValue || undefined;
+                const fbUtmContent = orderFields?.utm_content?.stringValue || undefined;
+                const fbUtmTerm = orderFields?.utm_term?.stringValue || undefined;
                 await supaUt.functions.invoke('utmify-event', {
                   body: {
                     order_id: fbOrderId,
@@ -954,6 +972,11 @@ Deno.serve(async (req) => {
                     customer_email: fbEmail,
                     customer_phone: fbPhone || undefined,
                     product_name: `Pedido #${fbOrderId.substring(0, 8)}`,
+                    utm_source: fbUtmSource,
+                    utm_medium: fbUtmMedium,
+                    utm_campaign: fbUtmCampaign,
+                    utm_content: fbUtmContent,
+                    utm_term: fbUtmTerm,
                   },
                 });
                 console.log(`📡 FALLBACK: UTMify Purchase sent for order ${fbOrderId}`);
