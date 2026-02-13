@@ -226,6 +226,7 @@ export default function Checkout() {
     sendInitiateCheckout({
       userId: effectiveUserId,
       email: formData.email || user?.email || undefined,
+      phone: formData.phone || undefined,
       name: formData.name,
       value: finalPrice,
       productNames: items.map(i => i.name),

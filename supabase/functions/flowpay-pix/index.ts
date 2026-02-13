@@ -505,6 +505,33 @@ Deno.serve(async (req) => {
           console.warn('⚠️ Analytics upsell registration failed:', analyticsError);
         }
 
+        // Send upsell Purchase to Meta CAPI
+        try {
+          const supabaseUrlCapi = Deno.env.get("SUPABASE_URL")!;
+          const serviceRoleKeyCapi = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+          const supaCapi = createClient(supabaseUrlCapi, serviceRoleKeyCapi);
+
+          const addonNameParts = (addon.customer_name || '').split(' ');
+
+          await supaCapi.functions.invoke('meta-capi', {
+            body: {
+              event_name: 'Purchase',
+              event_id: `purchase_upsell_${addon.order_id}_${addon.addon_type}_${Date.now()}`,
+              order_id: `${addon.order_id}_${addon.addon_type}`,
+              value: Number(addon.amount),
+              currency: 'BRL',
+              content_name: `Upsell ${addon.addon_type}`,
+              email: addon.customer_email || undefined,
+              first_name: addonNameParts[0] || undefined,
+              last_name: addonNameParts.slice(1).join(' ') || undefined,
+              external_id: addon.user_id || undefined,
+            },
+          });
+          console.log(`📡 Meta CAPI upsell Purchase sent for addon ${addon.id}`);
+        } catch (capiErr) {
+          console.warn('⚠️ Meta CAPI upsell failed:', capiErr);
+        }
+
         // Send upsell Purchase to UTMify
         try {
           const supabaseUrl3 = Deno.env.get("SUPABASE_URL")!;

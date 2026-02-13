@@ -63,6 +63,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
 export function sendInitiateCheckout(params: {
   userId?: string;
   email?: string;
+  phone?: string;
   name?: string;
   value?: number;
   productNames?: string[];
@@ -74,6 +75,7 @@ export function sendInitiateCheckout(params: {
     content_name: params.productNames?.join(', '),
     content_ids: params.productNames,
     email: params.email,
+    phone: params.phone,
     first_name: nameParts[0],
     last_name: nameParts.slice(1).join(' ') || undefined,
     external_id: params.userId,
