@@ -709,7 +709,7 @@ export default function Checkout() {
                     </div>
                     <div>
                       <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
-                      <p className="text-[12px] text-[#888]">Checkout seguro</p>
+                      <p className="text-[12px] text-[#888]">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
