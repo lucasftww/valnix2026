@@ -65,6 +65,9 @@ async function buildUserData(params: {
     userData.fbp = params.fbp;
   }
 
+  // Always send country = Brazil (hashed) for match quality
+  userData.country = await sha256('br');
+
   return userData;
 }
 
