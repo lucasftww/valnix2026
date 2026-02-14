@@ -73,9 +73,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
       try {
+        const idToken = user ? await user.getIdToken() : null;
+        const headers: Record<string, string> = {};
+        if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
         const response = await fetch(
           `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${pixData.chargeId}`,
-          { headers: { Authorization: `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` } }
+          { headers },
         );
         const data = await response.json();
         if (data.success && data.status === "COMPLETED") {

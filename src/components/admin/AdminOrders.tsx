@@ -350,9 +350,12 @@ export const AdminOrders = () => {
     }
     setVerifyingPayment(order.id);
     try {
+      const idToken = user ? await user.getIdToken() : null;
+      const headers: Record<string, string> = {};
+      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${order.flowpay_charge_id}`,
-        { headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` } }
+        { headers },
       );
       const data = await response.json();
       if (data.success && data.status === 'COMPLETED') {
