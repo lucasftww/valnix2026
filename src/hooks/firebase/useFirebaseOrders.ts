@@ -110,7 +110,7 @@ export function useUserOrders(userId: string | undefined) {
       return;
     }
 
-    console.log("Fetching orders for user:", userId);
+    
 
     const ordersRef = collection(db, 'orders');
     // Query without orderBy to avoid index requirement, sort client-side
@@ -118,7 +118,7 @@ export function useUserOrders(userId: string | undefined) {
 
     const unsubscribe = onSnapshot(q, 
       (snapshot) => {
-        console.log("Orders snapshot received:", snapshot.size, "documents");
+        
         const ordersData = snapshot.docs.map(doc => {
           const data = doc.data();
           // Handle Timestamp or string for created_at
