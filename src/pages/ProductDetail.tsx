@@ -325,15 +325,15 @@ const ProductDetail = () => {
 
             {/* Desktop: Imagem + Tabs */}
             <div className="hidden lg:block space-y-6">
-              <div className="relative rounded-xl overflow-hidden bg-black/80 border border-border/10">
-                <div className="relative flex items-center justify-center p-12">
+              <div className="relative rounded-xl overflow-hidden bg-card border border-border/10">
+                <div className="relative flex items-center justify-center p-6">
                   {product.image_url && (
                     <img
                       src={product.image_url}
                       alt={product.name}
                       loading="eager"
                       decoding="async"
-                      className="max-w-full max-h-[420px] w-auto h-auto object-contain"
+                      className="max-w-full max-h-[520px] w-auto h-auto object-contain"
                     />
                   )}
                 </div>
