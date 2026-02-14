@@ -1,7 +1,7 @@
 import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import paymentMethods from "@/assets/payment-methods.png";
+import paymentMethods from "@/assets/payment-methods-dark.png";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
@@ -259,9 +259,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             </div>
 
             {/* Payment Methods */}
-            <div className="flex flex-col items-center gap-2.5 w-full bg-black rounded-xl py-4 px-4">
+            <div className="flex flex-col items-center gap-2 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-10 w-auto object-contain" />
+              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-12 w-auto object-contain rounded-lg" />
             </div>
           </div>
 
@@ -363,9 +363,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             </div>
 
             {/* Payment Methods */}
-            <div className="flex flex-col items-center gap-3 flex-shrink-0 bg-black px-8 py-7 rounded-lg">
+            <div className="flex flex-col items-center gap-3 flex-shrink-0 px-6 py-5 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-12 w-auto object-contain" />
+              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-14 w-auto object-contain rounded-lg" />
             </div>
           </div>
 
