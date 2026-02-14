@@ -128,7 +128,10 @@ export const AdminDashboard = () => {
         totalProducts,
         totalUsers,
         topProducts,
-        recentOrders: orders.slice(0, 8),
+        recentOrders: [...orders]
+          .filter(o => o.payment_status === 'paid')
+          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .slice(0, 8),
         todayOrders: todayOrders.length,
         todayRevenue,
         avgTicket: paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0,
