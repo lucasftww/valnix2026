@@ -1,4 +1,4 @@
-import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw, CreditCard } from "lucide-react";
+import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
