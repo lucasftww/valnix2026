@@ -250,6 +250,18 @@ export const AdminUsers = () => {
             </CardContent>
           </Card>
 
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">VIP</span>
+                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-yellow-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-yellow-500">{stats.vipUsers}</p>
+              <p className="text-xs text-muted-foreground mt-1">Gastaram R$ 500+</p>
+            </CardContent>
+          </Card>
         </div>
 
         {/* Toolbar */}

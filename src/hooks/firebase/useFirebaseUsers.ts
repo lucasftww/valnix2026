@@ -122,14 +122,14 @@ export const useAdminUsers = () => {
             id: userId,
             email: userData.email || "",
             created_at: toISOString(userData.created_at),
-            phone: undefined,
-            full_name: undefined,
-            nickname: undefined,
-            avatar_url: undefined,
+            phone: userData.phone || undefined,
+            full_name: userData.full_name || userData.displayName || undefined,
+            nickname: userData.nickname || undefined,
+            avatar_url: userData.avatar_url || userData.photoURL || undefined,
             last_order_date: orderStats.last_order_date,
             total_orders: orderStats.total_orders,
             total_spent: orderStats.total_spent,
-            balance: 0,
+            balance: userData.balance || 0,
           });
         }
       });
