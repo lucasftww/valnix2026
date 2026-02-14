@@ -614,7 +614,17 @@ Deno.serve(async (req) => {
       } catch (deliveryError) {
         console.error(`⚠️ Auto-delivery failed for order ${orderId}:`, deliveryError);
       }
+      
 
+      // Increment coupon usage if order has coupon_id
+      const couponId = orderFields?.coupon_id?.stringValue;
+      if (couponId) {
+        try {
+          await incrementCouponUsage(couponId);
+        } catch (couponError) {
+          console.warn('⚠️ Coupon increment failed:', couponError);
+        }
+      }
 
       // Register Purchase in analytics_events (Supabase)
       try {
@@ -1071,3 +1081,39 @@ Deno.serve(async (req) => {
     });
   }
 });
+
+// Helper function to increment coupon usage (added for reliability)
+async function incrementCouponUsage(couponId: string) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+
+  const body = {
+    writes: [
+      {
+        transform: {
+          document: `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/coupons/${couponId}`,
+          fieldTransforms: [
+            {
+              fieldPath: 'current_uses',
+              increment: { integerValue: "1" }
+            }
+          ]
+        }
+      }
+    ]
+  };
+
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`❌ Coupon increment error: ${errorText}`);
+    // Don't throw, just log warning
+  } else {
+    console.log(`✅ Coupon ${couponId} incremented successfully`);
+  }
+}

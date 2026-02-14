@@ -540,7 +540,7 @@ export default function Checkout() {
         sessionStorage.setItem('valnix_card_payment', JSON.stringify({
           orderId,
           paymentId: cardData.paymentId,
-          couponId: appliedCoupon?.id || null,
+          couponId: appliedCoupon?.id || null, // Will be used to ensure coupon is saved to order on callback if not already
           couponCode: appliedCoupon?.code || null,
           discountAmount: discount || 0,
           customerName: formData.name,
@@ -550,16 +550,19 @@ export default function Checkout() {
           productNames: items.map(i => i.name),
         }));
 
-        // Save flowpay_charge_id on the order for admin verification
+        // Save flowpay_charge_id and coupon info on the order for admin verification & webhook processing
         try {
           const orderRef = doc(db, "orders", orderId);
-          await updateDoc(orderRef, { flowpay_charge_id: cardData.paymentId });
+          await updateDoc(orderRef, { 
+            flowpay_charge_id: cardData.paymentId,
+            coupon_id: appliedCoupon?.id || null,
+            coupon_code: appliedCoupon?.code || null,
+          });
         } catch (err) {
-          console.warn('⚠️ Failed to save flowpay_charge_id:', err);
+          console.warn('⚠️ Failed to save flowpay_charge_id/coupon:', err);
         }
 
-        // NOTE: Coupon usage is NOT incremented here because payment hasn't been confirmed yet.
-        // The card-callback page handles coupon increment after payment confirmation.
+        // NOTE: Coupon increment is handled by CardPaymentCallback after payment confirmation.
 
         saveCheckoutDataToProfile();
         clearCart();
@@ -595,6 +598,15 @@ export default function Checkout() {
         }),
         tokenPromise,
       ]);
+
+      // Update order with coupon info if applied
+      if (appliedCoupon) {
+        const orderRef = doc(db, "orders", orderId);
+        await updateDoc(orderRef, { 
+          coupon_id: appliedCoupon.id,
+          coupon_code: appliedCoupon.code,
+        });
+      }
 
       const orderItemsData = items.map(item => ({
         order_id: orderId,
@@ -706,7 +718,8 @@ export default function Checkout() {
               customerId={effectiveUserId}
               productNames={items.map(item => item.name)}
               productIds={items.map(item => item.id)}
-              couponId={appliedCoupon?.id || undefined}
+              // Coupon usage is now handled server-side via webhook or client-side polling fallback in PixPayment
+              couponId={appliedCoupon?.id || undefined} 
               onPaymentConfirmed={clearCart}
             />
           </div>

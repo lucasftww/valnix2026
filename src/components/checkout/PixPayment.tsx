@@ -67,15 +67,8 @@ export function PixPayment({
       console.error('❌ Failed to update order in Firestore:', error);
     }
 
-    // Increment coupon usage only after confirmed payment
-    if (couponId) {
-      try {
-        await updateDoc(doc(db, "coupons", couponId), { current_uses: increment(1) });
-        console.log(`✅ Coupon ${couponId} usage incremented`);
-      } catch (err) {
-        console.warn('⚠️ Failed to increment coupon usage:', err);
-      }
-    }
+    // NOTE: Coupon usage increment is handled server-side by the FlowPay webhook
+    // to ensure reliability and prevent double-counting.
     // 2. Auto-delivery is handled by the FlowPay webhook (server-side).
     // Client-side only updates order status to avoid race conditions.
 
