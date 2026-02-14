@@ -8,8 +8,8 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { db, auth } from "@/integrations/firebase/config";
-import { doc, updateDoc, getDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
-import { saveGuestOrder, updateGuestOrderDelivery } from "@/lib/guestOrders";
+import { doc, updateDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { saveGuestOrder } from "@/lib/guestOrders";
 
 
 interface PixPaymentProps {
@@ -65,64 +65,8 @@ export function PixPayment({
       console.error('❌ Failed to update order in Firestore:', error);
     }
 
-    // 2. Process auto-delivery for eligible products
-    try {
-      const itemsRef = collection(db, "order_items");
-      const q = query(itemsRef, where('order_id', '==', orderId));
-      const itemsSnapshot = await getDocs(q);
-      
-      let allDelivered = true;
-      
-      for (const itemDoc of itemsSnapshot.docs) {
-        const itemData = itemDoc.data();
-        
-        // Skip if already has delivery code
-        if (itemData.delivery_code) continue;
-        
-        const productId = itemData.product_id;
-        if (!productId) { allDelivered = false; continue; }
-        
-        const productRef = doc(db, "products", productId);
-        const productSnap = await getDoc(productRef);
-        if (!productSnap.exists()) { allDelivered = false; continue; }
-        
-        const productData = productSnap.data();
-        const deliveryType = productData.delivery_type || 'manual';
-        const qty = itemData.quantity || 1;
-        
-        if (deliveryType === 'auto_fake') {
-          const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-          const codes: string[] = [];
-          for (let i = 0; i < qty; i++) {
-            let code = '';
-            for (let j = 0; j < 16; j++) {
-              code += chars.charAt(Math.floor(Math.random() * chars.length));
-              if ((j + 1) % 4 === 0 && j < 15) code += '-';
-            }
-            codes.push(code);
-          }
-          await updateDoc(doc(db, "order_items", itemDoc.id), { delivery_code: codes.join(',') });
-          console.log(`✅ Auto-generated ${codes.length} code(s) for item ${itemDoc.id}`);
-        } else if (deliveryType === 'auto_real' && productData.auto_delivery_codes?.length > 0) {
-          const needed = Math.min(qty, productData.auto_delivery_codes.length);
-          const codes = productData.auto_delivery_codes.slice(0, needed);
-          await updateDoc(doc(db, "order_items", itemDoc.id), { delivery_code: codes.join(',') });
-          // Remove used codes from product
-          const remaining = productData.auto_delivery_codes.slice(needed);
-          await updateDoc(productRef, { auto_delivery_codes: remaining });
-          console.log(`✅ Assigned ${codes.length} real code(s) for item ${itemDoc.id}`);
-        } else {
-          allDelivered = false;
-        }
-      }
-      
-      if (allDelivered && itemsSnapshot.size > 0) {
-        await updateDoc(doc(db, "orders", orderId), { status: 'completed', updated_at: Timestamp.now() });
-        console.log(`✅ Order ${orderId} auto-completed`);
-      }
-    } catch (error) {
-      console.warn('⚠️ Auto-delivery processing failed:', error);
-    }
+    // 2. Auto-delivery is handled by the FlowPay webhook (server-side).
+    // Client-side only updates order status to avoid race conditions.
 
 
     // Purchase tracking (analytics, Meta CAPI, UTMify) is handled
