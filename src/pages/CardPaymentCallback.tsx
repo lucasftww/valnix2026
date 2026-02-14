@@ -105,26 +105,7 @@ export default function CardPaymentCallback() {
             const od = orderDoc.data();
             trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, "card");
 
-            // NOTE: Coupon usage increment is handled server-side by the FlowPay webhook logic
-    // (if implemented for card webhook) or should be added there.
-    // For now, if card webhook doesn't handle it, we might miss it here if we remove it.
-    // BUT since we added coupon_id to the order, we can rely on backend processing or add it back if needed.
-    // The previous instruction was to remove client-side increment.
-    // If card payment DOESN'T use the same webhook logic as PIX (it seems it uses flowpay-card function?), 
-    // then we might need to keep it here OR update flowpay-card function.
-    // Let's check if flowpay-card has webhook. It likely relies on this callback page for now as per previous code.
-    // Wait, flowpay-card index.ts I read didn't have webhook handler.
-    // So for CARD, we MUST keep client-side increment until we implement card webhook.
-    // Reverting decision to remove it from CardPaymentCallback for now, or I must implement it in flowpay-card.
-    // The user asked to "see if everything is working".
-    // I will KEEP it in CardPaymentCallback but ensure it uses the coupon_id from the order if available.
-    
-    // Actually, I'll keep the existing code but verify it works with the new storage logic.
-    // The previous code used `stored.couponId`.
-    // I updated Checkout.tsx to save `couponId` in sessionStorage.
-    // So it should work. I won't remove it from here yet to avoid breaking card coupon usage.
-    // I will just comment that it's client-side for card.
-    
+            // Increment coupon usage (client-side for card — no card webhook exists)
             if (stored?.couponId) {
               try {
                 await updateDoc(doc(db, "coupons", stored.couponId), { current_uses: increment(1) });
