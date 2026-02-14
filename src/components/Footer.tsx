@@ -2,6 +2,8 @@ import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lu
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
+import visaLogo from "@/assets/visa-logo.png";
+import mastercardLogo from "@/assets/mastercard-logo.png";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
@@ -266,10 +268,10 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                   <img src={pixLogo} alt="PIX" className="h-5 w-auto object-contain brightness-0 invert" width={20} height={20} />
                 </div>
                 <div className="w-12 h-8 rounded-md bg-[#1a1f71] flex items-center justify-center">
-                  <svg viewBox="0 0 48 32" className="w-8 h-5"><path d="M19.5 25.2L22.1 6.8H26.1L23.5 25.2H19.5Z" fill="#fff"/><path d="M38.4 7.2C37.6 6.9 36.3 6.5 34.7 6.5C30.7 6.5 27.9 8.6 27.9 11.5C27.8 13.7 29.8 14.9 31.3 15.7C32.8 16.5 33.3 17 33.3 17.7C33.3 18.8 32 19.3 30.8 19.3C29.1 19.3 28.2 19.1 26.8 18.4L26.2 18.1L25.6 22C26.7 22.5 28.6 22.9 30.6 22.9C34.9 22.9 37.6 20.8 37.6 17.8C37.6 16.1 36.6 14.8 34.3 13.7C32.9 13 32.1 12.5 32.1 11.7C32.1 11 32.9 10.3 34.5 10.3C35.9 10.2 36.9 10.5 37.7 10.9L38.1 11.1L38.4 7.2Z" fill="#fff"/><path d="M43.2 6.8H40.2C39.3 6.8 38.6 7.1 38.2 8L32.2 25.2H36.5L37.4 22.6H42.6L43.1 25.2H47L43.2 6.8ZM38.6 19.5C39 18.5 40.5 14.3 40.5 14.3L41.7 19.5H38.6Z" fill="#fff"/><path d="M16.4 6.8L12.5 19.2L12 16.7C11.2 13.9 8.6 10.8 5.7 9.3L9.4 25.2H13.7L20.7 6.8H16.4Z" fill="#fff"/></svg>
+                  <img src={visaLogo} alt="Visa" className="h-4 w-auto object-contain brightness-0 invert" width={32} height={16} />
                 </div>
                 <div className="w-12 h-8 rounded-md bg-[#1a1a2e] flex items-center justify-center">
-                  <svg viewBox="0 0 32 20" className="w-7 h-5"><circle cx="11" cy="10" r="7" fill="#eb001b"/><circle cx="21" cy="10" r="7" fill="#f79e1b"/><path d="M16 4.6a7 7 0 010 10.8 7 7 0 000-10.8z" fill="#ff5f00"/></svg>
+                  <img src={mastercardLogo} alt="Mastercard" className="h-6 w-auto object-contain" width={24} height={24} />
                 </div>
               </div>
             </div>
@@ -380,10 +382,10 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                   <img src={pixLogo} alt="PIX" className="h-6 w-auto object-contain brightness-0 invert" width={24} height={24} />
                 </div>
                 <div className="w-14 h-10 rounded-md bg-[#1a1f71] flex items-center justify-center">
-                  <svg viewBox="0 0 48 32" className="w-9 h-6"><path d="M19.5 25.2L22.1 6.8H26.1L23.5 25.2H19.5Z" fill="#fff"/><path d="M38.4 7.2C37.6 6.9 36.3 6.5 34.7 6.5C30.7 6.5 27.9 8.6 27.9 11.5C27.8 13.7 29.8 14.9 31.3 15.7C32.8 16.5 33.3 17 33.3 17.7C33.3 18.8 32 19.3 30.8 19.3C29.1 19.3 28.2 19.1 26.8 18.4L26.2 18.1L25.6 22C26.7 22.5 28.6 22.9 30.6 22.9C34.9 22.9 37.6 20.8 37.6 17.8C37.6 16.1 36.6 14.8 34.3 13.7C32.9 13 32.1 12.5 32.1 11.7C32.1 11 32.9 10.3 34.5 10.3C35.9 10.2 36.9 10.5 37.7 10.9L38.1 11.1L38.4 7.2Z" fill="#fff"/><path d="M43.2 6.8H40.2C39.3 6.8 38.6 7.1 38.2 8L32.2 25.2H36.5L37.4 22.6H42.6L43.1 25.2H47L43.2 6.8ZM38.6 19.5C39 18.5 40.5 14.3 40.5 14.3L41.7 19.5H38.6Z" fill="#fff"/><path d="M16.4 6.8L12.5 19.2L12 16.7C11.2 13.9 8.6 10.8 5.7 9.3L9.4 25.2H13.7L20.7 6.8H16.4Z" fill="#fff"/></svg>
+                  <img src={visaLogo} alt="Visa" className="h-5 w-auto object-contain brightness-0 invert" width={40} height={20} />
                 </div>
                 <div className="w-14 h-10 rounded-md bg-[#1a1a2e] flex items-center justify-center">
-                  <svg viewBox="0 0 32 20" className="w-8 h-6"><circle cx="11" cy="10" r="7" fill="#eb001b"/><circle cx="21" cy="10" r="7" fill="#f79e1b"/><path d="M16 4.6a7 7 0 010 10.8 7 7 0 000-10.8z" fill="#ff5f00"/></svg>
+                  <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" width={28} height={28} />
                 </div>
               </div>
             </div>
