@@ -38,11 +38,20 @@ const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>([]);
-  const [discount, setDiscount] = useState(0);
   const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
 
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalPrice = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
+
+  // Recalculate discount when cart total changes (e.g. quantity updated after coupon applied)
+  const discount = useMemo(() => {
+    if (!appliedCoupon) return 0;
+    if (appliedCoupon.discount_type === "percentage") {
+      return Math.min(totalPrice * (appliedCoupon.discount_value / 100), totalPrice);
+    }
+    return Math.min(Number(appliedCoupon.discount_value), totalPrice);
+  }, [appliedCoupon, totalPrice]);
+
   const finalPrice = useMemo(() => Math.max(0, totalPrice - discount), [totalPrice, discount]);
 
   const addItem = useCallback((newItem: Omit<CartItem, "quantity">) => {
@@ -70,7 +79,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = useCallback(() => {
     setItems([]);
-    setDiscount(0);
     setAppliedCoupon(null);
   }, []);
 
@@ -132,7 +140,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         discount_type: coupon.discount_type,
         discount_value: coupon.discount_value,
       });
-      setDiscount(discountAmount);
 
       toast.success(`Cupom ${coupon.code} aplicado! -R$ ${discountAmount.toFixed(2)}`);
     } catch (error) {
@@ -143,7 +150,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const removeCoupon = useCallback(() => {
     setAppliedCoupon(null);
-    setDiscount(0);
   }, []);
 
   return (

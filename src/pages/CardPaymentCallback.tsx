@@ -97,7 +97,7 @@ export default function CardPaymentCallback() {
             if (allDelivered && itemsSnap.size > 0) {
               await updateOrderStatus(orderId, "completed", "paid");
             }
-          } catch {}
+          } catch (err) { console.warn('⚠️ Auto-delivery error (card):', err); }
 
           // Track purchase
           const orderDoc = await getDoc(doc(db, "orders", orderId));
@@ -191,7 +191,7 @@ export default function CardPaymentCallback() {
                 setTimeout(() => navigate(`/order/${hash}?upsell=1&order_id=${orderId}`), 3000);
                 return;
               }
-            } catch {}
+            } catch (err) { console.warn('⚠️ Guest order save error (card):', err); }
           }
 
           setTimeout(() => navigate(`/painel-pagar?order_id=${orderId}`), 3000);
