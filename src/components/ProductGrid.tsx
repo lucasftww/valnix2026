@@ -69,6 +69,8 @@ const ProductGridComponent = () => {
           align: "start",
           loop: true,
           dragFree: true,
+          duration: 20,
+          skipSnaps: true,
         }}
         className="w-full"
       >
