@@ -793,28 +793,30 @@ export default function Checkout() {
                   onClick={() => setPaymentMethod("card")}
                 >
                   <RadioGroupItem value="card" id="card" className="shrink-0" />
-                  <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                  <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                    <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
                       <CreditCard className="w-4 h-4 text-white" />
                     </div>
-                    <div className="flex-1">
-                      <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
-                      <p className="text-[11px] text-[#888] mt-1.5">Pagamento instantâneo</p>
-                    </div>
-                    {/* Card brand logos */}
-                    <div className="flex items-center gap-1.5">
-                      <div className="h-7 w-10 rounded bg-[#1a1f71] flex items-center justify-center">
-                        <span className="text-[9px] font-bold text-white italic tracking-tight">VISA</span>
-                      </div>
-                      <div className="h-7 w-10 rounded bg-[#0a0a0a] border border-[#333] flex items-center justify-center overflow-hidden">
-                        <div className="flex">
-                          <div className="w-3 h-3 rounded-full bg-[#eb001b] -mr-1" />
-                          <div className="w-3 h-3 rounded-full bg-[#f79e1b] opacity-80" />
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="text-[14px] font-medium text-white whitespace-nowrap">Cartão de Crédito</p>
+                        {/* Card brand logos */}
+                        <div className="flex items-center gap-1">
+                          <div className="h-5 w-8 rounded bg-[#1a1f71] flex items-center justify-center">
+                            <span className="text-[7px] font-bold text-white italic tracking-tight">VISA</span>
+                          </div>
+                          <div className="h-5 w-8 rounded bg-[#0a0a0a] border border-[#333] flex items-center justify-center overflow-hidden">
+                            <div className="flex">
+                              <div className="w-2.5 h-2.5 rounded-full bg-[#eb001b] -mr-0.5" />
+                              <div className="w-2.5 h-2.5 rounded-full bg-[#f79e1b] opacity-80" />
+                            </div>
+                          </div>
+                          <div className="h-5 w-8 rounded bg-[#006fcf] flex items-center justify-center">
+                            <span className="text-[6px] font-bold text-white tracking-tight">AMEX</span>
+                          </div>
                         </div>
                       </div>
-                      <div className="h-7 w-10 rounded bg-[#006fcf] flex items-center justify-center">
-                        <span className="text-[7px] font-bold text-white tracking-tight">AMEX</span>
-                      </div>
+                      <p className="text-[11px] text-[#888] mt-1">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
