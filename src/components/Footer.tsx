@@ -258,25 +258,25 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
               </p>
             </div>
 
-            {/* Payment Methods - Only PIX */}
+            {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-lg text-center">
                 Formas de Pagamento:
               </h3>
-              <div className="flex flex-col gap-2 w-full max-w-xs">
-                <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-6 py-3">
+              <div className="flex items-center justify-center gap-3 w-full max-w-xs">
+                <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-4 py-2.5 flex-1 justify-center">
                   <img 
                     src={pixLogo} 
                     alt="PIX" 
-                    className="h-8 w-auto object-contain"
-                    width={32}
-                    height={32}
+                    className="h-6 w-auto object-contain"
+                    width={24}
+                    height={24}
                   />
-                  <span className="text-sm font-semibold text-foreground">PIX - Pagamento Instantâneo</span>
+                  <span className="text-xs font-semibold text-foreground">PIX</span>
                 </div>
-                <div className="flex items-center gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-6 py-3">
-                  <CreditCard className="w-7 h-7 text-blue-500 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-foreground">Cartão de Crédito</span>
+                <div className="flex items-center gap-1.5 bg-card/50 border border-border/40 rounded-xl px-4 py-2.5 flex-1 justify-center">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none"><rect x="1" y="4" width="22" height="16" rx="3" stroke="#a1a1aa" strokeWidth="1.5"/><rect x="1" y="4" width="22" height="5" fill="#a1a1aa" opacity="0.15"/><circle cx="9" cy="12" r="3" fill="#eb001b" opacity="0.9"/><circle cx="15" cy="12" r="3" fill="#f79e1b" opacity="0.9"/><path d="M12 9.8a3 3 0 010 4.4 3 3 0 000-4.4z" fill="#ff5f00" opacity="0.9"/></svg>
+                  <span className="text-xs font-semibold text-foreground">Crédito</span>
                 </div>
               </div>
             </div>
@@ -379,25 +379,25 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
               </p>
             </div>
 
-            {/* Payment Methods - Only PIX */}
+            {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 bg-black px-12 py-7 rounded-lg">
               <h3 className="text-foreground font-bold text-lg text-center">
                 Formas de Pagamento:
               </h3>
-              <div className="flex flex-col gap-2">
-                <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-6 py-3">
+              <div className="flex items-center gap-3">
+                <div className="flex items-center gap-2 bg-primary/5 border border-primary/20 rounded-xl px-5 py-3 justify-center">
                   <img 
                     src={pixLogo} 
                     alt="PIX" 
-                    className="h-8 w-auto object-contain"
-                    width={32}
-                    height={32}
+                    className="h-7 w-auto object-contain"
+                    width={28}
+                    height={28}
                   />
-                  <span className="text-sm font-semibold text-foreground">PIX - Pagamento Instantâneo</span>
+                  <span className="text-sm font-semibold text-foreground">PIX</span>
                 </div>
-                <div className="flex items-center gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-6 py-3">
-                  <CreditCard className="w-7 h-7 text-blue-500 flex-shrink-0" />
-                  <span className="text-sm font-semibold text-foreground">Cartão de Crédito</span>
+                <div className="flex items-center gap-2 bg-card/50 border border-border/40 rounded-xl px-5 py-3 justify-center">
+                  <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none"><rect x="1" y="4" width="22" height="16" rx="3" stroke="#a1a1aa" strokeWidth="1.5"/><rect x="1" y="4" width="22" height="5" fill="#a1a1aa" opacity="0.15"/><circle cx="9" cy="12" r="3" fill="#eb001b" opacity="0.9"/><circle cx="15" cy="12" r="3" fill="#f79e1b" opacity="0.9"/><path d="M12 9.8a3 3 0 010 4.4 3 3 0 000-4.4z" fill="#ff5f00" opacity="0.9"/></svg>
+                  <span className="text-sm font-semibold text-foreground">Crédito</span>
                 </div>
               </div>
             </div>
