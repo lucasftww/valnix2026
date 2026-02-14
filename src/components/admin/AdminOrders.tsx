@@ -92,8 +92,9 @@ interface OrderItem {
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
-const getPaymentMethodIcon = (method: string | null) => {
-  switch (method) {
+const getPaymentMethodIcon = (method: string | null, paymentStatus?: string) => {
+  const resolved = method || (paymentStatus === 'paid' ? 'pix' : null);
+  switch (resolved) {
     case 'pix': return <QrCode className="w-4 h-4" />;
     case 'card': return <CreditCard className="w-4 h-4" />;
     case 'balance': return <Wallet className="w-4 h-4" />;
@@ -101,8 +102,9 @@ const getPaymentMethodIcon = (method: string | null) => {
   }
 };
 
-const getPaymentMethodLabel = (method: string | null) => {
-  switch (method) {
+const getPaymentMethodLabel = (method: string | null, paymentStatus?: string) => {
+  const resolved = method || (paymentStatus === 'paid' ? 'pix' : null);
+  switch (resolved) {
     case 'pix': return 'PIX';
     case 'card': return 'Cartão';
     case 'balance': return 'Saldo';
@@ -745,9 +747,9 @@ export const AdminOrders = () => {
                               order.payment_method === 'balance' ? 'bg-purple-500/10 text-purple-500' :
                               'bg-muted text-muted-foreground'
                             }`}>
-                              {getPaymentMethodIcon(order.payment_method)}
+                               {getPaymentMethodIcon(order.payment_method, order.payment_status)}
                             </div>
-                            <span className="text-xs font-medium">{getPaymentMethodLabel(order.payment_method)}</span>
+                            <span className="text-xs font-medium">{getPaymentMethodLabel(order.payment_method, order.payment_status)}</span>
                           </div>
                         </TableCell>
                         <TableCell>
@@ -875,8 +877,8 @@ export const AdminOrders = () => {
                           <span className="text-sm font-bold text-primary">{formatCurrency(detailOrder.total_amount)}</span>
                         </div>
                         <div className="flex items-center gap-2">
-                          {getPaymentMethodIcon(detailOrder.payment_method)}
-                          <span className="text-sm font-medium">{getPaymentMethodLabel(detailOrder.payment_method)}</span>
+                          {getPaymentMethodIcon(detailOrder.payment_method, detailOrder.payment_status)}
+                          <span className="text-sm font-medium">{getPaymentMethodLabel(detailOrder.payment_method, detailOrder.payment_status)}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${paymentCfg.bg} ${paymentCfg.color}`}>
