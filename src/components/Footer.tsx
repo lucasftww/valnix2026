@@ -263,7 +263,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-3">
+              <div className="flex items-center justify-center gap-1.5">
                 <img src={pixLogo} alt="PIX" className="h-7 w-auto object-contain" />
                 <img src={visaLogo} alt="Visa" className="h-7 w-auto object-contain" />
                 <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" />
@@ -371,7 +371,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 px-6 py-5 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-4">
+              <div className="flex items-center justify-center gap-2">
                 <img src={pixLogo} alt="PIX" className="h-9 w-auto object-contain" />
                 <img src={visaLogo} alt="Visa" className="h-9 w-auto object-contain" />
                 <img src={mastercardLogo} alt="Mastercard" className="h-9 w-auto object-contain" />
