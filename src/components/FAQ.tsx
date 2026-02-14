@@ -32,7 +32,7 @@ function buildFaqs(label: string) {
   return [
     {
       question: `Como comprar ${label} na VALNIX?`,
-      answer: `Basta escolher o ${label} desejado, adicionar ao carrinho e pagar via PIX. A entrega é automática e instantânea após a confirmação do pagamento.`,
+      answer: `Basta escolher o ${label} desejado, adicionar ao carrinho e pagar via PIX ou Cartão de Crédito. A entrega é automática e instantânea após a confirmação do pagamento.`,
     },
     {
       question: "É seguro comprar na VALNIX?",
@@ -40,7 +40,7 @@ function buildFaqs(label: string) {
     },
     {
       question: `Como recebo o ${label}?`,
-      answer: `Após a confirmação do pagamento via PIX, você receberá o código do gift card automaticamente. A entrega é instantânea — sem espera.`,
+      answer: `Após a confirmação do pagamento via PIX ou Cartão de Crédito, você receberá o código do gift card automaticamente. A entrega é instantânea — sem espera.`,
     },
     {
       question: "Quais formas de pagamento são aceitas?",
