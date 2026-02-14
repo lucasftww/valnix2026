@@ -798,7 +798,7 @@ export default function Checkout() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[13px] sm:text-[14px] font-medium text-white whitespace-nowrap">Cartão</p>
+                        <p className="text-[13px] sm:text-[14px] font-medium text-white whitespace-nowrap">Crédito ou débito</p>
                         <div className="flex items-center gap-0.5 shrink-0">
                           <div className="h-[16px] w-[24px] rounded-sm bg-[#1a1f71] flex items-center justify-center">
                             <span className="text-[5px] font-bold text-white italic">VISA</span>
