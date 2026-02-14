@@ -163,6 +163,7 @@ export const AdminOrders = () => {
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailAddons, setDetailAddons] = useState<any[]>([]);
+  const [restoringOrders, setRestoringOrders] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -267,6 +268,27 @@ export const AdminOrders = () => {
   }, [orders]);
 
   // ── Handlers ────────────────────────────────────────────────────
+  const handleRestoreOrders = async () => {
+    setRestoringOrders(true);
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/restore-orders`,
+        { headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` } }
+      );
+      const data = await response.json();
+      if (data.success) {
+        toast({ title: `Restauração concluída!`, description: `${data.restored} pedido(s) restaurado(s), ${data.skipped} já existente(s).` });
+        if (data.restored > 0) fetchOrders();
+      } else {
+        toast({ title: "Erro na restauração", description: data.error, variant: "destructive" });
+      }
+    } catch (error: any) {
+      toast({ title: "Erro ao restaurar", description: error.message, variant: "destructive" });
+    } finally {
+      setRestoringOrders(false);
+    }
+  };
+
   const handleRefresh = async () => {
     setRefreshing(true);
     await fetchOrders();
@@ -587,6 +609,11 @@ export const AdminOrders = () => {
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="h-9">
               <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
               Atualizar
+            </Button>
+
+            <Button variant="outline" size="sm" onClick={handleRestoreOrders} disabled={restoringOrders} className="h-9">
+              {restoringOrders ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Package className="w-4 h-4 mr-1.5" />}
+              Restaurar Pagos
             </Button>
 
             <DropdownMenu>
