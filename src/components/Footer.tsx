@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
 import visaLogo from "@/assets/visa-logo.png";
 import mastercardLogo from "@/assets/mastercard-logo.png";
+import amexLogo from "@/assets/amex-logo.png";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
@@ -273,6 +274,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                 <div className="w-12 h-8 rounded-md bg-[#1a1a2e] flex items-center justify-center">
                   <img src={mastercardLogo} alt="Mastercard" className="h-6 w-auto object-contain" width={24} height={24} />
                 </div>
+                <div className="w-12 h-8 rounded-md bg-[#006fcf] flex items-center justify-center">
+                  <img src={amexLogo} alt="Amex" className="h-5 w-auto object-contain brightness-0 invert" width={20} height={20} />
+                </div>
               </div>
             </div>
           </div>
@@ -386,6 +390,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                 </div>
                 <div className="w-14 h-10 rounded-md bg-[#1a1a2e] flex items-center justify-center">
                   <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" width={28} height={28} />
+                </div>
+                <div className="w-14 h-10 rounded-md bg-[#006fcf] flex items-center justify-center">
+                  <img src={amexLogo} alt="Amex" className="h-6 w-auto object-contain brightness-0 invert" width={24} height={24} />
                 </div>
               </div>
             </div>
