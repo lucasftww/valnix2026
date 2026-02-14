@@ -529,7 +529,7 @@ const ProductDetail = () => {
         <div className="px-4 py-3 safe-area-inset-bottom flex items-center gap-3">
           <div className="flex-1 min-w-0">
             <span className="text-[11px] text-muted-foreground block">Total</span>
-            <span className="text-2xl font-extrabold text-primary">R$ {totalPrice}</span>
+            <span className="text-2xl font-extrabold text-primary whitespace-nowrap">R$&nbsp;{totalPrice}</span>
           </div>
           <Button 
             onClick={handleBuyNow} 
