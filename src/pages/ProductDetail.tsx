@@ -324,7 +324,7 @@ const ProductDetail = () => {
                     <ProductImage
                       src={product.image_url}
                       alt={product.name}
-                      className="max-w-[55%] max-h-[420px] w-auto h-auto"
+                      className="max-w-[70%] max-h-[420px] w-auto h-auto"
                       priority={true}
                     />
                   )}
