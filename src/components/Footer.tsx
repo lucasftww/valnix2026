@@ -265,17 +265,17 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
               <div className="flex items-center justify-center gap-2">
-                <div className="w-12 h-8 rounded-md bg-[#00b894] flex items-center justify-center">
-                  <img src={pixLogo} alt="PIX" className="h-5 w-auto object-contain brightness-0 invert" width={20} height={20} />
+                <div className="w-12 h-8 rounded-lg bg-[#00b894] flex items-center justify-center">
+                  <img src={pixLogo} alt="PIX" className="h-5 w-auto object-contain" width={20} height={20} />
                 </div>
-                <div className="w-12 h-8 rounded-md bg-[#1a1f71] flex items-center justify-center">
+                <div className="w-12 h-8 rounded-lg bg-[#1a1f71] flex items-center justify-center">
                   <img src={visaLogo} alt="Visa" className="h-4 w-auto object-contain brightness-0 invert" width={32} height={16} />
                 </div>
-                <div className="w-12 h-8 rounded-md bg-[#1a1a2e] flex items-center justify-center">
+                <div className="w-12 h-8 rounded-lg bg-[#1a1a2e] flex items-center justify-center">
                   <img src={mastercardLogo} alt="Mastercard" className="h-6 w-auto object-contain" width={24} height={24} />
                 </div>
-                <div className="w-12 h-8 rounded-md bg-[#006fcf] flex items-center justify-center">
-                  <img src={amexLogo} alt="Amex" className="h-5 w-auto object-contain brightness-0 invert" width={20} height={20} />
+                <div className="w-12 h-8 rounded-lg overflow-hidden flex items-center justify-center">
+                  <img src={amexLogo} alt="Amex" className="h-8 w-12 object-cover" width={48} height={32} />
                 </div>
               </div>
             </div>
@@ -382,17 +382,17 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             <div className="flex flex-col items-center gap-3 flex-shrink-0 bg-black px-10 py-7 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
               <div className="flex items-center justify-center gap-3">
-                <div className="w-14 h-10 rounded-md bg-[#00b894] flex items-center justify-center">
-                  <img src={pixLogo} alt="PIX" className="h-6 w-auto object-contain brightness-0 invert" width={24} height={24} />
+                <div className="w-14 h-10 rounded-lg bg-[#00b894] flex items-center justify-center">
+                  <img src={pixLogo} alt="PIX" className="h-6 w-auto object-contain" width={24} height={24} />
                 </div>
-                <div className="w-14 h-10 rounded-md bg-[#1a1f71] flex items-center justify-center">
+                <div className="w-14 h-10 rounded-lg bg-[#1a1f71] flex items-center justify-center">
                   <img src={visaLogo} alt="Visa" className="h-5 w-auto object-contain brightness-0 invert" width={40} height={20} />
                 </div>
-                <div className="w-14 h-10 rounded-md bg-[#1a1a2e] flex items-center justify-center">
+                <div className="w-14 h-10 rounded-lg bg-[#1a1a2e] flex items-center justify-center">
                   <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" width={28} height={28} />
                 </div>
-                <div className="w-14 h-10 rounded-md bg-[#006fcf] flex items-center justify-center">
-                  <img src={amexLogo} alt="Amex" className="h-6 w-auto object-contain brightness-0 invert" width={24} height={24} />
+                <div className="w-14 h-10 rounded-lg overflow-hidden flex items-center justify-center">
+                  <img src={amexLogo} alt="Amex" className="h-10 w-14 object-cover" width={56} height={40} />
                 </div>
               </div>
             </div>
