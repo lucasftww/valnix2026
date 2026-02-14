@@ -84,14 +84,16 @@ const FIREBASE_PROJECT_ID = "valnix";
      const supabase = createClient(supabaseUrl, serviceRoleKey);
  
      // Calculate date filter
-     let dateFilter = new Date();
-     if (dateRange === "7d") {
-       dateFilter.setDate(dateFilter.getDate() - 7);
-     } else if (dateRange === "30d") {
-       dateFilter.setDate(dateFilter.getDate() - 30);
-     } else {
-       dateFilter = new Date(0); // All time
-     }
+      let dateFilter = new Date();
+      if (dateRange === "today") {
+        dateFilter.setHours(0, 0, 0, 0);
+      } else if (dateRange === "7d") {
+        dateFilter.setDate(dateFilter.getDate() - 7);
+      } else if (dateRange === "30d") {
+        dateFilter.setDate(dateFilter.getDate() - 30);
+      } else {
+        dateFilter = new Date(0); // All time
+      }
  
      const { data: events, error } = await supabase
        .from("analytics_events")
