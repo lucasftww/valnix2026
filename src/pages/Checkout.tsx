@@ -798,19 +798,19 @@ export default function Checkout() {
                       <CreditCard className="w-3.5 h-3.5 text-white" />
                     </div>
                     <div className="min-w-0 flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-[13px] sm:text-[14px] font-medium text-white">Cartão de Crédito</p>
-                        <div className="flex items-center gap-1 shrink-0">
-                          <div className="h-[18px] w-7 rounded-sm bg-[#1a1f71] flex items-center justify-center">
-                            <span className="text-[6px] font-bold text-white italic">VISA</span>
+                      <div className="flex items-center gap-1.5">
+                        <p className="text-[13px] sm:text-[14px] font-medium text-white whitespace-nowrap">Cartão</p>
+                        <div className="flex items-center gap-0.5 shrink-0">
+                          <div className="h-[16px] w-[24px] rounded-sm bg-[#1a1f71] flex items-center justify-center">
+                            <span className="text-[5px] font-bold text-white italic">VISA</span>
                           </div>
-                          <div className="h-[18px] w-7 rounded-sm bg-[#0a0a0a] border border-[#333] flex items-center justify-center">
+                          <div className="h-[16px] w-[24px] rounded-sm bg-[#0a0a0a] border border-[#333] flex items-center justify-center">
                             <div className="flex">
-                              <div className="w-[7px] h-[7px] rounded-full bg-[#eb001b] -mr-[2px]" />
-                              <div className="w-[7px] h-[7px] rounded-full bg-[#f79e1b] opacity-80" />
+                              <div className="w-[6px] h-[6px] rounded-full bg-[#eb001b] -mr-[2px]" />
+                              <div className="w-[6px] h-[6px] rounded-full bg-[#f79e1b] opacity-80" />
                             </div>
                           </div>
-                          <div className="h-[18px] w-7 rounded-sm bg-[#006fcf] flex items-center justify-center">
+                          <div className="h-[16px] w-[24px] rounded-sm bg-[#006fcf] flex items-center justify-center">
                             <span className="text-[5px] font-bold text-white">AMEX</span>
                           </div>
                         </div>
