@@ -5,6 +5,9 @@ import pixLogo from "@/assets/pix-logo.png";
 import visaLogo from "@/assets/visa-logo.png";
 import mastercardLogo from "@/assets/mastercard-logo.png";
 import amexLogo from "@/assets/amex-logo.png";
+import eloLogo from "@/assets/elo-logo.png";
+import dinersLogo from "@/assets/diners-logo.png";
+import hipercardLogo from "@/assets/hipercard-logo.png";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
@@ -264,18 +267,27 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-2">
-                <div className="w-12 h-8 rounded-lg bg-[#00b894] flex items-center justify-center">
-                  <img src={pixLogo} alt="PIX" className="h-5 w-auto object-contain" width={20} height={20} />
+              <div className="flex flex-wrap items-center justify-center gap-2">
+                <div className="w-[52px] h-[34px] rounded-lg bg-white flex items-center justify-center p-1">
+                  <img src={pixLogo} alt="PIX" className="h-5 w-auto object-contain" />
                 </div>
-                <div className="w-12 h-8 rounded-lg bg-[#1a1f71] flex items-center justify-center">
-                  <img src={visaLogo} alt="Visa" className="h-4 w-auto object-contain brightness-0 invert" width={32} height={16} />
+                <div className="w-[52px] h-[34px] rounded-lg bg-white flex items-center justify-center p-1">
+                  <img src={visaLogo} alt="Visa" className="h-4 w-auto object-contain" />
                 </div>
-                <div className="w-12 h-8 rounded-lg bg-[#1a1a2e] flex items-center justify-center">
-                  <img src={mastercardLogo} alt="Mastercard" className="h-6 w-auto object-contain" width={24} height={24} />
+                <div className="w-[52px] h-[34px] rounded-lg bg-white flex items-center justify-center p-1">
+                  <img src={mastercardLogo} alt="Mastercard" className="h-6 w-auto object-contain" />
                 </div>
-                <div className="w-12 h-8 rounded-lg overflow-hidden flex items-center justify-center">
-                  <img src={amexLogo} alt="Amex" className="h-8 w-12 object-cover" width={48} height={32} />
+                <div className="w-[52px] h-[34px] rounded-lg overflow-hidden flex items-center justify-center">
+                  <img src={amexLogo} alt="Amex" className="h-[34px] w-[52px] object-cover" />
+                </div>
+                <div className="w-[52px] h-[34px] rounded-lg bg-white flex items-center justify-center p-1">
+                  <img src={eloLogo} alt="Elo" className="h-5 w-auto object-contain" />
+                </div>
+                <div className="w-[52px] h-[34px] rounded-lg bg-white flex items-center justify-center p-1">
+                  <img src={hipercardLogo} alt="Hipercard" className="h-5 w-auto object-contain" />
+                </div>
+                <div className="w-[52px] h-[34px] rounded-lg bg-white flex items-center justify-center p-1">
+                  <img src={dinersLogo} alt="Diners Club" className="h-5 w-auto object-contain" />
                 </div>
               </div>
             </div>
@@ -379,20 +391,29 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             </div>
 
             {/* Payment Methods */}
-            <div className="flex flex-col items-center gap-3 flex-shrink-0 bg-black px-10 py-7 rounded-lg">
+            <div className="flex flex-col items-center gap-4 flex-shrink-0 bg-black px-8 py-7 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-3">
-                <div className="w-14 h-10 rounded-lg bg-[#00b894] flex items-center justify-center">
-                  <img src={pixLogo} alt="PIX" className="h-6 w-auto object-contain" width={24} height={24} />
+              <div className="flex flex-wrap items-center justify-center gap-2.5">
+                <div className="w-[58px] h-[38px] rounded-lg bg-white flex items-center justify-center p-1.5">
+                  <img src={pixLogo} alt="PIX" className="h-6 w-auto object-contain" />
                 </div>
-                <div className="w-14 h-10 rounded-lg bg-[#1a1f71] flex items-center justify-center">
-                  <img src={visaLogo} alt="Visa" className="h-5 w-auto object-contain brightness-0 invert" width={40} height={20} />
+                <div className="w-[58px] h-[38px] rounded-lg bg-white flex items-center justify-center p-1.5">
+                  <img src={visaLogo} alt="Visa" className="h-5 w-auto object-contain" />
                 </div>
-                <div className="w-14 h-10 rounded-lg bg-[#1a1a2e] flex items-center justify-center">
-                  <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" width={28} height={28} />
+                <div className="w-[58px] h-[38px] rounded-lg bg-white flex items-center justify-center p-1.5">
+                  <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" />
                 </div>
-                <div className="w-14 h-10 rounded-lg overflow-hidden flex items-center justify-center">
-                  <img src={amexLogo} alt="Amex" className="h-10 w-14 object-cover" width={56} height={40} />
+                <div className="w-[58px] h-[38px] rounded-lg overflow-hidden flex items-center justify-center">
+                  <img src={amexLogo} alt="Amex" className="h-[38px] w-[58px] object-cover" />
+                </div>
+                <div className="w-[58px] h-[38px] rounded-lg bg-white flex items-center justify-center p-1.5">
+                  <img src={eloLogo} alt="Elo" className="h-6 w-auto object-contain" />
+                </div>
+                <div className="w-[58px] h-[38px] rounded-lg bg-white flex items-center justify-center p-1.5">
+                  <img src={hipercardLogo} alt="Hipercard" className="h-6 w-auto object-contain" />
+                </div>
+                <div className="w-[58px] h-[38px] rounded-lg bg-white flex items-center justify-center p-1.5">
+                  <img src={dinersLogo} alt="Diners Club" className="h-6 w-auto object-contain" />
                 </div>
               </div>
             </div>
