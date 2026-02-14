@@ -145,35 +145,9 @@ export default function Admin() {
               {/* Actions */}
               <div className="flex items-center gap-2">
                 {/* Notifications */}
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" size="icon" className="relative">
+                <Button variant="ghost" size="icon">
                       <Bell className="h-5 w-5 text-muted-foreground" />
-                      <span className="absolute -top-0.5 -right-0.5 h-4 w-4 rounded-full bg-destructive text-[10px] font-bold text-destructive-foreground flex items-center justify-center">
-                        3
-                      </span>
-                    </Button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-80">
-                    <DropdownMenuLabel className="flex items-center justify-between">
-                      Notificações
-                      <Badge variant="secondary" className="text-xs">3 novas</Badge>
-                    </DropdownMenuLabel>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-                      <span className="font-medium">Novo pedido recebido</span>
-                      <span className="text-xs text-muted-foreground">Há 5 minutos</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-                      <span className="font-medium">Pagamento confirmado</span>
-                      <span className="text-xs text-muted-foreground">Há 15 minutos</span>
-                    </DropdownMenuItem>
-                    <DropdownMenuItem className="flex flex-col items-start gap-1 py-3">
-                      <span className="font-medium">Novo usuário cadastrado</span>
-                      <span className="text-xs text-muted-foreground">Há 1 hora</span>
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
+                </Button>
 
                 {/* Settings */}
                 <DropdownMenu>
