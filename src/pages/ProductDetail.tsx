@@ -446,21 +446,67 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Descrição Mobile */}
-            <div className="lg:hidden bg-card border border-border/20 rounded-2xl p-5">
-              <h2 className="text-xl font-bold mb-4">Sobre o Produto</h2>
-              <div className="description-content text-sm text-muted-foreground leading-relaxed">
-                {product.rich_description ? (
-                  <div 
-                    className="prose prose-invert prose-sm max-w-none" 
-                    dangerouslySetInnerHTML={{ __html: sanitizedDescription }} 
-                  />
-                ) : product.description ? (
-                  <p className="whitespace-pre-line">{product.description}</p>
-                ) : (
-                  <p>Sem descrição disponível.</p>
+            {/* Descrição/Instruções/Termos Mobile — Tabs */}
+            <div className="lg:hidden bg-card border border-border/20 rounded-2xl overflow-hidden">
+              <Tabs defaultValue="description" className="w-full">
+                <TabsList className="w-full justify-start bg-transparent border-b border-border/20 rounded-none h-auto p-0">
+                  <TabsTrigger 
+                    value="description" 
+                    className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary px-3 py-3 text-[13px] font-medium"
+                  >
+                    Descrição
+                  </TabsTrigger>
+                  {product.instructions && (
+                    <TabsTrigger 
+                      value="instructions" 
+                      className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary px-3 py-3 text-[13px] font-medium"
+                    >
+                      Instruções
+                    </TabsTrigger>
+                  )}
+                  {product.terms_conditions && (
+                    <TabsTrigger 
+                      value="terms" 
+                      className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary px-3 py-3 text-[13px] font-medium"
+                    >
+                      Termos
+                    </TabsTrigger>
+                  )}
+                </TabsList>
+                
+                <TabsContent value="description" className="p-4 mt-0">
+                  <div className="description-content text-sm text-muted-foreground leading-relaxed">
+                    {product.rich_description ? (
+                      <div 
+                        className="prose prose-invert prose-sm max-w-none" 
+                        dangerouslySetInnerHTML={{ __html: sanitizedDescription }} 
+                      />
+                    ) : product.description ? (
+                      <p className="whitespace-pre-line">{product.description}</p>
+                    ) : (
+                      <p>Sem descrição disponível.</p>
+                    )}
+                  </div>
+                </TabsContent>
+                
+                {product.instructions && (
+                  <TabsContent value="instructions" className="p-4 mt-0">
+                    <div 
+                      className="prose prose-invert prose-sm max-w-none text-muted-foreground" 
+                      dangerouslySetInnerHTML={{ __html: sanitizedInstructions }} 
+                    />
+                  </TabsContent>
                 )}
-              </div>
+                
+                {product.terms_conditions && (
+                  <TabsContent value="terms" className="p-4 mt-0">
+                    <div 
+                      className="prose prose-invert prose-sm max-w-none text-muted-foreground" 
+                      dangerouslySetInnerHTML={{ __html: sanitizedTerms }} 
+                    />
+                  </TabsContent>
+                )}
+              </Tabs>
             </div>
           </div>
 
