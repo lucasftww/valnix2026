@@ -37,7 +37,7 @@ import {
 
 type SortField = "email" | "total_orders" | "total_spent" | "created_at" | "last_order_date";
 type SortOrder = "asc" | "desc";
-type FilterType = "all" | "with_orders" | "without_orders" | "vip";
+type FilterType = "all" | "with_orders" | "without_orders";
 
 const safeDate = (dateStr: string | undefined | null | { seconds: number; nanoseconds: number }): Date => {
   if (!dateStr) return new Date(0);
@@ -120,7 +120,6 @@ export const AdminUsers = () => {
       switch (filter) {
         case "with_orders": return user.total_orders > 0;
         case "without_orders": return user.total_orders === 0;
-        case "vip": return user.total_spent >= 500;
         default: return true;
       }
     })
