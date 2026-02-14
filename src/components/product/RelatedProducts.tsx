@@ -45,12 +45,13 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
       </div>
 
       {/* Carousel */}
-      <div className="relative">
+      <div className="relative group/carousel">
         <Carousel
           opts={{
             align: "start",
             loop: relatedProducts.length > 4,
             dragFree: true,
+            containScroll: "trimSnaps",
           }}
           className="w-full"
         >
@@ -114,10 +115,11 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
           </CarouselContent>
 
           {relatedProducts.length > 4 && (
-            <div className="hidden md:block">
-              <CarouselPrevious className="bg-background/80 hover:bg-background border-border/50 text-foreground -left-3 h-8 w-8" />
-              <CarouselNext className="bg-background/80 hover:bg-background border-border/50 text-foreground -right-3 h-8 w-8" />
-            </div>
+            <>
+              {/* Desktop: setas dentro do carrossel, visíveis ao hover */}
+              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 bg-background/90 hover:bg-background border border-border/50 text-foreground shadow-lg opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200" />
+              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 bg-background/90 hover:bg-background border border-border/50 text-foreground shadow-lg opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200" />
+            </>
           )}
         </Carousel>
       </div>
