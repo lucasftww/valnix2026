@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { updateOrderStatus } from "@/hooks/firebase";
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { saveGuestOrder } from "@/lib/guestOrders";
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, updateDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
@@ -53,8 +53,47 @@ export default function CardPaymentCallback() {
           // Auto-deliver items
           try {
             const itemsSnap = await getDocs(query(collection(db, "order_items"), where("order_id", "==", orderId)));
-            const allDelivered = itemsSnap.size > 0 && itemsSnap.docs.every(d => d.data().delivery_code);
-            if (allDelivered) {
+            let allDelivered = true;
+
+            for (const itemDoc of itemsSnap.docs) {
+              const itemData = itemDoc.data();
+              if (itemData.delivery_code) continue;
+
+              const productId = itemData.product_id;
+              if (!productId) { allDelivered = false; continue; }
+
+              const productRef = doc(db, "products", productId);
+              const productSnap = await getDoc(productRef);
+              if (!productSnap.exists()) { allDelivered = false; continue; }
+
+              const productData = productSnap.data();
+              const deliveryType = productData.delivery_type || 'manual';
+              const qty = itemData.quantity || 1;
+
+              if (deliveryType === 'auto_fake') {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                const codes: string[] = [];
+                for (let i = 0; i < qty; i++) {
+                  let code = '';
+                  for (let j = 0; j < 16; j++) {
+                    code += chars.charAt(Math.floor(Math.random() * chars.length));
+                    if ((j + 1) % 4 === 0 && j < 15) code += '-';
+                  }
+                  codes.push(code);
+                }
+                await updateDoc(doc(db, "order_items", itemDoc.id), { delivery_code: codes.join(',') });
+              } else if (deliveryType === 'auto_real' && productData.auto_delivery_codes?.length > 0) {
+                const needed = Math.min(qty, productData.auto_delivery_codes.length);
+                const codes = productData.auto_delivery_codes.slice(0, needed);
+                await updateDoc(doc(db, "order_items", itemDoc.id), { delivery_code: codes.join(',') });
+                const remaining = productData.auto_delivery_codes.slice(needed);
+                await updateDoc(productRef, { auto_delivery_codes: remaining });
+              } else {
+                allDelivered = false;
+              }
+            }
+
+            if (allDelivered && itemsSnap.size > 0) {
               await updateOrderStatus(orderId, "completed", "paid");
             }
           } catch {}
