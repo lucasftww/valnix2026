@@ -540,10 +540,26 @@ export default function Checkout() {
         sessionStorage.setItem('valnix_card_payment', JSON.stringify({
           orderId,
           paymentId: cardData.paymentId,
+          couponId: appliedCoupon?.id || null,
+          couponCode: appliedCoupon?.code || null,
+          discountAmount: discount || 0,
+          customerName: formData.name,
+          customerEmail: formData.email || user?.email || "",
+          customerPhone: formData.phone || "",
+          userId: effectiveUserId,
+          productNames: items.map(i => i.name),
         }));
 
+        // Save flowpay_charge_id on the order for admin verification
+        try {
+          const orderRef = doc(db, "orders", orderId);
+          await updateDoc(orderRef, { flowpay_charge_id: cardData.paymentId });
+        } catch (err) {
+          console.warn('⚠️ Failed to save flowpay_charge_id:', err);
+        }
+
         // NOTE: Coupon usage is NOT incremented here because payment hasn't been confirmed yet.
-        // The card-callback page or webhook should handle coupon increment after payment confirmation.
+        // The card-callback page handles coupon increment after payment confirmation.
 
         saveCheckoutDataToProfile();
         clearCart();
@@ -648,12 +664,8 @@ export default function Checkout() {
       // Ensure order items are saved before showing payment screen
       await itemsPromise;
 
-      // Increment coupon usage on successful PIX order creation
-      if (appliedCoupon) {
-        updateDoc(doc(db, "coupons", appliedCoupon.id), {
-          current_uses: increment(1),
-        }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
-      }
+      // NOTE: Coupon usage is NOT incremented here because PIX payment hasn't been confirmed yet.
+      // The PixPayment component handles coupon increment after payment confirmation via polling.
 
       saveCheckoutDataToProfile();
 
@@ -694,6 +706,7 @@ export default function Checkout() {
               customerId={effectiveUserId}
               productNames={items.map(item => item.name)}
               productIds={items.map(item => item.id)}
+              couponId={appliedCoupon?.id || undefined}
               onPaymentConfirmed={clearCart}
             />
           </div>

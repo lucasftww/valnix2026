@@ -5,8 +5,9 @@ import { Button } from "@/components/ui/button";
 import { updateOrderStatus } from "@/hooks/firebase";
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { saveGuestOrder } from "@/lib/guestOrders";
-import { doc, getDoc, updateDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
+import { supabase } from "@/lib/supabaseHelper";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
 
@@ -103,6 +104,63 @@ export default function CardPaymentCallback() {
           if (orderDoc.exists()) {
             const od = orderDoc.data();
             trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, "card");
+
+            // Increment coupon usage if applicable
+            if (stored?.couponId) {
+              try {
+                await updateDoc(doc(db, "coupons", stored.couponId), { current_uses: increment(1) });
+                console.log(`✅ Coupon ${stored.couponId} usage incremented (card)`);
+              } catch (err) {
+                console.warn('⚠️ Failed to increment coupon usage:', err);
+              }
+            }
+
+            // Send Meta CAPI Purchase event
+            try {
+              const nameParts = (stored?.customerName || od.customer_name || '').split(' ');
+              supabase.functions.invoke('meta-capi', {
+                body: {
+                  event_name: 'Purchase',
+                  event_id: `purchase_${orderId}_${Date.now()}`,
+                  order_id: orderId,
+                  value: od.total_amount,
+                  currency: 'BRL',
+                  content_name: stored?.productNames?.join(', ') || 'card purchase',
+                  email: stored?.customerEmail || od.customer_email,
+                  phone: stored?.customerPhone || od.customer_phone || undefined,
+                  first_name: nameParts[0] || undefined,
+                  last_name: nameParts.slice(1).join(' ') || undefined,
+                  external_id: stored?.userId || od.user_id || 'guest',
+                },
+              }).then(({ error }: any) => {
+                if (error) console.warn('⚠️ Meta CAPI card Purchase failed:', error);
+                else console.log('📡 Meta CAPI Purchase sent (card payment)');
+              });
+            } catch (e) { console.warn('⚠️ Meta CAPI card error:', e); }
+
+            // Send UTMify Purchase event
+            try {
+              const utmParams = JSON.parse(sessionStorage.getItem('valnix_utm_params') || '{}');
+              supabase.functions.invoke('utmify-event', {
+                body: {
+                  order_id: orderId,
+                  event_type: 'Purchase',
+                  value: od.total_amount,
+                  customer_name: stored?.customerName || od.customer_name,
+                  customer_email: stored?.customerEmail || od.customer_email,
+                  customer_phone: stored?.customerPhone || od.customer_phone || undefined,
+                  product_name: stored?.productNames?.join(', ') || 'card purchase',
+                  utm_source: utmParams.utm_source || undefined,
+                  utm_medium: utmParams.utm_medium || undefined,
+                  utm_campaign: utmParams.utm_campaign || undefined,
+                  utm_content: utmParams.utm_content || undefined,
+                  utm_term: utmParams.utm_term || undefined,
+                },
+              }).then(({ error }: any) => {
+                if (error) console.warn('⚠️ UTMify card Purchase failed:', error);
+                else console.log('📡 UTMify Purchase sent (card payment)');
+              });
+            } catch (e) { console.warn('⚠️ UTMify card error:', e); }
 
             // Save guest order for /order/:hash
             try {

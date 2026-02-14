@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { db, auth } from "@/integrations/firebase/config";
-import { doc, updateDoc, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { doc, updateDoc, increment, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
 import { saveGuestOrder } from "@/lib/guestOrders";
 
 
@@ -22,6 +22,7 @@ interface PixPaymentProps {
   customerId?: string;
   productNames?: string[];
   productIds?: string[];
+  couponId?: string;
   onPaymentConfirmed?: () => void;
 }
 
@@ -35,6 +36,7 @@ export function PixPayment({
   customerId,
   productNames,
   productIds,
+  couponId,
   onPaymentConfirmed 
 }: PixPaymentProps) {
   console.log("🔵 PixPayment rendering with:", { qrCodeText: qrCodeText?.substring(0, 30) + "...", amount, transactionId, orderId });
@@ -65,6 +67,15 @@ export function PixPayment({
       console.error('❌ Failed to update order in Firestore:', error);
     }
 
+    // Increment coupon usage only after confirmed payment
+    if (couponId) {
+      try {
+        await updateDoc(doc(db, "coupons", couponId), { current_uses: increment(1) });
+        console.log(`✅ Coupon ${couponId} usage incremented`);
+      } catch (err) {
+        console.warn('⚠️ Failed to increment coupon usage:', err);
+      }
+    }
     // 2. Auto-delivery is handled by the FlowPay webhook (server-side).
     // Client-side only updates order status to avoid race conditions.
 
