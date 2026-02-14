@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/integrations/firebase/config";
-import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, Timestamp } from "firebase/firestore";
+import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, query, where } from "firebase/firestore";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Button } from "@/components/ui/button";
@@ -282,10 +282,9 @@ export const AdminOrders = () => {
       else if (cleanType === "cancelled") toDelete = orders.filter(o => o.status === 'cancelled');
 
       for (const order of toDelete) {
-        const itemsRef = collection(db, "order_items");
-        const itemsSnapshot = await getDocs(itemsRef);
-        const items = itemsSnapshot.docs.filter(d => d.data().order_id === order.id);
-        for (const item of items) {
+        const q = query(collection(db, "order_items"), where("order_id", "==", order.id));
+        const itemsSnapshot = await getDocs(q);
+        for (const item of itemsSnapshot.docs) {
           await deleteDoc(doc(db, "order_items", item.id));
         }
         await deleteDoc(doc(db, "orders", order.id));
@@ -331,11 +330,9 @@ export const AdminOrders = () => {
   const loadOrderItems = async (orderId: string) => {
     setLoadingItems(true);
     try {
-      const itemsRef = collection(db, "order_items");
-      const snapshot = await getDocs(itemsRef);
-      const itemsData = snapshot.docs
-        .filter(docSnapshot => docSnapshot.data().order_id === orderId)
-        .map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
+      const q = query(collection(db, "order_items"), where("order_id", "==", orderId));
+      const snapshot = await getDocs(q);
+      const itemsData = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
       setOrderItems(itemsData);
     } catch (error: any) {
       toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
@@ -348,11 +345,9 @@ export const AdminOrders = () => {
     setDetailOrder(order);
     setLoadingDetail(true);
     try {
-      const itemsRef = collection(db, "order_items");
-      const snapshot = await getDocs(itemsRef);
-      const itemsData = snapshot.docs
-        .filter(docSnapshot => docSnapshot.data().order_id === order.id)
-        .map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
+      const q = query(collection(db, "order_items"), where("order_id", "==", order.id));
+      const snapshot = await getDocs(q);
+      const itemsData = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
       setDetailItems(itemsData);
     } catch (error: any) {
       toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
