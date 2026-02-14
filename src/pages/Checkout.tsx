@@ -516,6 +516,7 @@ export default function Checkout() {
           notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
           status: "pending",
           payment_status: "pending",
+          payment_method: "pix",
           fbc: getCookie('_fbc'),
           fbp: getCookie('_fbp'),
           utm_source: utmParams.utm_source || null,
