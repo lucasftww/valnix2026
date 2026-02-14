@@ -299,6 +299,16 @@ export async function createOrderItems(items: CreateOrderItemData[], processAuto
         const codes = item.auto_delivery_codes.slice(0, neededCodes);
         deliveryCode = codes.join(',');
         console.log(`Assigned ${codes.length} real code(s) for ${item.product_name}`);
+        
+        // Remove used codes from the product to prevent double-consumption
+        try {
+          const remaining = item.auto_delivery_codes.slice(neededCodes);
+          const productDocRef = doc(db, 'products', item.product_id);
+          await updateDoc(productDocRef, { auto_delivery_codes: remaining });
+          console.log(`✅ Removed ${neededCodes} used code(s) from product ${item.product_id}, ${remaining.length} remaining`);
+        } catch (err) {
+          console.warn(`⚠️ Failed to remove used codes from product ${item.product_id}:`, err);
+        }
       }
     }
     
