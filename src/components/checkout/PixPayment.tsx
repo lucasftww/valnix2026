@@ -8,7 +8,7 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { db, auth } from "@/integrations/firebase/config";
-import { doc, updateDoc, increment, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { collection, getDocs, query, where } from "firebase/firestore";
 import { saveGuestOrder } from "@/lib/guestOrders";
 
 
@@ -54,28 +54,10 @@ export function PixPayment({
     if (paymentConfirmed) return;
     setPaymentConfirmed(true);
     
-    // 1. Update order status in Firestore (client-side has Firebase Auth)
-    try {
-      const orderRef = doc(db, "orders", orderId);
-      await updateDoc(orderRef, {
-        payment_status: 'paid',
-        status: 'processing',
-        updated_at: Timestamp.now(),
-      });
-      console.log(`✅ Order ${orderId} marked as paid in Firestore`);
-    } catch (error) {
-      console.error('❌ Failed to update order in Firestore:', error);
-    }
-
-    // NOTE: Coupon usage increment is handled server-side by the FlowPay webhook
-    // to ensure reliability and prevent double-counting.
-    // 2. Auto-delivery is handled by the FlowPay webhook (server-side).
-    // Client-side only updates order status to avoid race conditions.
-
-
-    // Purchase tracking (analytics, Meta CAPI, UTMify) is handled
-    // exclusively by the FlowPay webhook to avoid duplicates and
-    // ensure only truly approved payments are tracked.
+    // NOTE: Order status update, auto-delivery, coupon increment, and Purchase 
+    // tracking are ALL handled server-side by the FlowPay webhook or polling fallback.
+    // Client-side does NOT update order status to avoid race conditions with the webhook.
+    // The server-side code has idempotency checks (skips if already 'paid').
 
     // Save guest order for /order/:hash access
     let orderHash: string | null = null;
