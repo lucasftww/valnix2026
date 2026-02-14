@@ -473,17 +473,42 @@ export default function Checkout() {
           utm_term: utmParams.utm_term || null,
         });
 
-        // Create order items
-        const orderItemsData = items.map(item => ({
-          order_id: orderId,
-          product_id: item.id,
-          product_name: item.name,
-          product_image: item.image,
-          quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity,
-        }));
-        createOrderItems(orderItemsData).catch(err => console.warn('⚠️ Order items failed:', err));
+        // Fetch delivery info for auto-delivery
+        const productIds = items.map(i => i.id);
+        const productsDeliveryInfo: Record<string, { delivery_type: string; auto_delivery_codes: string[] | null }> = {};
+        
+        for (const productId of productIds) {
+          try {
+            const productRef = doc(db, "products", productId);
+            const productSnap = await getDoc(productRef);
+            if (productSnap.exists()) {
+              const data = productSnap.data();
+              productsDeliveryInfo[productId] = {
+                delivery_type: data.delivery_type || 'manual',
+                auto_delivery_codes: data.auto_delivery_codes || null,
+              };
+            }
+          } catch (err) {
+            console.error(`Error fetching product ${productId}:`, err);
+          }
+        }
+
+        // Create order items with auto-delivery
+        const orderItemsData = items.map(item => {
+          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: 'manual', auto_delivery_codes: null };
+          return {
+            order_id: orderId,
+            product_id: item.id,
+            product_name: item.name,
+            product_image: item.image,
+            quantity: item.quantity,
+            unit_price: item.price,
+            total_price: item.price * item.quantity,
+            delivery_type: deliveryInfo.delivery_type,
+            auto_delivery_codes: deliveryInfo.auto_delivery_codes,
+          };
+        });
+        createOrderItems(orderItemsData, true).catch(err => console.warn('⚠️ Order items failed:', err));
 
         // Create card charge via edge function
         const cardResponse = await fetch(
