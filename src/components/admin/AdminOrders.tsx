@@ -171,8 +171,16 @@ export const AdminOrders = () => {
 
   useAutoVerifyPixPayments(orders as any, () => fetchOrders());
 
+  // Keep detailOrder in sync with orders list
   useEffect(() => {
-    fetchOrders();
+    if (detailOrder) {
+      const updated = orders.find(o => o.id === detailOrder.id);
+      if (updated && (updated.status !== detailOrder.status || updated.payment_status !== detailOrder.payment_status)) {
+        setDetailOrder(updated);
+      }
+    }
+  }, [orders]);
+  useEffect(() => {
     const ordersRef = collection(db, "orders");
     const unsubscribe = onSnapshot(ordersRef, () => { fetchOrders(); });
     return () => unsubscribe();
@@ -459,10 +467,13 @@ export const AdminOrders = () => {
     </div>
   );
 
+  const safetyThresholdForCounts = new Date(Date.now() - 30 * 60 * 1000).getTime();
+  const isSafeForCount = (o: Order) => new Date(o.created_at).getTime() < safetyThresholdForCounts;
+
   const cleanCounts = {
-    unpaid: orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length,
-    processing: orders.filter(o => o.status === 'processing' && o.payment_status !== 'paid').length,
-    pending: orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length,
+    unpaid: orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled' && isSafeForCount(o)).length,
+    processing: orders.filter(o => o.status === 'processing' && o.payment_status !== 'paid' && isSafeForCount(o)).length,
+    pending: orders.filter(o => o.status === 'pending' && o.payment_status === 'pending' && isSafeForCount(o)).length,
     cancelled: orders.filter(o => o.status === 'cancelled' && o.payment_status !== 'paid').length,
   };
 
