@@ -21,6 +21,7 @@ const FloatingContactButtons = lazy(() => import("@/components/FloatingContactBu
 const CategoryCards = lazy(() => import("@/components/CategoryCards").then(m => ({ default: m.CategoryCards })));
 const FAQ = lazy(() => import("@/components/FAQ").then(m => ({ default: m.FAQ })));
 const ReviewsCarousel = lazy(() => import("@/components/product/ReviewsCarousel"));
+const RelatedProducts = lazy(() => import("@/components/product/RelatedProducts"));
 
 // Componente de imagem otimizado inline (evita re-render)
 const ProductImage = memo(({ src, alt, className, priority = false }: { 
@@ -514,6 +515,11 @@ const ProductDetail = () => {
               <ReviewsCarousel reviews={reviews} />
             </Suspense>
           )}
+
+          {/* Produtos Relacionados */}
+          <Suspense fallback={<div className="h-48 mt-6 animate-pulse bg-muted/20 rounded-2xl" />}>
+            <RelatedProducts category={product.category} currentProductId={product.id} />
+          </Suspense>
         </div>
       </main>
 
