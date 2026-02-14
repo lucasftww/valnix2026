@@ -762,11 +762,11 @@ export default function Checkout() {
               <RadioGroup 
                 value={paymentMethod} 
                 onValueChange={(value) => setPaymentMethod(value as "pix" | "balance" | "card")}
-                className="space-y-3"
+                className="space-y-2.5"
               >
                 {/* PIX Option */}
                 <div 
-                  className={`relative flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     paymentMethod === "pix" 
                       ? "border-primary bg-primary/5" 
                       : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
@@ -774,18 +774,18 @@ export default function Checkout() {
                   onClick={() => setPaymentMethod("pix")}
                 >
                   <RadioGroupItem value="pix" id="pix" className="shrink-0" />
-                  <Label htmlFor="pix" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <img src={pixLogo} alt="PIX" className="w-8 h-8 object-contain" />
-                    <div>
-                      <p className="text-[14px] font-medium text-white">PIX</p>
-                      <p className="text-[11px] text-[#888] mt-1.5">Pagamento instantâneo</p>
+                  <Label htmlFor="pix" className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
+                    <img src={pixLogo} alt="PIX" className="w-7 h-7 object-contain shrink-0" />
+                    <div className="min-w-0">
+                      <p className="text-[13px] sm:text-[14px] font-medium text-white">PIX</p>
+                      <p className="text-[11px] text-[#888]">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
 
                 {/* Card Option */}
                 <div 
-                  className={`relative flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     paymentMethod === "card" 
                       ? "border-blue-500 bg-blue-500/5" 
                       : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
@@ -794,29 +794,28 @@ export default function Checkout() {
                 >
                   <RadioGroupItem value="card" id="card" className="shrink-0" />
                   <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
-                    <div className="w-8 h-8 shrink-0 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
-                      <CreditCard className="w-4 h-4 text-white" />
+                    <div className="w-7 h-7 shrink-0 rounded-md bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                      <CreditCard className="w-3.5 h-3.5 text-white" />
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="text-[14px] font-medium text-white whitespace-nowrap">Cartão de Crédito</p>
-                        {/* Card brand logos */}
-                        <div className="flex items-center gap-1">
-                          <div className="h-5 w-8 rounded bg-[#1a1f71] flex items-center justify-center">
-                            <span className="text-[7px] font-bold text-white italic tracking-tight">VISA</span>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="text-[13px] sm:text-[14px] font-medium text-white">Cartão de Crédito</p>
+                        <div className="flex items-center gap-1 shrink-0">
+                          <div className="h-[18px] w-7 rounded-sm bg-[#1a1f71] flex items-center justify-center">
+                            <span className="text-[6px] font-bold text-white italic">VISA</span>
                           </div>
-                          <div className="h-5 w-8 rounded bg-[#0a0a0a] border border-[#333] flex items-center justify-center overflow-hidden">
+                          <div className="h-[18px] w-7 rounded-sm bg-[#0a0a0a] border border-[#333] flex items-center justify-center">
                             <div className="flex">
-                              <div className="w-2.5 h-2.5 rounded-full bg-[#eb001b] -mr-0.5" />
-                              <div className="w-2.5 h-2.5 rounded-full bg-[#f79e1b] opacity-80" />
+                              <div className="w-[7px] h-[7px] rounded-full bg-[#eb001b] -mr-[2px]" />
+                              <div className="w-[7px] h-[7px] rounded-full bg-[#f79e1b] opacity-80" />
                             </div>
                           </div>
-                          <div className="h-5 w-8 rounded bg-[#006fcf] flex items-center justify-center">
-                            <span className="text-[6px] font-bold text-white tracking-tight">AMEX</span>
+                          <div className="h-[18px] w-7 rounded-sm bg-[#006fcf] flex items-center justify-center">
+                            <span className="text-[5px] font-bold text-white">AMEX</span>
                           </div>
                         </div>
                       </div>
-                      <p className="text-[11px] text-[#888] mt-1">Pagamento instantâneo</p>
+                      <p className="text-[11px] text-[#888]">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
