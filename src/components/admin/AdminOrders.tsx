@@ -277,11 +277,20 @@ export const AdminOrders = () => {
   const handleCleanByType = async () => {
     setCleaningActive(true);
     try {
+      // Safety: never delete orders created in the last 30 minutes (webhook may still confirm payment)
+      const safetyThreshold = new Date(Date.now() - 30 * 60 * 1000).getTime();
+      const isSafeToDelete = (o: Order) => new Date(o.created_at).getTime() < safetyThreshold;
+
       let toDelete: Order[] = [];
-      if (cleanType === "unpaid") toDelete = orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled');
-      else if (cleanType === "processing") toDelete = orders.filter(o => o.status === 'processing');
-      else if (cleanType === "pending") toDelete = orders.filter(o => o.status === 'pending' && o.payment_status === 'pending');
+      if (cleanType === "unpaid") toDelete = orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled' && isSafeToDelete(o));
+      else if (cleanType === "processing") toDelete = orders.filter(o => o.status === 'processing' && isSafeToDelete(o));
+      else if (cleanType === "pending") toDelete = orders.filter(o => o.status === 'pending' && o.payment_status === 'pending' && isSafeToDelete(o));
       else if (cleanType === "cancelled") toDelete = orders.filter(o => o.status === 'cancelled');
+
+      const skipped = orders.length - toDelete.length;
+      if (skipped > 0 && cleanType !== "cancelled") {
+        console.log(`⚠️ ${skipped} pedido(s) recente(s) preservado(s) (< 30min)`);
+      }
 
       for (const order of toDelete) {
         const q = query(collection(db, "order_items"), where("order_id", "==", order.id));
