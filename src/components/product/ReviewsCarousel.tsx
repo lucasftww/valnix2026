@@ -47,7 +47,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
                       {[1, 2, 3, 4, 5].map(star => (
                         <Star 
                           key={star} 
-                          className={`w-4 h-4 ${
+                          className={`w-3 h-3 md:w-4 md:h-4 ${
                             star <= review.rating 
                               ? 'fill-yellow-500 text-yellow-500' 
                               : 'text-gray-600'
