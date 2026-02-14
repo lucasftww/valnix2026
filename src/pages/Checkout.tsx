@@ -763,19 +763,34 @@ export default function Checkout() {
                 <div 
                   className={`relative flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
                     paymentMethod === "card" 
-                      ? "border-primary bg-primary/5" 
+                      ? "border-blue-500 bg-blue-500/5" 
                       : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
                   }`}
                   onClick={() => setPaymentMethod("card")}
                 >
                   <RadioGroupItem value="card" id="card" className="shrink-0" />
                   <Label htmlFor="card" className="flex items-center gap-3 cursor-pointer flex-1">
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <CreditCard className="w-4 h-4 text-blue-500" />
+                    <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center shadow-lg shadow-blue-500/20">
+                      <CreditCard className="w-4 h-4 text-white" />
                     </div>
                     <div className="flex-1">
                       <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
-                      <p className="text-[11px] text-muted-foreground">Pagamento instantâneo</p>
+                      <p className="text-[11px] text-[#888]">Pagamento instantâneo</p>
+                    </div>
+                    {/* Card brand logos */}
+                    <div className="flex items-center gap-1.5">
+                      <div className="h-7 w-10 rounded bg-[#1a1f71] flex items-center justify-center">
+                        <span className="text-[9px] font-bold text-white italic tracking-tight">VISA</span>
+                      </div>
+                      <div className="h-7 w-10 rounded bg-[#0a0a0a] border border-[#333] flex items-center justify-center overflow-hidden">
+                        <div className="flex">
+                          <div className="w-3 h-3 rounded-full bg-[#eb001b] -mr-1" />
+                          <div className="w-3 h-3 rounded-full bg-[#f79e1b] opacity-80" />
+                        </div>
+                      </div>
+                      <div className="h-7 w-10 rounded bg-[#0a0a0a] border border-[#333] flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-[#888]">+</span>
+                      </div>
                     </div>
                   </Label>
                 </div>
