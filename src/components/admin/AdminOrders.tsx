@@ -310,7 +310,7 @@ export const AdminOrders = () => {
     setCleaningActive(true);
     try {
       // Safety: never delete orders created in the last 30 minutes (webhook may still confirm payment)
-      const safetyThreshold = new Date(Date.now() - 30 * 60 * 1000).getTime();
+      const safetyThreshold = new Date(Date.now() - 5 * 60 * 1000).getTime();
       const isSafeToDelete = (o: Order) => new Date(o.created_at).getTime() < safetyThreshold;
 
       let toDelete: Order[] = [];
@@ -467,7 +467,7 @@ export const AdminOrders = () => {
     </div>
   );
 
-  const safetyThresholdForCounts = new Date(Date.now() - 30 * 60 * 1000).getTime();
+  const safetyThresholdForCounts = new Date(Date.now() - 5 * 60 * 1000).getTime();
   const isSafeForCount = (o: Order) => new Date(o.created_at).getTime() < safetyThresholdForCounts;
 
   const cleanCounts = {
