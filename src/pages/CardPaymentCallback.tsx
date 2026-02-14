@@ -181,6 +181,7 @@ export default function CardPaymentCallback() {
       setPollCount(prev => {
         if (prev >= 24) {
           if (intervalRef.current) clearInterval(intervalRef.current);
+          setStatus("failed");
           return prev;
         }
         checkStatus();

@@ -277,6 +277,7 @@ export default function Checkout() {
             description: `Seu saldo (R$ ${userBalance.toFixed(2)}) é menor que o valor do pedido.`,
             variant: "destructive",
           });
+          setLoading(false);
           return;
         }
 
