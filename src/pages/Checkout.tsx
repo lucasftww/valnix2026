@@ -754,7 +754,7 @@ export default function Checkout() {
                     <img src={pixLogo} alt="PIX" className="w-8 h-8 object-contain" />
                     <div>
                       <p className="text-[14px] font-medium text-white">PIX</p>
-                      <p className="text-[11px] text-[#888] mt-0.5">Pagamento instantâneo</p>
+                      <p className="text-[11px] text-[#888] mt-1">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
@@ -775,7 +775,7 @@ export default function Checkout() {
                     </div>
                     <div className="flex-1">
                       <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
-                      <p className="text-[11px] text-[#888] mt-0.5">Pagamento instantâneo</p>
+                      <p className="text-[11px] text-[#888] mt-1">Pagamento instantâneo</p>
                     </div>
                     {/* Card brand logos */}
                     <div className="flex items-center gap-1.5">
@@ -822,7 +822,7 @@ export default function Checkout() {
                             R$ {userBalance.toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#888] mt-0.5">
+                        <p className="text-[11px] text-[#888] mt-1">
                           {userBalance >= finalPrice 
                             ? "Pagamento imediato" 
                             : "Saldo insuficiente"}
