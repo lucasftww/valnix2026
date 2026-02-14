@@ -309,7 +309,7 @@ export const AdminOrders = () => {
   const handleCleanByType = async () => {
     setCleaningActive(true);
     try {
-      // Safety: never delete orders created in the last 30 minutes (webhook may still confirm payment)
+      // Safety: never delete orders created in the last 5 minutes (webhook may still confirm payment)
       const safetyThreshold = new Date(Date.now() - 5 * 60 * 1000).getTime();
       const isSafeToDelete = (o: Order) => new Date(o.created_at).getTime() < safetyThreshold;
 
@@ -321,7 +321,7 @@ export const AdminOrders = () => {
 
       const skipped = orders.length - toDelete.length;
       if (skipped > 0 && cleanType !== "cancelled") {
-        console.log(`⚠️ ${skipped} pedido(s) recente(s) preservado(s) (< 30min)`);
+        console.log(`⚠️ ${skipped} pedido(s) recente(s) preservado(s) (< 5min)`);
       }
 
       for (const order of toDelete) {
