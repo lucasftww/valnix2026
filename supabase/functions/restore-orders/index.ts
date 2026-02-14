@@ -139,6 +139,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Get all order_ids that have a Purchase event in analytics (confirmed paid)
+    const allOrderIds = Array.from(uniqueOrders.keys());
+    const { data: purchaseEvents } = await supabase
+      .from('analytics_events')
+      .select('order_id')
+      .eq('event_name', 'Purchase')
+      .in('order_id', allOrderIds);
+    
+    const paidOrderIds = new Set((purchaseEvents || []).map((e: any) => e.order_id));
+
     let restored = 0;
     let skipped = 0;
     const details: string[] = [];
@@ -146,9 +156,11 @@ Deno.serve(async (req) => {
     for (const [orderId, go] of uniqueOrders) {
       const orderData = go.order_data as any;
       
-      // Only restore orders that have delivery codes (confirmed paid)
+      // Restore if has delivery code OR confirmed paid via analytics
       const hasDeliveryCode = orderData?.items?.some((item: any) => item.delivery_code);
-      if (!hasDeliveryCode) {
+      const confirmedPaid = paidOrderIds.has(orderId);
+      
+      if (!hasDeliveryCode && !confirmedPaid) {
         skipped++;
         continue;
       }
@@ -156,6 +168,7 @@ Deno.serve(async (req) => {
       // Check if order already exists in Firestore
       const existing = await getFirestoreDoc('orders', orderId);
       if (existing) {
+        details.push(`⏭️ ${orderId} já existe no Firestore`);
         skipped++;
         continue;
       }
