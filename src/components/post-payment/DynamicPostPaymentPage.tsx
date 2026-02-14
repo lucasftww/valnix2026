@@ -120,7 +120,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           method: "POST",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${firebaseIdToken}`,
+            ...(firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {}),
           },
           body: JSON.stringify({
             amount: amountInCents,
