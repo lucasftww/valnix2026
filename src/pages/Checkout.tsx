@@ -731,24 +731,7 @@ export default function Checkout() {
                     </div>
                     <div className="flex-1">
                       <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
-                      <div className="flex items-center gap-1.5 mt-1">
-                        {/* Visa */}
-                        <div className="h-5 w-8 bg-white rounded-sm flex items-center justify-center">
-                          <svg viewBox="0 0 48 32" className="h-3.5 w-auto"><path d="M19.5 25.2h-3.9l2.4-15h3.9l-2.4 15zm16.3-14.6c-.8-.3-2-.6-3.5-.6-3.9 0-6.6 2.1-6.6 5.1 0 2.2 2 3.4 3.5 4.2 1.5.8 2 1.3 2 2 0 1.1-1.2 1.6-2.3 1.6-1.5 0-2.4-.2-3.6-.8l-.5-.2-.5 3.3c.9.4 2.6.8 4.3.8 4.1 0 6.8-2 6.8-5.2 0-1.7-1-3.1-3.4-4.2-1.4-.7-2.3-1.2-2.3-1.9 0-.6.7-1.3 2.3-1.3 1.3 0 2.3.3 3 .6l.4.2.4-3.3zm9.7-.4h-3c-.9 0-1.6.3-2 1.2l-5.7 13.8h4.1l.8-2.2h5l.5 2.2h3.6l-3.3-15zm-4.8 9.7c.3-.9 1.6-4.3 1.6-4.3l.5-1.3.2 1.2.9 4.4h-3.2zM16 10.2l-3.6 10.2-.4-2c-.7-2.3-2.8-4.8-5.1-6l3.5 13.4h4.1l6.1-15.6H16z" fill="#1A1F71"/><path d="M9.6 10.2H3.5l-.1.4c4.9 1.3 8.1 4.3 9.5 7.9l-1.4-7c-.2-.9-.9-1.2-1.9-1.3z" fill="#F9A533"/></svg>
-                        </div>
-                        {/* Mastercard */}
-                        <div className="h-5 w-8 bg-white rounded-sm flex items-center justify-center">
-                          <svg viewBox="0 0 48 32" className="h-3.5 w-auto"><circle cx="18" cy="16" r="10" fill="#EB001B"/><circle cx="30" cy="16" r="10" fill="#F79E1B"/><path d="M24 8.5a10 10 0 0 1 3.7 7.5A10 10 0 0 1 24 23.5a10 10 0 0 1-3.7-7.5A10 10 0 0 1 24 8.5z" fill="#FF5F00"/></svg>
-                        </div>
-                        {/* Elo */}
-                        <div className="h-5 w-8 bg-[#000] rounded-sm flex items-center justify-center">
-                          <span className="text-[8px] font-bold text-yellow-400 tracking-wide">elo</span>
-                        </div>
-                        {/* Hipercard */}
-                        <div className="h-5 w-8 bg-[#822124] rounded-sm flex items-center justify-center">
-                          <span className="text-[7px] font-bold text-white tracking-tight">hiper</span>
-                        </div>
-                      </div>
+                      <p className="text-[11px] text-muted-foreground">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
