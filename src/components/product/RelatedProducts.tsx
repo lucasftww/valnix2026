@@ -52,6 +52,8 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
             loop: relatedProducts.length > 4,
             dragFree: true,
             containScroll: "trimSnaps",
+            duration: 20,
+            skipSnaps: true,
           }}
           className="w-full"
         >
