@@ -149,7 +149,10 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }
   };
 
+  const [skipping, setSkipping] = useState(false);
   const handleSkip = async () => {
+    if (skipping) return;
+    setSkipping(true);
     // Record skip
     try {
       await supabase.from("sale_addons").insert({
@@ -165,7 +168,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     } catch (e) { /* ignore */ }
 
     if (isStandalone) {
-      // In standalone mode, skip goes to next upsell or home
       const nextRoute = config?.next_route || "/";
       if (nextRoute === "/") {
         navigate("/", { replace: true });

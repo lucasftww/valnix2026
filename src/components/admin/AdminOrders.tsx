@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/integrations/firebase/config";
 import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, query, where } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Button } from "@/components/ui/button";
@@ -161,6 +162,7 @@ export const AdminOrders = () => {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
+  const [detailAddons, setDetailAddons] = useState<any[]>([]);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -344,11 +346,19 @@ export const AdminOrders = () => {
   const handleViewDetail = async (order: Order) => {
     setDetailOrder(order);
     setLoadingDetail(true);
+    setDetailAddons([]);
     try {
       const q = query(collection(db, "order_items"), where("order_id", "==", order.id));
       const snapshot = await getDocs(q);
       const itemsData = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
       setDetailItems(itemsData);
+
+      // Fetch upsell addons from Supabase
+      const { data: addons } = await supabase
+        .from("sale_addons")
+        .select("*")
+        .eq("order_id", order.id);
+      setDetailAddons(addons || []);
     } catch (error: any) {
       toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
     } finally {
@@ -942,7 +952,41 @@ export const AdminOrders = () => {
                     )}
                   </div>
 
-                  {/* Footer info */}
+                  {/* Upsell Addons */}
+                  {detailAddons.length > 0 && (
+                    <div className="space-y-3">
+                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                        Upsells ({detailAddons.length})
+                      </h4>
+                      <div className="space-y-2">
+                        {detailAddons.map((addon: any) => {
+                          const addonLabels: Record<string, string> = {
+                            premium_benefits: "🔥 Turbine Gift Card",
+                            delivery_priority: "⚡ Entrega Prioritária",
+                            data_swap_warranty: "🎁 Proteção Total",
+                          };
+                          const isPaid = addon.status === "paid";
+                          const isSkipped = addon.status === "skipped";
+                          return (
+                            <div key={addon.id} className={`flex items-center justify-between p-3 rounded-lg border ${
+                              isPaid ? "border-green-500/20 bg-green-500/5" : isSkipped ? "border-border/30 bg-muted/20" : "border-yellow-500/20 bg-yellow-500/5"
+                            }`}>
+                              <div className="flex items-center gap-2">
+                                <span className="text-sm">{addonLabels[addon.addon_type] || addon.addon_type}</span>
+                                <Badge variant={isPaid ? "default" : isSkipped ? "secondary" : "outline"} className={`text-[10px] ${isPaid ? "bg-green-600" : ""}`}>
+                                  {isPaid ? "Pago" : isSkipped ? "Recusado" : "Pendente"}
+                                </Badge>
+                              </div>
+                              <span className={`text-sm font-semibold ${isPaid ? "text-green-500" : "text-muted-foreground"}`}>
+                                {addon.amount > 0 ? formatCurrency(addon.amount) : "—"}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+
                   <div className="flex items-center justify-between pt-2 border-t border-border/50">
                     <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                       <Hash className="w-3 h-3" />
