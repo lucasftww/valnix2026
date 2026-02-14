@@ -35,6 +35,30 @@ export interface SaveGuestOrderParams {
  * Returns the hash for the /order/:hash URL.
  */
 export async function saveGuestOrder(params: SaveGuestOrderParams): Promise<string> {
+  // Check if a guest order already exists for this order_id
+  const { data: existing } = await supabase
+    .from("guest_orders")
+    .select("hash")
+    .eq("order_id", params.orderId)
+    .maybeSingle();
+
+  if (existing) {
+    console.log(`ℹ️ Guest order already exists for ${params.orderId}, returning existing hash`);
+    // Update the order_data with latest info (e.g., delivery codes)
+    await supabase
+      .from("guest_orders")
+      .update({
+        order_data: {
+          items: params.items,
+          total_amount: params.totalAmount,
+          payment_method: params.paymentMethod || "pix",
+          created_at: new Date().toISOString(),
+        },
+      })
+      .eq("order_id", params.orderId);
+    return existing.hash;
+  }
+
   const hash = generateHash();
 
   const { error } = await supabase.from("guest_orders").insert({

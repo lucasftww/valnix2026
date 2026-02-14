@@ -508,7 +508,7 @@ export default function Checkout() {
             auto_delivery_codes: deliveryInfo.auto_delivery_codes,
           };
         });
-        createOrderItems(orderItemsData, true).catch(err => console.warn('⚠️ Order items failed:', err));
+        createOrderItems(orderItemsData, false).catch(err => console.warn('⚠️ Order items failed:', err));
 
         // Create card charge via edge function
         const cardResponse = await fetch(
@@ -542,12 +542,8 @@ export default function Checkout() {
           paymentId: cardData.paymentId,
         }));
 
-        // Increment coupon usage only on successful order
-        if (appliedCoupon) {
-          updateDoc(doc(db, "coupons", appliedCoupon.id), {
-            current_uses: increment(1),
-          }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
-        }
+        // NOTE: Coupon usage is NOT incremented here because payment hasn't been confirmed yet.
+        // The card-callback page or webhook should handle coupon increment after payment confirmation.
 
         saveCheckoutDataToProfile();
         clearCart();
