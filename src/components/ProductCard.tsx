@@ -113,7 +113,7 @@ const ProductCardComponent = ({
               height={375}
               loading={priority ? "eager" : "lazy"}
               decoding="async"
-              fetchPriority={priority ? "high" : "auto"}
+              {...(priority ? { fetchpriority: "high" } : {})}
               onLoad={() => setImageLoaded(true)}
               className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
             />
