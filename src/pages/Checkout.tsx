@@ -871,7 +871,7 @@ export default function Checkout() {
                   <>
                     <h3 className="text-[14px] font-semibold text-white mb-2">Pagamento com Cartão</h3>
                     <p className="text-[13px] text-[#888] leading-relaxed">
-                      Você será redirecionado para uma página de checkout segura para inserir os dados do cartão de crédito.
+                      Ao finalizar a compra, você será redirecionado para um site seguro para inserir os dados do seu cartão e completar o pagamento.
                     </p>
                   </>
                 ) : (
