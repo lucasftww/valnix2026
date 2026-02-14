@@ -57,10 +57,6 @@ const HeroBannerComponent = () => {
     return null;
   }
 
-  if (banners.length === 0) {
-    return null;
-  }
-
   return (
     <section className="container px-0 md:px-8 py-0 md:py-8">
       <Carousel

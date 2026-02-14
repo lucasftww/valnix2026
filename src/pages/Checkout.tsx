@@ -388,6 +388,13 @@ export default function Checkout() {
           });
         } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
 
+        // Increment coupon usage only on successful order
+        if (appliedCoupon) {
+          updateDoc(doc(db, "coupons", appliedCoupon.id), {
+            current_uses: increment(1),
+          }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
+        }
+
         clearCart();
 
         // Save guest order for /order/:hash access
@@ -494,6 +501,13 @@ export default function Checkout() {
           paymentId: cardData.paymentId,
         }));
 
+        // Increment coupon usage only on successful order
+        if (appliedCoupon) {
+          updateDoc(doc(db, "coupons", appliedCoupon.id), {
+            current_uses: increment(1),
+          }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
+        }
+
         clearCart();
 
         // Open FlowPay checkout in new tab and navigate to callback page
@@ -595,6 +609,13 @@ export default function Checkout() {
 
       // Ensure order items are saved before showing payment screen
       await itemsPromise;
+
+      // Increment coupon usage on successful PIX order creation
+      if (appliedCoupon) {
+        updateDoc(doc(db, "coupons", appliedCoupon.id), {
+          current_uses: increment(1),
+        }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
+      }
 
       setPaymentData({
         qrCodeText: pixData.brCode,
