@@ -159,7 +159,22 @@ export default function Checkout() {
     return () => { mounted = false; };
   }, [user]);
 
-  // Form validation
+  // Save checkout data to user profile (except nickname)
+  const saveCheckoutDataToProfile = useCallback(async () => {
+    if (!user?.uid) return;
+    try {
+      const profileRef = doc(db, "profiles", user.uid);
+      const updates: Record<string, string | null> = {};
+      if (formData.name.trim()) updates.full_name = formData.name.trim();
+      if (formData.phone.trim()) updates.phone = formData.phone.trim();
+      if (Object.keys(updates).length > 0) {
+        await updateDoc(profileRef, updates);
+      }
+    } catch (err) {
+      console.warn('⚠️ Failed to save profile data:', err);
+    }
+  }, [user?.uid, formData.name, formData.phone]);
+
   const isValidEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
 
   const validation = useMemo(() => {
@@ -395,6 +410,7 @@ export default function Checkout() {
           }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
         }
 
+        saveCheckoutDataToProfile();
         clearCart();
 
         // Save guest order for /order/:hash access
@@ -508,6 +524,7 @@ export default function Checkout() {
           }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
         }
 
+        saveCheckoutDataToProfile();
         clearCart();
 
         // Open FlowPay checkout in new tab and navigate to callback page
@@ -616,6 +633,8 @@ export default function Checkout() {
           current_uses: increment(1),
         }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
       }
+
+      saveCheckoutDataToProfile();
 
       setPaymentData({
         qrCodeText: pixData.brCode,
