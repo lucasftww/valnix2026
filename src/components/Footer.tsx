@@ -1,7 +1,9 @@
 import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
-import paymentMethods from "@/assets/payment-methods-dark.png";
+import pixLogo from "@/assets/pix-logo.png";
+import visaLogo from "@/assets/visa-logo.png";
+import mastercardLogo from "@/assets/mastercard-logo.png";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
@@ -259,9 +261,13 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             </div>
 
             {/* Payment Methods */}
-            <div className="flex flex-col items-center gap-2 w-full">
+            <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-12 w-auto object-contain rounded-lg" />
+              <div className="flex items-center justify-center gap-4">
+                <img src={pixLogo} alt="PIX" className="h-8 w-8 object-contain" />
+                <img src={visaLogo} alt="Visa" className="h-8 w-8 object-contain" />
+                <img src={mastercardLogo} alt="Mastercard" className="h-8 w-8 object-contain rounded" />
+              </div>
             </div>
           </div>
 
@@ -365,7 +371,11 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 px-6 py-5 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-14 w-auto object-contain rounded-lg" />
+              <div className="flex items-center justify-center gap-5">
+                <img src={pixLogo} alt="PIX" className="h-10 w-10 object-contain" />
+                <img src={visaLogo} alt="Visa" className="h-10 w-10 object-contain" />
+                <img src={mastercardLogo} alt="Mastercard" className="h-10 w-10 object-contain rounded" />
+              </div>
             </div>
           </div>
 
