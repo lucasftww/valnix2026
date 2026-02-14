@@ -36,7 +36,7 @@ function buildFaqs(label: string) {
     },
     {
       question: "É seguro comprar na VALNIX?",
-      answer: "Sim! Priorizamos a segurança de nossos clientes em todas as etapas da compra. Utilizamos criptografia SSL no site, garantindo que suas informações e dados pessoais estejam protegidos durante a transação. Mais de 1250 clientes satisfeitos com avaliação média de 4.8 estrelas.",
+      answer: "Com certeza! A VALNIX é referência em segurança no mercado gamer. Utilizamos criptografia SSL de 256 bits em todo o site, garantindo proteção total das suas informações e dados pessoais. Já são mais de 20 mil clientes satisfeitos, com avaliação média de 4.9 estrelas. Aceitamos PIX e Cartão de Crédito com total segurança.",
     },
     {
       question: `Como recebo o ${label}?`,
