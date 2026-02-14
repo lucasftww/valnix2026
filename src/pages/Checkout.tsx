@@ -778,7 +778,6 @@ export default function Checkout() {
                     <img src={pixLogo} alt="PIX" className="w-7 h-7 object-contain shrink-0" />
                     <div className="min-w-0">
                       <p className="text-[13px] sm:text-[14px] font-medium text-white">PIX</p>
-                      <p className="text-[11px] text-[#888]">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
@@ -815,7 +814,7 @@ export default function Checkout() {
                           </div>
                         </div>
                       </div>
-                      <p className="text-[11px] text-[#888]">Pagamento instantâneo</p>
+                      
                     </div>
                   </Label>
                 </div>
