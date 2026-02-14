@@ -185,7 +185,10 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     }
   };
 
+  const [skipping, setSkipping] = useState(false);
   const handleSkip = async () => {
+    if (skipping) return;
+    setSkipping(true);
     try {
       await supabase.from("sale_addons").insert({
         order_id: orderId,
