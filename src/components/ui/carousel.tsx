@@ -180,7 +180,7 @@ const CarouselPrevious = React.forwardRef<HTMLButtonElement, React.ComponentProp
           className,
         )}
         disabled={!canScrollPrev}
-        onClick={scrollPrev}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); scrollPrev(); }}
         aria-label="Slide anterior"
         {...props}
       >
@@ -208,7 +208,7 @@ const CarouselNext = React.forwardRef<HTMLButtonElement, React.ComponentProps<ty
           className,
         )}
         disabled={!canScrollNext}
-        onClick={scrollNext}
+        onClick={(e) => { e.stopPropagation(); e.preventDefault(); scrollNext(); }}
         aria-label="Próximo slide"
         {...props}
       >

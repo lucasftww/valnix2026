@@ -39,7 +39,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
           to={`/${category}`}
           className="text-xs md:text-sm text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 font-medium"
         >
-          Ver todas
+          Ver todos
           <ChevronRight className="w-3.5 h-3.5" />
         </Link>
       </div>
@@ -116,9 +116,8 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
           {relatedProducts.length > 4 && (
             <>
-              {/* Desktop: setas dentro do carrossel, visíveis ao hover */}
-              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 bg-background/90 hover:bg-background border border-border/50 text-foreground shadow-lg opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200" />
-              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-10 h-9 w-9 bg-background/90 hover:bg-background border border-border/50 text-foreground shadow-lg opacity-0 group-hover/carousel:opacity-100 transition-opacity duration-200" />
+              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/95 hover:bg-background border border-border/50 text-foreground shadow-lg" />
+              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/95 hover:bg-background border border-border/50 text-foreground shadow-lg" />
             </>
           )}
         </Carousel>
