@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { updateOrderStatus } from "@/hooks/firebase";
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { saveGuestOrder } from "@/lib/guestOrders";
-import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where, Timestamp } from "firebase/firestore";
+import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { supabase } from "@/lib/supabaseHelper";
 
@@ -59,9 +59,64 @@ export default function CardPaymentCallback() {
             }
           } catch (err) { console.warn('⚠️ Order status update error (card):', err); }
 
-          // NOTE: Auto-delivery is handled server-side by the FlowPay PIX webhook
-          // or polling fallback in the edge function. We do NOT duplicate it client-side
-          // to prevent race conditions (e.g., double code generation for auto_real products).
+          // Auto-delivery for card payments (no webhook exists for card, so we handle it client-side)
+          // Idempotent: skips items that already have delivery_code
+          try {
+            const itemsSnap = await getDocs(query(collection(db, "order_items"), where("order_id", "==", orderId)));
+            let allDelivered = true;
+
+            for (const itemDoc of itemsSnap.docs) {
+              const itemData = itemDoc.data();
+              if (itemData.delivery_code) continue; // Already delivered
+
+              const productId = itemData.product_id;
+              if (!productId) { allDelivered = false; continue; }
+
+              const productSnap = await getDoc(doc(db, "products", productId));
+              if (!productSnap.exists()) { allDelivered = false; continue; }
+
+              const product = productSnap.data();
+              const deliveryType = product.delivery_type || 'manual';
+              const qty = itemData.quantity || 1;
+
+              if (deliveryType === 'auto_fake') {
+                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+                const codes: string[] = [];
+                for (let q = 0; q < qty; q++) {
+                  let code = '';
+                  for (let i = 0; i < 16; i++) {
+                    code += chars.charAt(Math.floor(Math.random() * chars.length));
+                    if ((i + 1) % 4 === 0 && i < 15) code += '-';
+                  }
+                  codes.push(code);
+                }
+                await updateDoc(itemDoc.ref, { delivery_code: codes.join(',') });
+                console.log(`✅ Auto-generated ${codes.length} fake code(s) for card item ${itemDoc.id}`);
+              } else if (deliveryType === 'auto_real') {
+                const autoCodes = product.auto_delivery_codes || [];
+                if (autoCodes.length > 0) {
+                  const needed = Math.min(qty, autoCodes.length);
+                  const usedCodes = autoCodes.slice(0, needed);
+                  const remaining = autoCodes.slice(needed);
+                  await updateDoc(itemDoc.ref, { delivery_code: usedCodes.join(',') });
+                  await updateDoc(doc(db, "products", productId), { auto_delivery_codes: remaining });
+                  console.log(`✅ Assigned ${usedCodes.length} real code(s) for card item ${itemDoc.id}`);
+                } else {
+                  allDelivered = false;
+                  console.warn(`⚠️ No auto_delivery_codes for product ${productId}`);
+                }
+              } else {
+                allDelivered = false; // manual delivery
+              }
+            }
+
+            if (allDelivered && itemsSnap.size > 0) {
+              await updateDoc(doc(db, "orders", orderId), { status: 'completed', updated_at: new Date().toISOString() });
+              console.log(`✅ Card order ${orderId} auto-completed`);
+            }
+          } catch (deliveryErr) {
+            console.warn('⚠️ Card auto-delivery error:', deliveryErr);
+          }
 
           // Track purchase
           const orderDoc = await getDoc(doc(db, "orders", orderId));
