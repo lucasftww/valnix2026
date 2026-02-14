@@ -307,9 +307,9 @@ export const AdminOrders = () => {
 
       let toDelete: Order[] = [];
       if (cleanType === "unpaid") toDelete = orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled' && isSafeToDelete(o));
-      else if (cleanType === "processing") toDelete = orders.filter(o => o.status === 'processing' && isSafeToDelete(o));
+      else if (cleanType === "processing") toDelete = orders.filter(o => o.status === 'processing' && o.payment_status !== 'paid' && isSafeToDelete(o));
       else if (cleanType === "pending") toDelete = orders.filter(o => o.status === 'pending' && o.payment_status === 'pending' && isSafeToDelete(o));
-      else if (cleanType === "cancelled") toDelete = orders.filter(o => o.status === 'cancelled');
+      else if (cleanType === "cancelled") toDelete = orders.filter(o => o.status === 'cancelled' && o.payment_status !== 'paid');
 
       const skipped = orders.length - toDelete.length;
       if (skipped > 0 && cleanType !== "cancelled") {
