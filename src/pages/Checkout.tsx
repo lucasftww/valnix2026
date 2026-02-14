@@ -754,7 +754,7 @@ export default function Checkout() {
                     <img src={pixLogo} alt="PIX" className="w-8 h-8 object-contain" />
                     <div>
                       <p className="text-[14px] font-medium text-white">PIX</p>
-                      <p className="text-[12px] text-[#888]">Pagamento instantâneo</p>
+                      <p className="text-[11px] text-[#888] mt-0.5">Pagamento instantâneo</p>
                     </div>
                   </Label>
                 </div>
@@ -775,7 +775,7 @@ export default function Checkout() {
                     </div>
                     <div className="flex-1">
                       <p className="text-[14px] font-medium text-white">Cartão de Crédito</p>
-                      <p className="text-[11px] text-[#888]">Pagamento instantâneo</p>
+                      <p className="text-[11px] text-[#888] mt-0.5">Pagamento instantâneo</p>
                     </div>
                     {/* Card brand logos */}
                     <div className="flex items-center gap-1.5">
@@ -788,8 +788,8 @@ export default function Checkout() {
                           <div className="w-3 h-3 rounded-full bg-[#f79e1b] opacity-80" />
                         </div>
                       </div>
-                      <div className="h-7 w-10 rounded bg-[#0a0a0a] border border-[#333] flex items-center justify-center">
-                        <span className="text-[7px] font-bold text-[#888]">+</span>
+                      <div className="h-7 w-10 rounded bg-[#006fcf] flex items-center justify-center">
+                        <span className="text-[7px] font-bold text-white tracking-tight">AMEX</span>
                       </div>
                     </div>
                   </Label>
@@ -822,7 +822,7 @@ export default function Checkout() {
                             R$ {userBalance.toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-[12px] text-[#888]">
+                        <p className="text-[11px] text-[#888] mt-0.5">
                           {userBalance >= finalPrice 
                             ? "Pagamento imediato" 
                             : "Saldo insuficiente"}
