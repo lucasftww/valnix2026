@@ -44,7 +44,7 @@ function buildFaqs(label: string) {
     },
     {
       question: "Quais formas de pagamento são aceitas?",
-      answer: "Aceitamos PIX com confirmação instantânea. Após o pagamento ser confirmado, a entrega do gift card é automática e imediata.",
+      answer: "Aceitamos PIX e Cartão de Crédito (Visa, Mastercard, Amex) com confirmação instantânea. Após o pagamento ser confirmado, a entrega do gift card é automática e imediata.",
     },
     {
       question: "E se eu precisar de ajuda?",
