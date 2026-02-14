@@ -3,6 +3,7 @@ import { db } from "@/integrations/firebase/config";
 import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, query, where } from "firebase/firestore";
 import { supabase } from "@/integrations/supabase/client";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
+import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -170,6 +171,7 @@ export const AdminOrders = () => {
   const { user } = useAuth();
 
   useAutoVerifyPixPayments(orders as any, () => fetchOrders());
+  useAutoVerifyCardPayments(orders as any, () => fetchOrders());
 
   // Keep detailOrder in sync with orders list
   useEffect(() => {
@@ -350,13 +352,16 @@ export const AdminOrders = () => {
     }
     setVerifyingPayment(order.id);
     try {
+      const isCard = order.payment_method === 'card';
       const idToken = user ? await user.getIdToken() : null;
       const headers: Record<string, string> = {};
-      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${order.flowpay_charge_id}`,
-        { headers },
-      );
+      if (idToken && !isCard) headers['Authorization'] = `Bearer ${idToken}`;
+
+      const endpoint = isCard
+        ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-card?action=status&id=${order.flowpay_charge_id}`
+        : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${order.flowpay_charge_id}`;
+
+      const response = await fetch(endpoint, { headers });
       const data = await response.json();
       if (data.success && data.status === 'COMPLETED') {
         const orderRef = doc(db, "orders", order.id);
