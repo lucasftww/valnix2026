@@ -1,4 +1,4 @@
-import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lucide-react";
+import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
@@ -261,17 +261,23 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods - Only PIX */}
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-lg text-center">
-                Forma de Pagamento:
+                Formas de Pagamento:
               </h3>
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-6 py-3">
-                <img 
-                  src={pixLogo} 
-                  alt="PIX" 
-                  className="h-8 w-auto object-contain"
-                  width={32}
-                  height={32}
-                />
-                <span className="text-sm font-semibold text-foreground">PIX - Pagamento Instantâneo</span>
+              <div className="flex flex-col gap-2 w-full max-w-xs">
+                <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-6 py-3">
+                  <img 
+                    src={pixLogo} 
+                    alt="PIX" 
+                    className="h-8 w-auto object-contain"
+                    width={32}
+                    height={32}
+                  />
+                  <span className="text-sm font-semibold text-foreground">PIX - Pagamento Instantâneo</span>
+                </div>
+                <div className="flex items-center gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-6 py-3">
+                  <CreditCard className="w-7 h-7 text-blue-500 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-foreground">Cartão de Crédito</span>
+                </div>
               </div>
             </div>
           </div>
@@ -376,17 +382,23 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods - Only PIX */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 bg-black px-12 py-7 rounded-lg">
               <h3 className="text-foreground font-bold text-lg text-center">
-                Forma de Pagamento:
+                Formas de Pagamento:
               </h3>
-              <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-6 py-3">
-                <img 
-                  src={pixLogo} 
-                  alt="PIX" 
-                  className="h-8 w-auto object-contain"
-                  width={32}
-                  height={32}
-                />
-                <span className="text-sm font-semibold text-foreground">PIX - Pagamento Instantâneo</span>
+              <div className="flex flex-col gap-2">
+                <div className="flex items-center gap-3 bg-primary/5 border border-primary/20 rounded-xl px-6 py-3">
+                  <img 
+                    src={pixLogo} 
+                    alt="PIX" 
+                    className="h-8 w-auto object-contain"
+                    width={32}
+                    height={32}
+                  />
+                  <span className="text-sm font-semibold text-foreground">PIX - Pagamento Instantâneo</span>
+                </div>
+                <div className="flex items-center gap-3 bg-blue-500/5 border border-blue-500/20 rounded-xl px-6 py-3">
+                  <CreditCard className="w-7 h-7 text-blue-500 flex-shrink-0" />
+                  <span className="text-sm font-semibold text-foreground">Cartão de Crédito</span>
+                </div>
               </div>
             </div>
           </div>
