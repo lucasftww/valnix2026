@@ -1,12 +1,7 @@
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from "@/components/ui/table";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -15,61 +10,43 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Loader2, Search, Mail, Phone, Calendar, User, Users, 
   ShoppingCart, DollarSign, TrendingUp, Crown, Star, 
-  ArrowUpDown, ChevronDown, Eye, Filter,
-  UserCheck, Clock, Wallet, Trash2, AlertTriangle
+  ChevronDown, Eye, Filter, UserCheck, Clock, Wallet, Trash2, AlertTriangle, Copy
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { AdminCard } from "./AdminCard";
 import { AdminEmptyState } from "./AdminEmptyState";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuSeparator,
-  DropdownMenuLabel,
+  DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator, DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import {
-  Dialog,
-  DialogContent,
-  DialogDescription,
-  DialogHeader,
-  DialogTitle,
-  DialogFooter,
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter,
 } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAdminUsers, useUserOrders, updateUserBalance, deleteFirebaseUser, type FirebaseUser } from "@/hooks/firebase/useFirebaseUsers";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { Label } from "@/components/ui/label";
+import {
+  Tooltip, TooltipContent, TooltipProvider, TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 type SortField = "email" | "total_orders" | "total_spent" | "created_at" | "last_order_date";
 type SortOrder = "asc" | "desc";
 type FilterType = "all" | "with_orders" | "without_orders" | "vip";
 
-// Safe date parser that handles Firestore Timestamps, ISO strings, and invalid values
 const safeDate = (dateStr: string | undefined | null | { seconds: number; nanoseconds: number }): Date => {
   if (!dateStr) return new Date(0);
-  // Handle Firestore Timestamp objects
-  if (typeof dateStr === 'object' && 'seconds' in dateStr) {
-    return new Date(dateStr.seconds * 1000);
-  }
+  if (typeof dateStr === 'object' && 'seconds' in dateStr) return new Date(dateStr.seconds * 1000);
   const d = new Date(dateStr as string);
   return isNaN(d.getTime()) ? new Date(0) : d;
 };
+
+const formatCurrency = (v: number) => v.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 export const AdminUsers = () => {
   const [searchTerm, setSearchTerm] = useState("");
@@ -85,50 +62,27 @@ export const AdminUsers = () => {
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
-
-  // Usar hooks Firebase
   const { data: users = [], isLoading, error } = useAdminUsers();
-  
-  // Buscar pedidos do usuário selecionado
   const { data: userOrders = [] } = useUserOrders(selectedUser?.id || null);
 
   const handleUpdateBalance = async () => {
     if (!balanceDialogUser) return;
-    
     const balanceValue = parseFloat(newBalance.replace(",", "."));
     if (isNaN(balanceValue) || balanceValue < 0) {
-      toast({
-        title: "Valor inválido",
-        description: "Digite um valor numérico válido (maior ou igual a zero).",
-        variant: "destructive",
-      });
+      toast({ title: "Valor inválido", description: "Digite um valor numérico válido.", variant: "destructive" });
       return;
     }
-    
     setUpdatingBalance(true);
     try {
       await updateUserBalance(balanceDialogUser.id, balanceValue);
-      
-      toast({
-        title: "Saldo atualizado!",
-        description: `Saldo de ${balanceDialogUser.email} definido para R$ ${balanceValue.toFixed(2)}`,
-      });
-      
-      // Refresh users list
+      toast({ title: "Saldo atualizado!", description: `Saldo definido para R$ ${balanceValue.toFixed(2)}` });
       queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
-      
       setBalanceDialogUser(null);
       setNewBalance("");
     } catch (error) {
       console.error("Error updating balance:", error);
-      toast({
-        title: "Erro ao atualizar saldo",
-        description: "Tente novamente mais tarde.",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingBalance(false);
-    }
+      toast({ title: "Erro ao atualizar saldo", variant: "destructive" });
+    } finally { setUpdatingBalance(false); }
   };
 
   const openBalanceDialog = (user: FirebaseUser) => {
@@ -138,89 +92,56 @@ export const AdminUsers = () => {
 
   const handleDeleteUser = async () => {
     if (!deleteDialogUser) return;
-    
     setDeletingUser(true);
     try {
       await deleteFirebaseUser(deleteDialogUser.id);
-      
-      toast({
-        title: "Usuário excluído!",
-        description: `${deleteDialogUser.email} foi removido do sistema.`,
-      });
-      
-      // Refresh users list
+      toast({ title: "Usuário excluído!", description: `${deleteDialogUser.email} removido.` });
       queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
-      
       setDeleteDialogUser(null);
     } catch (error) {
       console.error("Error deleting user:", error);
-      toast({
-        title: "Erro ao excluir usuário",
-        description: "Tente novamente mais tarde.",
-        variant: "destructive",
-      });
-    } finally {
-      setDeletingUser(false);
-    }
+      toast({ title: "Erro ao excluir", variant: "destructive" });
+    } finally { setDeletingUser(false); }
   };
 
-  // Filtrar e ordenar usuários
+  const copyToClipboard = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    toast({ title: `${label} copiado!` });
+  };
+
   const processedUsers = users
     .filter((user) => {
-      // Filtro de busca
       const matchesSearch = 
         user.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.phone?.includes(searchTerm) ||
         user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         user.nickname?.toLowerCase().includes(searchTerm.toLowerCase());
-      
       if (!matchesSearch) return false;
-
-      // Filtro por tipo
       switch (filter) {
-        case "with_orders":
-          return user.total_orders > 0;
-        case "without_orders":
-          return user.total_orders === 0;
-        case "vip":
-          return user.total_spent >= 500;
-        default:
-          return true;
+        case "with_orders": return user.total_orders > 0;
+        case "without_orders": return user.total_orders === 0;
+        case "vip": return user.total_spent >= 500;
+        default: return true;
       }
     })
     .sort((a, b) => {
       let comparison = 0;
-      
       switch (sortField) {
-        case "email":
-          comparison = a.email.localeCompare(b.email);
-          break;
-        case "total_orders":
-          comparison = a.total_orders - b.total_orders;
-          break;
-        case "total_spent":
-          comparison = a.total_spent - b.total_spent;
-          break;
-        case "created_at":
-          comparison = safeDate(a.created_at).getTime() - safeDate(b.created_at).getTime();
-          break;
+        case "email": comparison = a.email.localeCompare(b.email); break;
+        case "total_orders": comparison = a.total_orders - b.total_orders; break;
+        case "total_spent": comparison = a.total_spent - b.total_spent; break;
+        case "created_at": comparison = safeDate(a.created_at).getTime() - safeDate(b.created_at).getTime(); break;
         case "last_order_date":
           const dateA = a.last_order_date ? safeDate(a.last_order_date).getTime() : 0;
           const dateB = b.last_order_date ? safeDate(b.last_order_date).getTime() : 0;
-          comparison = dateA - dateB;
-          break;
+          comparison = dateA - dateB; break;
       }
-      
       return sortOrder === "asc" ? comparison : -comparison;
     });
 
   const toggleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortOrder(sortOrder === "asc" ? "desc" : "asc");
-    } else {
-      setSortField(field);
-      setSortOrder("desc");
-    }
+    if (sortField === field) setSortOrder(sortOrder === "asc" ? "desc" : "asc");
+    else { setSortField(field); setSortOrder("desc"); }
   };
 
   const getInitials = (user: FirebaseUser) => {
@@ -229,23 +150,21 @@ export const AdminUsers = () => {
     return user.email?.slice(0, 2).toUpperCase() || "??";
   };
 
-  const getDisplayName = (user: FirebaseUser) => {
-    return user.nickname || user.full_name || user.email?.split("@")[0] || "Usuário";
-  };
+  const getDisplayName = (user: FirebaseUser) => user.nickname || user.full_name || user.email?.split("@")[0] || "Usuário";
 
   const getUserTier = (totalSpent: number) => {
-    if (totalSpent >= 1000) return { label: "Diamante", color: "bg-gradient-to-r from-cyan-400 to-blue-500", icon: Crown };
-    if (totalSpent >= 500) return { label: "Ouro", color: "bg-gradient-to-r from-yellow-400 to-orange-500", icon: Star };
-    if (totalSpent >= 100) return { label: "Prata", color: "bg-gradient-to-r from-gray-300 to-gray-400", icon: Star };
+    if (totalSpent >= 1000) return { label: "Diamante", color: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20", icon: Crown };
+    if (totalSpent >= 500) return { label: "Ouro", color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20", icon: Star };
+    if (totalSpent >= 100) return { label: "Prata", color: "bg-gray-400/15 text-gray-400 border-gray-400/20", icon: Star };
     return null;
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case "completed": return "bg-green-500/10 text-green-600";
-      case "processing": return "bg-blue-500/10 text-blue-600";
-      case "pending": return "bg-yellow-500/10 text-yellow-600";
-      case "cancelled": return "bg-red-500/10 text-red-600";
+      case "completed": return "bg-green-500/10 text-green-500";
+      case "processing": return "bg-blue-500/10 text-blue-500";
+      case "pending": return "bg-yellow-500/10 text-yellow-500";
+      case "cancelled": return "bg-red-500/10 text-red-500";
       default: return "bg-muted text-muted-foreground";
     }
   };
@@ -260,20 +179,18 @@ export const AdminUsers = () => {
     }
   };
 
-  // Estatísticas
   const stats = {
     total: users.length,
     withOrders: users.filter(u => u.total_orders > 0).length,
     totalSpent: users.reduce((sum, u) => sum + u.total_spent, 0),
     avgOrderValue: users.filter(u => u.total_orders > 0).length > 0 
-      ? users.reduce((sum, u) => sum + u.total_spent, 0) / users.filter(u => u.total_orders > 0).reduce((sum, u) => sum + u.total_orders, 0)
-      : 0,
+      ? users.reduce((sum, u) => sum + u.total_spent, 0) / users.filter(u => u.total_orders > 0).reduce((sum, u) => sum + u.total_orders, 0) : 0,
     newThisMonth: users.filter(u => {
-      const userDate = safeDate(u.created_at);
-      const now = new Date();
-      return userDate.getMonth() === now.getMonth() && userDate.getFullYear() === now.getFullYear();
+      const d = safeDate(u.created_at); const now = new Date();
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     }).length,
     vipUsers: users.filter(u => u.total_spent >= 500).length,
+    conversionRate: users.length > 0 ? ((users.filter(u => u.total_orders > 0).length / users.length) * 100).toFixed(0) : '0',
   };
 
   if (isLoading) {
@@ -283,343 +200,249 @@ export const AdminUsers = () => {
           <div className="w-12 h-12 border-4 border-primary/20 rounded-full" />
           <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
         </div>
-        <p className="text-muted-foreground mt-4">Carregando usuários...</p>
+        <p className="text-sm text-muted-foreground mt-4">Carregando usuários...</p>
       </div>
     );
   }
 
-  if (error) {
-    return (
-      <AdminEmptyState
-        icon={Users}
-        title="Erro ao carregar usuários"
-        description={(error as Error).message}
-      />
-    );
-  }
+  if (error) return <AdminEmptyState icon={Users} title="Erro ao carregar" description={(error as Error).message} />;
 
   return (
-    <div className="space-y-6">
-      {/* Stats Cards - Grid responsivo melhorado */}
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-blue-500 to-blue-600 border-0 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-          <CardContent className="flex items-center gap-4 py-5 relative">
-            <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <Users className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl lg:text-3xl font-bold">{stats.total}</p>
-              <p className="text-xs lg:text-sm text-white/80 truncate">Total de Usuários</p>
-            </div>
-          </CardContent>
-        </Card>
+    <TooltipProvider>
+      <div className="space-y-6">
+        {/* Stats Grid */}
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Usuários</span>
+                <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
+                  <Users className="w-4 h-4 text-blue-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold">{stats.total}</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.newThisMonth} novos este mês</p>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-gradient-to-br from-green-500 to-emerald-600 border-0 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-          <CardContent className="flex items-center gap-4 py-5 relative">
-            <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <UserCheck className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl lg:text-3xl font-bold">{stats.withOrders}</p>
-              <p className="text-xs lg:text-sm text-white/80 truncate">Com Compras</p>
-            </div>
-          </CardContent>
-        </Card>
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Compradores</span>
+                <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                  <UserCheck className="w-4 h-4 text-green-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-green-500">{stats.withOrders}</p>
+              <p className="text-xs text-muted-foreground mt-1">{stats.conversionRate}% de conversão</p>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-gradient-to-br from-purple-500 to-violet-600 border-0 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-          <CardContent className="flex items-center gap-4 py-5 relative">
-            <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <DollarSign className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-xl lg:text-2xl font-bold truncate">
-                R$ {stats.totalSpent.toLocaleString('pt-BR', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </p>
-              <p className="text-xs lg:text-sm text-white/80 truncate">Total em Vendas</p>
-            </div>
-          </CardContent>
-        </Card>
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita</span>
+                <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
+                  <DollarSign className="w-4 h-4 text-purple-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold">{formatCurrency(stats.totalSpent)}</p>
+              <p className="text-xs text-muted-foreground mt-1">Ticket médio {formatCurrency(stats.avgOrderValue)}</p>
+            </CardContent>
+          </Card>
 
-        <Card className="bg-gradient-to-br from-amber-500 to-orange-600 border-0 text-white overflow-hidden relative">
-          <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10" />
-          <CardContent className="flex items-center gap-4 py-5 relative">
-            <div className="h-11 w-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0">
-              <Crown className="h-5 w-5" />
-            </div>
-            <div className="min-w-0">
-              <p className="text-2xl lg:text-3xl font-bold">{stats.vipUsers}</p>
-              <p className="text-xs lg:text-sm text-white/80 truncate">Clientes VIP</p>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
+          <Card className="border-border/50 bg-card/50">
+            <CardContent className="p-4">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">VIP</span>
+                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
+                  <Crown className="w-4 h-4 text-yellow-500" />
+                </div>
+              </div>
+              <p className="text-2xl font-bold text-yellow-500">{stats.vipUsers}</p>
+              <p className="text-xs text-muted-foreground mt-1">R$500+ em compras</p>
+            </CardContent>
+          </Card>
+        </div>
 
-      {/* Mini stats secundários */}
-      <div className="grid gap-4 grid-cols-2 md:grid-cols-4">
-        <div className="bg-muted/30 rounded-xl p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-blue-500/10 flex items-center justify-center">
-            <TrendingUp className="h-5 w-5 text-blue-500" />
+        {/* Toolbar */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input placeholder="Buscar por email, telefone, nome..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 h-9 bg-card/50" />
           </div>
-          <div>
-            <p className="text-lg font-bold">
-              R$ {stats.avgOrderValue.toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-            </p>
-            <p className="text-xs text-muted-foreground">Ticket Médio</p>
+
+          <div className="flex items-center gap-2">
+            <span className="text-sm text-muted-foreground">{processedUsers.length} de {users.length}</span>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 h-9">
+                  <Filter className="h-3.5 w-3.5" />
+                  {filter === "all" ? "Todos" : filter === "with_orders" ? "Compradores" : filter === "without_orders" ? "Sem compras" : "VIP"}
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={() => setFilter("all")}>Todos</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("with_orders")}>Compradores</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("without_orders")}>Sem compras</DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setFilter("vip")}>
+                  <Crown className="h-3.5 w-3.5 mr-1.5 text-yellow-500" /> VIP (R$500+)
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1.5 h-9">
+                  <TrendingUp className="h-3.5 w-3.5" />
+                  Ordenar
+                  <ChevronDown className="h-3 w-3" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                {([
+                  ["created_at", "Data de cadastro"],
+                  ["total_spent", "Total gasto"],
+                  ["total_orders", "Nº de pedidos"],
+                  ["last_order_date", "Último pedido"],
+                  ["email", "Email"],
+                ] as [SortField, string][]).map(([field, label]) => (
+                  <DropdownMenuItem key={field} onClick={() => toggleSort(field)}>
+                    {label} {sortField === field && (sortOrder === "desc" ? "↓" : "↑")}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
-        <div className="bg-muted/30 rounded-xl p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-green-500/10 flex items-center justify-center">
-            <Clock className="h-5 w-5 text-green-500" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">{stats.newThisMonth}</p>
-            <p className="text-xs text-muted-foreground">Novos este mês</p>
-          </div>
-        </div>
-
-        <div className="bg-muted/30 rounded-xl p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-purple-500/10 flex items-center justify-center">
-            <ShoppingCart className="h-5 w-5 text-purple-500" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">
-              {users.reduce((sum, u) => sum + u.total_orders, 0)}
-            </p>
-            <p className="text-xs text-muted-foreground">Total de Pedidos</p>
-          </div>
-        </div>
-
-        <div className="bg-muted/30 rounded-xl p-4 flex items-center gap-3">
-          <div className="h-10 w-10 rounded-lg bg-orange-500/10 flex items-center justify-center">
-            <Star className="h-5 w-5 text-orange-500" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">
-              {stats.total > 0 ? ((stats.withOrders / stats.total) * 100).toFixed(0) : 0}%
-            </p>
-            <p className="text-xs text-muted-foreground">Taxa de Conversão</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Users Table */}
-      <AdminCard
-        title="Lista de Usuários"
-        description={`${processedUsers.length} de ${users.length} usuários`}
-        icon={User}
-      >
-        <div className="space-y-4">
-          {/* Toolbar */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-            {/* Search */}
-            <div className="relative flex-1 max-w-md">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por email, telefone, nome ou apelido..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9"
-              />
-            </div>
-
-            {/* Filters */}
-            <div className="flex items-center gap-2">
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <Filter className="h-4 w-4" />
-                    {filter === "all" ? "Todos" : 
-                     filter === "with_orders" ? "Com Compras" :
-                     filter === "without_orders" ? "Sem Compras" : "VIP"}
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Filtrar por</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => setFilter("all")}>
-                    Todos os usuários
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilter("with_orders")}>
-                    Com compras
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilter("without_orders")}>
-                    Sem compras
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => setFilter("vip")}>
-                    <Crown className="h-4 w-4 mr-2 text-amber-500" />
-                    Clientes VIP (R$500+)
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button variant="outline" size="sm" className="gap-2">
-                    <ArrowUpDown className="h-4 w-4" />
-                    Ordenar
-                    <ChevronDown className="h-3 w-3" />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Ordenar por</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem onClick={() => toggleSort("created_at")}>
-                    Data de cadastro {sortField === "created_at" && (sortOrder === "desc" ? "↓" : "↑")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleSort("total_spent")}>
-                    Total gasto {sortField === "total_spent" && (sortOrder === "desc" ? "↓" : "↑")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleSort("total_orders")}>
-                    Nº de pedidos {sortField === "total_orders" && (sortOrder === "desc" ? "↓" : "↑")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleSort("last_order_date")}>
-                    Último pedido {sortField === "last_order_date" && (sortOrder === "desc" ? "↓" : "↑")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem onClick={() => toggleSort("email")}>
-                    Email {sortField === "email" && (sortOrder === "desc" ? "↓" : "↑")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            </div>
-          </div>
-
-          {/* Table */}
-          {processedUsers.length === 0 ? (
-            <AdminEmptyState
-              icon={Users}
-              title="Nenhum usuário encontrado"
-              description="Tente alterar os termos da busca ou filtros"
-            />
-          ) : (
-            <div className="border rounded-xl overflow-hidden">
+        {/* Users Table */}
+        {processedUsers.length === 0 ? (
+          <AdminEmptyState icon={Users} title="Nenhum usuário encontrado" description="Ajuste os filtros ou busca" />
+        ) : (
+          <Card className="border-border/50 overflow-hidden">
+            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
-                  <TableRow className="bg-muted/50">
-                    <TableHead>Usuário</TableHead>
-                    <TableHead className="hidden md:table-cell">Contato</TableHead>
-                    <TableHead className="text-center">Pedidos</TableHead>
-                    <TableHead className="text-right">Total Gasto</TableHead>
-                    <TableHead className="hidden lg:table-cell">Último Pedido</TableHead>
-                    <TableHead className="text-center">Ações</TableHead>
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableHead className="font-semibold">Usuário</TableHead>
+                    <TableHead className="hidden md:table-cell font-semibold">Contato</TableHead>
+                    <TableHead className="text-center font-semibold">Pedidos</TableHead>
+                    <TableHead className="text-right font-semibold">Total Gasto</TableHead>
+                    <TableHead className="hidden lg:table-cell font-semibold">Saldo</TableHead>
+                    <TableHead className="hidden lg:table-cell font-semibold">Último Pedido</TableHead>
+                    <TableHead className="text-center font-semibold w-[120px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
                   {processedUsers.map((user) => {
                     const tier = getUserTier(user.total_spent);
-                    
                     return (
-                      <TableRow key={user.id} className="hover:bg-muted/30 group">
+                      <TableRow key={user.id} className="group hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedUser(user)}>
                         <TableCell>
                           <div className="flex items-center gap-3">
                             <div className="relative shrink-0">
-                              <Avatar className="h-10 w-10 border-2 border-primary/20">
+                              <Avatar className="h-9 w-9 border border-border/50">
                                 <AvatarImage src={user.avatar_url || ""} alt="Avatar" />
-                                <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
-                                  {getInitials(user)}
-                                </AvatarFallback>
+                                <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{getInitials(user)}</AvatarFallback>
                               </Avatar>
                               {tier && (
-                                <div className={cn(
-                                  "absolute -bottom-1 -right-1 h-5 w-5 rounded-full flex items-center justify-center",
-                                  tier.color
-                                )}>
-                                  <tier.icon className="h-3 w-3 text-white" />
+                                <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-background flex items-center justify-center border border-border/50">
+                                  <tier.icon className="h-2.5 w-2.5 text-yellow-500" />
                                 </div>
                               )}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-2">
-                                <p className="font-medium select-text">{getDisplayName(user)}</p>
+                              <div className="flex items-center gap-1.5">
+                                <p className="font-medium text-sm truncate max-w-[140px]">{getDisplayName(user)}</p>
                                 {tier && (
-                                  <Badge variant="outline" className="text-[10px] px-1.5 py-0 hidden sm:inline-flex shrink-0">
+                                  <Badge variant="outline" className={cn("text-[9px] px-1 py-0 border hidden sm:inline-flex", tier.color)}>
                                     {tier.label}
                                   </Badge>
                                 )}
                               </div>
-                              <p className="text-xs text-muted-foreground select-all cursor-text">{user.email}</p>
+                              <p className="text-xs text-muted-foreground truncate max-w-[160px] select-all cursor-text">{user.email}</p>
                             </div>
                           </div>
                         </TableCell>
-                        <TableCell className="hidden md:table-cell">
-                          <div className="space-y-1">
-                            {user.phone ? (
-                              <div className="flex items-center gap-2 text-sm">
-                                <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
-                                <span className="select-all cursor-text">{user.phone}</span>
-                              </div>
-                            ) : (
-                              <span className="text-xs text-muted-foreground">Sem telefone</span>
-                            )}
-                          </div>
+                        <TableCell className="hidden md:table-cell" onClick={(e) => e.stopPropagation()}>
+                          {user.phone ? (
+                            <div className="flex items-center gap-1.5 text-sm">
+                              <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                              <span className="select-all cursor-text">{user.phone}</span>
+                              <button onClick={() => copyToClipboard(user.phone!, "Telefone")} className="text-muted-foreground hover:text-foreground transition-colors opacity-0 group-hover:opacity-100">
+                                <Copy className="h-3 w-3" />
+                              </button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground/50">—</span>
+                          )}
                         </TableCell>
                         <TableCell className="text-center">
-                          <Badge 
-                            variant={user.total_orders > 0 ? "default" : "secondary"}
-                            className={cn(
-                              "font-bold",
-                              user.total_orders > 0 && "bg-green-500/10 text-green-600 hover:bg-green-500/20",
-                              user.total_orders >= 5 && "bg-blue-500/10 text-blue-600 hover:bg-blue-500/20",
-                              user.total_orders >= 10 && "bg-purple-500/10 text-purple-600 hover:bg-purple-500/20"
-                            )}
-                          >
+                          <Badge variant="secondary" className={cn(
+                            "font-bold text-xs",
+                            user.total_orders > 0 && "bg-green-500/10 text-green-500",
+                            user.total_orders >= 5 && "bg-blue-500/10 text-blue-500",
+                            user.total_orders >= 10 && "bg-purple-500/10 text-purple-500"
+                          )}>
                             {user.total_orders}
                           </Badge>
                         </TableCell>
                         <TableCell className="text-right">
                           <span className={cn(
-                            "font-bold select-text",
+                            "font-semibold text-sm",
                             user.total_spent > 0 && "text-primary",
-                            user.total_spent >= 500 && "text-amber-500"
+                            user.total_spent >= 500 && "text-yellow-500"
                           )}>
-                            R$ {user.total_spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                            {formatCurrency(user.total_spent)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden lg:table-cell">
+                          <span className={cn("text-sm font-medium", user.balance > 0 ? "text-green-500" : "text-muted-foreground/50")}>
+                            {user.balance > 0 ? formatCurrency(user.balance) : '—'}
                           </span>
                         </TableCell>
                         <TableCell className="hidden lg:table-cell">
                           {user.last_order_date ? (
-                            <div className="text-sm text-muted-foreground">
-                              {formatDistanceToNow(safeDate(user.last_order_date), { 
-                                addSuffix: true, 
-                                locale: ptBR 
-                              })}
-                            </div>
+                            <span className="text-xs text-muted-foreground">
+                              {formatDistanceToNow(safeDate(user.last_order_date), { addSuffix: true, locale: ptBR })}
+                            </span>
                           ) : (
-                            <span className="text-xs text-muted-foreground">Nunca</span>
+                            <span className="text-xs text-muted-foreground/50">Nunca</span>
                           )}
                         </TableCell>
-                        <TableCell className="text-center">
-                          <div className="flex items-center justify-center gap-1 opacity-70 group-hover:opacity-100 transition-opacity">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8"
-                              onClick={() => setSelectedUser(user)}
-                              title="Ver detalhes"
-                            >
-                              <Eye className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-green-600 hover:text-green-700 hover:bg-green-500/10"
-                              onClick={() => openBalanceDialog(user)}
-                              title="Definir saldo"
-                            >
-                              <Wallet className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-red-500 hover:text-red-600 hover:bg-red-500/10"
-                              onClick={() => setDeleteDialogUser(user)}
-                              title="Excluir usuário"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                        <TableCell className="text-center" onClick={(e) => e.stopPropagation()}>
+                          <div className="flex items-center justify-center gap-0.5 opacity-60 group-hover:opacity-100 transition-opacity">
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => setSelectedUser(user)}>
+                                  <Eye className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Ver detalhes</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-green-500 hover:text-green-400 hover:bg-green-500/10" onClick={() => openBalanceDialog(user)}>
+                                  <Wallet className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Editar saldo</TooltipContent>
+                            </Tooltip>
+                            <Tooltip>
+                              <TooltipTrigger asChild>
+                                <Button variant="ghost" size="icon" className="h-8 w-8 text-red-500 hover:text-red-400 hover:bg-red-500/10" onClick={() => setDeleteDialogUser(user)}>
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </TooltipTrigger>
+                              <TooltipContent>Excluir</TooltipContent>
+                            </Tooltip>
                           </div>
                         </TableCell>
                       </TableRow>
@@ -628,238 +451,165 @@ export const AdminUsers = () => {
                 </TableBody>
               </Table>
             </div>
-          )}
-        </div>
-      </AdminCard>
+          </Card>
+        )}
 
-      {/* User Detail Dialog */}
-      <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-3">
-              <Avatar className="h-12 w-12 border-2 border-primary/20">
-                <AvatarImage src={selectedUser?.avatar_url || ""} alt="Avatar" />
-                <AvatarFallback className="text-lg font-bold bg-primary/10 text-primary">
-                  {selectedUser && getInitials(selectedUser)}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <p className="text-lg select-text">{selectedUser && getDisplayName(selectedUser)}</p>
-                <p className="text-sm font-normal text-muted-foreground select-all cursor-text">{selectedUser?.email}</p>
-              </div>
-            </DialogTitle>
-          </DialogHeader>
-
-          {selectedUser && (
-            <div className="space-y-4">
-              {/* User Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div className="bg-muted/30 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Total de Pedidos</p>
-                  <p className="text-xl font-bold text-primary">{selectedUser.total_orders}</p>
-                </div>
-                <div className="bg-muted/30 rounded-lg p-3">
-                  <p className="text-xs text-muted-foreground mb-1">Total Gasto</p>
-                  <p className="text-xl font-bold text-green-500">
-                    R$ {selectedUser.total_spent.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                  </p>
-                </div>
-              </div>
-
-              {/* Balance */}
-              <div className="bg-gradient-to-r from-green-500/10 to-emerald-500/10 rounded-lg p-4 border border-green-500/20">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="h-10 w-10 rounded-full bg-green-500/20 flex items-center justify-center">
-                      <Wallet className="h-5 w-5 text-green-500" />
-                    </div>
+        {/* User Detail Dialog */}
+        <Dialog open={!!selectedUser} onOpenChange={() => setSelectedUser(null)}>
+          <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+            {selectedUser && (
+              <>
+                <DialogHeader>
+                  <DialogTitle className="flex items-center gap-3">
+                    <Avatar className="h-11 w-11 border border-border/50">
+                      <AvatarImage src={selectedUser.avatar_url || ""} alt="Avatar" />
+                      <AvatarFallback className="font-bold bg-primary/10 text-primary">{getInitials(selectedUser)}</AvatarFallback>
+                    </Avatar>
                     <div>
-                      <p className="text-xs text-muted-foreground">Saldo Disponível</p>
-                      <p className="text-xl font-bold text-green-500">
-                        R$ {selectedUser.balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                      </p>
+                      <p className="text-lg">{getDisplayName(selectedUser)}</p>
+                      <p className="text-sm font-normal text-muted-foreground select-all cursor-text">{selectedUser.email}</p>
+                    </div>
+                  </DialogTitle>
+                </DialogHeader>
+
+                <div className="space-y-4">
+                  {/* Stats */}
+                  <div className="grid grid-cols-3 gap-3">
+                    <div className="bg-muted/20 rounded-xl p-3 border border-border/30 text-center">
+                      <p className="text-xl font-bold text-primary">{selectedUser.total_orders}</p>
+                      <p className="text-[11px] text-muted-foreground">Pedidos</p>
+                    </div>
+                    <div className="bg-muted/20 rounded-xl p-3 border border-border/30 text-center">
+                      <p className="text-xl font-bold text-green-500">{formatCurrency(selectedUser.total_spent)}</p>
+                      <p className="text-[11px] text-muted-foreground">Total Gasto</p>
+                    </div>
+                    <div className="bg-muted/20 rounded-xl p-3 border border-border/30 text-center">
+                      <p className="text-xl font-bold text-emerald-500">{formatCurrency(selectedUser.balance)}</p>
+                      <p className="text-[11px] text-muted-foreground">Saldo</p>
                     </div>
                   </div>
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    onClick={() => {
-                      setSelectedUser(null);
-                      openBalanceDialog(selectedUser);
-                    }}
-                    className="border-green-500/30 text-green-600 hover:bg-green-500/10"
-                  >
-                    Editar
-                  </Button>
-                </div>
-              </div>
 
-              <Separator />
-
-              {/* Contact Info */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Informações de Contato</p>
-                <div className="space-y-2 text-sm">
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Mail className="h-4 w-4 shrink-0" />
-                    <span className="select-all cursor-text">{selectedUser.email}</span>
-                  </div>
-                  {selectedUser.phone && (
-                    <div className="flex items-center gap-2 text-muted-foreground">
-                      <Phone className="h-4 w-4 shrink-0" />
-                      <span className="select-all cursor-text">{selectedUser.phone}</span>
-                    </div>
-                  )}
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Calendar className="h-4 w-4" />
-                    <span>Cadastrado em {format(safeDate(selectedUser.created_at), "dd/MM/yyyy 'às' HH:mm")}</span>
-                  </div>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Recent Orders */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium">Últimos Pedidos</p>
-                {userOrders.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    Nenhum pedido encontrado
-                  </p>
-                ) : (
-                  <ScrollArea className="h-[180px]">
-                    <div className="space-y-2">
-                      {userOrders.map((order) => (
-                        <div key={order.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
-                          <div>
-                            <p className="text-sm font-medium">#{order.id.slice(0, 8)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(safeDate(order.created_at), "dd/MM/yyyy")}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-sm font-bold text-primary">
-                              R$ {order.total_amount.toFixed(2)}
-                            </p>
-                            <Badge className={cn("text-xs", getStatusColor(order.status || "pending"))}>
-                              {getStatusLabel(order.status || "pending")}
-                            </Badge>
-                          </div>
+                  {/* Contact */}
+                  <div className="space-y-2 p-3 rounded-xl bg-muted/10 border border-border/30">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Contato</h4>
+                    <div className="space-y-1.5">
+                      <div className="flex items-center gap-2 text-sm">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                        <span className="select-all cursor-text">{selectedUser.email}</span>
+                        <button onClick={() => copyToClipboard(selectedUser.email, "E-mail")} className="text-muted-foreground hover:text-foreground"><Copy className="h-3 w-3" /></button>
+                      </div>
+                      {selectedUser.phone && (
+                        <div className="flex items-center gap-2 text-sm">
+                          <Phone className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+                          <span className="select-all cursor-text">{selectedUser.phone}</span>
+                          <button onClick={() => copyToClipboard(selectedUser.phone!, "Telefone")} className="text-muted-foreground hover:text-foreground"><Copy className="h-3 w-3" /></button>
                         </div>
-                      ))}
+                      )}
+                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                        <Calendar className="h-3.5 w-3.5 shrink-0" />
+                        <span>Cadastrado em {format(safeDate(selectedUser.created_at), "dd/MM/yyyy 'às' HH:mm")}</span>
+                      </div>
                     </div>
-                  </ScrollArea>
+                  </div>
+
+                  {/* Actions */}
+                  <div className="flex gap-2">
+                    <Button variant="outline" size="sm" className="flex-1 border-green-500/30 text-green-500 hover:bg-green-500/10" onClick={() => { setSelectedUser(null); openBalanceDialog(selectedUser); }}>
+                      <Wallet className="h-4 w-4 mr-1.5" /> Editar Saldo
+                    </Button>
+                    <Button variant="outline" size="sm" className="flex-1 border-red-500/30 text-red-500 hover:bg-red-500/10" onClick={() => { setSelectedUser(null); setDeleteDialogUser(selectedUser); }}>
+                      <Trash2 className="h-4 w-4 mr-1.5" /> Excluir
+                    </Button>
+                  </div>
+
+                  <Separator />
+
+                  {/* Orders */}
+                  <div className="space-y-2">
+                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Últimos Pedidos</h4>
+                    {userOrders.length === 0 ? (
+                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum pedido</p>
+                    ) : (
+                      <ScrollArea className="h-[180px]">
+                        <div className="space-y-2">
+                          {userOrders.map((order) => (
+                            <div key={order.id} className="flex items-center justify-between p-2.5 bg-muted/15 rounded-lg border border-border/20">
+                              <div>
+                                <code className="text-xs font-mono text-muted-foreground">#{order.id.slice(0, 8)}</code>
+                                <p className="text-[11px] text-muted-foreground">{format(safeDate(order.created_at), "dd/MM/yyyy")}</p>
+                              </div>
+                              <div className="text-right">
+                                <p className="text-sm font-bold text-primary">{formatCurrency(order.total_amount)}</p>
+                                <Badge className={cn("text-[10px] px-1.5 py-0", getStatusColor(order.status || "pending"))}>
+                                  {getStatusLabel(order.status || "pending")}
+                                </Badge>
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </ScrollArea>
+                    )}
+                  </div>
+                </div>
+              </>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Balance Dialog */}
+        <Dialog open={!!balanceDialogUser} onOpenChange={() => setBalanceDialogUser(null)}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle className="flex items-center gap-2">
+                <Wallet className="h-5 w-5 text-green-500" /> Definir Saldo
+              </DialogTitle>
+              <DialogDescription>
+                Atualizar saldo de <strong>{balanceDialogUser?.email}</strong>
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-3 py-3">
+              <div className="space-y-2">
+                <Label htmlFor="balance">Novo saldo (R$)</Label>
+                <div className="relative">
+                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm">R$</span>
+                  <Input id="balance" type="text" inputMode="decimal" value={newBalance} onChange={(e) => setNewBalance(e.target.value)} placeholder="0,00" className="pl-10 text-lg font-semibold" />
+                </div>
+                <p className="text-xs text-muted-foreground">Atual: R$ {balanceDialogUser?.balance.toFixed(2).replace(".", ",")}</p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setBalanceDialogUser(null)} disabled={updatingBalance}>Cancelar</Button>
+              <Button onClick={handleUpdateBalance} disabled={updatingBalance} className="bg-green-600 hover:bg-green-700">
+                {updatingBalance ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Salvando...</> : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+
+        {/* Delete Dialog */}
+        <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle className="flex items-center gap-2 text-red-500">
+                <AlertTriangle className="h-5 w-5" /> Excluir Usuário
+              </AlertDialogTitle>
+              <AlertDialogDescription className="space-y-2">
+                <p>Excluir <strong>{deleteDialogUser?.email}</strong>?</p>
+                <p className="text-red-500 font-medium">Esta ação não pode ser desfeita.</p>
+                {deleteDialogUser && deleteDialogUser.total_orders > 0 && (
+                  <p className="text-yellow-500">⚠️ {deleteDialogUser.total_orders} pedido(s) registrado(s).</p>
                 )}
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Balance Edit Dialog */}
-      <Dialog open={!!balanceDialogUser} onOpenChange={() => setBalanceDialogUser(null)}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle className="flex items-center gap-2">
-              <Wallet className="h-5 w-5 text-green-500" />
-              Definir Saldo
-            </DialogTitle>
-            <DialogDescription>
-              Atualize o saldo da conta de <strong>{balanceDialogUser?.email}</strong>
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="space-y-4 py-4">
-            <div className="space-y-2">
-              <Label htmlFor="balance">Novo saldo (R$)</Label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">R$</span>
-                <Input
-                  id="balance"
-                  type="text"
-                  inputMode="decimal"
-                  value={newBalance}
-                  onChange={(e) => setNewBalance(e.target.value)}
-                  placeholder="0,00"
-                  className="pl-10 text-lg font-semibold"
-                />
-              </div>
-              <p className="text-xs text-muted-foreground">
-                Saldo atual: R$ {balanceDialogUser?.balance.toFixed(2).replace(".", ",")}
-              </p>
-            </div>
-          </div>
-
-          <DialogFooter>
-            <Button
-              variant="outline"
-              onClick={() => setBalanceDialogUser(null)}
-              disabled={updatingBalance}
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleUpdateBalance}
-              disabled={updatingBalance}
-              className="bg-green-600 hover:bg-green-700"
-            >
-              {updatingBalance ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Salvando...
-                </>
-              ) : (
-                "Salvar Saldo"
-              )}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
-
-      {/* Delete User Confirmation Dialog */}
-      <AlertDialog open={!!deleteDialogUser} onOpenChange={() => setDeleteDialogUser(null)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle className="flex items-center gap-2 text-red-500">
-              <AlertTriangle className="h-5 w-5" />
-              Excluir Usuário
-            </AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                Tem certeza que deseja excluir o usuário <strong>{deleteDialogUser?.email}</strong>?
-              </p>
-              <p className="text-red-500 font-medium">
-                Esta ação não pode ser desfeita. O perfil e permissões do usuário serão removidos permanentemente.
-              </p>
-              {deleteDialogUser && deleteDialogUser.total_orders > 0 && (
-                <p className="text-amber-500">
-                  ⚠️ Este usuário possui {deleteDialogUser.total_orders} pedido(s) registrado(s).
-                </p>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deletingUser}>Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(e) => { e.preventDefault(); handleDeleteUser(); }}
-              disabled={deletingUser}
-              className="bg-red-600 hover:bg-red-700 text-white"
-            >
-              {deletingUser ? (
-                <>
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  Excluindo...
-                </>
-              ) : (
-                <>
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  Excluir Usuário
-                </>
-              )}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </div>
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel disabled={deletingUser}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={(e) => { e.preventDefault(); handleDeleteUser(); }} disabled={deletingUser} className="bg-red-600 hover:bg-red-700 text-white">
+                {deletingUser ? <><Loader2 className="h-4 w-4 animate-spin mr-1.5" />Excluindo...</> : <><Trash2 className="h-4 w-4 mr-1.5" />Excluir</>}
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+      </div>
+    </TooltipProvider>
   );
 };
