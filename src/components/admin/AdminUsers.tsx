@@ -251,18 +251,6 @@ export const AdminUsers = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">VIP</span>
-                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                  <Crown className="w-4 h-4 text-yellow-500" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-yellow-500">{stats.vipUsers}</p>
-              <p className="text-xs text-muted-foreground mt-1">R$500+ em compras</p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Toolbar */}
@@ -279,7 +267,7 @@ export const AdminUsers = () => {
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" size="sm" className="gap-1.5 h-9">
                   <Filter className="h-3.5 w-3.5" />
-                  {filter === "all" ? "Todos" : filter === "with_orders" ? "Compradores" : filter === "without_orders" ? "Sem compras" : "VIP"}
+                  {filter === "all" ? "Todos" : filter === "with_orders" ? "Compradores" : "Sem compras"}
                   <ChevronDown className="h-3 w-3" />
                 </Button>
               </DropdownMenuTrigger>
@@ -289,9 +277,6 @@ export const AdminUsers = () => {
                 <DropdownMenuItem onClick={() => setFilter("all")}>Todos</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilter("with_orders")}>Compradores</DropdownMenuItem>
                 <DropdownMenuItem onClick={() => setFilter("without_orders")}>Sem compras</DropdownMenuItem>
-                <DropdownMenuItem onClick={() => setFilter("vip")}>
-                  <Crown className="h-3.5 w-3.5 mr-1.5 text-yellow-500" /> VIP (R$500+)
-                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
 
