@@ -194,14 +194,14 @@ const ProductDetail = () => {
       <Header />
       <Navigation />
       <main className="flex-1">
-        {/* Breadcrumb */}
-        <div className="container px-4 md:px-8 pt-4 pb-2">
-          <div className="flex items-center gap-2 text-xs sm:text-sm text-muted-foreground overflow-x-auto whitespace-nowrap scrollbar-hide">
+        {/* Breadcrumb - desktop only */}
+        <div className="container px-4 md:px-8 pt-4 pb-2 hidden lg:block">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <Link to="/" className="hover:text-primary transition-colors shrink-0">
               Início
             </Link>
             <span>/</span>
-            <span className="text-foreground truncate max-w-[200px] sm:max-w-none">{product.name}</span>
+            <span className="text-foreground truncate">{product.name}</span>
           </div>
         </div>
 
@@ -232,7 +232,6 @@ const ProductDetail = () => {
 
                 {/* Info */}
                 <div className="px-5 pb-5 pt-3 space-y-2.5">
-                  <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-widest">Produto Digital</p>
                   <h1 className="text-xl font-bold leading-snug">{product.name}</h1>
 
                   <div className="flex items-center gap-1.5">
@@ -252,74 +251,16 @@ const ProductDetail = () => {
                     )}
                     <span className="text-2xl font-extrabold text-primary">R$ {totalPrice}</span>
                   </div>
-
-                  <div className="flex items-center gap-3 text-[11px] text-muted-foreground pt-1 border-t border-border/10 mt-1">
-                    <span className="flex items-center gap-1"><Zap className="w-3 h-3 text-primary" /> Entrega automática</span>
-                    <span className="flex items-center gap-1"><img src={pixLogo} alt="PIX" className="w-3.5 h-3.5" loading="lazy" /> PIX</span>
-                    <span className="flex items-center gap-1"><ShieldCheck className="w-3 h-3 text-primary" /> Seguro</span>
-                  </div>
                 </div>
               </div>
 
-              {/* Quantidade */}
-              <div className="rounded-2xl border border-border/20 bg-card p-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">Quantidade</span>
-                  <div className="flex items-center gap-3">
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      onClick={decreaseQuantity} 
-                      disabled={quantity <= 1}
-                      className="h-9 w-9 rounded-lg"
-                      aria-label="Diminuir quantidade"
-                    >
-                      <Minus className="h-4 w-4" />
-                    </Button>
-                    <span className="w-8 text-center text-lg font-bold">{quantity}</span>
-                    <Button 
-                      variant="outline" 
-                      size="icon" 
-                      onClick={increaseQuantity} 
-                      className="h-9 w-9 rounded-lg"
-                      aria-label="Aumentar quantidade"
-                    >
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              </div>
-
-              {/* Garantias */}
-              <div className="rounded-2xl border border-border/20 bg-card p-4 space-y-2.5">
-                <div className="flex items-center gap-3">
-                  <Zap className="w-4 h-4 text-primary shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Entrega Instantânea</p>
-                    <p className="text-[11px] text-muted-foreground">Receba na hora após o pagamento</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <ShieldCheck className="w-4 h-4 text-primary shrink-0" />
-                  <div>
-                    <p className="text-sm font-medium">Compra 100% Segura</p>
-                    <p className="text-[11px] text-muted-foreground">Dados protegidos e criptografados</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <img src={pixLogo} alt="PIX" className="w-4 h-4 shrink-0" loading="lazy" />
-                  <div>
-                    <p className="text-sm font-medium">Pagamento via PIX</p>
-                    <p className="text-[11px] text-muted-foreground">Aprovação instantânea</p>
-                  </div>
-                </div>
-                <div className="flex items-center gap-3">
-                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-4 h-4 shrink-0 text-primary"><rect width="20" height="14" x="2" y="5" rx="2"/><line x1="2" x2="22" y1="10" y2="10"/></svg>
-                  <div>
-                    <p className="text-sm font-medium">Cartão de Crédito</p>
-                    <p className="text-[11px] text-muted-foreground">Pagamento instantâneo</p>
-                  </div>
-                </div>
+              {/* Garantias compactas */}
+              <div className="flex items-center justify-between rounded-2xl border border-border/20 bg-card px-4 py-3">
+                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Zap className="w-3.5 h-3.5 text-primary" /> Entrega Imediata</span>
+                <span className="text-border/30">•</span>
+                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><ShieldCheck className="w-3.5 h-3.5 text-primary" /> Seguro</span>
+                <span className="text-border/30">•</span>
+                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><img src={pixLogo} alt="PIX" className="w-3.5 h-3.5" loading="lazy" /> PIX</span>
               </div>
             </div>
 
@@ -537,18 +478,37 @@ const ProductDetail = () => {
         </div>
       </main>
 
-      {/* Sticky CTA Mobile — redesenhado */}
+      {/* Sticky CTA Mobile — com quantidade integrada */}
       <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-blur-md border-t border-border/30" style={{ transform: 'translateZ(0)' }}>
         <div className="px-4 py-3 safe-area-inset-bottom flex items-center gap-3">
-          <div className="flex-1 min-w-0">
-            <span className="text-[11px] text-muted-foreground block">Total</span>
-            <span className="text-2xl font-extrabold text-primary whitespace-nowrap">R$&nbsp;{totalPrice}</span>
+          {/* Quantidade inline */}
+          <div className="flex items-center gap-1.5 shrink-0">
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={decreaseQuantity} 
+              disabled={quantity <= 1}
+              className="h-9 w-9 rounded-lg"
+              aria-label="Diminuir quantidade"
+            >
+              <Minus className="h-4 w-4" />
+            </Button>
+            <span className="w-6 text-center text-base font-bold">{quantity}</span>
+            <Button 
+              variant="outline" 
+              size="icon" 
+              onClick={increaseQuantity} 
+              className="h-9 w-9 rounded-lg"
+              aria-label="Aumentar quantidade"
+            >
+              <Plus className="h-4 w-4" />
+            </Button>
           </div>
           <Button 
             onClick={handleBuyNow} 
-            className="shrink-0 h-14 px-8 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
+            className="flex-1 h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
           >
-            Comprar Agora
+            Comprar R$&nbsp;{totalPrice}
           </Button>
         </div>
       </div>
