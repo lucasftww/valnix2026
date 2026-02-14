@@ -14,7 +14,7 @@ const NavigationComponent = () => {
 
   const prefetchCategoryProducts = useCallback((categorySlug: string) => {
     queryClient.prefetchQuery({
-      queryKey: ["products", categorySlug],
+      queryKey: ["category-products", categorySlug],
       queryFn: async () => {
         const q = query(
           collection(db, "products"),

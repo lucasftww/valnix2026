@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
 import { db } from "@/integrations/firebase/config";
-import { collection, query, where, getDocs, updateDoc, doc, increment } from "firebase/firestore";
+import { collection, query, where, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
 
 export interface CartItem {
@@ -134,11 +134,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       setDiscount(discountAmount);
 
-      // Increment usage counter
-      await updateDoc(doc(db, "coupons", couponDoc.id), {
-        current_uses: increment(1),
-      });
-
       toast.success(`Cupom ${coupon.code} aplicado! -R$ ${discountAmount.toFixed(2)}`);
     } catch (error) {
       console.error("Error applying coupon:", error);
@@ -147,15 +142,9 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [items]);
 
   const removeCoupon = useCallback(() => {
-    if (appliedCoupon) {
-      // Decrement usage counter
-      updateDoc(doc(db, "coupons", appliedCoupon.id), {
-        current_uses: increment(-1),
-      }).catch(err => console.warn("Failed to decrement coupon usage:", err));
-    }
     setAppliedCoupon(null);
     setDiscount(0);
-  }, [appliedCoupon]);
+  }, []);
 
   return (
     <CartContext.Provider
