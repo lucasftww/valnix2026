@@ -1,4 +1,5 @@
 import { memo, useMemo } from "react";
+import { ShieldCheck, Zap, CreditCard, HeadphonesIcon, HelpCircle } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -31,24 +32,29 @@ function getProductLabel(productName?: string, productCategory?: string): string
 function buildFaqs(label: string) {
   return [
     {
+      icon: HelpCircle,
       question: `Como comprar ${label} na VALNIX?`,
-      answer: `Basta escolher o ${label} desejado, adicionar ao carrinho e pagar via PIX ou Cartão de Crédito. A entrega é automática e instantânea após a confirmação do pagamento.`,
+      answer: `É super simples! Escolha o ${label} desejado, adicione ao carrinho e pague via PIX ou Cartão de Crédito (Visa, Mastercard, Amex). A entrega é automática e instantânea — você recebe em segundos após a confirmação do pagamento.`,
     },
     {
+      icon: ShieldCheck,
       question: "É seguro comprar na VALNIX?",
-      answer: "Com certeza! A VALNIX é referência em segurança no mercado gamer. Utilizamos criptografia SSL de 256 bits em todo o site, garantindo proteção total das suas informações e dados pessoais. Já são mais de 20 mil clientes satisfeitos, com avaliação média de 4.9 estrelas. Aceitamos PIX e Cartão de Crédito com total segurança.",
+      answer: "100% seguro! A VALNIX é referência em segurança no mercado gamer brasileiro. Utilizamos criptografia SSL de 256 bits, certificação Google Safe Browsing e Norton Secured. Já são mais de 20 mil clientes satisfeitos, com avaliação média de 4.9 estrelas. Seus dados estão completamente protegidos em todas as etapas.",
     },
     {
+      icon: Zap,
       question: `Como recebo o ${label}?`,
-      answer: `Após a confirmação do pagamento via PIX ou Cartão de Crédito, você receberá o código do gift card automaticamente. A entrega é instantânea — sem espera.`,
+      answer: `Entrega instantânea! Após a confirmação do pagamento via PIX ou Cartão de Crédito, você receberá o código automaticamente na tela e por e-mail. Sem espera, sem complicação — é na hora.`,
     },
     {
+      icon: CreditCard,
       question: "Quais formas de pagamento são aceitas?",
-      answer: "Aceitamos PIX e Cartão de Crédito (Visa, Mastercard, Amex) com confirmação instantânea. Após o pagamento ser confirmado, a entrega do gift card é automática e imediata.",
+      answer: "Aceitamos PIX (confirmação em segundos) e Cartão de Crédito (Visa, Mastercard, Amex) com processamento instantâneo. Ambos os métodos possuem entrega automática e imediata do seu gift card.",
     },
     {
+      icon: HeadphonesIcon,
       question: "E se eu precisar de ajuda?",
-      answer: "Nossa equipe de suporte está disponível das 10h às 23h diariamente. Entre em contato através do nosso Discord e responderemos o mais rápido possível.",
+      answer: "Nosso suporte é humanizado e rápido! Atendemos diariamente das 10h às 23h pelo nosso Discord. Tempo médio de resposta: menos de 5 minutos. Estamos sempre prontos para ajudar você.",
     },
   ];
 }
@@ -64,25 +70,34 @@ const FAQComponent = ({ productName, productCategory }: FAQProps) => {
           <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
             DÚVIDAS FREQUENTES
           </h2>
+          <p className="text-muted-foreground text-sm md:text-base mt-3">
+            Tudo o que você precisa saber antes de comprar
+          </p>
         </div>
         
         <Accordion type="single" collapsible className="space-y-3 md:space-y-4">
-          {faqs.map((faq, index) => (
-            <AccordionItem 
-              key={index} 
-              value={`item-${index}`}
-              className="border border-primary/30 md:border-2 rounded-lg px-4 md:px-6 bg-card/50 hover:border-primary transition-colors"
-            >
-              <AccordionTrigger className="text-left hover:no-underline py-4 md:py-6">
-                <span className="text-sm md:text-lg font-semibold text-primary">
-                  {faq.question}
-                </span>
-              </AccordionTrigger>
-              <AccordionContent className="text-muted-foreground text-sm md:text-base pb-4 md:pb-6">
-                {faq.answer}
-              </AccordionContent>
-            </AccordionItem>
-          ))}
+          {faqs.map((faq, index) => {
+            const Icon = faq.icon;
+            return (
+              <AccordionItem 
+                key={index} 
+                value={`item-${index}`}
+                className="border border-primary/30 md:border-2 rounded-lg px-4 md:px-6 bg-card/50 hover:border-primary transition-colors"
+              >
+                <AccordionTrigger className="text-left hover:no-underline py-4 md:py-6">
+                  <div className="flex items-center gap-3">
+                    <Icon className="w-4 h-4 md:w-5 md:h-5 text-primary shrink-0" />
+                    <span className="text-sm md:text-lg font-semibold text-primary">
+                      {faq.question}
+                    </span>
+                  </div>
+                </AccordionTrigger>
+                <AccordionContent className="text-muted-foreground text-sm md:text-base pb-4 md:pb-6 pl-7 md:pl-8">
+                  {faq.answer}
+                </AccordionContent>
+              </AccordionItem>
+            );
+          })}
         </Accordion>
       </div>
     </section>
