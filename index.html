@@ -221,6 +221,8 @@
           } catch(e){}
           return;
         }
+        // If UTMs already captured in this session, don't overwrite with auto-detection
+        try { if (sessionStorage.getItem('valnix_utm_params')) return; } catch(e){}
         var ref = (document.referrer || '').toLowerCase();
         var utm = null;
         if (params.get('gclid')) {
@@ -259,6 +261,14 @@
           utm = { utm_source: 'bing', utm_medium: 'organic', utm_campaign: 'seo' };
         } else if (!ref) {
           utm = { utm_source: 'direct', utm_medium: '(none)', utm_campaign: 'direct' };
+        } else {
+          // Unknown referrer — extract domain as source
+          try {
+            var refDomain = new URL(ref).hostname.replace('www.','');
+            utm = { utm_source: refDomain, utm_medium: 'referral', utm_campaign: 'referral' };
+          } catch(e2) {
+            utm = { utm_source: 'unknown', utm_medium: 'referral', utm_campaign: 'referral' };
+          }
         }
         if (utm) {
           var url = new URL(window.location.href);
