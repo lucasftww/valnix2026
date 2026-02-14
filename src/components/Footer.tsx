@@ -263,10 +263,10 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-4">
-                <img src={pixLogo} alt="PIX" className="h-8 w-8 object-contain" />
-                <img src={visaLogo} alt="Visa" className="h-8 w-8 object-contain" />
-                <img src={mastercardLogo} alt="Mastercard" className="h-8 w-8 object-contain rounded" />
+              <div className="flex items-center justify-center gap-5">
+                <img src={pixLogo} alt="PIX" className="h-10 w-auto object-contain" />
+                <img src={visaLogo} alt="Visa" className="h-10 w-auto object-contain" />
+                <img src={mastercardLogo} alt="Mastercard" className="h-10 w-auto object-contain rounded" />
               </div>
             </div>
           </div>
@@ -371,10 +371,10 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 px-6 py-5 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-5">
-                <img src={pixLogo} alt="PIX" className="h-10 w-10 object-contain" />
-                <img src={visaLogo} alt="Visa" className="h-10 w-10 object-contain" />
-                <img src={mastercardLogo} alt="Mastercard" className="h-10 w-10 object-contain rounded" />
+              <div className="flex items-center justify-center gap-6">
+                <img src={pixLogo} alt="PIX" className="h-12 w-auto object-contain" />
+                <img src={visaLogo} alt="Visa" className="h-12 w-auto object-contain" />
+                <img src={mastercardLogo} alt="Mastercard" className="h-12 w-auto object-contain rounded" />
               </div>
             </div>
           </div>
