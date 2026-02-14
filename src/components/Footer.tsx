@@ -259,9 +259,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             </div>
 
             {/* Payment Methods */}
-            <div className="flex flex-col items-center gap-2.5 w-full">
+            <div className="flex flex-col items-center gap-2.5 w-full bg-black rounded-xl py-4 px-4">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-8 w-auto object-contain" />
+              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-10 w-auto object-contain" />
             </div>
           </div>
 
@@ -365,7 +365,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Payment Methods */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 bg-black px-8 py-7 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-10 w-auto object-contain" />
+              <img src={paymentMethods} alt="PIX, Visa, Mastercard e mais" className="h-12 w-auto object-contain" />
             </div>
           </div>
 
