@@ -216,17 +216,17 @@ export function AdminAnalytics() {
         {/* Key Metrics */}
         <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
           {[
-            { label: 'Visualizações', value: metrics.pageViews.toLocaleString(), icon: Eye, color: 'blue' },
-            { label: 'Carrinhos', value: metrics.addToCarts.toLocaleString(), icon: ShoppingCart, color: 'orange' },
-            { label: 'Compras', value: metrics.purchases.toString(), icon: CreditCard, color: 'green' },
-            { label: 'Receita', value: metrics.revenue > 0 ? `R$ ${metrics.revenue.toLocaleString('pt-BR')}` : '—', icon: DollarSign, color: 'emerald' },
-            { label: 'Conversão', value: `${metrics.overallConversion}%`, icon: Target, color: 'purple' },
+            { label: 'Visualizações', value: metrics.pageViews.toLocaleString(), icon: Eye, bgColor: 'bg-blue-500/10', textColor: 'text-blue-500' },
+            { label: 'Carrinhos', value: metrics.addToCarts.toLocaleString(), icon: ShoppingCart, bgColor: 'bg-orange-500/10', textColor: 'text-orange-500' },
+            { label: 'Compras', value: metrics.purchases.toString(), icon: CreditCard, bgColor: 'bg-green-500/10', textColor: 'text-green-500' },
+            { label: 'Receita', value: metrics.revenue > 0 ? `R$ ${metrics.revenue.toLocaleString('pt-BR')}` : '—', icon: DollarSign, bgColor: 'bg-emerald-500/10', textColor: 'text-emerald-500' },
+            { label: 'Conversão', value: `${metrics.overallConversion}%`, icon: Target, bgColor: 'bg-purple-500/10', textColor: 'text-purple-500' },
           ].map((m) => (
             <Card key={m.label} className="border-border/50 bg-card/50">
               <CardContent className="p-4">
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-${m.color}-500/10`}>
-                    <m.icon className={`h-4 w-4 text-${m.color}-500`} />
+                  <div className={`p-2 rounded-lg ${m.bgColor}`}>
+                    <m.icon className={`h-4 w-4 ${m.textColor}`} />
                   </div>
                   <div>
                     <p className="text-xl font-bold">{m.value}</p>

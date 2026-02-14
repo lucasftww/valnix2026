@@ -233,7 +233,7 @@ export const AdminOrders = () => {
 
     if (filterStatus !== "all") result = result.filter(o => o.status === filterStatus);
     if (filterPayment !== "all") result = result.filter(o => o.payment_status === filterPayment);
-    if (filterMethod !== "all") result = result.filter(o => o.payment_method === filterMethod);
+    if (filterMethod !== "all") result = result.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === filterMethod);
 
     result = [...result].sort((a, b) => {
       if (sortField === "date") {
@@ -263,9 +263,9 @@ export const AdminOrders = () => {
       totalRevenue: paidOrders.reduce((sum, o) => sum + o.total_amount, 0),
       pendingDelivery: pendingDelivery.length,
       paidCount: paidOrders.length,
-      pixCount: orders.filter(o => o.payment_method === 'pix' && o.payment_status === 'paid').length,
-      cardCount: orders.filter(o => o.payment_method === 'card' && o.payment_status === 'paid').length,
-      balanceCount: orders.filter(o => o.payment_method === 'balance' && o.payment_status === 'paid').length,
+      pixCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'pix' && o.payment_status === 'paid').length,
+      cardCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'card' && o.payment_status === 'paid').length,
+      balanceCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'balance' && o.payment_status === 'paid').length,
     };
   }, [orders]);
 
@@ -461,9 +461,9 @@ export const AdminOrders = () => {
 
   const cleanCounts = {
     unpaid: orders.filter(o => o.payment_status !== 'paid' && o.status !== 'cancelled').length,
-    processing: orders.filter(o => o.status === 'processing').length,
+    processing: orders.filter(o => o.status === 'processing' && o.payment_status !== 'paid').length,
     pending: orders.filter(o => o.status === 'pending' && o.payment_status === 'pending').length,
-    cancelled: orders.filter(o => o.status === 'cancelled').length,
+    cancelled: orders.filter(o => o.status === 'cancelled' && o.payment_status !== 'paid').length,
   };
 
   return (
@@ -742,9 +742,9 @@ export const AdminOrders = () => {
                         <TableCell>
                           <div className="flex items-center gap-1.5">
                             <div className={`w-6 h-6 rounded-md flex items-center justify-center ${
-                              order.payment_method === 'pix' ? 'bg-green-500/10 text-green-500' :
-                              order.payment_method === 'card' ? 'bg-blue-500/10 text-blue-500' :
-                              order.payment_method === 'balance' ? 'bg-purple-500/10 text-purple-500' :
+                              (order.payment_method || (order.payment_status === 'paid' ? 'pix' : null)) === 'pix' ? 'bg-green-500/10 text-green-500' :
+                              (order.payment_method || (order.payment_status === 'paid' ? 'pix' : null)) === 'card' ? 'bg-blue-500/10 text-blue-500' :
+                              (order.payment_method || (order.payment_status === 'paid' ? 'pix' : null)) === 'balance' ? 'bg-purple-500/10 text-purple-500' :
                               'bg-muted text-muted-foreground'
                             }`}>
                                {getPaymentMethodIcon(order.payment_method, order.payment_status)}
