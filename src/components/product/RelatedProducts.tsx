@@ -28,7 +28,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
   if (relatedProducts.length === 0) return null;
 
   return (
-    <section className="mt-8 lg:mt-12 max-w-7xl mx-auto">
+    <section className="mt-8 lg:mt-12">
       {/* Header */}
       <div className="flex items-center justify-between mb-4">
         <h2 className="text-base md:text-lg font-bold flex items-center gap-2 text-foreground">
@@ -63,7 +63,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
               return (
                 <CarouselItem
                   key={product.id}
-                  className="pl-2 md:pl-3 basis-[38%] sm:basis-[30%] md:basis-[22%] lg:basis-[19%]"
+                  className="pl-2 md:pl-3 basis-[42%] sm:basis-[32%] md:basis-1/4 lg:basis-1/5"
                 >
                   <Link
                     to={ROUTES.PRODUCT(product.id)}
