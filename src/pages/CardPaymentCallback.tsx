@@ -48,56 +48,20 @@ export default function CardPaymentCallback() {
           if (intervalRef.current) clearInterval(intervalRef.current);
           sessionStorage.removeItem('valnix_card_payment');
 
-          // Mark order as paid
-          await updateOrderStatus(orderId, "processing", "paid");
-
-          // Auto-deliver items
+          // Mark order as paid (only if not already paid by webhook)
           try {
-            const itemsSnap = await getDocs(query(collection(db, "order_items"), where("order_id", "==", orderId)));
-            let allDelivered = true;
-
-            for (const itemDoc of itemsSnap.docs) {
-              const itemData = itemDoc.data();
-              if (itemData.delivery_code) continue;
-
-              const productId = itemData.product_id;
-              if (!productId) { allDelivered = false; continue; }
-
-              const productRef = doc(db, "products", productId);
-              const productSnap = await getDoc(productRef);
-              if (!productSnap.exists()) { allDelivered = false; continue; }
-
-              const productData = productSnap.data();
-              const deliveryType = productData.delivery_type || 'manual';
-              const qty = itemData.quantity || 1;
-
-              if (deliveryType === 'auto_fake') {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                const codes: string[] = [];
-                for (let i = 0; i < qty; i++) {
-                  let code = '';
-                  for (let j = 0; j < 16; j++) {
-                    code += chars.charAt(Math.floor(Math.random() * chars.length));
-                    if ((j + 1) % 4 === 0 && j < 15) code += '-';
-                  }
-                  codes.push(code);
-                }
-                await updateDoc(doc(db, "order_items", itemDoc.id), { delivery_code: codes.join(',') });
-              } else if (deliveryType === 'auto_real' && productData.auto_delivery_codes?.length > 0) {
-                const needed = Math.min(qty, productData.auto_delivery_codes.length);
-                const codes = productData.auto_delivery_codes.slice(0, needed);
-                await updateDoc(doc(db, "order_items", itemDoc.id), { delivery_code: codes.join(',') });
-                const remaining = productData.auto_delivery_codes.slice(needed);
-                await updateDoc(productRef, { auto_delivery_codes: remaining });
-              } else {
-                allDelivered = false;
-              }
+            const orderDoc2 = await getDoc(doc(db, "orders", orderId));
+            if (orderDoc2.exists() && orderDoc2.data()?.payment_status !== 'paid') {
+              await updateOrderStatus(orderId, "processing", "paid");
+              console.log(`✅ Card order ${orderId} marked as paid (client-side)`);
+            } else {
+              console.log(`ℹ️ Card order ${orderId} already paid (webhook handled it)`);
             }
+          } catch (err) { console.warn('⚠️ Order status update error (card):', err); }
 
-            if (allDelivered && itemsSnap.size > 0) {
-              await updateOrderStatus(orderId, "completed", "paid");
-            }
-          } catch (err) { console.warn('⚠️ Auto-delivery error (card):', err); }
+          // NOTE: Auto-delivery is handled server-side by the FlowPay PIX webhook
+          // or polling fallback in the edge function. We do NOT duplicate it client-side
+          // to prevent race conditions (e.g., double code generation for auto_real products).
 
           // Track purchase
           const orderDoc = await getDoc(doc(db, "orders", orderId));

@@ -265,6 +265,7 @@ export default function Checkout() {
           description: "O valor mínimo para finalizar um pedido é R$ 1,00",
           variant: "destructive",
         });
+        setLoading(false);
         return;
       }
 
