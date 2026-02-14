@@ -63,7 +63,7 @@ function getPathname(url: string | null): string {
 }
 
 export function AdminAnalytics() {
-  const [dateRange, setDateRange] = useState<'7d' | '30d' | 'all'>('7d');
+  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
   
   const { data: events = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['analytics-events', dateRange],
@@ -125,7 +125,7 @@ export function AdminAnalytics() {
   const eventsByDay = useMemo(() => {
     const days: Record<string, Record<string, number | string>> = {};
     const today = new Date();
-    const daysCount = dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 30;
+    const daysCount = dateRange === 'today' ? 1 : dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 30;
     
     for (let i = daysCount - 1; i >= 0; i--) {
       const date = format(subDays(today, i), 'dd/MM');
@@ -201,6 +201,7 @@ export function AdminAnalytics() {
           <div className="flex items-center gap-2">
             <Tabs value={dateRange} onValueChange={(v) => setDateRange(v as typeof dateRange)}>
               <TabsList className="bg-muted/50 h-9">
+                <TabsTrigger value="today" className="text-xs">Hoje</TabsTrigger>
                 <TabsTrigger value="7d" className="text-xs">7 dias</TabsTrigger>
                 <TabsTrigger value="30d" className="text-xs">30 dias</TabsTrigger>
                 <TabsTrigger value="all" className="text-xs">Todos</TabsTrigger>
