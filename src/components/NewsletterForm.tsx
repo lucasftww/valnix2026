@@ -2,7 +2,8 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/lib/supabaseHelper";
+import { db } from "@/integrations/firebase/config";
+import { collection, addDoc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { z } from "zod";
 
@@ -27,7 +28,6 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Verificar se está logado
     if (!user) {
       toast({
         title: "Você deve logar primeiro",
@@ -37,7 +37,6 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
       return;
     }
     
-    // Validar email
     const validation = newsletterSchema.safeParse({ email });
     
     if (!validation.success) {
@@ -52,21 +51,22 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
     setIsLoading(true);
 
     try {
-      const { error } = await supabase
-        .from("newsletter_subscribers")
-        .insert([{ email: validation.data.email }]);
-
-      if (error) {
-        // Email já existe
-        if (error.code === "23505") {
-          toast({
-            title: "Email já cadastrado",
-            description: "Este email já está inscrito na nossa newsletter!",
-          });
-        } else {
-          throw error;
-        }
+      const subscribersRef = collection(db, "newsletter_subscribers");
+      
+      // Check if email already exists
+      const existingQuery = query(subscribersRef, where("email", "==", validation.data.email.toLowerCase()));
+      const existingSnapshot = await getDocs(existingQuery);
+      
+      if (!existingSnapshot.empty) {
+        toast({
+          title: "Email já cadastrado",
+          description: "Este email já está inscrito na nossa newsletter!",
+        });
       } else {
+        await addDoc(subscribersRef, {
+          email: validation.data.email.toLowerCase(),
+          created_at: serverTimestamp(),
+        });
         toast({
           title: "Obrigado pela assinatura!",
           description: "Você receberá nossas novidades em breve 🎉",

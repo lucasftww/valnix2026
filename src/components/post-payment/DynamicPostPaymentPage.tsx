@@ -1,7 +1,8 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
-import { supabase } from "@/lib/supabaseHelper";
+import { db } from "@/integrations/firebase/config";
+import { collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -26,6 +27,26 @@ const iconMap: Record<string, typeof Shield> = {
   delivery_priority: Zap,
   data_swap_warranty: Shield,
 };
+
+/** Helper to insert a sale_addon doc into Firestore */
+async function insertSaleAddon(data: Record<string, any>) {
+  const saleAddonsRef = collection(db, "sale_addons");
+  await addDoc(saleAddonsRef, {
+    ...data,
+    created_at: serverTimestamp(),
+    updated_at: serverTimestamp(),
+  });
+}
+
+/** Helper to update a sale_addon doc in Firestore by order_id + addon_type */
+async function updateSaleAddon(orderId: string, addonType: string, updates: Record<string, any>) {
+  const saleAddonsRef = collection(db, "sale_addons");
+  const q = query(saleAddonsRef, where("order_id", "==", orderId), where("addon_type", "==", addonType));
+  const snapshot = await getDocs(q);
+  for (const doc of snapshot.docs) {
+    await updateDoc(doc.ref, { ...updates, updated_at: serverTimestamp() });
+  }
+}
 
 export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProps) {
   const navigate = useNavigate();
@@ -85,8 +106,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         if (data.success && data.status === "COMPLETED") {
           clearInterval(poll);
           setPaymentConfirmed(true);
-          // sale_addons update handled by webhook
-          // Frontend only needs to update UI
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
           const nextRoute = config?.next_route || "/";
           if (nextRoute === "/order" && hashParam) {
@@ -111,8 +130,8 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     if (!config || purchasing) return;
     setPurchasing(true);
     try {
-      // Record addon attempt
-      await supabase.from("sale_addons").insert({
+      // Record addon attempt in Firestore
+      await insertSaleAddon({
         order_id: orderId,
         user_id: user?.uid || null,
         addon_type: addonType,
@@ -143,12 +162,11 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       const data = await pixResponse.json();
       if (!pixResponse.ok || !data.success) throw new Error(data.error || "Erro ao gerar PIX");
 
-      // Update addon with charge info
-      await supabase
-        .from("sale_addons")
-        .update({ pix_code: data.brCode, flowpay_charge_id: data.chargeId, updated_at: new Date().toISOString() })
-        .eq("order_id", orderId)
-        .eq("addon_type", addonType);
+      // Update addon with charge info in Firestore
+      await updateSaleAddon(orderId, addonType, {
+        pix_code: data.brCode,
+        flowpay_charge_id: data.chargeId,
+      });
 
       setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
     } catch (err: any) {
@@ -163,9 +181,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const handleSkip = async () => {
     if (skipping) return;
     setSkipping(true);
-    // Record skip
+    // Record skip in Firestore
     try {
-      await supabase.from("sale_addons").insert({
+      await insertSaleAddon({
         order_id: orderId,
         addon_type: addonType,
         status: "skipped",
@@ -182,14 +200,11 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     if (isStandalone) {
       navigate(nextRoute === "/" ? "/" : nextRoute, { replace: true });
     } else {
-      // If next_route is "/order" and we have a hash, redirect to /order/{hash}
       if (nextRoute === "/order" && hashParam) {
         navigate(`/order/${hashParam}`, { replace: true });
       } else if (nextRoute === "/order" && !hashParam) {
-        // Logged-in user without hash, go home
         navigate("/", { replace: true });
       } else {
-        // Forward order_id and hash to next upsell page
         const params = new URLSearchParams();
         params.set("order_id", orderId);
         if (hashParam) params.set("hash", hashParam);
