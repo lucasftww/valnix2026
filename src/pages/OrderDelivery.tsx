@@ -1,8 +1,7 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
 import { db } from "@/integrations/firebase/config";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -105,9 +104,11 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
       try {
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${pixData.chargeId}`
-        );
+        const { invokeFunction } = await import("@/lib/apiHelper");
+        const response = await invokeFunction('flowpay-pix', {
+          method: 'GET',
+          queryParams: { action: 'status', chargeId: pixData.chargeId },
+        });
         const data = await response.json();
         if (data.success && data.status === "COMPLETED") {
           clearInterval(poll);
@@ -148,7 +149,8 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     try {
       const utmParams = JSON.parse(sessionStorage.getItem('valnix_utm_params') || '{}');
       
-      await supabase.from("sale_addons").insert({
+      const saleAddonsRef = collection(db, "sale_addons");
+      const addonDocRef = await addDoc(saleAddonsRef, {
         order_id: orderId,
         user_id: userId || null,
         addon_type: config.addon_type,
@@ -159,30 +161,33 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
         utm_source: utmParams.utm_source || null,
         utm_medium: utmParams.utm_medium || null,
         utm_campaign: utmParams.utm_campaign || null,
+        pix_code: null,
+        pix_qr_code: null,
+        flowpay_charge_id: null,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
       });
 
       const amountInCents = Math.round(config.price * 100);
-      const pixResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            amount: amountInCents,
-            orderId: `upsell-${orderId}-${config.addon_type}`,
-            description: `Upsell ${config.title}`,
-            customer: { name: userName || "Cliente", email: userEmail || undefined },
-          }),
-        }
-      );
+      const { invokeFunction } = await import("@/lib/apiHelper");
+      const pixResponse = await invokeFunction('flowpay-pix', {
+        method: "POST",
+        queryParams: { action: 'create' },
+        body: {
+          amount: amountInCents,
+          orderId: `upsell-${orderId}-${config.addon_type}`,
+          description: `Upsell ${config.title}`,
+          customer: { name: userName || "Cliente", email: userEmail || undefined },
+        },
+      });
       const data = await pixResponse.json();
       if (!pixResponse.ok || !data.success) throw new Error(data.error || "Erro ao gerar PIX");
 
-      await supabase
-        .from("sale_addons")
-        .update({ pix_code: data.brCode, flowpay_charge_id: data.chargeId, updated_at: new Date().toISOString() })
-        .eq("order_id", orderId)
-        .eq("addon_type", config.addon_type);
+      await updateDoc(addonDocRef, {
+        pix_code: data.brCode,
+        flowpay_charge_id: data.chargeId,
+        updated_at: serverTimestamp(),
+      });
 
       setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
     } catch (err: any) {
@@ -197,12 +202,15 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     if (skipping) return;
     setSkipping(true);
     try {
-      await supabase.from("sale_addons").insert({
+      const saleAddonsRef2 = collection(db, "sale_addons");
+      await addDoc(saleAddonsRef2, {
         order_id: orderId,
         addon_type: config.addon_type,
         status: "skipped",
         amount: 0,
         user_id: userId || null,
+        created_at: serverTimestamp(),
+        updated_at: serverTimestamp(),
       });
     } catch (e) { /* ignore */ }
     onSkip();
@@ -356,19 +364,30 @@ export default function OrderDelivery() {
 
     const fetchOrder = async () => {
       try {
-        const { data, error } = await supabase
-          .from("guest_orders")
-          .select("*")
-          .eq("hash", hash)
-          .maybeSingle();
+        const guestOrdersRef = collection(db, "guest_orders");
+        const q = query(guestOrdersRef, where("hash", "==", hash));
+        const snapshot = await getDocs(q);
 
-        if (error || !data) {
+        if (snapshot.empty) {
           setNotFound(true);
         } else {
-          if (new Date(data.expires_at) < new Date()) {
+          const docData = snapshot.docs[0].data();
+          const expiresAt = docData.expires_at?.toDate ? docData.expires_at.toDate() : new Date(docData.expires_at);
+          if (expiresAt < new Date()) {
             setNotFound(true);
           } else {
-            setOrder(data as unknown as GuestOrderData);
+            setOrder({
+              id: snapshot.docs[0].id,
+              hash: docData.hash,
+              order_id: docData.order_id,
+              email: docData.email,
+              customer_name: docData.customer_name,
+              customer_phone: docData.customer_phone,
+              order_data: docData.order_data,
+              linked: docData.linked,
+              created_at: docData.created_at?.toDate ? docData.created_at.toDate().toISOString() : new Date().toISOString(),
+              expires_at: expiresAt.toISOString(),
+            } as GuestOrderData);
           }
         }
       } catch (err) {

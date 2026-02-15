@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { collection, getDocs, updateDoc, query, where } from "firebase/firestore";
 
 /**
  * On login/signup, AUTOMATICALLY links guest orders by email.
@@ -22,30 +23,28 @@ export function useGuestOrderLinking(userId: string | undefined, userEmail: stri
 
     const autoLink = async () => {
       try {
-        // Find unlinked guest orders for this email
-        const { data, error } = await supabase
-          .from("guest_orders")
-          .select("id, order_id, hash")
-          .eq("email", userEmail.toLowerCase())
-          .eq("linked", false);
+        const guestOrdersRef = collection(db, "guest_orders");
+        const q = query(
+          guestOrdersRef,
+          where("email", "==", userEmail.toLowerCase()),
+          where("linked", "==", false)
+        );
+        const snapshot = await getDocs(q);
 
-        if (error || !data || data.length === 0) {
+        if (snapshot.empty) {
           setChecked(true);
           sessionStorage.setItem(sessionKey, "true");
           return;
         }
 
         // AUTO-LINK all of them immediately (no user action needed)
-        for (const order of data) {
-          await supabase
-            .from("guest_orders")
-            .update({ linked: true, user_id: userId })
-            .eq("id", order.id);
+        for (const doc of snapshot.docs) {
+          await updateDoc(doc.ref, { linked: true, user_id: userId });
         }
 
-        console.log(`✅ Auto-linked ${data.length} guest order(s) for ${userEmail}`);
-        setLinkedCount(data.length);
-        setLinkedHashes(data.map(o => o.hash));
+        console.log(`✅ Auto-linked ${snapshot.size} guest order(s) for ${userEmail}`);
+        setLinkedCount(snapshot.size);
+        setLinkedHashes(snapshot.docs.map(d => d.data().hash));
       } catch (err) {
         console.error("Error auto-linking guest orders:", err);
       } finally {

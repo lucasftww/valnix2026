@@ -1,7 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { db } from "@/integrations/firebase/config";
 import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, query, where } from "firebase/firestore";
-import { supabase } from "@/integrations/supabase/client";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
@@ -283,10 +282,11 @@ export const AdminOrders = () => {
   const handleRestoreOrders = async () => {
     setRestoringOrders(true);
     try {
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/restore-orders`,
-        { headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` } }
-      );
+      const { invokeFunction } = await import("@/lib/apiHelper");
+      const response = await invokeFunction('restore-orders', {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+      });
       const data = await response.json();
       if (data.success) {
         toast({ title: `Restauração concluída!`, description: `${data.restored} pedido(s) restaurado(s), ${data.skipped} já existente(s).` });
@@ -357,11 +357,20 @@ export const AdminOrders = () => {
       const headers: Record<string, string> = {};
       if (idToken && !isCard) headers['Authorization'] = `Bearer ${idToken}`;
 
+      const { invokeFunction } = await import("@/lib/apiHelper");
       const endpoint = isCard
-        ? `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-card?action=status&id=${order.flowpay_charge_id}`
-        : `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${order.flowpay_charge_id}`;
+        ? 'flowpay-card'
+        : 'flowpay-pix';
+      const qp = isCard
+        ? { action: 'status', id: order.flowpay_charge_id }
+        : { action: 'status', chargeId: order.flowpay_charge_id };
+      const response = await invokeFunction(endpoint, {
+        method: 'GET',
+        queryParams: qp,
+        headers: idToken && !isCard ? { 'Authorization': `Bearer ${idToken}` } : {},
+      });
 
-      const response = await fetch(endpoint, { headers });
+      const data = await response.json();
       const data = await response.json();
       if (data.success && data.status === 'COMPLETED') {
         const orderRef = doc(db, "orders", order.id);

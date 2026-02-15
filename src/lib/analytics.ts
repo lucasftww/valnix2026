@@ -1,8 +1,8 @@
 /**
  * Analytics tracking utilities
- * Records events via edge function (service_role) for the admin funnel dashboard
+ * Records events via backend function for the admin funnel dashboard
  */
-import { supabase } from "@/lib/supabaseHelper";
+import { invokeFunction } from "@/lib/apiHelper";
 
 function getDeviceType(): string {
   const ua = navigator.userAgent;
@@ -31,7 +31,7 @@ export async function trackAnalyticsEvent(
   } = {}
 ) {
   try {
-    await supabase.functions.invoke('track-analytics', {
+    await invokeFunction('track-analytics', {
       body: {
         event_name: eventName,
         user_id: data.userId || null,

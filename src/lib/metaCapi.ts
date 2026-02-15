@@ -1,8 +1,8 @@
 /**
  * Meta CAPI client-side helper
- * Captures fbc/fbp cookies and sends events via Edge Function
+ * Captures fbc/fbp cookies and sends events via backend function
  */
-import { supabase } from "@/lib/supabaseHelper";
+import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
 
 // Read cookie by name
 function getCookie(name: string): string | undefined {
@@ -49,11 +49,8 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
     };
 
     // Fire and forget - non-blocking
-    supabase.functions.invoke('meta-capi', {
-      body: payload,
-    }).then(({ error }) => {
-      if (error) console.warn('⚠️ Meta CAPI event failed:', error);
-      else console.log(`📡 Meta CAPI ${data.event_name} sent`);
+    invokeFunctionFireAndForget('meta-capi', payload).then(() => {
+      console.log(`📡 Meta CAPI ${data.event_name} sent`);
     });
   } catch (e) {
     console.warn('⚠️ Meta CAPI helper error:', e);
