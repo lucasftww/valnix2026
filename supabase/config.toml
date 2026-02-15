@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.flowpay-card]
 verify_jwt = false
+
+[functions.admin-post-payment]
+verify_jwt = false
