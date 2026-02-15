@@ -21,7 +21,9 @@ Deno.serve(async (req) => {
 
     const idToken = authHeader.replace("Bearer ", "");
 
-    // Verify Firebase token
+    // Verify Firebase token AND check admin email
+    const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
+
     const verifyRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyAaNn-kRBPAMEMWv0MIaMaF5hy9gerVp9g`,
       {
@@ -35,6 +37,17 @@ Deno.serve(async (req) => {
       return new Response(
         JSON.stringify({ error: "Invalid token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const verifyData = await verifyRes.json();
+    const userEmail = verifyData?.users?.[0]?.email?.toLowerCase();
+
+    if (!userEmail || !ALLOWED_ADMIN_EMAILS.includes(userEmail)) {
+      console.warn(`⚠️ Unauthorized upload attempt: ${userEmail}`);
+      return new Response(
+        JSON.stringify({ error: "Admin access required" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
