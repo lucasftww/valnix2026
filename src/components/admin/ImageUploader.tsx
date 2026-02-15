@@ -109,7 +109,7 @@ export const ImageUploader = ({
       // Build unique file name
       const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
 
-      setCompressionProgress("Enviando para Firebase Storage...");
+      setCompressionProgress("Enviando para Cloudflare R2...");
 
       // Get Firebase auth token
       const user = auth.currentUser;
@@ -227,9 +227,9 @@ export const ImageUploader = ({
                   <p className="text-xs text-muted-foreground mt-1">
                     JPG, PNG, WEBP ou AVIF (máx. 20MB)
                   </p>
-                  <p className="text-xs text-green-500 mt-1">
-                    ✓ Otimização automática para WebP → Firebase Storage
-                  </p>
+                   <p className="text-xs text-primary mt-1">
+                     ✓ Otimização automática para WebP → Cloudflare R2
+                   </p>
                 </div>
               </>
             )}
