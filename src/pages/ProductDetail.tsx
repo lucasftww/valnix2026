@@ -80,17 +80,20 @@ const ProductDetail = () => {
     [id]
   );
 
+  // Remove "bonox" (case-insensitive) de qualquer texto
+  const stripBonox = (html: string) => html.replace(/bonox/gi, '');
+
   // Memoizar HTML sanitizado para evitar re-sanitize a cada render
   const sanitizedDescription = useMemo(() => 
-    product?.rich_description ? DOMPurify.sanitize(product.rich_description) : '',
+    product?.rich_description ? stripBonox(DOMPurify.sanitize(product.rich_description)) : '',
     [product?.rich_description]
   );
   const sanitizedInstructions = useMemo(() => 
-    product?.instructions ? DOMPurify.sanitize(product.instructions) : '',
+    product?.instructions ? stripBonox(DOMPurify.sanitize(product.instructions)) : '',
     [product?.instructions]
   );
   const sanitizedTerms = useMemo(() => 
-    product?.terms_conditions ? DOMPurify.sanitize(product.terms_conditions) : '',
+    product?.terms_conditions ? stripBonox(DOMPurify.sanitize(product.terms_conditions)) : '',
     [product?.terms_conditions]
   );
 
