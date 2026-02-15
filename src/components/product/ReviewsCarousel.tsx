@@ -35,7 +35,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
           />
         ))}
       </div>
-      <span className="text-[11px] text-primary font-medium shrink-0 leading-[1]">✓ Verificada</span>
+      
     </div>
 
     <p className="text-[13px] md:text-sm text-foreground/80 leading-relaxed italic line-clamp-2">
