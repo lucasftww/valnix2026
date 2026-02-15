@@ -31,7 +31,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
         <h2 className="text-base md:text-xl font-bold text-foreground mb-3">Avaliações dos clientes</h2>
         <Carousel
           opts={{
-            align: "start",
+            align: "center",
             loop: true,
             skipSnaps: false,
             duration: 20,
@@ -39,9 +39,9 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           plugins={[autoplayRef.current]}
           className="w-full"
         >
-          <CarouselContent className="-ml-2">
+          <CarouselContent className="-ml-3">
             {reviews.map((review) => (
-              <CarouselItem key={review.id} className="pl-2 basis-full md:basis-1/2 lg:basis-1/3">
+              <CarouselItem key={review.id} className="pl-3 basis-full md:basis-1/2 lg:basis-1/3">
                 <div className="rounded-lg bg-muted/40 border border-border/30 px-3 py-2.5 md:px-4 md:py-3 h-full flex flex-col gap-1.5 select-none">
                   <div className="flex items-center justify-between">
                     <div className="flex gap-0.5">
