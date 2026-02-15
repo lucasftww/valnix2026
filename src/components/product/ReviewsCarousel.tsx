@@ -39,9 +39,9 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           plugins={[autoplayRef.current]}
           className="w-full"
         >
-          <CarouselContent className="-ml-3 md:-ml-4">
+          <CarouselContent className="-ml-2 md:-ml-3">
             {reviews.map((review) => (
-              <CarouselItem key={review.id} className="pl-3 md:pl-4 basis-[85%] md:basis-1/2 lg:basis-1/3">
+              <CarouselItem key={review.id} className="pl-2 md:pl-3 basis-[85%] md:basis-1/2 lg:basis-1/3">
                 <div className="relative rounded-xl bg-muted/40 border border-border/30 p-4 md:p-5 h-full flex flex-col gap-3 hover:bg-muted/60 transition-colors">
                   <div className="flex gap-0.5">
                     {[1, 2, 3, 4, 5].map(star => (
