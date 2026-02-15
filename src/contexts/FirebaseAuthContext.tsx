@@ -35,11 +35,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(firebaseUser);
       if (firebaseUser) {
         try {
-          const userDoc = await getDoc(doc(db, "users", firebaseUser.uid));
+          // Parallelize user + profile reads
+          const [userDoc, profileDoc] = await Promise.all([
+            getDoc(doc(db, "users", firebaseUser.uid)),
+            getDoc(doc(db, "profiles", firebaseUser.uid)),
+          ]);
+
           if (userDoc.exists()) {
             setIsAdmin(userDoc.data()?.role === "admin");
           } else {
-            // Create user doc for role management
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
               role: "user",
@@ -47,8 +51,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
             setIsAdmin(false);
           }
-          // Ensure profiles doc exists (for balance, phone, etc.)
-          const profileDoc = await getDoc(doc(db, "profiles", firebaseUser.uid));
+
           if (!profileDoc.exists()) {
             await setDoc(doc(db, "profiles", firebaseUser.uid), {
               email: firebaseUser.email,

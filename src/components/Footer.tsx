@@ -36,6 +36,13 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
+  const trustBadges = [
+    { icon: <Shield className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Compra Segura", desc: "Ambiente seguro para pagamentos online" },
+    { icon: <Mail className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Envio Imediato", desc: "Envio imediato via E-mail após a compra" },
+    { icon: <Headphones className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Suporte Profissional", desc: "Equipe de suporte das 10h às 23h diariamente" },
+    { icon: <RefreshCcw className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Entrega ou Reembolso", desc: "Caso haja qualquer tipo de problema, devolvemos seu dinheiro integralmente!" },
+  ];
+
   return (
     <footer className="w-full bg-background border-t border-border mt-16">
       {/* Main Footer Content */}
@@ -54,67 +61,24 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             </div>
           </div>
 
-          {/* Trust Badges - Carousel no mobile, grid no desktop */}
+          {/* Trust Badges */}
           <div className="bg-black/40 py-8 border-b border-border/30">
             <div className="container px-4 md:px-8">
-              {/* Mobile: Carrossel */}
               {isMobile ? (
                 <div className="relative max-w-md mx-auto">
-                  <Carousel 
-                    opts={{
-                      align: "start",
-                      loop: true,
-                    }}
-                    className="w-full"
-                  >
+                  <Carousel opts={{ align: "start", loop: true }} className="w-full">
                     <CarouselContent>
-                      <CarouselItem>
-                        <div className="flex items-start gap-3 px-4">
-                          <div className="flex-shrink-0">
-                            <Shield className="w-6 h-6 text-primary" strokeWidth={1.5} />
+                      {trustBadges.map((badge) => (
+                        <CarouselItem key={badge.title}>
+                          <div className="flex items-start gap-3 px-4">
+                            <div className="flex-shrink-0">{badge.icon}</div>
+                            <div>
+                              <h4 className="text-sm font-semibold text-foreground mb-1">{badge.title}</h4>
+                              <p className="text-xs text-muted-foreground">{badge.desc}</p>
+                            </div>
                           </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-foreground mb-1">Compra Segura</h4>
-                            <p className="text-xs text-muted-foreground">Ambiente seguro para pagamentos online</p>
-                          </div>
-                        </div>
-                      </CarouselItem>
-                      
-                      <CarouselItem>
-                        <div className="flex items-start gap-3 px-4">
-                          <div className="flex-shrink-0">
-                            <Mail className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-foreground mb-1">Envio Imediato</h4>
-                            <p className="text-xs text-muted-foreground">Envio imediato via E-mail após a compra</p>
-                          </div>
-                        </div>
-                      </CarouselItem>
-                      
-                      <CarouselItem>
-                        <div className="flex items-start gap-3 px-4">
-                          <div className="flex-shrink-0">
-                            <Headphones className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-foreground mb-1">Suporte Profissional</h4>
-                            <p className="text-xs text-muted-foreground">Equipe de suporte das 10h às 23h diariamente</p>
-                          </div>
-                        </div>
-                      </CarouselItem>
-                      
-                      <CarouselItem>
-                        <div className="flex items-start gap-3 px-4">
-                          <div className="flex-shrink-0">
-                            <RefreshCcw className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                          </div>
-                          <div>
-                            <h4 className="text-sm font-semibold text-foreground mb-1">Entrega ou Reembolso</h4>
-                            <p className="text-xs text-muted-foreground">Caso haja qualquer tipo de problema, devolvemos seu dinheiro integralmente!</p>
-                          </div>
-                        </div>
-                      </CarouselItem>
+                        </CarouselItem>
+                      ))}
                     </CarouselContent>
                     <div className="flex justify-center gap-3 mt-6">
                       <CarouselPrevious className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-8 w-8" aria-label="Ver benefício anterior" />
@@ -123,47 +87,16 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
                   </Carousel>
                 </div>
               ) : (
-                /* Desktop: Grid */
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <Shield className="w-6 h-6 text-primary" strokeWidth={1.5} />
+                  {trustBadges.map((badge) => (
+                    <div key={badge.title} className="flex items-start gap-3">
+                      <div className="flex-shrink-0">{badge.icon}</div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground mb-1">{badge.title}</h4>
+                        <p className="text-xs text-muted-foreground">{badge.desc}</p>
+                      </div>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground mb-1">Compra Segura</h4>
-                      <p className="text-xs text-muted-foreground">Ambiente seguro para pagamentos online</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <Mail className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground mb-1">Envio Imediato</h4>
-                      <p className="text-xs text-muted-foreground">Envio imediato via E-mail após a compra</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <Headphones className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground mb-1">Suporte Profissional</h4>
-                      <p className="text-xs text-muted-foreground">Equipe de suporte das 10h às 23h diariamente</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <RefreshCcw className="w-6 h-6 text-primary" strokeWidth={1.5} />
-                    </div>
-                    <div>
-                      <h4 className="text-sm font-semibold text-foreground mb-1">Entrega ou Reembolso</h4>
-                      <p className="text-xs text-muted-foreground">Caso haja qualquer tipo de problema, devolvemos seu dinheiro integralmente!</p>
-                    </div>
-                  </div>
+                  ))}
                 </div>
               )}
             </div>
