@@ -8,10 +8,10 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ArrowLeft, Camera, User, Package, Loader2, Check, Wallet } from "lucide-react";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
-import { db } from "@/integrations/firebase/config";
+import { db, auth } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { storage } from "@/integrations/firebase/config";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { invokeFunction } from "@/lib/apiHelper";
+import imageCompression from "browser-image-compression";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRecentOrders } from "@/hooks/firebase";
@@ -135,15 +135,39 @@ export default function Profile() {
     setUploading(true);
 
     try {
-      const fileExt = file.name.split(".").pop();
-      const fileName = `avatars/${user.uid}/avatar.${fileExt}`;
+      // Compress to WebP
+      const compressed = await imageCompression(file, {
+        maxSizeMB: 0.3,
+        maxWidthOrHeight: 400,
+        useWebWorker: true,
+        fileType: "image/webp" as const,
+      });
 
-      // Upload para Firebase Storage
-      const storageRef = ref(storage, fileName);
-      await uploadBytes(storageRef, file, { contentType: file.type });
+      const fileName = `avatars/${user.uid}/avatar.webp`;
 
-      // Obter URL pública
-      const downloadUrl = await getDownloadURL(storageRef);
+      // Convert to base64
+      const base64 = await new Promise<string>((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve((reader.result as string).split(",")[1]);
+        reader.onerror = reject;
+        reader.readAsDataURL(compressed);
+      });
+
+      // Get Firebase auth token
+      const token = await auth.currentUser!.getIdToken();
+
+      // Upload via R2 edge function
+      const response = await invokeFunction("upload-r2", {
+        body: { fileBase64: base64, fileName, contentType: "image/webp" },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Falha no upload");
+      }
+
+      const { url: downloadUrl } = await response.json();
 
       // Atualizar perfil com a nova URL
       await updateProfileMutation.mutateAsync({
@@ -152,7 +176,7 @@ export default function Profile() {
 
       toast({
         title: "Foto atualizada!",
-        description: "Sua foto de perfil foi alterada.",
+        description: "Sua foto de perfil foi alterada via R2.",
       });
     } catch (error: any) {
       toast({
