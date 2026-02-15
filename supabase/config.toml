@@ -20,3 +20,6 @@ verify_jwt = false
 
 [functions.admin-post-payment]
 verify_jwt = false
+
+[functions.restore-orders-json]
+verify_jwt = false
