@@ -552,7 +552,7 @@ const ProductDetail = () => {
           </div>
           <Button 
             onClick={handleBuyNow} 
-            className="flex-1 h-14 text-lg font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
+            className="flex-1 h-11 text-[15px] font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
           >
             Comprar R$&nbsp;{totalPrice}
           </Button>
