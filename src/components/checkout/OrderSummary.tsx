@@ -53,7 +53,7 @@ export const OrderSummary = memo(function OrderSummary({
   const isSubmitDisabled = loading || finalPrice < 1 || !isFormValid;
 
   return (
-    <div className="w-full lg:w-[340px] space-y-5">
+    <div className="hidden lg:block w-full lg:w-[340px] space-y-5">
       {/* Cupom de desconto */}
       <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5">
         <h3 className="text-[15px] font-semibold text-white mb-4">Cupom de desconto</h3>
@@ -174,7 +174,7 @@ export const OrderSummary = memo(function OrderSummary({
         <Button 
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="w-full h-14 bg-[#f5e642] hover:bg-[#e6d83c] text-black font-bold rounded-xl text-base hidden lg:flex"
+          className="w-full h-14 bg-[#c0392b] hover:bg-[#a93226] text-white font-bold rounded-xl text-base hidden lg:flex"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
