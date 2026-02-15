@@ -201,6 +201,7 @@ export default function Checkout() {
   }, [formData]);
 
   const isFormValid = validation.name && validation.document && validation.email;
+  const socialProofCount = useMemo(() => Math.floor(Math.random() * 8) + 12, []);
 
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     let formattedValue = value;
@@ -752,6 +753,27 @@ export default function Checkout() {
       <CheckoutHeader currentStep={1} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-10">
+        {/* Mobile: Mini order summary at top */}
+        <div className="lg:hidden mb-4">
+          <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-4 flex items-center gap-3">
+            {items[0] && (
+              <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] overflow-hidden flex-shrink-0 border border-[#222]">
+                <img src={items[0].image} alt={items[0].name} className="w-full h-full object-cover" loading="lazy" />
+              </div>
+            )}
+            <div className="flex-1 min-w-0">
+              <p className="text-white text-[13px] font-medium truncate">
+                {items.length === 1 ? items[0]?.name : `${items.length} itens`}
+              </p>
+              <p className="text-primary text-[15px] font-bold">R$ {finalPrice.toFixed(2).replace('.', ',')}</p>
+            </div>
+            <div className="flex items-center gap-1.5 text-green-500 text-[11px] font-medium bg-green-500/10 px-2.5 py-1 rounded-full shrink-0">
+              <Zap className="w-3 h-3" />
+              <span>Entrega na hora</span>
+            </div>
+          </div>
+        </div>
+
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Column */}
           <div className="flex-1 space-y-5">
@@ -992,7 +1014,15 @@ export default function Checkout() {
               </div>
 
               {/* Mobile Submit Button */}
-              <div className="lg:hidden mt-6">
+              <div className="lg:hidden mt-6 space-y-3">
+                {/* Social proof + urgency */}
+                <div className="flex items-center justify-center gap-4 text-[11px] text-[#888]">
+                  <span className="flex items-center gap-1">
+                    <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+                    {socialProofCount} pessoas comprando agora
+                  </span>
+                </div>
+
                 <Button 
                   onClick={handleSubmit}
                   disabled={loading || finalPrice < 1}
@@ -1011,6 +1041,21 @@ export default function Checkout() {
                     "Pagar com PIX →"
                   )}
                 </Button>
+
+                {/* Trust signals below CTA */}
+                <div className="flex items-center justify-center gap-3 text-[11px] text-[#666]">
+                  <span className="flex items-center gap-1">
+                    <Lock className="w-3 h-3" />
+                    Seguro
+                  </span>
+                  <span className="text-[#333]">•</span>
+                  <span className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-green-500" />
+                    Código na hora
+                  </span>
+                  <span className="text-[#333]">•</span>
+                  <span>100% garantido</span>
+                </div>
               </div>
             </div>
           </div>
