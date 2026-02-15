@@ -1,6 +1,6 @@
 import { useState, useEffect, lazy, Suspense } from "react";
-import { collection, getDocs, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+import { auth } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,6 +59,12 @@ interface Product {
   terms_conditions?: string | null;
 }
 
+const getFirebaseToken = async () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.getIdToken();
+};
+
 export const AdminProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
@@ -95,11 +101,17 @@ export const AdminProducts = () => {
 
   const fetchCategories = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "categories"));
-      const categoriesData = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as Category & { is_active?: boolean; display_order?: number }))
-        .filter((c) => c.is_active !== false)
-        .sort((a, b) => (a.display_order ?? 0) - (b.display_order ?? 0));
+      const token = await getFirebaseToken();
+      const response = await invokeFunction('admin-data', {
+        method: 'GET',
+        queryParams: { resource: 'categories' },
+        headers: { 'x-firebase-token': token },
+      });
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      const data = await response.json();
+      const categoriesData = (data.categories || [])
+        .filter((c: any) => c.is_active !== false)
+        .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
       setCategories(categoriesData);
     } catch (error: any) {
       toast({
@@ -112,10 +124,16 @@ export const AdminProducts = () => {
 
   const fetchProducts = async () => {
     try {
-      const snapshot = await getDocs(collection(db, "products"));
-      const productsData = snapshot.docs
-        .map((doc) => ({ id: doc.id, ...doc.data() } as Product & { created_at?: string }))
-        .sort((a, b) => {
+      const token = await getFirebaseToken();
+      const response = await invokeFunction('admin-data', {
+        method: 'GET',
+        queryParams: { resource: 'products' },
+        headers: { 'x-firebase-token': token },
+      });
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const data = await response.json();
+      const productsData = (data.products || [])
+        .sort((a: any, b: any) => {
           const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
           const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
           return dateB - dateA;
@@ -166,8 +184,15 @@ export const AdminProducts = () => {
     };
 
     try {
+      const token = await getFirebaseToken();
       if (editingProduct) {
-        await updateDoc(doc(db, "products", editingProduct.id), productData);
+        const res = await invokeFunction('admin-data', {
+          method: 'PUT',
+          queryParams: { resource: 'products' },
+          headers: { 'x-firebase-token': token },
+          body: { id: editingProduct.id, ...productData },
+        });
+        if (!res.ok) throw new Error('Failed to update product');
         
         toast({
           title: "Produto atualizado!",
@@ -175,10 +200,13 @@ export const AdminProducts = () => {
         });
       } else {
         const newId = crypto.randomUUID();
-        await setDoc(doc(db, "products", newId), {
-          ...productData,
-          created_at: now,
+        const res = await invokeFunction('admin-data', {
+          method: 'POST',
+          queryParams: { resource: 'products' },
+          headers: { 'x-firebase-token': token },
+          body: { id: newId, ...productData, created_at: now },
         });
+        if (!res.ok) throw new Error('Failed to create product');
         
         toast({
           title: "Produto criado!",
@@ -252,7 +280,14 @@ export const AdminProducts = () => {
         updated_at: now,
       };
 
-      await setDoc(doc(db, "products", newId), duplicatedProduct);
+      const token = await getFirebaseToken();
+      const res = await invokeFunction('admin-data', {
+        method: 'POST',
+        queryParams: { resource: 'products' },
+        headers: { 'x-firebase-token': token },
+        body: { id: newId, ...duplicatedProduct },
+      });
+      if (!res.ok) throw new Error('Failed to duplicate product');
 
       toast({
         title: "Produto duplicado!",
@@ -277,7 +312,13 @@ export const AdminProducts = () => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
 
     try {
-      await deleteDoc(doc(db, "products", id));
+      const token = await getFirebaseToken();
+      const res = await invokeFunction('admin-data', {
+        method: 'DELETE',
+        queryParams: { resource: 'products', id },
+        headers: { 'x-firebase-token': token },
+      });
+      if (!res.ok) throw new Error('Failed to delete product');
 
       toast({
         title: "Produto excluído!",
@@ -297,10 +338,14 @@ export const AdminProducts = () => {
 
   const handleToggleFeatured = async (product: Product) => {
     try {
-      await updateDoc(doc(db, "products", product.id), {
-        featured: !product.featured,
-        updated_at: new Date().toISOString(),
+      const token = await getFirebaseToken();
+      const res = await invokeFunction('admin-data', {
+        method: 'PUT',
+        queryParams: { resource: 'products' },
+        headers: { 'x-firebase-token': token },
+        body: { id: product.id, featured: !product.featured, updated_at: new Date().toISOString() },
       });
+      if (!res.ok) throw new Error('Failed to toggle featured');
       
       toast({
         title: product.featured ? "Removido dos Mais Vendidos" : "Adicionado aos Mais Vendidos",

@@ -1,11 +1,11 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs, query, orderBy, where, doc, getDoc, updateDoc, deleteDoc, setDoc, Timestamp } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+import { doc, getDoc } from "firebase/firestore";
+import { db, auth } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 
 // Convert Firestore Timestamp or string to ISO string
 function toISOString(val: any): string {
   if (!val) return new Date().toISOString();
-  if (val instanceof Timestamp) return val.toDate().toISOString();
   if (typeof val === 'object' && 'seconds' in val) return new Date(val.seconds * 1000).toISOString();
   if (typeof val === 'string') {
     const d = new Date(val);
@@ -36,149 +36,64 @@ export interface FirebaseOrder {
   payment_status: string;
 }
 
-// Fetch all users with their order statistics
+async function getFirebaseToken(): Promise<string> {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.getIdToken();
+}
+
+// Fetch all users via admin-data edge function (server-side, bypasses Firestore rules)
 export const useAdminUsers = () => {
   return useQuery({
     queryKey: ["firebase-admin-users"],
     queryFn: async () => {
-      // Fetch from both collections to catch all users
-      // Use Promise.allSettled to avoid crash if one collection has permission issues
-      const [profilesResult, usersResult, ordersResult] = await Promise.allSettled([
-        getDocs(query(collection(db, "profiles"), orderBy("created_at", "desc"))),
-        getDocs(collection(db, "users")),
-        getDocs(collection(db, "orders")),
-      ]);
+      const token = await getFirebaseToken();
+      const response = await invokeFunction('admin-data', {
+        method: 'GET',
+        queryParams: { resource: 'users' },
+        headers: { 'x-firebase-token': token },
+      });
 
-      const profilesSnapshot = profilesResult.status === "fulfilled" ? profilesResult.value : null;
-      const usersSnapshot = usersResult.status === "fulfilled" ? usersResult.value : null;
-      const ordersSnapshot = ordersResult.status === "fulfilled" ? ordersResult.value : null;
-
-      if (!profilesSnapshot && !usersSnapshot) {
-        console.warn("Could not fetch users from any collection");
-        return [];
+      if (!response.ok) {
+        const err = await response.json().catch(() => ({ error: 'Failed to fetch users' }));
+        throw new Error(err.error || 'Failed to fetch users');
       }
 
-      // Create a map of user orders
-      const userOrdersMap = new Map<string, { 
-        total_orders: number; 
-        total_spent: number; 
-        last_order_date?: string;
-      }>();
-
-      ordersSnapshot?.forEach((d) => {
-        const order = d.data();
-        const userId = order.user_id;
-        
-        if (userId && order.payment_status === "paid") {
-          const existing = userOrdersMap.get(userId) || { 
-            total_orders: 0, 
-            total_spent: 0,
-            last_order_date: undefined
-          };
-          
-          existing.total_orders += 1;
-          existing.total_spent += Number(order.total_amount) || 0;
-          
-          const orderDate = toISOString(order.created_at);
-          if (!existing.last_order_date || orderDate > existing.last_order_date) {
-            existing.last_order_date = orderDate;
-          }
-          
-          userOrdersMap.set(userId, existing);
-        }
-      });
-
-      // Build user map from profiles first
-      const userMap = new Map<string, FirebaseUser>();
-
-      profilesSnapshot?.docs.forEach((d) => {
-        const profile = d.data();
-        const userId = d.id;
-        const orderStats = userOrdersMap.get(userId) || { total_orders: 0, total_spent: 0 };
-
-        userMap.set(userId, {
-          id: userId,
-          email: profile.email || "",
-          created_at: toISOString(profile.created_at),
-          phone: profile.phone,
-          full_name: profile.full_name,
-          nickname: profile.nickname,
-          avatar_url: profile.avatar_url,
-          last_order_date: orderStats.last_order_date,
-          total_orders: orderStats.total_orders,
-          total_spent: orderStats.total_spent,
-          balance: profile.balance || 0,
-        });
-      });
-
-      // Add users from "users" collection that don't have a profile yet
-      usersSnapshot?.docs.forEach((d) => {
-        const userId = d.id;
-        if (!userMap.has(userId)) {
-          const userData = d.data();
-          const orderStats = userOrdersMap.get(userId) || { total_orders: 0, total_spent: 0 };
-
-          userMap.set(userId, {
-            id: userId,
-            email: userData.email || "",
-            created_at: toISOString(userData.created_at),
-            phone: userData.phone || undefined,
-            full_name: userData.full_name || userData.displayName || undefined,
-            nickname: userData.nickname || undefined,
-            avatar_url: userData.avatar_url || userData.photoURL || undefined,
-            last_order_date: orderStats.last_order_date,
-            total_orders: orderStats.total_orders,
-            total_spent: orderStats.total_spent,
-            balance: userData.balance || 0,
-          });
-        }
-      });
-
-      // Sort by created_at descending
-      const users = Array.from(userMap.values());
-      users.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-
-      return users;
+      const data = await response.json();
+      return (data.users || []).map((u: any) => ({
+        ...u,
+        created_at: toISOString(u.created_at),
+        last_order_date: u.last_order_date ? toISOString(u.last_order_date) : undefined,
+        total_orders: u.total_orders || 0,
+        total_spent: u.total_spent || 0,
+        balance: u.balance || 0,
+      })) as FirebaseUser[];
     },
   });
 };
 
-// Fetch orders for a specific user
+// Fetch orders for a specific user via edge function
 export const useUserOrders = (userId: string | null) => {
   return useQuery({
     queryKey: ["firebase-user-orders", userId],
     queryFn: async () => {
       if (!userId) return [];
-      
-      try {
-        const ordersRef = collection(db, "orders");
-        // Only use where() without orderBy() to avoid requiring a composite index
-        const ordersQuery = query(
-          ordersRef, 
-          where("user_id", "==", userId)
-        );
-        
-        const snapshot = await getDocs(ordersQuery);
-        
-        const orders = snapshot.docs.map((doc) => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            created_at: toISOString(data.created_at),
-            total_amount: Number(data.total_amount) || 0,
-            status: data.status || "pending",
-            payment_status: data.payment_status || "pending",
-          } as FirebaseOrder;
-        });
+      const token = await getFirebaseToken();
+      const response = await invokeFunction('admin-data', {
+        method: 'GET',
+        queryParams: { resource: 'user-orders', userId },
+        headers: { 'x-firebase-token': token },
+      });
 
-        // Sort in JS instead of Firestore to avoid composite index requirement
-        orders.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-        
-        return orders.slice(0, 10);
-      } catch (error) {
-        console.error("Error fetching user orders:", error);
-        return [];
-      }
+      if (!response.ok) return [];
+      const data = await response.json();
+      return (data.orders || []).map((o: any) => ({
+        id: o.id,
+        created_at: toISOString(o.created_at),
+        total_amount: Number(o.total_amount) || 0,
+        status: o.status || "pending",
+        payment_status: o.payment_status || "pending",
+      })) as FirebaseOrder[];
     },
     enabled: !!userId,
   });
@@ -190,7 +105,6 @@ export const useIsUserAdmin = (userId: string | null) => {
     queryKey: ["firebase-user-admin", userId],
     queryFn: async () => {
       if (!userId) return false;
-      
       const roleDoc = await getDoc(doc(db, "user_roles", userId));
       if (roleDoc.exists()) {
         return roleDoc.data()?.role === "admin";
@@ -201,24 +115,25 @@ export const useIsUserAdmin = (userId: string | null) => {
   });
 };
 
-// Update user balance - uses setDoc with merge to create doc if it doesn't exist
+// Update user balance via edge function
 export const updateUserBalance = async (userId: string, newBalance: number): Promise<void> => {
-  const profileRef = doc(db, "profiles", userId);
-  await setDoc(profileRef, {
-    balance: newBalance
-  }, { merge: true });
+  const token = await getFirebaseToken();
+  const response = await invokeFunction('admin-data', {
+    method: 'PUT',
+    queryParams: { resource: 'users' },
+    headers: { 'x-firebase-token': token },
+    body: { id: userId, balance: newBalance },
+  });
+  if (!response.ok) throw new Error('Failed to update balance');
 };
 
-// Delete user from Firestore (profiles and user_roles collections)
+// Delete user via edge function
 export const deleteFirebaseUser = async (userId: string): Promise<void> => {
-  // Delete profile
-  const profileRef = doc(db, "profiles", userId);
-  await deleteDoc(profileRef);
-  
-  // Delete user role if exists
-  const roleRef = doc(db, "user_roles", userId);
-  const roleDoc = await getDoc(roleRef);
-  if (roleDoc.exists()) {
-    await deleteDoc(roleRef);
-  }
+  const token = await getFirebaseToken();
+  const response = await invokeFunction('admin-data', {
+    method: 'DELETE',
+    queryParams: { resource: 'users', id: userId },
+    headers: { 'x-firebase-token': token },
+  });
+  if (!response.ok) throw new Error('Failed to delete user');
 };
