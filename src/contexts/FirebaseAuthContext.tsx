@@ -12,6 +12,9 @@ import {
 import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
+// ── Security: Only these emails can be admin ──────────────────────
+const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
+
 interface AuthContextType {
   user: User | null;
   loading: boolean;
@@ -33,26 +36,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
-      // Set loading false IMMEDIATELY so UI renders without waiting for Firestore
       setLoading(false);
       
       if (firebaseUser) {
-        // Background: check admin + create profile (non-blocking)
         try {
           const [userDoc, profileDoc] = await Promise.all([
             getDoc(doc(db, "users", firebaseUser.uid)),
             getDoc(doc(db, "profiles", firebaseUser.uid)),
           ]);
 
-          const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
           if (userDoc.exists()) {
-            const isRoleAdmin = userDoc.data()?.role === "admin";
+            const data = userDoc.data();
+            const isRoleAdmin = data?.role === "admin";
             const isAllowedEmail = ALLOWED_ADMIN_EMAILS.includes(firebaseUser.email?.toLowerCase() || "");
             setIsAdmin(isRoleAdmin && isAllowedEmail);
+
+            // Security: if someone set themselves as admin but isn't allowed, strip it
+            if (isRoleAdmin && !isAllowedEmail) {
+              console.warn("⚠️ Unauthorized admin detected, stripping role:", firebaseUser.email);
+              await setDoc(doc(db, "users", firebaseUser.uid), {
+                ...data,
+                role: "user",
+                isAdmin: false,
+              });
+              setIsAdmin(false);
+            }
           } else {
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
               role: "user",
+              isAdmin: false,
               created_at: new Date().toISOString(),
             });
             setIsAdmin(false);
@@ -90,9 +103,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signUp = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
+      // Security: NEVER allow signUp to create admin users
       await setDoc(doc(db, "users", result.user.uid), {
         email: result.user.email,
         role: "user",
+        isAdmin: false,
         created_at: new Date().toISOString(),
       });
       return { error: null };
@@ -112,9 +127,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const result = await signInWithPopup(auth, provider);
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       if (!userDoc.exists()) {
+        // Security: NEVER allow Google login to create admin users
         await setDoc(doc(db, "users", result.user.uid), {
           email: result.user.email,
           role: "user",
+          isAdmin: false,
           created_at: new Date().toISOString(),
         });
       }
