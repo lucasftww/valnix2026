@@ -9,6 +9,7 @@ import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense } from "react";
+import PageTransition from "@/components/PageTransition";
 
 // Componente interno para usar hooks dentro do BrowserRouter
 const AppContent = () => {
@@ -68,33 +69,40 @@ const App = () => {
                   <ScrollToTop />
                   
                   <Suspense fallback={
-                    <div className="min-h-screen bg-background" />
+                    <div className="min-h-screen bg-background flex items-center justify-center">
+                      <div className="relative">
+                        <div className="w-10 h-10 border-3 border-primary/20 rounded-full" />
+                        <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
+                      </div>
+                    </div>
                   }>
-                    <Routes>
-                      <Route path="/" element={<Index />} />
-                      <Route path="/auth/*" element={<Auth />} />
-                      <Route path="/cart" element={<Cart />} />
-                      <Route path="/checkout" element={<Checkout />} />
-                      <Route path="/my-orders" element={<MyOrders />} />
-                      <Route path="/profile" element={<Profile />} />
-                      <Route path="/admin/*" element={<Admin />} />
+                    <PageTransition>
+                      <Routes>
+                        <Route path="/" element={<Index />} />
+                        <Route path="/auth/*" element={<Auth />} />
+                        <Route path="/cart" element={<Cart />} />
+                        <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/my-orders" element={<MyOrders />} />
+                        <Route path="/profile" element={<Profile />} />
+                        <Route path="/admin/*" element={<Admin />} />
 
-                      <Route path="/about" element={<About />} />
-                      <Route path="/terms" element={<Terms />} />
-                      <Route path="/seized" element={<Seized />} />
-                      <Route path="/valorant" element={<Valorant />} />
-                      <Route path="/painel-pagar" element={<PainelPagar />} />
-                      <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
-                      <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
+                        <Route path="/about" element={<About />} />
+                        <Route path="/terms" element={<Terms />} />
+                        <Route path="/seized" element={<Seized />} />
+                        <Route path="/valorant" element={<Valorant />} />
+                        <Route path="/painel-pagar" element={<PainelPagar />} />
+                        <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
+                        <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
 
-                      <Route path="/card-callback" element={<CardPaymentCallback />} />
-                      <Route path="/order/:hash" element={<OrderDelivery />} />
-                      <Route path="/product/:id" element={<ProductDetail />} />
-                      {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
-                      <Route path="/:categorySlug" element={<Category />} />
+                        <Route path="/card-callback" element={<CardPaymentCallback />} />
+                        <Route path="/order/:hash" element={<OrderDelivery />} />
+                        <Route path="/product/:id" element={<ProductDetail />} />
+                        {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
+                        <Route path="/:categorySlug" element={<Category />} />
 
-                      <Route path="*" element={<NotFound />} />
-                    </Routes>
+                        <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </PageTransition>
                   </Suspense>
                 </BrowserRouter>
             </CartProvider>
