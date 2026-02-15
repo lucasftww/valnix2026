@@ -113,9 +113,9 @@ const HeaderComponent = () => {
             </SheetTrigger>
             <SheetContent 
               side="left" 
-              className="w-[280px] p-0 bg-[#0a0a0a] border-r border-[#1f1f1f]"
+              className="w-[280px] p-0 bg-background border-r border-border/30"
             >
-              <SheetHeader className="px-5 py-4 border-b border-[#1f1f1f]">
+              <SheetHeader className="px-5 py-4 border-b border-border/30">
                 <SheetTitle className="text-left text-sm font-semibold text-primary uppercase tracking-wider">
                   Categorias
                 </SheetTitle>
