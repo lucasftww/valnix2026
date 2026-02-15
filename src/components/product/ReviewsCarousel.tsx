@@ -26,8 +26,8 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
   if (reviews.length === 0) return null;
 
   return (
-    <div className="mt-8 max-w-7xl mx-auto px-4 md:px-0">
-      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 p-5 md:p-8 shadow-lg">
+    <div className="mt-8 max-w-7xl mx-auto px-6 md:px-8">
+      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-8 md:px-12 py-5 md:py-8 shadow-lg">
         <h2 className="text-xl md:text-2xl font-bold text-foreground mb-5">Avaliações dos clientes</h2>
         <Carousel
           opts={{
@@ -70,11 +70,11 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
             ))}
           </CarouselContent>
           <CarouselPrevious 
-            className="-left-4 md:-left-5 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
+            className="-left-6 md:-left-8 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
             aria-label="Ver avaliação anterior" 
           />
           <CarouselNext 
-            className="-right-4 md:-right-5 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
+            className="-right-6 md:-right-8 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
             aria-label="Ver próxima avaliação" 
           />
         </Carousel>
