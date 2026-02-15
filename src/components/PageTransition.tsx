@@ -1,33 +1,15 @@
-import { useEffect, useState } from "react";
-import { useLocation } from "react-router-dom";
+import { memo } from "react";
 
-const PageTransition = ({ children }: { children: React.ReactNode }) => {
-  const location = useLocation();
-  const [displayChildren, setDisplayChildren] = useState(children);
-  const [transitionState, setTransitionState] = useState<"enter" | "exit">("enter");
-
-  useEffect(() => {
-    if (children !== displayChildren) {
-      setTransitionState("exit");
-      const timeout = setTimeout(() => {
-        setDisplayChildren(children);
-        setTransitionState("enter");
-      }, 150);
-      return () => clearTimeout(timeout);
-    }
-  }, [children, location.pathname]);
-
+// Simplified PageTransition — instant render, no exit delay
+// Previous 150ms exit animation was adding perceived latency on every navigation
+const PageTransition = memo(({ children }: { children: React.ReactNode }) => {
   return (
-    <div
-      className={`transition-opacity duration-200 ease-out ${
-        transitionState === "enter"
-          ? "opacity-100"
-          : "opacity-0"
-      }`}
-    >
-      {displayChildren}
+    <div className="animate-fade-in" style={{ animationDuration: '150ms' }}>
+      {children}
     </div>
   );
-};
+});
+
+PageTransition.displayName = 'PageTransition';
 
 export default PageTransition;

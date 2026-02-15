@@ -33,9 +33,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
+      // Set loading false IMMEDIATELY so UI renders without waiting for Firestore
+      setLoading(false);
+      
       if (firebaseUser) {
+        // Background: check admin + create profile (non-blocking)
         try {
-          // Parallelize user + profile reads
           const [userDoc, profileDoc] = await Promise.all([
             getDoc(doc(db, "users", firebaseUser.uid)),
             getDoc(doc(db, "profiles", firebaseUser.uid)),
@@ -67,7 +70,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       } else {
         setIsAdmin(false);
       }
-      setLoading(false);
     });
 
     return () => unsubscribe();
