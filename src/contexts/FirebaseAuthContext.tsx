@@ -12,8 +12,8 @@ import {
 import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
-// ── Security: Only these emails can be admin ──────────────────────
-const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com", "valnixbr@gmail.com"];
+// ── Security: admin role is determined solely by Firestore "users" doc ──
+// No emails are hardcoded here to prevent exposure in client-side JS
 
 interface AuthContextType {
   user: User | null;
@@ -47,31 +47,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           if (userDoc.exists()) {
             const data = userDoc.data();
-            const isRoleAdmin = data?.role === "admin";
-            const isAllowedEmail = ALLOWED_ADMIN_EMAILS.includes(firebaseUser.email?.toLowerCase() || "");
-            setIsAdmin(isRoleAdmin && isAllowedEmail);
-
-            // Security: if someone set themselves as admin but isn't allowed, strip it
-            if (isRoleAdmin && !isAllowedEmail) {
-              console.warn("⚠️ Unauthorized admin detected, stripping role:", firebaseUser.email);
-              await setDoc(doc(db, "users", firebaseUser.uid), {
-                ...data,
-                role: "user",
-                isAdmin: false,
-              });
-              setIsAdmin(false);
-            }
+            const isRoleAdmin = data?.role === "admin" && data?.isAdmin === true;
+            setIsAdmin(isRoleAdmin);
           } else {
-            // Auto-promote allowed admin emails on first login
-            const isAllowedEmail = ALLOWED_ADMIN_EMAILS.includes(firebaseUser.email?.toLowerCase() || "");
-            const newRole = isAllowedEmail ? "admin" : "user";
+            // New user — always starts as regular user
+            // Admin role must be set manually in Firestore
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
-              role: newRole,
-              isAdmin: isAllowedEmail,
+              role: "user",
+              isAdmin: false,
               created_at: new Date().toISOString(),
             });
-            setIsAdmin(isAllowedEmail);
+            setIsAdmin(false);
           }
 
           if (!profileDoc.exists()) {
