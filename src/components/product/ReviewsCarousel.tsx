@@ -26,9 +26,9 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
   if (reviews.length === 0) return null;
 
   return (
-    <div className="mt-8 max-w-7xl mx-auto px-6 md:px-8">
-      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-8 md:px-12 py-5 md:py-8 shadow-lg">
-        <h2 className="text-xl md:text-2xl font-bold text-foreground mb-5">Avaliações dos clientes</h2>
+    <div className="mt-8 max-w-7xl mx-auto px-2 md:px-8">
+      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-4 md:px-12 py-5 md:py-8 shadow-lg">
+        <h2 className="text-lg md:text-2xl font-bold text-foreground mb-5">Avaliações dos clientes</h2>
         <Carousel
           opts={{
             align: "start",
@@ -41,7 +41,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
         >
           <CarouselContent className="-ml-2 md:-ml-3">
             {reviews.map((review) => (
-              <CarouselItem key={review.id} className="pl-2 md:pl-3 basis-[85%] md:basis-1/2 lg:basis-1/3">
+              <CarouselItem key={review.id} className="pl-2 md:pl-3 basis-full md:basis-1/2 lg:basis-1/3">
                 <div className="relative rounded-xl bg-muted/40 border border-border/30 p-4 md:p-5 h-full flex flex-col gap-3 hover:bg-muted/60 transition-colors">
                   <div className="flex gap-0.5">
                     {[1, 2, 3, 4, 5].map(star => (
@@ -62,19 +62,30 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
                     <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary uppercase shrink-0">
                       {review.customer_name.charAt(0)}
                     </div>
-                    <span className="font-semibold text-sm text-foreground">{review.customer_name}</span>
-                    <span className="text-xs text-primary ml-auto font-medium whitespace-nowrap">✓ Compra verificada</span>
+                    <span className="font-semibold text-sm text-foreground truncate">{review.customer_name}</span>
+                    <span className="text-xs text-primary ml-auto font-medium whitespace-nowrap">✓ Verificada</span>
                   </div>
                 </div>
               </CarouselItem>
             ))}
           </CarouselContent>
+          {/* Setas abaixo do carrossel no mobile, nas laterais no desktop */}
+          <div className="flex justify-center gap-4 mt-4 md:hidden">
+            <CarouselPrevious 
+              className="static translate-y-0 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
+              aria-label="Ver avaliação anterior" 
+            />
+            <CarouselNext 
+              className="static translate-y-0 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
+              aria-label="Ver próxima avaliação" 
+            />
+          </div>
           <CarouselPrevious 
-            className="-left-6 md:-left-8 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
+            className="hidden md:flex -left-8 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
             aria-label="Ver avaliação anterior" 
           />
           <CarouselNext 
-            className="-right-6 md:-right-8 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
+            className="hidden md:flex -right-8 h-7 w-7 bg-transparent border-none shadow-none hover:bg-transparent text-foreground/70 hover:text-foreground animate-pulse" 
             aria-label="Ver próxima avaliação" 
           />
         </Carousel>
