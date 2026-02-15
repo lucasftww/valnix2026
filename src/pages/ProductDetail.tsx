@@ -5,7 +5,7 @@ import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
-import { Minus, Plus, Star, ShieldCheck, Zap, ChevronRight } from "lucide-react";
+import { Minus, Plus, Star, ShieldCheck, Zap, ChevronRight, ChevronDown } from "lucide-react";
 import { useState, useMemo, useEffect, lazy, Suspense, memo, useCallback } from "react";
 import { useProductById, useProductReviews } from "@/hooks/firebase";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
@@ -66,6 +66,7 @@ const ProductDetail = () => {
   const { addItem } = useCart();
   const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
+  const [mobileSection, setMobileSection] = useState<string | null>(null);
   
 
   // Buscar produto com Firebase
@@ -447,40 +448,23 @@ const ProductDetail = () => {
               </div>
             </div>
 
-            {/* Descrição/Instruções/Termos Mobile — Tabs */}
-            <div className="lg:hidden bg-card border border-border/20 rounded-2xl overflow-hidden">
-              <Tabs defaultValue="description" className="w-full">
-                <TabsList className="w-full justify-start bg-transparent border-b border-border/20 rounded-none h-auto p-0">
-                  <TabsTrigger 
-                    value="description" 
-                    className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary px-3 py-2.5 text-xs font-medium"
-                  >
-                    Descrição
-                  </TabsTrigger>
-                  {product.instructions && (
-                    <TabsTrigger 
-                      value="instructions" 
-                      className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary px-3 py-2.5 text-xs font-medium"
-                    >
-                      Instruções
-                    </TabsTrigger>
-                  )}
-                  {product.terms_conditions && (
-                    <TabsTrigger 
-                      value="terms" 
-                      className="flex-1 rounded-none border-b-2 border-transparent data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary px-3 py-2.5 text-xs font-medium"
-                    >
-                      Termos
-                    </TabsTrigger>
-                  )}
-                </TabsList>
-                
-                <TabsContent value="description" className="mt-0">
-                  <div className="max-h-[200px] overflow-y-auto p-3">
-                    <div className="description-content text-xs text-muted-foreground leading-relaxed">
+            {/* Descrição/Instruções/Termos Mobile — Accordion style */}
+            <div className="lg:hidden space-y-2.5">
+              {/* Descrição */}
+              <div className="bg-card border border-border/20 rounded-xl overflow-hidden">
+                <button
+                  onClick={() => setMobileSection(mobileSection === 'description' ? null : 'description')}
+                  className="w-full flex items-center justify-between px-4 py-3"
+                >
+                  <span className="text-sm font-semibold">Descrição</span>
+                  <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${mobileSection === 'description' ? 'rotate-180' : ''}`} />
+                </button>
+                {mobileSection === 'description' && (
+                  <div className="px-4 pb-4 border-t border-border/10">
+                    <div className="pt-3 description-content text-xs text-muted-foreground leading-relaxed">
                       {product.rich_description ? (
                         <div 
-                          className="prose prose-invert prose-xs max-w-none [&_p]:text-xs [&_p]:mb-2 [&_li]:text-xs [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs [&_h4]:text-xs" 
+                          className="prose prose-invert prose-xs max-w-none [&_p]:text-xs [&_p]:mb-2 [&_li]:text-xs [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs" 
                           dangerouslySetInnerHTML={{ __html: sanitizedDescription }} 
                         />
                       ) : product.description ? (
@@ -490,30 +474,50 @@ const ProductDetail = () => {
                       )}
                     </div>
                   </div>
-                </TabsContent>
-                
-                {product.instructions && (
-                  <TabsContent value="instructions" className="mt-0">
-                    <div className="max-h-[200px] overflow-y-auto p-3">
+                )}
+              </div>
+
+              {/* Instruções */}
+              {product.instructions && (
+                <div className="bg-card border border-border/20 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setMobileSection(mobileSection === 'instructions' ? null : 'instructions')}
+                    className="w-full flex items-center justify-between px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold">Instruções de Uso</span>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${mobileSection === 'instructions' ? 'rotate-180' : ''}`} />
+                  </button>
+                  {mobileSection === 'instructions' && (
+                    <div className="px-4 pb-4 border-t border-border/10">
                       <div 
-                        className="prose prose-invert prose-xs max-w-none text-muted-foreground [&_p]:text-xs [&_p]:mb-2 [&_li]:text-xs [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs" 
+                        className="pt-3 prose prose-invert prose-xs max-w-none text-muted-foreground [&_p]:text-xs [&_p]:mb-2 [&_li]:text-xs [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs" 
                         dangerouslySetInnerHTML={{ __html: sanitizedInstructions }} 
                       />
                     </div>
-                  </TabsContent>
-                )}
-                
-                {product.terms_conditions && (
-                  <TabsContent value="terms" className="mt-0">
-                    <div className="max-h-[200px] overflow-y-auto p-3">
+                  )}
+                </div>
+              )}
+
+              {/* Termos */}
+              {product.terms_conditions && (
+                <div className="bg-card border border-border/20 rounded-xl overflow-hidden">
+                  <button
+                    onClick={() => setMobileSection(mobileSection === 'terms' ? null : 'terms')}
+                    className="w-full flex items-center justify-between px-4 py-3"
+                  >
+                    <span className="text-sm font-semibold">Termos e Condições</span>
+                    <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform ${mobileSection === 'terms' ? 'rotate-180' : ''}`} />
+                  </button>
+                  {mobileSection === 'terms' && (
+                    <div className="px-4 pb-4 border-t border-border/10">
                       <div 
-                        className="prose prose-invert prose-xs max-w-none text-muted-foreground [&_p]:text-xs [&_p]:mb-2 [&_li]:text-xs [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs" 
+                        className="pt-3 prose prose-invert prose-xs max-w-none text-muted-foreground [&_p]:text-xs [&_p]:mb-2 [&_li]:text-xs [&_h1]:text-sm [&_h2]:text-sm [&_h3]:text-xs" 
                         dangerouslySetInnerHTML={{ __html: sanitizedTerms }} 
                       />
                     </div>
-                  </TabsContent>
-                )}
-              </Tabs>
+                  )}
+                </div>
+              )}
             </div>
           </div>
 
