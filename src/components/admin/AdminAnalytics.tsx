@@ -72,11 +72,13 @@ export function AdminAnalytics() {
       if (!currentUser) throw new Error('User not authenticated');
       
       const firebaseToken = await currentUser.getIdToken();
+      const { invokeFunction } = await import("@/lib/apiHelper");
       
-      const response = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-analytics?dateRange=${dateRange}`,
-        { headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'x-firebase-token': firebaseToken } }
-      );
+      const response = await invokeFunction("admin-analytics", {
+        method: "GET",
+        queryParams: { dateRange },
+        headers: { "x-firebase-token": firebaseToken },
+      });
       
       if (!response.ok) {
         const error = await response.json();
