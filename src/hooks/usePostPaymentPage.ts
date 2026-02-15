@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { db } from '@/integrations/firebase/config';
+import { collection, query, where, getDocs } from 'firebase/firestore';
 
 export interface PostPaymentPageConfig {
   id: string;
@@ -26,21 +27,32 @@ export function usePostPaymentPage(addonType: string) {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const { data, error: fetchError } = await supabase
-          .from('post_payment_pages')
-          .select('*')
-          .eq('addon_type', addonType)
-          .eq('is_active', true)
-          .maybeSingle();
+        const pagesRef = collection(db, 'post_payment_pages');
+        const q = query(
+          pagesRef,
+          where('addon_type', '==', addonType),
+          where('is_active', '==', true)
+        );
+        const snapshot = await getDocs(q);
 
-        if (fetchError) throw fetchError;
-
-        if (data) {
+        if (!snapshot.empty) {
+          const doc = snapshot.docs[0];
+          const data = doc.data();
           setConfig({
-            ...data,
+            id: doc.id,
+            addon_type: data.addon_type,
+            title: data.title || 'Oferta Especial',
+            subtitle: data.subtitle || null,
+            badge_text: data.badge_text || null,
+            badge_color: data.badge_color || 'yellow',
             benefits: Array.isArray(data.benefits) ? data.benefits as string[] : [],
-            price: Number(data.price),
+            price: Number(data.price) || 0,
             original_price: data.original_price ? Number(data.original_price) : null,
+            button_accept_text: data.button_accept_text || 'SIM! EU QUERO!',
+            button_skip_text: data.button_skip_text || 'Não, obrigado',
+            next_route: data.next_route || '/',
+            is_active: data.is_active ?? true,
+            display_order: data.display_order || 0,
           });
         }
       } catch (err: any) {

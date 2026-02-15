@@ -1,4 +1,5 @@
-import { supabase } from "@/integrations/supabase/client";
+import { db } from "@/integrations/firebase/config";
+import { collection, addDoc, getDocs, updateDoc, query, where, serverTimestamp, Timestamp } from "firebase/firestore";
 
 /**
  * Generates a short unique hash for guest order access links.
@@ -31,55 +32,53 @@ export interface SaveGuestOrderParams {
 }
 
 /**
- * Saves a guest order to Supabase with a unique hash for access.
+ * Saves a guest order to Firestore with a unique hash for access.
  * Returns the hash for the /order/:hash URL.
  */
 export async function saveGuestOrder(params: SaveGuestOrderParams): Promise<string> {
-  // Check if a guest order already exists for this order_id
-  const { data: existing } = await supabase
-    .from("guest_orders")
-    .select("hash")
-    .eq("order_id", params.orderId)
-    .maybeSingle();
+  const guestOrdersRef = collection(db, "guest_orders");
 
-  if (existing) {
+  // Check if a guest order already exists for this order_id
+  const existingQuery = query(guestOrdersRef, where("order_id", "==", params.orderId));
+  const existingSnapshot = await getDocs(existingQuery);
+
+  if (!existingSnapshot.empty) {
+    const existingDoc = existingSnapshot.docs[0];
     console.log(`ℹ️ Guest order already exists for ${params.orderId}, returning existing hash`);
-    // Update the order_data with latest info (e.g., delivery codes)
-    await supabase
-      .from("guest_orders")
-      .update({
-        order_data: {
-          items: params.items,
-          total_amount: params.totalAmount,
-          payment_method: params.paymentMethod || "pix",
-          created_at: new Date().toISOString(),
-        },
-      })
-      .eq("order_id", params.orderId);
-    return existing.hash;
+    // Update the order_data with latest info
+    await updateDoc(existingDoc.ref, {
+      order_data: {
+        items: params.items,
+        total_amount: params.totalAmount,
+        payment_method: params.paymentMethod || "pix",
+        created_at: new Date().toISOString(),
+      },
+    });
+    return existingDoc.data().hash;
   }
 
   const hash = generateHash();
+  const expiresAt = new Date();
+  expiresAt.setDate(expiresAt.getDate() + 30);
 
-  const { error } = await supabase.from("guest_orders").insert({
+  await addDoc(guestOrdersRef, {
     hash,
     order_id: params.orderId,
     email: params.email.toLowerCase(),
     customer_name: params.customerName || null,
     customer_phone: params.customerPhone || null,
     guest_session_id: params.guestSessionId || null,
+    user_id: null,
+    linked: false,
     order_data: {
       items: params.items,
       total_amount: params.totalAmount,
       payment_method: params.paymentMethod || "pix",
       created_at: new Date().toISOString(),
     },
+    created_at: serverTimestamp(),
+    expires_at: Timestamp.fromDate(expiresAt),
   });
-
-  if (error) {
-    console.error("Error saving guest order:", error);
-    throw error;
-  }
 
   console.log(`✅ Guest order saved with hash: ${hash}`);
   return hash;
@@ -99,20 +98,15 @@ export async function updateGuestOrderDelivery(
     delivery_code: string | null;
   }>
 ): Promise<void> {
-  // Get the existing guest order
-  const { data: existingOrder } = await supabase
-    .from("guest_orders")
-    .select("id, order_data")
-    .eq("order_id", orderId)
-    .maybeSingle();
+  const guestOrdersRef = collection(db, "guest_orders");
+  const q = query(guestOrdersRef, where("order_id", "==", orderId));
+  const snapshot = await getDocs(q);
 
-  if (!existingOrder) return;
+  if (snapshot.empty) return;
 
-  const orderData = existingOrder.order_data as any;
+  const existingDoc = snapshot.docs[0];
+  const orderData = existingDoc.data().order_data as any;
   orderData.items = items;
 
-  await supabase
-    .from("guest_orders")
-    .update({ order_data: orderData })
-    .eq("id", existingOrder.id);
+  await updateDoc(existingDoc.ref, { order_data: orderData });
 }

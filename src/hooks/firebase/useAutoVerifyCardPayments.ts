@@ -29,9 +29,11 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
         verifiedRef.current.add(order.id);
 
         try {
-          const response = await fetch(
-            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-card?action=status&id=${order.flowpay_charge_id}`,
-          );
+          const { invokeFunction } = await import("@/lib/apiHelper");
+          const response = await invokeFunction('flowpay-card', {
+            method: 'GET',
+            queryParams: { action: 'status', id: order.flowpay_charge_id },
+          });
           const data = await response.json();
 
           if (data.success && data.status === 'COMPLETED') {

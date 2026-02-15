@@ -16,7 +16,7 @@ import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
 import pixLogo from "@/assets/pix-logo.png";
-import { supabase } from "@/lib/supabaseHelper";
+import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 import { sendInitiateCheckout } from "@/lib/metaCapi";
 import { saveGuestOrder } from "@/lib/guestOrders";
@@ -362,48 +362,42 @@ export default function Checkout() {
         // Send Purchase to Meta CAPI (server-side via edge function)
         try {
           const nameParts = formData.name.split(' ');
-          supabase.functions.invoke('meta-capi', {
-            body: {
-              event_name: 'Purchase',
-              event_id: `purchase_${orderId}_${Date.now()}`,
-              order_id: orderId,
-              value: orderAmount,
-              currency: 'BRL',
-              content_name: items.map(i => i.name).join(', '),
-              email: formData.email || user?.email,
-              phone: formData.phone || undefined,
-              first_name: nameParts[0] || undefined,
-              last_name: nameParts.slice(1).join(' ') || undefined,
-              external_id: effectiveUserId,
-              fbc: getCookie('_fbc') || undefined,
-              fbp: getCookie('_fbp') || undefined,
-            },
-          }).then(({ error }) => {
-            if (error) console.warn('⚠️ Meta CAPI balance Purchase failed:', error);
-            else console.log('📡 Meta CAPI Purchase sent (balance payment)');
+          invokeFunctionFireAndForget('meta-capi', {
+            event_name: 'Purchase',
+            event_id: `purchase_${orderId}_${Date.now()}`,
+            order_id: orderId,
+            value: orderAmount,
+            currency: 'BRL',
+            content_name: items.map(i => i.name).join(', '),
+            email: formData.email || user?.email,
+            phone: formData.phone || undefined,
+            first_name: nameParts[0] || undefined,
+            last_name: nameParts.slice(1).join(' ') || undefined,
+            external_id: effectiveUserId,
+            fbc: getCookie('_fbc') || undefined,
+            fbp: getCookie('_fbp') || undefined,
+          }).then(() => {
+            console.log('📡 Meta CAPI Purchase sent (balance payment)');
           });
         } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
 
         // Send Purchase to UTMify (server-side via edge function)
         try {
-          supabase.functions.invoke('utmify-event', {
-            body: {
-              order_id: orderId,
-              event_type: 'Purchase',
-              value: orderAmount,
-              customer_name: formData.name,
-              customer_email: formData.email || user?.email,
-              customer_phone: formData.phone || undefined,
-              product_name: items.map(i => i.name).join(', '),
-              utm_source: utmParams.utm_source || undefined,
-              utm_medium: utmParams.utm_medium || undefined,
-              utm_campaign: utmParams.utm_campaign || undefined,
-              utm_content: utmParams.utm_content || undefined,
-              utm_term: utmParams.utm_term || undefined,
-            },
-          }).then(({ error }) => {
-            if (error) console.warn('⚠️ UTMify balance Purchase failed:', error);
-            else console.log('📡 UTMify Purchase sent (balance payment)');
+          invokeFunctionFireAndForget('utmify-event', {
+            order_id: orderId,
+            event_type: 'Purchase',
+            value: orderAmount,
+            customer_name: formData.name,
+            customer_email: formData.email || user?.email,
+            customer_phone: formData.phone || undefined,
+            product_name: items.map(i => i.name).join(', '),
+            utm_source: utmParams.utm_source || undefined,
+            utm_medium: utmParams.utm_medium || undefined,
+            utm_campaign: utmParams.utm_campaign || undefined,
+            utm_content: utmParams.utm_content || undefined,
+            utm_term: utmParams.utm_term || undefined,
+          }).then(() => {
+            console.log('📡 UTMify Purchase sent (balance payment)');
           });
         } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
 
@@ -515,24 +509,21 @@ export default function Checkout() {
         createOrderItems(orderItemsData, false).catch(err => console.warn('⚠️ Order items failed:', err));
 
         // Create card charge via edge function
-        const cardResponse = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-card?action=create`,
-          {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              amount: Math.round(orderAmount * 100),
-              orderId,
-              description: `Pedido ${orderId.substring(0, 8)}`,
-              customer: {
-                name: formData.name,
-                email: formData.email || user?.email || undefined,
-                phone: formData.phone || undefined,
-                taxId: cpfDigits,
-              },
-            }),
-          }
-        );
+        const cardResponse = await invokeFunction('flowpay-card', {
+          method: 'POST',
+          queryParams: { action: 'create' },
+          body: {
+            amount: Math.round(orderAmount * 100),
+            orderId,
+            description: `Pedido ${orderId.substring(0, 8)}`,
+            customer: {
+              name: formData.name,
+              email: formData.email || user?.email || undefined,
+              phone: formData.phone || undefined,
+              taxId: cpfDigits,
+            },
+          },
+        });
 
         const cardData = await cardResponse.json();
 
@@ -630,24 +621,22 @@ export default function Checkout() {
       }
 
       // Fire PIX + order items in parallel
-      const pixPromise = fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
-        {
-          method: 'POST',
-          headers: pixHeaders,
-          body: JSON.stringify({
-            amount: Math.round(orderAmount * 100),
-            orderId,
-            description: `Pedido ${orderId.substring(0, 8)}`,
-            customer: {
-              name: formData.name,
-              email: formData.email || user?.email || undefined,
-              phone: formData.phone || undefined,
-              taxId: cpfDigits,
-            },
-          }),
-        }
-      );
+      const pixPromise = invokeFunction('flowpay-pix', {
+        method: 'POST',
+        queryParams: { action: 'create' },
+        headers: firebaseIdToken ? { 'Authorization': `Bearer ${firebaseIdToken}` } : {},
+        body: {
+          amount: Math.round(orderAmount * 100),
+          orderId,
+          description: `Pedido ${orderId.substring(0, 8)}`,
+          customer: {
+            name: formData.name,
+            email: formData.email || user?.email || undefined,
+            phone: formData.phone || undefined,
+            taxId: cpfDigits,
+          },
+        },
+      });
 
       // Fire order items creation in parallel (don't await before PIX)
       const itemsPromise = createOrderItems(orderItemsData).catch(err => {

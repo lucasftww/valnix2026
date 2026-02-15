@@ -131,10 +131,12 @@ export function PixPayment({
           headers['Authorization'] = `Bearer ${idToken}`;
         }
 
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${transactionId}`,
-          { headers },
-        );
+        const { invokeFunction } = await import("@/lib/apiHelper");
+        const response = await invokeFunction('flowpay-pix', {
+          method: 'GET',
+          queryParams: { action: 'status', chargeId: transactionId },
+          headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
+        });
         const data = await response.json();
         
         if (data.success && data.status === 'COMPLETED') {
