@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
 import {
   User,
   signInWithEmailAndPassword,
@@ -11,10 +11,11 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { isBlockedEmail } from "@/lib/blockedEmails";
+import { isBlockedEmail, isBlockedUid } from "@/lib/blockedEmails";
 
-// ── Security: admin role is determined solely by Firestore "users" doc ──
-// No emails are hardcoded here to prevent exposure in client-side JS
+// ── Security: admin role is determined ONLY by "user_roles" collection ──
+// The "users" collection is NOT trusted for admin status (users can write to it)
+// The "user_roles" collection must be write-protected by Firestore Security Rules
 
 interface AuthContextType {
   user: User | null;
@@ -34,32 +35,65 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
+  // Track if we've already reverted a rogue admin doc to avoid loops
+  const revertedRef = useRef(new Set<string>());
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
       setLoading(false);
       
       if (firebaseUser) {
+        // Block banned UIDs immediately
+        if (isBlockedUid(firebaseUser.uid)) {
+          await firebaseSignOut(auth);
+          setIsAdmin(false);
+          return;
+        }
+
         try {
-          const [userDoc, profileDoc] = await Promise.all([
+          // ── SECURITY: Check admin ONLY from user_roles collection ──
+          // user_roles is write-protected by Firestore Rules (only admin can write)
+          // The "users" collection is NOT trusted for role checks
+          const [roleDoc, userDoc, profileDoc] = await Promise.all([
+            getDoc(doc(db, "user_roles", firebaseUser.uid)),
             getDoc(doc(db, "users", firebaseUser.uid)),
             getDoc(doc(db, "profiles", firebaseUser.uid)),
           ]);
 
+          const hasAdminRole = roleDoc.exists() && roleDoc.data()?.role === "admin";
+          setIsAdmin(hasAdminRole);
+
+          // ── AUTO-REVERT: If users doc claims admin but user_roles says no ──
+          // This catches privilege escalation attempts
           if (userDoc.exists()) {
-            const data = userDoc.data();
-            const isRoleAdmin = data?.role === "admin" && data?.isAdmin === true;
-            setIsAdmin(isRoleAdmin);
+            const userData = userDoc.data();
+            if ((userData?.role === "admin" || userData?.isAdmin === true) && !hasAdminRole) {
+              if (!revertedRef.current.has(firebaseUser.uid)) {
+                revertedRef.current.add(firebaseUser.uid);
+                console.warn("🚨 Unauthorized admin detected, reverting:", firebaseUser.uid);
+                try {
+                  await setDoc(doc(db, "users", firebaseUser.uid), {
+                    email: firebaseUser.email,
+                    role: "user",
+                    isAdmin: false,
+                    created_at: userData.created_at || new Date().toISOString(),
+                    flagged_at: new Date().toISOString(),
+                    flagged_reason: "unauthorized_admin_revert",
+                  });
+                } catch (revertErr) {
+                  console.error("Failed to revert rogue admin doc:", revertErr);
+                }
+              }
+            }
           } else {
-            // New user — always starts as regular user
-            // Admin role must be set manually in Firestore
+            // New user — create users doc (non-admin)
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
               role: "user",
               isAdmin: false,
               created_at: new Date().toISOString(),
             });
-            setIsAdmin(false);
           }
 
           if (!profileDoc.exists()) {
