@@ -26,7 +26,7 @@ async function getFirebaseAccessToken(): Promise<string> {
   const payload = {
     iss: saKey.client_email, sub: saKey.client_email,
     aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/cloud-platform',
   };
   const enc = new TextEncoder();
   const headerB64 = base64url(enc.encode(JSON.stringify(header)));
@@ -83,6 +83,34 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
+    const url = new URL(req.url);
+    const action = url.searchParams.get('action');
+
+    // Storage bucket diagnostic
+    if (action === 'storage') {
+      const accessToken = await getFirebaseAccessToken();
+      
+      // List all buckets in the project
+      const listRes = await fetch(`https://storage.googleapis.com/storage/v1/b?project=${FIREBASE_PROJECT_ID}`, {
+        headers: { 'Authorization': `Bearer ${accessToken}` },
+      });
+      const listData = await listRes.json();
+      
+      // Also try Firebase Storage API
+      const bucketNames = ['valnix.firebasestorage.app', 'valnix.appspot.com'];
+      const bucketChecks: Record<string, any> = {};
+      for (const b of bucketNames) {
+        const r = await fetch(`https://storage.googleapis.com/storage/v1/b/${b}`, {
+          headers: { 'Authorization': `Bearer ${accessToken}` },
+        });
+        bucketChecks[b] = { status: r.status, body: await r.json() };
+      }
+      
+      return new Response(JSON.stringify({ buckets: listData, bucketChecks }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
     const collections = ['products', 'categories', 'orders', 'order_items', 'profiles', 'site_banners', 'product_reviews'];
     const report: Record<string, any> = {};
 

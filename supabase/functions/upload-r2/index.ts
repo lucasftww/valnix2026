@@ -173,19 +173,44 @@ Deno.serve(async (req) => {
       bytes[i] = binaryStr.charCodeAt(i);
     }
 
-    // Upload to Firebase Storage using Google Cloud Storage JSON API
+    // Upload to Firebase Storage using Firebase Storage REST API
     const accessToken = await getFirebaseAccessToken();
     const encodedName = encodeURIComponent(sanitizedFileName);
     
-    // Try firebasestorage.app bucket first, fall back to appspot.com
+    // Try multiple bucket names with Firebase Storage REST API
     let uploadRes: Response | null = null;
     let usedBucket = FIREBASE_STORAGE_BUCKET;
     
-    for (const bucket of [FIREBASE_STORAGE_BUCKET, "valnix.appspot.com"]) {
-      const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodedName}`;
-      console.log(`Trying upload to bucket: ${bucket}`);
+    const bucketsToTry = [FIREBASE_STORAGE_BUCKET, "valnix.appspot.com"];
+    
+    for (const bucket of bucketsToTry) {
+      // Use Firebase Storage REST API endpoint
+      const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedName}`;
+      console.log(`Trying Firebase Storage REST API upload to bucket: ${bucket}`);
       
       uploadRes = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": resolvedContentType,
+          "X-Goog-Upload-Protocol": "raw",
+        },
+        body: bytes,
+      });
+      
+      if (uploadRes.ok) {
+        usedBucket = bucket;
+        break;
+      }
+      
+      const errorText = await uploadRes.text();
+      console.error(`Bucket ${bucket} failed:`, uploadRes.status, errorText);
+      
+      // Also try GCS JSON API as fallback
+      const gcsUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodedName}`;
+      console.log(`Trying GCS JSON API upload to bucket: ${bucket}`);
+      
+      uploadRes = await fetch(gcsUrl, {
         method: "POST",
         headers: {
           "Authorization": `Bearer ${accessToken}`,
@@ -199,13 +224,13 @@ Deno.serve(async (req) => {
         break;
       }
       
-      const errorText = await uploadRes.text();
-      console.error(`Bucket ${bucket} failed:`, uploadRes.status, errorText);
+      const gcsErrorText = await uploadRes.text();
+      console.error(`GCS bucket ${bucket} failed:`, uploadRes.status, gcsErrorText);
     }
 
     if (!uploadRes || !uploadRes.ok) {
       return new Response(
-        JSON.stringify({ error: `Upload failed to all buckets` }),
+        JSON.stringify({ error: "Upload failed to all buckets" }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
