@@ -17,15 +17,10 @@ export function useBackRedirect(redirectPath = "/") {
       redirectPath +
       (currentParams ? separator + currentParams : "");
 
-    // Push extra history entries so "back" triggers popstate
-    history.pushState({}, "", location.pathname + location.search);
-    history.pushState({}, "", location.pathname + location.search);
-    history.pushState({}, "", location.pathname + location.search);
-
+    // Replace current history entry instead of pushing extra entries
+    // This avoids the "Session History Item Has Been Marked Skippable" warning
     const handlePopState = () => {
-      setTimeout(() => {
-        window.location.href = fullUrl;
-      }, 1);
+      window.location.href = fullUrl;
     };
 
     window.addEventListener("popstate", handlePopState);

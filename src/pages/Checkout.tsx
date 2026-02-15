@@ -923,11 +923,13 @@ export default function Checkout() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Name */}
                   <div>
-                    <label className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-name" className="block text-[13px] text-[#888] mb-2">
                       Nome completo <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <Input
+                        id="checkout-name"
+                        name="name"
                         value={formData.name}
                         onChange={(e) => handleInputChange('name', e.target.value)}
                         onBlur={() => handleBlur('name')}
@@ -944,11 +946,13 @@ export default function Checkout() {
                   
                   {/* CPF */}
                   <div>
-                    <label className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-cpf" className="block text-[13px] text-[#888] mb-2">
                       CPF <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <Input
+                        id="checkout-cpf"
+                        name="cpf"
                         value={formData.document}
                         onChange={(e) => handleInputChange('document', e.target.value)}
                         onBlur={() => handleBlur('document')}
@@ -969,11 +973,13 @@ export default function Checkout() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Email */}
                   <div>
-                    <label className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-email" className="block text-[13px] text-[#888] mb-2">
                       E-mail <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
                       <Input
+                        id="checkout-email"
+                        name="email"
                         value={formData.email}
                         onChange={(e) => handleInputChange('email', e.target.value)}
                         onBlur={() => handleBlur('email')}
@@ -991,10 +997,12 @@ export default function Checkout() {
 
                   {/* Phone (optional) */}
                   <div>
-                    <label className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-phone" className="block text-[13px] text-[#888] mb-2">
                       Telefone <span className="text-[#555]">(opcional)</span>
                     </label>
                     <Input
+                      id="checkout-phone"
+                      name="phone"
                       value={formData.phone}
                       onChange={(e) => handleInputChange('phone', e.target.value)}
                       placeholder="(DDD) 99999-9999"
