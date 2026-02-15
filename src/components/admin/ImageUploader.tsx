@@ -1,10 +1,10 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { storage } from "@/integrations/firebase/config";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import imageCompression from "browser-image-compression";
+import { invokeFunction } from "@/lib/apiHelper";
+import { auth } from "@/integrations/firebase/config";
 
 type ImagePreset = 'product' | 'banner' | 'icon';
 
@@ -20,6 +20,18 @@ const presetConfig = {
   banner: { maxSizeMB: 1, maxWidthOrHeight: 1400 },
   icon: { maxSizeMB: 0.2, maxWidthOrHeight: 400 },
 };
+
+/** Convert a File/Blob to base64 string (without the data: prefix) */
+const fileToBase64 = (file: Blob): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const result = reader.result as string;
+      resolve(result.split(",")[1]); // strip "data:…;base64,"
+    };
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 
 export const ImageUploader = ({ 
   currentImageUrl, 
@@ -53,17 +65,15 @@ export const ImageUploader = ({
       setCompressionProgress("Iniciando otimização...");
       const compressedFile = await imageCompression(file, options);
       
-      // Log para debug - confirmar conversão WebP
       console.log(`✅ Imagem otimizada: ${file.name} (${file.type}) → WebP`);
       console.log(`   Tamanho: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
-      console.log(`   Tipo final: ${compressedFile.type}`);
       
       setCompressionProgress(null);
       return compressedFile;
     } catch (error) {
       console.error("Erro ao comprimir imagem:", error);
       setCompressionProgress(null);
-      return file; // Retorna original se falhar
+      return file;
     }
   };
 
@@ -71,7 +81,6 @@ export const ImageUploader = ({
     const file = event.target.files?.[0];
     if (!file) return;
 
-    // Validar tipo de arquivo
     const allowedTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp', 'image/avif'];
     if (!allowedTypes.includes(file.type)) {
       toast({
@@ -82,7 +91,6 @@ export const ImageUploader = ({
       return;
     }
 
-    // Aumentar limite para 20MB (será comprimido depois)
     if (file.size > 20971520) {
       toast({
         title: "Erro",
@@ -95,36 +103,48 @@ export const ImageUploader = ({
     setUploading(true);
 
     try {
-      // Comprimir imagem automaticamente
+      // Compress
       const compressedFile = await compressImage(file);
-      
-      // Criar nome único para o arquivo (sempre .webp)
+
+      // Build unique file name
       const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
 
-      // Upload para Firebase Storage
-      const storageRef = ref(storage, fileName);
-      await uploadBytes(storageRef, compressedFile, {
-        contentType: 'image/webp',
-        customMetadata: { cacheControl: '31536000' }
+      setCompressionProgress("Enviando para R2...");
+
+      // Get Firebase auth token
+      const user = auth.currentUser;
+      if (!user) throw new Error("Usuário não autenticado");
+      const token = await user.getIdToken();
+
+      // Convert to base64 and upload via edge function
+      const base64 = await fileToBase64(compressedFile);
+
+      const response = await invokeFunction("upload-r2", {
+        body: { fileBase64: base64, fileName, contentType: "image/webp" },
+        headers: { Authorization: `Bearer ${token}` },
       });
 
-      // Obter URL pública
-      const downloadUrl = await getDownloadURL(storageRef);
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || "Falha no upload");
+      }
 
-      setPreviewUrl(downloadUrl);
-      onImageUploaded(downloadUrl);
+      const { url } = await response.json();
+
+      setPreviewUrl(url);
+      onImageUploaded(url);
       
       const savedKB = ((file.size - compressedFile.size) / 1024).toFixed(0);
       toast({
         title: "Sucesso",
-        description: `Imagem otimizada e enviada! Economizou ${savedKB}KB`
+        description: `Imagem enviada para R2! Economizou ${savedKB}KB`
       });
 
     } catch (error) {
       console.error("Erro ao fazer upload:", error);
       toast({
         title: "Erro",
-        description: "Erro ao enviar imagem",
+        description: error instanceof Error ? error.message : "Erro ao enviar imagem",
         variant: "destructive"
       });
     } finally {
@@ -208,7 +228,7 @@ export const ImageUploader = ({
                     JPG, PNG, WEBP ou AVIF (máx. 20MB)
                   </p>
                   <p className="text-xs text-green-500 mt-1">
-                    ✓ Otimização automática para WebP
+                    ✓ Otimização automática para WebP → Cloudflare R2
                   </p>
                 </div>
               </>
