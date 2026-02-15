@@ -26,9 +26,19 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
   if (reviews.length === 0) return null;
 
   return (
-    <div className="mt-6 max-w-7xl mx-auto">
-      <div className="relative rounded-2xl border-2 border-primary/30 bg-card p-6">
-        <h2 className="text-2xl font-bold mb-6">Últimas avaliações</h2>
+    <div className="mt-8 max-w-7xl mx-auto">
+      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 p-6 md:p-8 shadow-lg">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="flex items-center gap-1">
+            {[1, 2, 3, 4, 5].map(s => (
+              <Star key={s} className="w-5 h-5 fill-yellow-500 text-yellow-400" />
+            ))}
+          </div>
+          <h2 className="text-xl md:text-2xl font-bold text-foreground">Avaliações dos clientes</h2>
+          <span className="ml-auto text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
+            {reviews.length} avaliações
+          </span>
+        </div>
         <Carousel
           opts={{
             align: "start",
@@ -40,25 +50,29 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           <CarouselContent className="-ml-2 md:-ml-4">
             {reviews.map((review) => (
               <CarouselItem key={review.id} className="pl-2 md:pl-4 basis-full md:basis-1/2 lg:basis-1/3">
-                <div className="relative rounded-xl border-2 border-primary/20 bg-muted/30 p-4 h-full">
-                  <div className="flex items-center justify-between mb-3">
-                    <span className="font-bold text-sm">{review.customer_name}</span>
-                    <div className="flex gap-0.5">
-                      {[1, 2, 3, 4, 5].map(star => (
-                        <Star 
-                          key={star} 
-                          className={`w-3 h-3 md:w-4 md:h-4 ${
-                            star <= review.rating 
-                              ? 'fill-yellow-500 text-yellow-500' 
-                              : 'text-gray-600'
-                          }`} 
-                        />
-                      ))}
-                    </div>
+                <div className="relative rounded-xl bg-muted/40 border border-border/30 p-5 h-full flex flex-col gap-3 hover:bg-muted/60 transition-colors">
+                  <div className="flex gap-0.5">
+                    {[1, 2, 3, 4, 5].map(star => (
+                      <Star 
+                        key={star} 
+                        className={`w-4 h-4 ${
+                          star <= review.rating 
+                            ? 'fill-yellow-500 text-yellow-500' 
+                            : 'text-muted-foreground/30'
+                        }`} 
+                      />
+                    ))}
                   </div>
-                  <p className="text-sm text-muted-foreground leading-relaxed">
-                    {review.comment}
+                  <p className="text-sm text-foreground/80 leading-relaxed flex-1 italic">
+                    "{review.comment}"
                   </p>
+                  <div className="flex items-center gap-2 pt-2 border-t border-border/20">
+                    <div className="w-7 h-7 rounded-full bg-primary/20 flex items-center justify-center text-xs font-bold text-primary uppercase">
+                      {review.customer_name.charAt(0)}
+                    </div>
+                    <span className="font-semibold text-sm text-foreground">{review.customer_name}</span>
+                    <span className="text-xs text-primary ml-auto font-medium">✓ Compra verificada</span>
+                  </div>
                 </div>
               </CarouselItem>
             ))}
