@@ -536,7 +536,7 @@ const ProductDetail = () => {
       </main>
 
       {/* Sticky CTA Mobile — clean conversion bar */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-[#0d0d0d] border-t border-[#1f1f1f]">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-[#0d0d0d] border-t border-[#1f1f1f] pb-6">
         <div className="px-4 py-3 safe-area-inset-bottom flex items-center justify-between gap-4">
           {/* Preço */}
           <div className="flex flex-col min-w-0">
@@ -557,7 +557,6 @@ const ProductDetail = () => {
             onClick={handleBuyNow} 
             className="h-12 px-6 text-[15px] font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.97] transition-transform shrink-0 shadow-lg shadow-primary/25"
           >
-            <Zap className="w-4 h-4 mr-1.5" />
             Comprar Agora
           </Button>
         </div>
