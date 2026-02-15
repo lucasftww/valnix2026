@@ -1,13 +1,23 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-firebase-token",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-};
+const ALLOWED_ORIGINS = [
+  "https://www.valnix.com.br",
+  "https://valnix.com.br",
+  "https://valnix2026.lovable.app",
+  "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-firebase-token",
+    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+  };
+}
 
 const FIREBASE_PROJECT_ID = "valnix";
-const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com", "valnixbr@gmail.com"];
 
 // ── Firebase Auth ──────────────────────────────────────────────────
 let cachedAccessToken: string | null = null;
@@ -66,12 +76,23 @@ async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; emai
   } catch { return null; }
 }
 
+// ── Admin check via Firestore user_roles (NOT hardcoded emails) ────
+async function isAdminInFirestore(uid: string): Promise<boolean> {
+  try {
+    const accessToken = await getFirebaseAccessToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (!res.ok) return false;
+    const doc = await res.json();
+    return doc.fields?.role?.stringValue === 'admin';
+  } catch { return false; }
+}
+
 // ── Firestore query with date filter ───────────────────────────────
 async function queryAnalyticsEvents(dateFilter: Date) {
   const accessToken = await getFirebaseAccessToken();
   const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
 
-  // Query analytics_events with timestamp filter
   const res = await fetch(queryUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -121,6 +142,7 @@ async function queryAnalyticsEvents(dateFilter: Date) {
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
@@ -136,8 +158,10 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    if (!ALLOWED_ADMIN_EMAILS.includes(userData.email.toLowerCase())) {
-      console.warn(`⚠️ Unauthorized admin attempt: ${userData.email}`);
+    // Check admin via Firestore user_roles collection (not hardcoded emails)
+    const adminStatus = await isAdminInFirestore(userData.uid);
+    if (!adminStatus) {
+      console.warn(`⚠️ Unauthorized admin attempt: ${userData.email} (${userData.uid})`);
       return new Response(JSON.stringify({ error: "Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -158,6 +182,6 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
   }
 });
