@@ -376,9 +376,12 @@ const ProductDetail = () => {
                         </Button>
                         <div className="flex items-center justify-center">
                           <input 
+                            id="product-quantity"
+                            name="quantity"
                             type="number" 
                             readOnly 
                             value={quantity}
+                            autoComplete="off"
                             aria-label="Quantidade do produto"
                             className="w-16 h-10 text-center text-lg font-bold bg-background border border-border rounded-lg outline-none"
                           />
