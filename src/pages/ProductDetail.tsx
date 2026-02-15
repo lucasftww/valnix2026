@@ -528,37 +528,30 @@ const ProductDetail = () => {
         </div>
       </main>
 
-      {/* Sticky CTA Mobile — com quantidade integrada */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-blur-md border-t border-border/30" style={{ transform: 'translateZ(0)' }}>
-        <div className="px-6 py-3 safe-area-inset-bottom flex items-center gap-3">
-          {/* Quantidade inline */}
-          <div className="flex items-center gap-1.5 shrink-0">
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={decreaseQuantity} 
-              disabled={quantity <= 1}
-              className="h-9 w-9 rounded-lg"
-              aria-label="Diminuir quantidade"
-            >
-              <Minus className="h-4 w-4" />
-            </Button>
-            <span className="w-6 text-center text-base font-bold">{quantity}</span>
-            <Button 
-              variant="outline" 
-              size="icon" 
-              onClick={increaseQuantity} 
-              className="h-9 w-9 rounded-lg"
-              aria-label="Aumentar quantidade"
-            >
-              <Plus className="h-4 w-4" />
-            </Button>
+      {/* Sticky CTA Mobile — clean conversion bar */}
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-[#1a1a2e]/98 backdrop-blur-md border-t border-border/20" style={{ transform: 'translateZ(0)' }}>
+        <div className="px-4 py-3 safe-area-inset-bottom flex items-center justify-between gap-4">
+          {/* Preço */}
+          <div className="flex flex-col min-w-0">
+            {product.old_price && product.old_price > product.price && (
+              <div className="flex items-center gap-1.5">
+                <span className="text-xs text-muted-foreground line-through">
+                  R${(product.old_price * quantity).toFixed(2).replace('.', ',')}
+                </span>
+                <span className="text-[10px] font-bold bg-green-500 text-white px-1.5 py-0.5 rounded-md">
+                  -{product.discount || Math.round((1 - product.price / product.old_price) * 100)}%
+                </span>
+              </div>
+            )}
+            <span className="text-xl font-extrabold text-primary">R$ {totalPrice}</span>
           </div>
+          {/* Botão Comprar */}
           <Button 
             onClick={handleBuyNow} 
-            className="flex-1 h-11 text-[15px] font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.98] transition-transform"
+            className="h-12 px-6 text-[15px] font-bold bg-primary hover:bg-primary/90 text-primary-foreground rounded-xl active:scale-[0.97] transition-transform shrink-0 shadow-lg shadow-primary/25"
           >
-            Comprar R$&nbsp;{totalPrice}
+            <Zap className="w-4 h-4 mr-1.5" />
+            Comprar Agora
           </Button>
         </div>
       </div>
