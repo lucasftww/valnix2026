@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { auth } from "@/integrations/firebase/config";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -52,6 +52,23 @@ const routeMap: Record<string, string> = {
   data_swap_warranty: "/painel-pagar-trocadados",
 };
 
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+async function callAdminPostPayment(method: string, body?: any) {
+  const token = await auth.currentUser?.getIdToken();
+  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-post-payment`, {
+    method,
+    headers: {
+      "Content-Type": "application/json",
+      "apikey": SUPABASE_KEY,
+      "x-firebase-token": token || "",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  return res.json();
+}
+
 export function AdminPostPaymentPages() {
   const [pages, setPages] = useState<PageConfig[]>([]);
   const [stats, setStats] = useState<Record<string, AddonStats>>({});
@@ -76,40 +93,41 @@ export function AdminPostPaymentPages() {
   };
 
   useEffect(() => {
-    fetchPages();
-    fetchStats();
+    fetchData();
   }, []);
 
-  const fetchPages = async () => {
-    const { data } = await supabase
-      .from("post_payment_pages")
-      .select("*")
-      .order("display_order");
-    if (data) {
-      setPages(data.map(d => ({ ...d, benefits: Array.isArray(d.benefits) ? d.benefits as string[] : [], price: Number(d.price), original_price: d.original_price ? Number(d.original_price) : null })));
+  const fetchData = async () => {
+    try {
+      const result = await callAdminPostPayment("GET");
+      if (result.pages) {
+        setPages(result.pages.map((d: any) => ({
+          ...d,
+          benefits: Array.isArray(d.benefits) ? d.benefits as string[] : [],
+          price: Number(d.price),
+          original_price: d.original_price ? Number(d.original_price) : null,
+        })));
+      }
+      if (result.addons) {
+        const s: Record<string, AddonStats> = {};
+        for (const row of result.addons) {
+          if (!s[row.addon_type]) s[row.addon_type] = { total: 0, paid: 0, skipped: 0, revenue: 0 };
+          s[row.addon_type].total++;
+          if (row.status === "paid") { s[row.addon_type].paid++; s[row.addon_type].revenue += Number(row.amount); }
+          if (row.status === "skipped") s[row.addon_type].skipped++;
+        }
+        setStats(s);
+      }
+    } catch (err) {
+      console.error("Error loading post-payment data:", err);
     }
     setLoading(false);
   };
 
-  const fetchStats = async () => {
-    const { data } = await supabase.from("sale_addons").select("addon_type, status, amount");
-    if (!data) return;
-
-    const s: Record<string, AddonStats> = {};
-    for (const row of data) {
-      if (!s[row.addon_type]) s[row.addon_type] = { total: 0, paid: 0, skipped: 0, revenue: 0 };
-      s[row.addon_type].total++;
-      if (row.status === "paid") { s[row.addon_type].paid++; s[row.addon_type].revenue += Number(row.amount); }
-      if (row.status === "skipped") s[row.addon_type].skipped++;
-    }
-    setStats(s);
-  };
-
   const handleSave = async (page: PageConfig) => {
     setSaving(page.id);
-    const { error } = await supabase
-      .from("post_payment_pages")
-      .update({
+    try {
+      const result = await callAdminPostPayment("PUT", {
+        id: page.id,
         title: page.title,
         subtitle: page.subtitle,
         badge_text: page.badge_text,
@@ -120,14 +138,15 @@ export function AdminPostPaymentPages() {
         button_accept_text: page.button_accept_text,
         button_skip_text: page.button_skip_text,
         is_active: page.is_active,
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", page.id);
+      });
 
-    if (error) {
-      toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
-    } else {
-      toast({ title: "Salvo!", description: `Página "${page.title}" atualizada.` });
+      if (result.error) {
+        toast({ title: "Erro ao salvar", description: result.error, variant: "destructive" });
+      } else {
+        toast({ title: "Salvo!", description: `Página "${page.title}" atualizada.` });
+      }
+    } catch {
+      toast({ title: "Erro ao salvar", description: "Falha na conexão", variant: "destructive" });
     }
     setSaving(null);
   };
