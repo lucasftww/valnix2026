@@ -1,14 +1,3 @@
-import { memo } from "react";
-
-// Simplified PageTransition — instant render, no exit delay
-// Previous 150ms exit animation was adding perceived latency on every navigation
-const PageTransition = memo(({ children }: { children: React.ReactNode }) => {
-  return (
-    <>{children}</>
-  
-  );
-});
-
-PageTransition.displayName = 'PageTransition';
-
+// No-op wrapper — kept for import compatibility
+const PageTransition = ({ children }: { children: React.ReactNode }) => <>{children}</>;
 export default PageTransition;
