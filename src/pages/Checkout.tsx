@@ -1012,6 +1012,8 @@ export default function Checkout() {
             <div className="lg:hidden bg-[#111] rounded-lg border border-[#1f1f1f] p-4">
               <div className="flex gap-2">
                 <Input
+                  id="mobile-coupon-code"
+                  name="mobile-coupon"
                   value={couponCode}
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   placeholder="Código do cupom"

@@ -59,6 +59,8 @@ export const OrderSummary = memo(function OrderSummary({
         <h3 className="text-[15px] font-semibold text-white mb-4">Cupom de desconto</h3>
         <div className="flex gap-2">
           <Input
+            id="desktop-coupon-code"
+            name="desktop-coupon"
             value={couponCode}
             onChange={(e) => onCouponChange(e.target.value.toUpperCase())}
             placeholder="Digite o código do cupom"
