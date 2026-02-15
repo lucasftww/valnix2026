@@ -81,7 +81,7 @@ const ProductDetail = () => {
   );
 
   // Remove "bonox" (case-insensitive) de qualquer texto
-  const stripBonox = (html: string) => html.replace(/bonox/gi, 'VALNIX');
+  const stripBonox = (html: string) => html.replace(/bonoxs?\b/gi, 'VALNIX');
 
   // Memoizar HTML sanitizado para evitar re-sanitize a cada render
   const sanitizedDescription = useMemo(() => 
