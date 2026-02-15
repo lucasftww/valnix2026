@@ -1,7 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
+import { storage } from "@/integrations/firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import imageCompression from "browser-image-compression";
 
@@ -100,24 +101,18 @@ export const ImageUploader = ({
       // Criar nome único para o arquivo (sempre .webp)
       const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
 
-      // Upload para o Supabase Storage
-      const { data, error } = await supabase.storage
-        .from('product-images')
-        .upload(fileName, compressedFile, {
-          cacheControl: '31536000', // 1 ano de cache
-          upsert: false,
-          contentType: 'image/webp'
-        });
-
-      if (error) throw error;
+      // Upload para Firebase Storage
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, compressedFile, {
+        contentType: 'image/webp',
+        customMetadata: { cacheControl: '31536000' }
+      });
 
       // Obter URL pública
-      const { data: { publicUrl } } = supabase.storage
-        .from('product-images')
-        .getPublicUrl(data.path);
+      const downloadUrl = await getDownloadURL(storageRef);
 
-      setPreviewUrl(publicUrl);
-      onImageUploaded(publicUrl);
+      setPreviewUrl(downloadUrl);
+      onImageUploaded(downloadUrl);
       
       const savedKB = ((file.size - compressedFile.size) / 1024).toFixed(0);
       toast({
