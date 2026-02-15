@@ -1007,6 +1007,42 @@ export default function Checkout() {
               </div>
 
             </div>
+
+            {/* Mobile Coupon - minimal */}
+            <div className="lg:hidden bg-[#111] rounded-lg border border-[#1f1f1f] p-4">
+              <div className="flex gap-2">
+                <Input
+                  value={couponCode}
+                  onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
+                  placeholder="Código do cupom"
+                  disabled={!!appliedCoupon}
+                  className="h-10 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#555] rounded-lg text-[13px] flex-1"
+                />
+                {appliedCoupon ? (
+                  <Button
+                    variant="outline"
+                    onClick={removeCoupon}
+                    className="h-10 border-[#333] text-[#888] hover:bg-[#1a1a1a] rounded-lg px-4 text-[13px]"
+                  >
+                    Remover
+                  </Button>
+                ) : (
+                  <Button
+                    variant="outline"
+                    onClick={handleApplyCoupon}
+                    disabled={applyingCoupon || !couponCode.trim()}
+                    className="h-10 border-[#333] text-[#aaa] hover:bg-[#1a1a1a] rounded-lg px-4 text-[13px]"
+                  >
+                    {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Aplicar"}
+                  </Button>
+                )}
+              </div>
+              {appliedCoupon && (
+                <p className="text-green-500 text-[12px] mt-2">
+                  Cupom {appliedCoupon.code} aplicado! -R$ {discount.toFixed(2).replace('.', ',')}
+                </p>
+              )}
+            </div>
           </div>
 
           {/* Right Column - Sidebar */}
