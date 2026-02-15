@@ -386,7 +386,7 @@ const ProductDetail = () => {
                             value={quantity}
                             autoComplete="off"
                             aria-label="Quantidade do produto"
-                            className="w-16 h-10 text-center text-lg font-bold bg-background border border-border rounded-lg outline-none"
+                            className="w-16 h-10 text-center text-lg font-bold bg-background border border-border rounded-lg outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                           />
                         </div>
                         <Button 
