@@ -100,11 +100,11 @@ export function PixPayment({
     });
     
     setTimeout(() => {
-      // Redirect to order delivery page first, then upsell is accessible from there
+      // Redirect to full-screen upsell funnel first
       if (orderHash) {
-        navigate(`/order/${orderHash}?upsell=1&order_id=${orderId}`);
+        navigate(`/painel-pagar-entrega?order_id=${orderId}&hash=${orderHash}`);
       } else {
-        navigate(`/painel-pagar?order_id=${orderId}`);
+        navigate(`/painel-pagar-entrega?order_id=${orderId}`);
       }
     }, 3000);
   };
