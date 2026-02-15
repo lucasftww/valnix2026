@@ -95,7 +95,7 @@ const HeaderComponent = () => {
   }, [signOut, navigate]);
   
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background" style={{ transform: 'translateZ(0)' }}>
+    <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background">
       <div className="container h-16 md:h-[72px] flex items-center px-4 md:px-6">
         {/* Left Section - Menu (Mobile) + Logo */}
         <div className="flex items-center gap-3 flex-shrink-0">

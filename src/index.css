@@ -159,10 +159,9 @@ All colors MUST be HSL.
     aspect-ratio: 1/1;
   }
   
-  /* Smooth transforms for mobile */
+  /* GPU hint — only apply when hardware acceleration is available */
   .gpu-accelerated {
     transform: translateZ(0);
-    will-change: transform;
   }
   
   /* Better mobile scrolling */
@@ -246,7 +245,6 @@ All colors MUST be HSL.
   background: hsl(var(--primary));
   border-radius: 6px;
   border: 2px solid hsl(var(--background));
-  transition: background 0.2s ease;
 }
 
 ::-webkit-scrollbar-thumb:hover {
