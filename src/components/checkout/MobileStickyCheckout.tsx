@@ -58,7 +58,7 @@ const MobileStickyCheckoutComponent = ({
       )}
 
       {/* Sticky bar */}
-      <div className="bg-[#0d0d0d] border-t border-[#1f1f1f] px-4 py-3 safe-area-inset-bottom">
+      <div className="bg-[#0d0d0d] border-t border-[#1f1f1f] px-4 pt-3 pb-8 safe-area-inset-bottom">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button
