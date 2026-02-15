@@ -536,8 +536,8 @@ const ProductDetail = () => {
       </main>
 
       {/* Sticky CTA Mobile — clean conversion bar */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-[#1a1a2e]/98 backdrop-blur-md border-t border-border/20" style={{ transform: 'translateZ(0)' }}>
-        <div className="px-4 py-5 safe-area-inset-bottom flex items-center justify-between gap-4">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-[#0d0d0d] border-t border-[#1f1f1f]">
+        <div className="px-4 py-3 safe-area-inset-bottom flex items-center justify-between gap-4">
           {/* Preço */}
           <div className="flex flex-col min-w-0">
             {product.old_price && product.old_price > product.price && (
