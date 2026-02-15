@@ -1,6 +1,6 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { collection, getDocs, onSnapshot } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+import { auth } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   DollarSign, ShoppingCart, Package, TrendingUp, RefreshCw, 
@@ -10,7 +10,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -22,66 +22,61 @@ const formatCurrency = (value: number) =>
 
 const PIE_COLORS = ['#10b981', '#f59e0b', '#ef4444'];
 
+const getFirebaseToken = async () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.getIdToken();
+};
+
 export const AdminDashboard = () => {
   const queryClient = useQueryClient();
-
-  useEffect(() => {
-    const ordersRef = collection(db, "orders");
-    const unsubscribe = onSnapshot(ordersRef, () => {
-      queryClient.invalidateQueries({ queryKey: ['admin-stats'] });
-    });
-    return () => unsubscribe();
-  }, [queryClient]);
 
   const { data: stats, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const [ordersSnapshot, productsSnapshot, profilesSnapshot, orderItemsSnapshot] = await Promise.all([
-        getDocs(collection(db, "orders")),
-        getDocs(collection(db, "products")),
-        getDocs(collection(db, "profiles")),
-        getDocs(collection(db, "order_items"))
-      ]);
-
-      const totalUsers = profilesSnapshot.size;
-      const totalProducts = productsSnapshot.docs.filter(doc => doc.data().is_active !== false).length;
-
-      const orders = ordersSnapshot.docs.map(doc => {
-        const data = doc.data();
-        let createdAt: string;
-        if (data.created_at?.toDate) createdAt = data.created_at.toDate().toISOString();
-        else if (typeof data.created_at === 'string') createdAt = data.created_at;
-        else createdAt = new Date().toISOString();
-        
-        return {
-          id: doc.id,
-          customer_name: data.customer_name as string || '',
-          total_amount: (data.total_amount as number) || 0,
-          payment_status: (data.payment_status as string) || 'pending',
-          status: (data.status as string) || 'pending',
-          created_at: createdAt,
-        };
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "dashboard-stats" },
+        headers: { "x-firebase-token": token },
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
 
-      const paidOrders = orders.filter(o => o.payment_status === 'paid');
-      const pendingOrders = orders.filter(o => o.status === 'pending' && o.payment_status === 'paid');
-      const paidOrderIds = paidOrders.map(o => o.id);
+      const allOrders = (data.orders || []) as any[];
+      const allProducts = (data.products || []) as any[];
+      const allProfiles = (data.profiles || []) as any[];
+      const allOrderItems = (data.orderItems || []) as any[];
+
+      const totalUsers = allProfiles.length;
+      const totalProducts = allProducts.filter((p: any) => p.is_active !== false).length;
+
+      const orders = allOrders.map((o: any) => ({
+        id: o.id,
+        customer_name: o.customer_name || '',
+        total_amount: Number(o.total_amount) || 0,
+        payment_status: o.payment_status || 'pending',
+        status: o.status || 'pending',
+        created_at: o.created_at || new Date().toISOString(),
+      }));
+
+      const paidOrders = orders.filter((o: any) => o.payment_status === 'paid');
+      const pendingOrders = orders.filter((o: any) => o.status === 'pending' && o.payment_status === 'paid');
+      const paidOrderIds = paidOrders.map((o: any) => o.id);
       
-      const allOrderItems = orderItemsSnapshot.docs.map(doc => {
-        const data = doc.data();
-        return {
-          id: doc.id,
-          order_id: (data.order_id as string) || '',
-          product_name: (data.product_name as string) || '',
-          quantity: (data.quantity as number) || 0,
-          total_price: (data.total_price as number) || 0,
-        };
-      });
+      const orderItems = allOrderItems
+        .map((item: any) => ({
+          id: item.id,
+          order_id: item.order_id || '',
+          product_name: item.product_name || '',
+          quantity: Number(item.quantity) || 0,
+          total_price: Number(item.total_price) || 0,
+        }))
+        .filter((item: any) => paidOrderIds.includes(item.order_id));
+
+      const totalRevenue = paidOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount), 0);
       
-      const orderItems = allOrderItems.filter(item => paidOrderIds.includes(item.order_id));
-      const totalRevenue = paidOrders.reduce((sum, order) => sum + Number(order.total_amount), 0);
-      
-      const productSales = orderItems.reduce((acc, item) => {
+      const productSales = orderItems.reduce((acc: any, item: any) => {
         if (!acc[item.product_name]) acc[item.product_name] = { quantity: 0, revenue: 0 };
         acc[item.product_name].quantity += item.quantity;
         acc[item.product_name].revenue += Number(item.total_price);
@@ -89,13 +84,13 @@ export const AdminDashboard = () => {
       }, {} as Record<string, { quantity: number; revenue: number }>);
 
       const topProducts = Object.entries(productSales || {})
-        .sort((a, b) => b[1].quantity - a[1].quantity)
+        .sort((a: any, b: any) => b[1].quantity - a[1].quantity)
         .slice(0, 5);
 
       const today = new Date().toISOString().split('T')[0];
-      const todayOrders = orders.filter(o => o.created_at?.startsWith(today));
-      const todayRevenue = todayOrders.filter(o => o.payment_status === 'paid')
-        .reduce((sum, o) => sum + Number(o.total_amount), 0);
+      const todayOrders = orders.filter((o: any) => o.created_at?.startsWith(today));
+      const todayRevenue = todayOrders.filter((o: any) => o.payment_status === 'paid')
+        .reduce((sum: number, o: any) => sum + Number(o.total_amount), 0);
 
       const last7Days = Array.from({ length: 7 }, (_, i) => {
         const date = new Date();
@@ -104,8 +99,8 @@ export const AdminDashboard = () => {
       });
 
       const revenueByDay = last7Days.map(date => {
-        const dayOrders = orders.filter(o => o.created_at?.startsWith(date) && o.payment_status === 'paid');
-        const revenue = dayOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+        const dayOrders = orders.filter((o: any) => o.created_at?.startsWith(date) && o.payment_status === 'paid');
+        const revenue = dayOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount), 0);
         const dayName = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
         return {
           name: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3),
@@ -116,8 +111,8 @@ export const AdminDashboard = () => {
 
       const paymentDistribution = [
         { name: 'Pago', value: paidOrders.length, color: '#10b981' },
-        { name: 'Pendente', value: orders.filter(o => o.payment_status === 'pending').length, color: '#f59e0b' },
-        { name: 'Falhou', value: orders.filter(o => o.payment_status === 'failed').length, color: '#ef4444' }
+        { name: 'Pendente', value: orders.filter((o: any) => o.payment_status === 'pending').length, color: '#f59e0b' },
+        { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' }
       ].filter(item => item.value > 0);
 
       return {
@@ -129,8 +124,8 @@ export const AdminDashboard = () => {
         totalUsers,
         topProducts,
         recentOrders: [...orders]
-          .filter(o => o.payment_status === 'paid')
-          .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+          .filter((o: any) => o.payment_status === 'paid')
+          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
           .slice(0, 8),
         todayOrders: todayOrders.length,
         todayRevenue,
@@ -292,7 +287,7 @@ export const AdminDashboard = () => {
             </div>
           </CardHeader>
           <CardContent>
-            {stats?.revenueByDay && stats.revenueByDay.some(d => d.receita > 0) ? (
+            {stats?.revenueByDay && stats.revenueByDay.some((d: any) => d.receita > 0) ? (
               <ResponsiveContainer width="100%" height={240}>
                 <AreaChart data={stats.revenueByDay}>
                   <defs>
@@ -344,7 +339,7 @@ export const AdminDashboard = () => {
                 <ResponsiveContainer width="100%" height={170}>
                   <PieChart>
                     <Pie data={stats.paymentDistribution} cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={4} dataKey="value">
-                      {stats.paymentDistribution.map((entry, i) => (
+                      {stats.paymentDistribution.map((entry: any, i: number) => (
                         <Cell key={i} fill={entry.color} strokeWidth={0} />
                       ))}
                     </Pie>
@@ -355,7 +350,7 @@ export const AdminDashboard = () => {
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex justify-center gap-4 flex-wrap">
-                  {stats.paymentDistribution.map((entry, i) => (
+                  {stats.paymentDistribution.map((entry: any, i: number) => (
                     <div key={i} className="flex items-center gap-1.5">
                       <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: entry.color }} />
                       <span className="text-xs text-muted-foreground">{entry.name}: {entry.value}</span>
@@ -383,47 +378,37 @@ export const AdminDashboard = () => {
                 <Zap className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-base">Mais Vendidos</CardTitle>
-                <CardDescription className="text-xs">Top 5 por quantidade</CardDescription>
+                <CardTitle className="text-base">Top Produtos</CardTitle>
+                <CardDescription className="text-xs">Mais vendidos por quantidade</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             {stats?.topProducts && stats.topProducts.length > 0 ? (
               <div className="space-y-3">
-                {stats.topProducts.map(([name, data], index) => {
-                  const maxQty = stats.topProducts[0][1].quantity;
-                  const pct = (data.quantity / maxQty) * 100;
-                  
+                {stats.topProducts.map(([name, data]: [string, any], i: number) => {
+                  const maxQty = (stats.topProducts[0][1] as any).quantity;
                   return (
                     <div key={name} className="space-y-1.5">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <div className={cn(
-                            "flex h-6 w-6 items-center justify-center rounded-md text-xs font-bold",
-                            index === 0 ? "bg-yellow-500/15 text-yellow-500" :
-                            index === 1 ? "bg-gray-400/15 text-gray-400" :
-                            index === 2 ? "bg-orange-500/15 text-orange-500" :
-                            "bg-muted text-muted-foreground"
-                          )}>
-                            {index + 1}
-                          </div>
-                          <div>
-                            <p className="font-medium text-sm line-clamp-1">{name}</p>
-                            <p className="text-[11px] text-muted-foreground">{data.quantity} vendidos</p>
-                          </div>
+                      <div className="flex items-center justify-between text-sm">
+                        <div className="flex items-center gap-2">
+                          <span className="text-xs font-bold text-muted-foreground w-5">{i + 1}.</span>
+                          <span className="font-medium truncate max-w-[200px]">{name}</span>
                         </div>
-                        <span className="font-bold text-sm text-primary">{formatCurrency(data.revenue)}</span>
+                        <div className="flex items-center gap-3 text-xs text-muted-foreground">
+                          <span>{data.quantity} un</span>
+                          <span className="font-medium text-foreground">{formatCurrency(data.revenue)}</span>
+                        </div>
                       </div>
-                      <Progress value={pct} className="h-1" />
+                      <Progress value={(data.quantity / maxQty) * 100} className="h-1.5" />
                     </div>
                   );
                 })}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <Zap className="h-10 w-10 text-muted-foreground/20 mb-2" />
-                <p className="text-sm text-muted-foreground">Nenhuma venda ainda</p>
+                <Package className="h-8 w-8 text-muted-foreground/20 mb-2" />
+                <p className="text-sm text-muted-foreground">Sem vendas ainda</p>
               </div>
             )}
           </CardContent>
@@ -433,50 +418,39 @@ export const AdminDashboard = () => {
         <Card className="border-border/50 bg-card/50">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <ShoppingCart className="h-4 w-4 text-blue-500" />
+              <div className="h-8 w-8 rounded-lg bg-green-500/10 flex items-center justify-center">
+                <ShoppingCart className="h-4 w-4 text-green-500" />
               </div>
               <div>
                 <CardTitle className="text-base">Pedidos Recentes</CardTitle>
-                <CardDescription className="text-xs">Últimos 8 pedidos</CardDescription>
+                <CardDescription className="text-xs">Últimas vendas confirmadas</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent>
             {stats?.recentOrders && stats.recentOrders.length > 0 ? (
-              <div className="space-y-1">
+              <div className="space-y-2">
                 {stats.recentOrders.map((order: any) => (
-                  <div key={order.id} className="flex items-center justify-between py-2.5 px-2 rounded-lg hover:bg-muted/20 transition-colors">
-                    <div className="flex items-center gap-2.5">
-                      <div className={cn(
-                        "h-2 w-2 rounded-full shrink-0",
-                        order.payment_status === 'paid' ? "bg-green-500" :
-                        order.payment_status === 'pending' ? "bg-yellow-500" : "bg-red-500"
-                      )} />
-                      <div>
-                        <p className="font-medium text-sm">{order.customer_name}</p>
+                  <div key={order.id} className="flex items-center justify-between py-2 border-b border-border/30 last:border-0">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className="h-8 w-8 rounded-full bg-green-500/10 flex items-center justify-center shrink-0">
+                        <CheckCircle2 className="h-4 w-4 text-green-500" />
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-sm font-medium truncate max-w-[160px]">{order.customer_name || 'Cliente'}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {new Date(order.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                          {new Date(order.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
                     </div>
-                    <div className="text-right">
-                      <p className="font-bold text-sm">{formatCurrency(Number(order.total_amount))}</p>
-                      <Badge variant="secondary" className={cn(
-                        "text-[10px] px-1.5 py-0",
-                        order.payment_status === 'paid' ? "bg-green-500/10 text-green-500" :
-                        order.payment_status === 'pending' ? "bg-yellow-500/10 text-yellow-500" : "bg-red-500/10 text-red-500"
-                      )}>
-                        {order.payment_status === 'paid' ? 'Pago' : order.payment_status === 'pending' ? 'Pendente' : 'Falhou'}
-                      </Badge>
-                    </div>
+                    <span className="font-bold text-sm text-green-500 shrink-0">{formatCurrency(order.total_amount)}</span>
                   </div>
                 ))}
               </div>
             ) : (
               <div className="flex flex-col items-center justify-center py-10 text-center">
-                <ShoppingCart className="h-10 w-10 text-muted-foreground/20 mb-2" />
-                <p className="text-sm text-muted-foreground">Nenhum pedido ainda</p>
+                <ShoppingCart className="h-8 w-8 text-muted-foreground/20 mb-2" />
+                <p className="text-sm text-muted-foreground">Sem pedidos pagos</p>
               </div>
             )}
           </CardContent>

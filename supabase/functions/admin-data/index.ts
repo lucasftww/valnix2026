@@ -335,6 +335,38 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      if (resource === "coupons") {
+        const coupons = await queryCollection("coupons");
+        // Convert Firestore timestamps
+        for (const c of coupons) {
+          if (c.created_at && typeof c.created_at === 'object' && c.created_at.seconds) {
+            c.created_at = new Date(c.created_at.seconds * 1000).toISOString();
+          }
+        }
+        coupons.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
+        return new Response(JSON.stringify({ coupons }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "dashboard-stats") {
+        const [orders, products, profiles, orderItems] = await Promise.all([
+          queryCollection("orders"),
+          queryCollection("products"),
+          queryCollection("profiles"),
+          queryCollection("order_items"),
+        ]);
+
+        // Convert timestamps
+        for (const o of orders) {
+          if (o.created_at && typeof o.created_at === 'object' && o.created_at.seconds) {
+            o.created_at = new Date(o.created_at.seconds * 1000).toISOString();
+          }
+        }
+
+        return new Response(JSON.stringify({ orders, products, profiles, orderItems }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       return new Response(JSON.stringify({ error: "Invalid resource" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -346,6 +378,20 @@ Deno.serve(async (req) => {
         const docId = body.id || crypto.randomUUID();
         delete body.id;
         const success = await createFirestoreDoc("products", docId, body);
+        return new Response(JSON.stringify({ success, id: docId }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (resource === "categories") {
+        const docId = body.id || crypto.randomUUID();
+        delete body.id;
+        const success = await createFirestoreDoc("categories", docId, body);
+        return new Response(JSON.stringify({ success, id: docId }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (resource === "coupons") {
+        const docId = body.id || crypto.randomUUID();
+        delete body.id;
+        const success = await createFirestoreDoc("coupons", docId, body);
         return new Response(JSON.stringify({ success, id: docId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -385,8 +431,17 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      return new Response(JSON.stringify({ error: "Invalid resource" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (resource === "categories") {
+        const success = await updateFirestoreDoc("categories", docId, body);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "coupons") {
+        const success = await updateFirestoreDoc("coupons", docId, body);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // ── DELETE ────────────────────────────────────────────────────
@@ -421,8 +476,17 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      return new Response(JSON.stringify({ error: "Invalid resource" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      if (resource === "categories") {
+        const success = await deleteFirestoreDoc("categories", docId);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "coupons") {
+        const success = await deleteFirestoreDoc("coupons", docId);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     return new Response(JSON.stringify({ error: "Method not allowed" }),

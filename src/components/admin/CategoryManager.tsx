@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { collection, doc, setDoc, updateDoc, deleteDoc, getDocs, writeBatch } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+import { auth } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 import { QUERY_KEYS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,6 +18,12 @@ import type { Category } from "@/types";
 interface CategoryNode extends Category {
   children: CategoryNode[];
 }
+
+const getFirebaseToken = async () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.getIdToken();
+};
 
 export const CategoryManager = () => {
   const { toast } = useToast();
@@ -38,15 +44,18 @@ export const CategoryManager = () => {
     parent_id: null as string | null,
   });
 
-  // Load categories from Firestore
   const loadCategories = async () => {
     setIsLoading(true);
     try {
-      const snapshot = await getDocs(collection(db, "categories"));
-      const allCats = snapshot.docs.map((d) => ({
-        id: d.id,
-        ...(d.data() as any),
-      })) as Category[];
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "categories" },
+        headers: { "x-firebase-token": token },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const allCats = (data.categories || []) as Category[];
 
       // Build tree
       const map = new Map<string, CategoryNode>();
@@ -74,7 +83,6 @@ export const CategoryManager = () => {
     }
   };
 
-  // Load on mount
   useEffect(() => {
     loadCategories();
   }, []);
@@ -136,7 +144,8 @@ export const CategoryManager = () => {
 
     setIsSaving(true);
     try {
-      const data: any = {
+      const token = await getFirebaseToken();
+      const catData: any = {
         name: formData.name,
         slug: formData.slug,
         is_active: formData.is_active,
@@ -146,21 +155,29 @@ export const CategoryManager = () => {
       };
 
       if (editingCategory) {
-        await updateDoc(doc(db, "categories", editingCategory.id), {
-          ...data,
-          updated_at: new Date().toISOString(),
+        const res = await invokeFunction("admin-data", {
+          method: "PUT",
+          queryParams: { resource: "categories" },
+          headers: { "x-firebase-token": token },
+          body: { id: editingCategory.id, ...catData, updated_at: new Date().toISOString() },
         });
+        if (!res.ok) throw new Error("Failed to update category");
         toast({ title: "Sucesso", description: "Categoria atualizada!" });
       } else {
-        const newRef = doc(collection(db, "categories"));
-        await setDoc(newRef, {
-          ...data,
-          display_order: categories.length,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          icon_url: null,
-          description: null,
+        const res = await invokeFunction("admin-data", {
+          method: "POST",
+          queryParams: { resource: "categories" },
+          headers: { "x-firebase-token": token },
+          body: {
+            ...catData,
+            display_order: categories.length,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            icon_url: null,
+            description: null,
+          },
         });
+        if (!res.ok) throw new Error("Failed to create category");
         toast({ title: "Sucesso", description: "Categoria criada!" });
       }
 
@@ -177,7 +194,13 @@ export const CategoryManager = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
     try {
-      await deleteDoc(doc(db, "categories", id));
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "DELETE",
+        queryParams: { resource: "categories", id },
+        headers: { "x-firebase-token": token },
+      });
+      if (!res.ok) throw new Error("Failed to delete category");
       toast({ title: "Sucesso", description: "Categoria excluída!" });
       invalidate();
     } catch (err) {
@@ -193,11 +216,16 @@ export const CategoryManager = () => {
     setCategories(items);
 
     try {
-      const batch = writeBatch(db);
-      items.forEach((item, index) => {
-        batch.update(doc(db, "categories", item.id), { display_order: index });
-      });
-      await batch.commit();
+      const token = await getFirebaseToken();
+      // Update display_order for each category
+      for (let i = 0; i < items.length; i++) {
+        await invokeFunction("admin-data", {
+          method: "PUT",
+          queryParams: { resource: "categories" },
+          headers: { "x-firebase-token": token },
+          body: { id: items[i].id, display_order: i },
+        });
+      }
       toast({ title: "Sucesso", description: "Ordem atualizada!" });
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
     } catch (err) {
