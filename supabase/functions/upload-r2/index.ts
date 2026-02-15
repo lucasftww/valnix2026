@@ -1,3 +1,5 @@
+import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+
 const ALLOWED_ORIGINS = [
   "https://www.valnix.com.br",
   "https://valnix.com.br",
@@ -12,6 +14,7 @@ function getCorsHeaders(req: Request) {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers":
       "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
   };
 }
 
@@ -19,6 +22,7 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif"];
 const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
 const FIREBASE_PROJECT_ID = "valnix";
+const FIREBASE_STORAGE_BUCKET = "valnix.firebasestorage.app";
 
 // ── Firebase Service Account Auth ──────────────────────────────────
 let cachedAccessToken: string | null = null;
@@ -40,7 +44,7 @@ async function getFirebaseAccessToken(): Promise<string> {
   const payload = {
     iss: saKey.client_email, sub: saKey.client_email,
     aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/devstorage.read_write https://www.googleapis.com/auth/datastore',
   };
   const enc = new TextEncoder();
   const headerB64 = base64url(enc.encode(JSON.stringify(header)));
@@ -121,7 +125,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check admin via Firestore user_roles (not hardcoded emails)
+    // Check admin via Firestore user_roles
     const adminStatus = await isAdminInFirestore(userUid);
     if (!adminStatus) {
       console.warn(`⚠️ Unauthorized upload attempt: ${userEmail} (${userUid})`);
@@ -161,20 +165,6 @@ Deno.serve(async (req) => {
     // Sanitize fileName — only allow safe characters
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._\-\/]/g, "_");
 
-    // Get R2 credentials
-    const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID");
-    const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY");
-    const endpoint = Deno.env.get("R2_ENDPOINT");
-    const publicUrl = Deno.env.get("R2_PUBLIC_URL");
-
-    if (!accessKeyId || !secretAccessKey || !endpoint || !publicUrl) {
-      console.error("R2 credentials not configured");
-      return new Response(
-        JSON.stringify({ error: "R2 not configured" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
     // Decode base64 to bytes
     const binaryStr = atob(fileBase64);
     const bytes = new Uint8Array(binaryStr.length);
@@ -182,70 +172,32 @@ Deno.serve(async (req) => {
       bytes[i] = binaryStr.charCodeAt(i);
     }
 
-    // Build S3 PUT request with AWS Signature V4
-    const bucketName = "valnix";
-    const region = "auto";
-    const service = "s3";
-    const method = "PUT";
-    const host = endpoint.replace("https://", "");
-    const url = `${endpoint}/${bucketName}/${sanitizedFileName}`;
+    // Upload to Firebase Storage using Google Cloud Storage JSON API
+    const accessToken = await getFirebaseAccessToken();
+    const encodedName = encodeURIComponent(sanitizedFileName);
+    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${FIREBASE_STORAGE_BUCKET}/o?uploadType=media&name=${encodedName}`;
 
-    const now = new Date();
-    const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
-    const dateStamp = amzDate.slice(0, 8);
-
-    const canonicalUri = `/${bucketName}/${sanitizedFileName}`;
-    const canonicalQuerystring = "";
-    const payloadHash = await sha256Hex(bytes);
-
-    const canonicalHeaders =
-      `content-type:${resolvedContentType}\n` +
-      `host:${host}\n` +
-      `x-amz-content-sha256:${payloadHash}\n` +
-      `x-amz-date:${amzDate}\n`;
-
-    const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
-
-    const canonicalRequest = [
-      method, canonicalUri, canonicalQuerystring, canonicalHeaders, signedHeaders, payloadHash,
-    ].join("\n");
-
-    const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
-    const stringToSign = [
-      "AWS4-HMAC-SHA256", amzDate, credentialScope,
-      await sha256Hex(new TextEncoder().encode(canonicalRequest)),
-    ].join("\n");
-
-    const signingKey = await getSignatureKey(secretAccessKey, dateStamp, region, service);
-    const signature = await hmacHex(signingKey, stringToSign);
-
-    const authorizationHeader =
-      `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, ` +
-      `SignedHeaders=${signedHeaders}, Signature=${signature}`;
-
-    const r2Response = await fetch(url, {
-      method: "PUT",
+    const uploadRes = await fetch(uploadUrl, {
+      method: "POST",
       headers: {
+        "Authorization": `Bearer ${accessToken}`,
         "Content-Type": resolvedContentType,
-        "x-amz-content-sha256": payloadHash,
-        "x-amz-date": amzDate,
-        Authorization: authorizationHeader,
-        Host: host,
       },
       body: bytes,
     });
 
-    if (!r2Response.ok) {
-      const errorText = await r2Response.text();
-      console.error("R2 upload failed:", r2Response.status, errorText);
+    if (!uploadRes.ok) {
+      const errorText = await uploadRes.text();
+      console.error("Firebase Storage upload failed:", uploadRes.status, errorText);
       return new Response(
-        JSON.stringify({ error: `R2 upload failed: ${r2Response.status}` }),
+        JSON.stringify({ error: `Upload failed: ${uploadRes.status}` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const fileUrl = `${publicUrl}/${sanitizedFileName}`;
-    console.log(`✅ Uploaded to R2: ${sanitizedFileName}`);
+    // Build public URL
+    const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_STORAGE_BUCKET}/o/${encodedName}?alt=media`;
+    console.log(`✅ Uploaded to Firebase Storage: ${sanitizedFileName}`);
 
     return new Response(
       JSON.stringify({ url: fileUrl }),
@@ -260,34 +212,3 @@ Deno.serve(async (req) => {
     );
   }
 });
-
-// ---- AWS Signature V4 helpers ----
-async function hmacSha256(key: ArrayBuffer | Uint8Array, data: string | Uint8Array): Promise<ArrayBuffer> {
-  const cryptoKey = await crypto.subtle.importKey(
-    "raw", key instanceof Uint8Array ? key : new Uint8Array(key),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const encoded = typeof data === "string" ? new TextEncoder().encode(data) : data;
-  return crypto.subtle.sign("HMAC", cryptoKey, encoded);
-}
-
-async function hmacHex(key: ArrayBuffer, data: string): Promise<string> {
-  const sig = await hmacSha256(key, data);
-  return arrayToHex(new Uint8Array(sig));
-}
-
-async function sha256Hex(data: Uint8Array): Promise<string> {
-  const hash = await crypto.subtle.digest("SHA-256", data);
-  return arrayToHex(new Uint8Array(hash));
-}
-
-function arrayToHex(arr: Uint8Array): string {
-  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-async function getSignatureKey(key: string, dateStamp: string, region: string, service: string): Promise<ArrayBuffer> {
-  const kDate = await hmacSha256(new TextEncoder().encode("AWS4" + key), dateStamp);
-  const kRegion = await hmacSha256(kDate, region);
-  const kService = await hmacSha256(kRegion, service);
-  return hmacSha256(kService, "aws4_request");
-}
