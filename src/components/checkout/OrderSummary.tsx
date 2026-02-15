@@ -174,16 +174,12 @@ export const OrderSummary = memo(function OrderSummary({
         <Button 
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="w-full h-14 bg-primary hover:bg-primary/90 text-white font-bold rounded-xl text-base hidden lg:flex shadow-lg shadow-primary/20"
+          className="w-full h-14 bg-[#f5e642] hover:bg-[#e6d83c] text-black font-bold rounded-xl text-base hidden lg:flex"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
-          ) : paymentMethod === "balance" ? (
-            "Pagar com Saldo →"
-          ) : paymentMethod === "card" ? (
-            "Pagar com Cartão →"
           ) : (
-            "Pagar com PIX →"
+            "Finalizar Compra"
           )}
         </Button>
 
