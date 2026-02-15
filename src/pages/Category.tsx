@@ -141,7 +141,7 @@ export default function Category() {
               )}
 
               {/* Products Grid */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: '4px' }} className="lg:!grid-cols-3 md:!gap-6 touch-manipulation">
+              <div className="grid grid-cols-2 gap-1 md:gap-6 lg:grid-cols-3 touch-manipulation">
                 {productsLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <ProductSkeleton key={i} />
