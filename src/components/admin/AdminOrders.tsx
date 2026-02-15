@@ -413,12 +413,10 @@ export const AdminOrders = () => {
       // Fetch upsell addons via edge function (service_role) since RLS restricts anon reads
       try {
         const firebaseToken = await (await import("@/integrations/firebase/config")).auth.currentUser?.getIdToken();
-        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-post-payment`, {
-          headers: {
-            'Content-Type': 'application/json',
-            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
-            'x-firebase-token': firebaseToken || '',
-          },
+        const { invokeFunction } = await import("@/lib/apiHelper");
+        const res = await invokeFunction("admin-post-payment", {
+          method: "GET",
+          headers: { "x-firebase-token": firebaseToken || "" },
         });
         if (res.ok) {
           const result = await res.json();

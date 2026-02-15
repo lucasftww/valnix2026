@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
-import { supabase } from "@/integrations/supabase/client";
+import { supabase } from "@/lib/supabaseHelper";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -75,12 +75,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     const poll = setInterval(async () => {
       try {
         const idToken = user ? await user.getIdToken() : null;
-        const headers: Record<string, string> = {};
-        if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-        const response = await fetch(
-          `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=status&chargeId=${pixData.chargeId}`,
-          { headers },
-        );
+        const { invokeFunction } = await import("@/lib/apiHelper");
+        const response = await invokeFunction("flowpay-pix", {
+          method: "GET",
+          queryParams: { action: "status", chargeId: pixData.chargeId },
+          headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
+        });
         const data = await response.json();
         if (data.success && data.status === "COMPLETED") {
           clearInterval(poll);
@@ -128,22 +128,18 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       // Create PIX charge with Firebase auth
       const amountInCents = Math.round(config.price * 100);
       const firebaseIdToken = await user?.getIdToken();
-      const pixResponse = await fetch(
-        `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/flowpay-pix?action=create`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {}),
-          },
-          body: JSON.stringify({
-            amount: amountInCents,
-            orderId: `upsell-${orderId}-${addonType}`,
-            description: `Upsell ${config.title}`,
-            customer: { name: user?.displayName || "Cliente", email: user?.email || undefined },
-          }),
-        }
-      );
+      const { invokeFunction } = await import("@/lib/apiHelper");
+      const pixResponse = await invokeFunction("flowpay-pix", {
+        method: "POST",
+        queryParams: { action: "create" },
+        headers: firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {},
+        body: {
+          amount: amountInCents,
+          orderId: `upsell-${orderId}-${addonType}`,
+          description: `Upsell ${config.title}`,
+          customer: { name: user?.displayName || "Cliente", email: user?.email || undefined },
+        },
+      });
       const data = await pixResponse.json();
       if (!pixResponse.ok || !data.success) throw new Error(data.error || "Erro ao gerar PIX");
 
