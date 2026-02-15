@@ -67,8 +67,8 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
               </CarouselItem>
             ))}
           </CarouselContent>
-          <CarouselPrevious className="left-1 h-8 w-8" aria-label="Ver avaliação anterior" />
-          <CarouselNext className="right-1 h-8 w-8" aria-label="Ver próxima avaliação" />
+          <CarouselPrevious className="-left-3 md:-left-4 h-7 w-7" aria-label="Ver avaliação anterior" />
+          <CarouselNext className="-right-3 md:-right-4 h-7 w-7" aria-label="Ver próxima avaliação" />
         </Carousel>
       </div>
     </div>
