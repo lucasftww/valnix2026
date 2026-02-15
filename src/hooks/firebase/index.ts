@@ -2,7 +2,7 @@
 export { useAutoVerifyPixPayments } from "./useAutoVerifyPixPayments";
 export { useAutoVerifyCardPayments } from "./useAutoVerifyCardPayments";
 export { useCategories, useCategoriesTree, useHomeCategories } from "./useFirebaseCategories";
-export { useFeaturedProducts, useCategoryProducts, useProduct, useProductPrefetch } from "./useFirebaseProducts";
+export { useFeaturedProducts, useCategoryProducts, useProduct } from "./useFirebaseProducts";
 
 export { 
   useProductsWithReviews, 

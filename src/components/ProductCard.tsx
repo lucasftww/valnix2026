@@ -76,12 +76,7 @@ const ProductCardComponent = ({
     return () => observer.disconnect();
   }, [priority]);
 
-  // Prefetch product data when card becomes visible on screen (mobile optimization)
-  useEffect(() => {
-    if (!isVisible) return;
-    const timer = setTimeout(() => triggerPrefetch(), 300);
-    return () => clearTimeout(timer);
-  }, [isVisible, triggerPrefetch]);
+  // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
 
   const hasDiscount = discount && discount > 0;
   const hasOriginalPrice = originalPrice && originalPrice > price;

@@ -149,23 +149,8 @@ export const useProduct = (productId: string | undefined) => {
       };
     },
     enabled: !!productId,
-    staleTime: 30 * 60 * 1000, // 30 min
-    gcTime: 60 * 60 * 1000,    // 1 hora
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
-};
-
-// Hook para prefetch de produto
-export const useProductPrefetch = () => {
-  const queryClient = useQuery({
-    queryKey: ['prefetch-helper'],
-    queryFn: () => null,
-    enabled: false,
-  });
-  
-  return {
-    prefetchProduct: (productId: string) => {
-      queryClient.refetch();
-    }
-  };
 };
