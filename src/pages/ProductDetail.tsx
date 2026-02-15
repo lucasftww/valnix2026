@@ -254,14 +254,6 @@ const ProductDetail = () => {
                 </div>
               </div>
 
-              {/* Garantias compactas */}
-              <div className="flex items-center justify-between rounded-2xl border border-border/20 bg-card px-4 py-3">
-                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><Zap className="w-3.5 h-3.5 text-primary" /> Entrega Imediata</span>
-                <span className="text-border/30">•</span>
-                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><ShieldCheck className="w-3.5 h-3.5 text-primary" /> Seguro</span>
-                <span className="text-border/30">•</span>
-                <span className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><img src={pixLogo} alt="PIX" className="w-3.5 h-3.5" loading="lazy" /> PIX</span>
-              </div>
             </div>
 
             {/* Desktop: Imagem + Tabs */}
