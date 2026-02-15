@@ -1,6 +1,5 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
-// FlowPay PIX Edge Function v2
+// FlowPay PIX Edge Function v3 — fully Firestore-based (no Supabase client)
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

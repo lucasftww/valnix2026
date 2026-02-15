@@ -1,8 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
-import { createClient } from "jsr:@supabase/supabase-js@2";
 
 // Meta Conversions API (CAPI) Edge Function
-// Receives events and sends them to Meta with enriched user data
+// Now logs to Firestore instead of Supabase
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -10,6 +9,57 @@ const corsHeaders = {
 };
 
 const META_API_VERSION = 'v22.0';
+const FIREBASE_PROJECT_ID = 'valnix';
+
+// ── Firebase Auth ──────────────────────────────────────────────────
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt = 0;
+
+function base64url(data: Uint8Array): string {
+  let binary = '';
+  for (const byte of data) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function getFirebaseAccessToken(): Promise<string> {
+  if (cachedAccessToken && Date.now() < tokenExpiresAt - 60_000) return cachedAccessToken;
+  const saKeyRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
+  if (!saKeyRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY not configured');
+  const saKey = JSON.parse(saKeyRaw);
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: saKey.client_email, sub: saKey.client_email,
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/datastore',
+  };
+  const enc = new TextEncoder();
+  const headerB64 = base64url(enc.encode(JSON.stringify(header)));
+  const payloadB64 = base64url(enc.encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+  const pemBody = saKey.private_key.replace(/-----BEGIN PRIVATE KEY-----/, '').replace(/-----END PRIVATE KEY-----/, '').replace(/\n/g, '');
+  const keyBytes = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBytes, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, enc.encode(unsignedToken));
+  const jwt = `${unsignedToken}.${base64url(new Uint8Array(signature))}`;
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  if (!tokenRes.ok) throw new Error(`Firebase auth failed: ${tokenRes.status}`);
+  const tokenData = await tokenRes.json();
+  cachedAccessToken = tokenData.access_token;
+  tokenExpiresAt = Date.now() + (tokenData.expires_in * 1000);
+  return cachedAccessToken!;
+}
+
+function toFirestoreValue(val: unknown): Record<string, unknown> {
+  if (val === null || val === undefined) return { nullValue: null };
+  if (typeof val === 'string') return { stringValue: val };
+  if (typeof val === 'number') return { doubleValue: val };
+  if (typeof val === 'boolean') return { booleanValue: val };
+  return { stringValue: String(val) };
+}
 
 // ── SHA-256 hash helper ────────────────────────────────────────────
 async function sha256(value: string): Promise<string> {
@@ -22,52 +72,24 @@ async function sha256(value: string): Promise<string> {
 
 // ── Build user_data with hashed PII ────────────────────────────────
 async function buildUserData(params: {
-  email?: string;
-  phone?: string;
-  firstName?: string;
-  lastName?: string;
-  clientIp?: string;
-  userAgent?: string;
-  fbc?: string;
-  fbp?: string;
-  externalId?: string;
+  email?: string; phone?: string; firstName?: string; lastName?: string;
+  clientIp?: string; userAgent?: string; fbc?: string; fbp?: string; externalId?: string;
 }) {
   const userData: Record<string, string | undefined> = {};
-
-  if (params.email) {
-    userData.em = await sha256(params.email);
-  }
+  if (params.email) userData.em = await sha256(params.email);
   if (params.phone) {
-    // Normalize phone: remove non-digits, add BR prefix if needed
     let phone = params.phone.replace(/\D/g, '');
     if (phone.length === 10 || phone.length === 11) phone = '55' + phone;
     userData.ph = await sha256(phone);
   }
-  if (params.firstName) {
-    userData.fn = await sha256(params.firstName);
-  }
-  if (params.lastName) {
-    userData.ln = await sha256(params.lastName);
-  }
-  if (params.externalId) {
-    userData.external_id = await sha256(params.externalId);
-  }
-  if (params.clientIp) {
-    userData.client_ip_address = params.clientIp;
-  }
-  if (params.userAgent) {
-    userData.client_user_agent = params.userAgent;
-  }
-  if (params.fbc) {
-    userData.fbc = params.fbc;
-  }
-  if (params.fbp) {
-    userData.fbp = params.fbp;
-  }
-
-  // Always send country = Brazil (hashed) for match quality
+  if (params.firstName) userData.fn = await sha256(params.firstName);
+  if (params.lastName) userData.ln = await sha256(params.lastName);
+  if (params.externalId) userData.external_id = await sha256(params.externalId);
+  if (params.clientIp) userData.client_ip_address = params.clientIp;
+  if (params.userAgent) userData.client_user_agent = params.userAgent;
+  if (params.fbc) userData.fbc = params.fbc;
+  if (params.fbp) userData.fbp = params.fbp;
   userData.country = await sha256('br');
-
   return userData;
 }
 
@@ -75,42 +97,27 @@ async function buildUserData(params: {
 async function sendToMeta(eventPayload: Record<string, unknown>, testEventCode?: string) {
   const pixelId = Deno.env.get('META_PIXEL_ID');
   const accessToken = Deno.env.get('META_ACCESS_TOKEN');
-
   if (!pixelId || !accessToken) {
     console.error('❌ META_PIXEL_ID or META_ACCESS_TOKEN not configured');
     return { success: false, error: 'Meta CAPI not configured' };
   }
-
-  const body: Record<string, unknown> = {
-    data: [eventPayload],
-  };
-
-  if (testEventCode) {
-    body.test_event_code = testEventCode;
-  } else {
-    // Fallback to environment variable if set
+  const body: Record<string, unknown> = { data: [eventPayload] };
+  if (testEventCode) body.test_event_code = testEventCode;
+  else {
     const envTestCode = Deno.env.get('META_TEST_EVENT_CODE');
-    if (envTestCode) {
-      body.test_event_code = envTestCode;
-    }
+    if (envTestCode) body.test_event_code = envTestCode;
   }
-
   const url = `https://graph.facebook.com/${META_API_VERSION}/${pixelId}/events?access_token=${accessToken}`;
-
   try {
     const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     });
-
     const data = await response.json();
-    
     if (!response.ok) {
       console.error('❌ Meta CAPI error:', JSON.stringify(data));
       return { success: false, error: data.error?.message || 'Meta API error', statusCode: response.status };
     }
-
     console.log('✅ Meta CAPI event sent:', JSON.stringify(data));
     return { success: true, data };
   } catch (error) {
@@ -119,25 +126,27 @@ async function sendToMeta(eventPayload: Record<string, unknown>, testEventCode?:
   }
 }
 
-// ── Log event to Supabase for monitoring ───────────────────────────
+// ── Log event to Firestore ─────────────────────────────────────────
 async function logCapiEvent(
-  eventName: string,
-  eventId: string,
-  orderId: string | null,
+  eventName: string, eventId: string, orderId: string | null,
   result: { success: boolean; error?: string; statusCode?: number }
 ) {
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabase = createClient(supabaseUrl, serviceRoleKey);
-
-    await supabase.from('capi_event_log').insert({
-      event_name: eventName,
-      event_id: eventId,
-      order_id: orderId,
-      status: result.success ? 'sent' : 'failed',
-      error_message: result.error || null,
-      status_code: result.statusCode || null,
+    const accessToken = await getFirebaseAccessToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/capi_event_log`;
+    const fields: Record<string, unknown> = {
+      event_name: toFirestoreValue(eventName),
+      event_id: toFirestoreValue(eventId),
+      order_id: toFirestoreValue(orderId),
+      status: toFirestoreValue(result.success ? 'sent' : 'failed'),
+      error_message: toFirestoreValue(result.error || null),
+      status_code: toFirestoreValue(result.statusCode || null),
+      created_at: toFirestoreValue(new Date().toISOString()),
+    };
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ fields }),
     });
   } catch (e) {
     console.warn('⚠️ CAPI log insert failed:', e);
@@ -152,107 +161,57 @@ Deno.serve(async (req) => {
   try {
     const body = await req.json();
     const {
-      event_name,
-      event_id,
-      order_id,
-      value,
-      currency = 'BRL',
-      content_name,
-      content_ids,
-      content_type = 'product',
-      num_items = 1,
-      event_source_url,
-      // User data (raw, will be hashed)
-      email,
-      phone,
-      first_name,
-      last_name,
-      external_id,
-      client_ip,
-      user_agent,
-      fbc,
-      fbp,
-      // Optional test mode
-      test_event_code,
+      event_name, event_id, order_id, value, currency = 'BRL',
+      content_name, content_ids, content_type = 'product', num_items = 1,
+      event_source_url, email, phone, first_name, last_name,
+      external_id, client_ip, user_agent, fbc, fbp, test_event_code,
     } = body;
 
     if (!event_name) {
       return new Response(JSON.stringify({ error: 'event_name is required' }), {
-        status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    // Fallback IP/UA from request headers if not provided
-    const resolvedIp = client_ip 
-      || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || req.headers.get('cf-connecting-ip')
-      || req.headers.get('x-real-ip')
-      || undefined;
+    const resolvedIp = client_ip || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
+      || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || undefined;
     const resolvedUa = user_agent || req.headers.get('user-agent') || undefined;
-
-    // Generate unique event_id for deduplication
     const resolvedEventId = event_id || `${order_id || 'evt'}_${Date.now()}`;
 
-    // Build user data with SHA-256 hashes
     const userData = await buildUserData({
-      email,
-      phone,
-      firstName: first_name,
-      lastName: last_name,
-      clientIp: resolvedIp,
-      userAgent: resolvedUa,
-      fbc,
-      fbp,
-      externalId: external_id,
+      email, phone, firstName: first_name, lastName: last_name,
+      clientIp: resolvedIp, userAgent: resolvedUa, fbc, fbp, externalId: external_id,
     });
 
-    // Build event payload
     const eventPayload: Record<string, unknown> = {
-      event_name,
-      event_time: Math.floor(Date.now() / 1000),
-      event_id: resolvedEventId,
-      action_source: 'website',
-      user_data: userData,
+      event_name, event_time: Math.floor(Date.now() / 1000),
+      event_id: resolvedEventId, action_source: 'website', user_data: userData,
     };
-
-    if (event_source_url) {
-      eventPayload.event_source_url = event_source_url;
-    }
-
-    // Add custom data for Purchase/InitiateCheckout
+    if (event_source_url) eventPayload.event_source_url = event_source_url;
     if (value !== undefined) {
       eventPayload.custom_data = {
-        value: Number(value),
-        currency,
+        value: Number(value), currency,
         ...(content_name ? { content_name } : {}),
         ...(content_ids ? { content_ids } : {}),
-        content_type,
-        num_items,
+        content_type, num_items,
       };
     }
 
     console.log(`📡 Sending ${event_name} to Meta CAPI (event_id: ${resolvedEventId})`);
-
     const result = await sendToMeta(eventPayload, test_event_code);
-
-    // Log to Supabase
     await logCapiEvent(event_name, resolvedEventId, order_id || null, result);
 
     return new Response(JSON.stringify({
-      success: result.success,
-      event_id: resolvedEventId,
+      success: result.success, event_id: resolvedEventId,
       ...(result.error ? { error: result.error } : {}),
     }), {
       status: result.success ? 200 : 502,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-
   } catch (error) {
     console.error('❌ Meta CAPI edge function error:', error);
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
