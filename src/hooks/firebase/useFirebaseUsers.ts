@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { doc, getDoc } from "firebase/firestore";
-import { db, auth } from "@/integrations/firebase/config";
+import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 
 // Convert Firestore Timestamp or string to ISO string
@@ -99,17 +98,25 @@ export const useUserOrders = (userId: string | null) => {
   });
 };
 
-// Check if user is admin
+// Check if user is admin via edge function (avoids direct Firestore read blocked by rules)
 export const useIsUserAdmin = (userId: string | null) => {
   return useQuery({
     queryKey: ["firebase-user-admin", userId],
     queryFn: async () => {
       if (!userId) return false;
-      const roleDoc = await getDoc(doc(db, "user_roles", userId));
-      if (roleDoc.exists()) {
-        return roleDoc.data()?.role === "admin";
+      try {
+        const token = await getFirebaseToken();
+        const response = await invokeFunction('admin-data', {
+          method: 'GET',
+          queryParams: { resource: 'check-admin', userId },
+          headers: { 'x-firebase-token': token },
+        });
+        if (!response.ok) return false;
+        const data = await response.json();
+        return data.isAdmin === true;
+      } catch {
+        return false;
       }
-      return false;
     },
     enabled: !!userId,
   });

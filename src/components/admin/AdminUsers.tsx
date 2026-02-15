@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Loader2, Search, Mail, Phone, Calendar, User, Users, 
   ShoppingCart, DollarSign, TrendingUp, Crown, Star, 
-  ChevronDown, Eye, Filter, UserCheck, Clock, Wallet, Trash2, AlertTriangle, Copy
+  ChevronDown, Eye, Filter, UserCheck, Clock, Wallet, Trash2, AlertTriangle, Copy, Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
@@ -27,6 +27,8 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAdminUsers, useUserOrders, updateUserBalance, deleteFirebaseUser, type FirebaseUser } from "@/hooks/firebase/useFirebaseUsers";
+import { auth } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
@@ -59,6 +61,9 @@ export const AdminUsers = () => {
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [deleteDialogUser, setDeleteDialogUser] = useState<FirebaseUser | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
+  
+  const [cleaningUp, setCleaningUp] = useState(false);
+  const [cleanupResult, setCleanupResult] = useState<{ removed: string[]; removedCount: number; totalChecked: number } | null>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -108,6 +113,36 @@ export const AdminUsers = () => {
     navigator.clipboard.writeText(text);
     toast({ title: `${label} copiado!` });
   };
+
+  const handleCleanup = useCallback(async () => {
+    if (!confirm("Tem certeza? Isso vai remover perfis órfãos (sem conta no Firebase Auth) e emails bloqueados.")) return;
+    setCleaningUp(true);
+    setCleanupResult(null);
+    try {
+      const user = auth.currentUser;
+      if (!user) throw new Error("Not authenticated");
+      const token = await user.getIdToken();
+      const res = await invokeFunction("admin-data", {
+        method: "POST",
+        queryParams: { resource: "cleanup-users" },
+        headers: { "x-firebase-token": token },
+        body: {},
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setCleanupResult(data);
+      toast({ 
+        title: "Limpeza concluída!", 
+        description: `${data.removedCount} usuários removidos de ${data.totalChecked} verificados.` 
+      });
+      queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
+    } catch (err) {
+      console.error("Cleanup error:", err);
+      toast({ title: "Erro na limpeza", description: (err as Error).message, variant: "destructive" });
+    } finally {
+      setCleaningUp(false);
+    }
+  }, [toast, queryClient]);
 
   const processedUsers = users
     .filter((user) => {
@@ -273,6 +308,17 @@ export const AdminUsers = () => {
 
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">{processedUsers.length} de {users.length}</span>
+
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="gap-1.5 h-9 border-orange-500/30 text-orange-500 hover:bg-orange-500/10"
+              onClick={handleCleanup}
+              disabled={cleaningUp}
+            >
+              {cleaningUp ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Sparkles className="h-3.5 w-3.5" />}
+              {cleaningUp ? "Limpando..." : "Limpar Órfãos"}
+            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>

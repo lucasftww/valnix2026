@@ -40,7 +40,7 @@ async function getFirebaseAccessToken(): Promise<string> {
   const payload = {
     iss: saKey.client_email, sub: saKey.client_email,
     aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/firebase',
   };
   const enc = new TextEncoder();
   const headerB64 = base64url(enc.encode(JSON.stringify(header)));
@@ -230,6 +230,15 @@ Deno.serve(async (req) => {
 
     // ── GET: Fetch data ──────────────────────────────────────────
     if (req.method === "GET") {
+      if (resource === "check-admin") {
+        const checkUserId = url.searchParams.get("userId");
+        if (!checkUserId) return new Response(JSON.stringify({ isAdmin: false }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        const isAdmin = await isAdminInFirestore(checkUserId);
+        return new Response(JSON.stringify({ isAdmin }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (resource === "users") {
         const [profiles, users, orders] = await Promise.all([
           queryCollection("profiles"),
@@ -395,6 +404,90 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success, id: docId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+
+      // ── Cleanup: remove blocked emails + orphan profiles ──────
+      if (resource === "cleanup-users") {
+        const BLOCKED_EMAILS = [
+          "lucaseucontato@gmail.com",
+          "rodrigofaro@gmail.com",
+          "test_redteam@gmail.com",
+        ];
+
+        const accessToken = await getFirebaseAccessToken();
+        const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
+
+        // Get all profiles and users from Firestore
+        const [profiles, users] = await Promise.all([
+          queryCollection("profiles"),
+          queryCollection("users"),
+        ]);
+
+        const allDocIds = new Set<string>();
+        for (const p of profiles) allDocIds.add(p.id);
+        for (const u of users) allDocIds.add(u.id);
+
+        const removed: string[] = [];
+        const errors: string[] = [];
+
+        for (const docId of allDocIds) {
+          // Get email from profile or user doc
+          const profile = profiles.find((p: any) => p.id === docId);
+          const userDoc = users.find((u: any) => u.id === docId);
+          const email = (profile?.email || userDoc?.email || '').toLowerCase().trim();
+
+          // 1. Remove blocked emails
+          if (BLOCKED_EMAILS.includes(email)) {
+            try {
+              await Promise.allSettled([
+                deleteFirestoreDoc("profiles", docId),
+                deleteFirestoreDoc("users", docId),
+                deleteFirestoreDoc("user_roles", docId),
+              ]);
+              removed.push(`blocked:${email}`);
+              console.log(`🗑️ Removed blocked user: ${email} (${docId})`);
+            } catch (err) {
+              errors.push(`Failed to remove blocked ${email}: ${err}`);
+            }
+            continue;
+          }
+
+          // 2. Check if user exists in Firebase Auth
+          try {
+            const authRes = await fetch(
+              `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
+              {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                body: JSON.stringify({ localId: [docId] }),
+              }
+            );
+            const authData = await authRes.json();
+            const authUser = authData.users?.[0];
+
+            if (!authUser) {
+              // Orphan — no matching Firebase Auth user
+              await Promise.allSettled([
+                deleteFirestoreDoc("profiles", docId),
+                deleteFirestoreDoc("users", docId),
+                deleteFirestoreDoc("user_roles", docId),
+              ]);
+              removed.push(`orphan:${email || docId}`);
+              console.log(`🗑️ Removed orphan profile: ${email || docId} (${docId})`);
+            }
+          } catch (err) {
+            errors.push(`Auth check failed for ${docId}: ${err}`);
+          }
+        }
+
+        return new Response(JSON.stringify({ 
+          success: true, 
+          removed, 
+          removedCount: removed.length,
+          totalChecked: allDocIds.size,
+          errors: errors.length > 0 ? errors : undefined,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       return new Response(JSON.stringify({ error: "Invalid resource" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
