@@ -129,7 +129,7 @@ Deno.serve(async (req) => {
     // Check admin via Firestore user_roles
     const adminStatus = await isAdminInFirestore(userUid);
     if (!adminStatus) {
-      console.warn(`⚠️ Unauthorized upload attempt: ${userEmail} (${userUid})`);
+      console.warn(`🚨 BLOCKED upload attempt | uid=${userUid} | email=${userEmail} | origin=${req.headers.get("Origin") || "unknown"} | ip=${req.headers.get("x-forwarded-for") || "unknown"} | time=${new Date().toISOString()}`);
       return new Response(
         JSON.stringify({ error: "Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }

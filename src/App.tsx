@@ -59,8 +59,8 @@ const CardPaymentCallback = lazy(() => import("./pages/CardPaymentCallback"));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
-      staleTime: 30 * 60 * 1000, // 30 min - cache agressivo
-      gcTime: 60 * 60 * 1000,    // 1 hora - mantém em memória
+      staleTime: 5 * 60 * 1000,  // 5 min
+      gcTime: 30 * 60 * 1000,    // 30 min
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: false,

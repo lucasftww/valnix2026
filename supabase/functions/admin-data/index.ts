@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
 
     const adminStatus = await isAdminInFirestore(userData.uid);
     if (!adminStatus) {
-      console.warn(`⚠️ Unauthorized admin-data attempt: ${userData.email}`);
+      console.warn(`🚨 BLOCKED admin-data attempt | uid=${userData.uid} | email=${userData.email} | resource=${new URL(req.url).searchParams.get("resource")} | method=${req.method} | origin=${req.headers.get("Origin") || "unknown"} | ip=${req.headers.get("x-forwarded-for") || "unknown"} | time=${new Date().toISOString()}`);
       return new Response(JSON.stringify({ error: "Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
