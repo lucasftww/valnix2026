@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { isTempEmail } from "@/lib/tempEmailDomains";
 import { isBlockedEmail } from "@/lib/blockedEmails";
+import { checkRateLimit, recordFailedAttempt, resetAttempts } from "@/lib/rateLimiter";
 import vLogo from "@/assets/v-logo-login.png";
 
 
@@ -38,6 +39,18 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
+    const rateLimitKey = loginEmail.toLowerCase().trim();
+    const rateCheck = checkRateLimit(rateLimitKey);
+    if (!rateCheck.allowed) {
+      toast({
+        title: "Muitas tentativas",
+        description: `Aguarde ${Math.ceil((rateCheck.retryAfterSeconds || 300) / 60)} minutos antes de tentar novamente.`,
+        variant: "destructive",
+      });
+      setLoading(false);
+      return;
+    }
+
     if (isBlockedEmail(loginEmail)) {
       toast({ title: "Acesso negado", description: "Esta conta foi suspensa.", variant: "destructive" });
       setLoading(false);
@@ -47,8 +60,10 @@ export default function Auth() {
     const { error } = await signIn(loginEmail, loginPassword);
     
     if (!error) {
+      resetAttempts(rateLimitKey);
       navigate(redirectTo, { replace: true });
     } else {
+      recordFailedAttempt(rateLimitKey);
       const code = (error as any)?.code || '';
       const msg = code === 'auth/wrong-password' || code === 'auth/invalid-credential'
         ? 'Email ou senha incorretos.'
