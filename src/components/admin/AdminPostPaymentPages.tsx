@@ -52,19 +52,14 @@ const routeMap: Record<string, string> = {
   data_swap_warranty: "/painel-pagar-trocadados",
 };
 
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
-const SUPABASE_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
-
-async function callAdminPostPayment(method: string, body?: any) {
+async function callAdminPostPayment(method: string, body?: any, queryParams?: Record<string, string>) {
+  const { invokeFunction } = await import("@/lib/apiHelper");
   const token = await auth.currentUser?.getIdToken();
-  const res = await fetch(`${SUPABASE_URL}/functions/v1/admin-post-payment`, {
+  const res = await invokeFunction("admin-post-payment", {
     method,
-    headers: {
-      "Content-Type": "application/json",
-      "apikey": SUPABASE_KEY,
-      "x-firebase-token": token || "",
-    },
-    body: body ? JSON.stringify(body) : undefined,
+    body,
+    queryParams,
+    headers: { "x-firebase-token": token || "" },
   });
   return res.json();
 }

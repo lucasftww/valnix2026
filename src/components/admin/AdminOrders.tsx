@@ -371,7 +371,6 @@ export const AdminOrders = () => {
       });
 
       const data = await response.json();
-      const data = await response.json();
       if (data.success && data.status === 'COMPLETED') {
         const orderRef = doc(db, "orders", order.id);
         await updateDoc(orderRef, { payment_status: 'paid', status: 'processing', updated_at: Timestamp.now() });
