@@ -13,7 +13,7 @@ import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
 
 // ── Security: Only these emails can be admin ──────────────────────
-const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
+const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com", "valnixbr@gmail.com"];
 
 interface AuthContextType {
   user: User | null;
@@ -62,13 +62,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setIsAdmin(false);
             }
           } else {
+            // Auto-promote allowed admin emails on first login
+            const isAllowedEmail = ALLOWED_ADMIN_EMAILS.includes(firebaseUser.email?.toLowerCase() || "");
+            const newRole = isAllowedEmail ? "admin" : "user";
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
-              role: "user",
-              isAdmin: false,
+              role: newRole,
+              isAdmin: isAllowedEmail,
               created_at: new Date().toISOString(),
             });
-            setIsAdmin(false);
+            setIsAdmin(isAllowedEmail);
           }
 
           if (!profileDoc.exists()) {
