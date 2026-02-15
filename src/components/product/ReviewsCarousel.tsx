@@ -4,8 +4,8 @@ import {
   Carousel,
   CarouselContent,
   CarouselItem,
-  CarouselNext,
   CarouselPrevious,
+  CarouselNext,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
 
@@ -39,7 +39,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
     </div>
 
     <p className="text-sm text-foreground/75 leading-relaxed italic line-clamp-2">
-      "{review.comment}"
+      &ldquo;{review.comment}&rdquo;
     </p>
 
     <div className="flex items-center gap-2.5 mt-auto">
@@ -50,6 +50,19 @@ const ReviewCard = ({ review }: { review: Review }) => (
         {review.customer_name}
       </span>
     </div>
+  </div>
+);
+
+const NavArrows = () => (
+  <div className="flex items-center justify-center gap-6 mt-4">
+    <CarouselPrevious
+      className="static translate-y-0 h-8 w-8 rounded-full bg-muted/40 border-border/40 text-foreground/50 hover:bg-muted hover:text-foreground"
+      aria-label="Ver avaliação anterior"
+    />
+    <CarouselNext
+      className="static translate-y-0 h-8 w-8 rounded-full bg-muted/40 border-border/40 text-foreground/50 hover:bg-muted hover:text-foreground"
+      aria-label="Ver próxima avaliação"
+    />
   </div>
 );
 
@@ -66,51 +79,29 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
         Avaliações dos clientes
       </h2>
 
-      <div className="relative">
-        <Carousel
-          opts={{
-            align: "start",
-            loop: true,
-            skipSnaps: false,
-            duration: 20,
-          }}
-          plugins={[autoplayRef.current]}
-          className="w-full"
-        >
-          <CarouselContent className="-ml-4">
-            {reviews.map((review) => (
-              <CarouselItem
-                key={review.id}
-                className="pl-4 basis-[82%] sm:basis-[48%] lg:basis-[32%]"
-              >
-                <ReviewCard review={review} />
-              </CarouselItem>
-            ))}
-          </CarouselContent>
+      <Carousel
+        opts={{
+          align: "start",
+          loop: true,
+          skipSnaps: false,
+          duration: 20,
+        }}
+        plugins={[autoplayRef.current]}
+        className="w-full"
+      >
+        <CarouselContent className="-ml-4">
+          {reviews.map((review) => (
+            <CarouselItem
+              key={review.id}
+              className="pl-4 basis-[85%] sm:basis-[48%] lg:basis-[33.333%]"
+            >
+              <ReviewCard review={review} />
+            </CarouselItem>
+          ))}
+        </CarouselContent>
 
-          {/* Mobile: setas abaixo */}
-          <div className="flex items-center justify-center gap-8 mt-4 md:hidden">
-            <CarouselPrevious
-              className="static translate-y-0 h-8 w-8 rounded-full bg-muted/40 border-border/40 text-foreground/50 hover:bg-muted hover:text-foreground"
-              aria-label="Ver avaliação anterior"
-            />
-            <CarouselNext
-              className="static translate-y-0 h-8 w-8 rounded-full bg-muted/40 border-border/40 text-foreground/50 hover:bg-muted hover:text-foreground"
-              aria-label="Ver próxima avaliação"
-            />
-          </div>
-
-          {/* Desktop: setas laterais fora do conteúdo */}
-          <CarouselPrevious
-            className="hidden md:flex -left-5 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-muted/50 border-border/40 text-foreground/50 hover:bg-muted hover:text-foreground"
-            aria-label="Ver avaliação anterior"
-          />
-          <CarouselNext
-            className="hidden md:flex -right-5 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-muted/50 border-border/40 text-foreground/50 hover:bg-muted hover:text-foreground"
-            aria-label="Ver próxima avaliação"
-          />
-        </Carousel>
-      </div>
+        <NavArrows />
+      </Carousel>
     </div>
   );
 };
