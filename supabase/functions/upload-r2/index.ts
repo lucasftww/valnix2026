@@ -23,9 +23,8 @@ const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif"];
 const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
 const FIREBASE_PROJECT_ID = "valnix";
-const FIREBASE_STORAGE_BUCKET = "valnix.firebasestorage.app";
 
-// ── Firebase Service Account Auth ──────────────────────────────────
+// ── Firebase Service Account Auth (for admin check) ───────────────
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
 
@@ -45,7 +44,7 @@ async function getFirebaseAccessToken(): Promise<string> {
   const payload = {
     iss: saKey.client_email, sub: saKey.client_email,
     aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/datastore',
   };
   const enc = new TextEncoder();
   const headerB64 = base64url(enc.encode(JSON.stringify(header)));
@@ -79,6 +78,96 @@ async function isAdminInFirestore(uid: string): Promise<boolean> {
   } catch { return false; }
 }
 
+// ── AWS Signature V4 for Cloudflare R2 ─────────────────────────────
+async function hmacSHA256(key: ArrayBuffer, message: string): Promise<ArrayBuffer> {
+  const cryptoKey = await crypto.subtle.importKey('raw', key, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  return crypto.subtle.sign('HMAC', cryptoKey, new TextEncoder().encode(message));
+}
+
+async function getSignatureKey(key: string, dateStamp: string, region: string, service: string): Promise<ArrayBuffer> {
+  const kDate = await hmacSHA256(new TextEncoder().encode('AWS4' + key), dateStamp);
+  const kRegion = await hmacSHA256(kDate, region);
+  const kService = await hmacSHA256(kRegion, service);
+  return hmacSHA256(kService, 'aws4_request');
+}
+
+function toHex(buffer: ArrayBuffer): string {
+  return [...new Uint8Array(buffer)].map(b => b.toString(16).padStart(2, '0')).join('');
+}
+
+async function uploadToR2(fileName: string, body: Uint8Array, contentType: string): Promise<string> {
+  const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')!;
+  const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!;
+  const endpoint = Deno.env.get('R2_ENDPOINT')!; // e.g. https://<account_id>.r2.cloudflarestorage.com
+  const publicUrl = Deno.env.get('R2_PUBLIC_URL')!; // e.g. https://pub-xxx.r2.dev or custom domain
+
+  // Parse endpoint to get host and bucket
+  const endpointUrl = new URL(endpoint);
+  const host = endpointUrl.host;
+  // The endpoint might include the bucket name in the path, or we use it as the base
+  // Typical R2 endpoint: https://<account_id>.r2.cloudflarestorage.com/<bucket>
+  // or just https://<account_id>.r2.cloudflarestorage.com with bucket in path
+  
+  const pathParts = endpointUrl.pathname.split('/').filter(Boolean);
+  let bucket = '';
+  let basePath = '';
+  
+  if (pathParts.length > 0) {
+    bucket = pathParts[0];
+    basePath = `/${bucket}`;
+  }
+
+  const encodedFileName = fileName; // already sanitized
+  const objectPath = `${basePath}/${encodedFileName}`;
+  
+  const now = new Date();
+  const dateStamp = now.toISOString().slice(0, 10).replace(/-/g, '');
+  const amzDate = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+  const region = 'auto';
+  const service = 's3';
+
+  // Hash the payload
+  const payloadHash = toHex(await crypto.subtle.digest('SHA-256', body));
+
+  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+
+  const canonicalRequest = `PUT\n${objectPath}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
+  const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
+  const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalRequest)))}`;
+
+  const signingKey = await getSignatureKey(secretAccessKey, dateStamp, region, service);
+  const signature = toHex(await hmacSHA256(signingKey, stringToSign));
+
+  const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
+
+  const uploadUrl = `https://${host}${objectPath}`;
+  console.log(`Uploading to R2: ${uploadUrl}`);
+
+  const res = await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: {
+      'Authorization': authorization,
+      'Content-Type': contentType,
+      'x-amz-content-sha256': payloadHash,
+      'x-amz-date': amzDate,
+    },
+    body: body,
+  });
+
+  if (!res.ok) {
+    const errText = await res.text();
+    console.error(`R2 upload failed: ${res.status}`, errText);
+    throw new Error(`R2 upload failed: ${res.status} - ${errText}`);
+  }
+
+  // Build public URL
+  const fileUrl = `${publicUrl.replace(/\/$/, '')}/${encodedFileName}`;
+  console.log(`✅ Uploaded to R2: ${fileUrl}`);
+  return fileUrl;
+}
+
+// ── Main handler ───────────────────────────────────────────────────
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
 
@@ -98,7 +187,6 @@ Deno.serve(async (req) => {
 
     const idToken = authHeader.replace("Bearer ", "");
 
-    // Verify Firebase token
     const verifyRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
       {
@@ -126,7 +214,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Check admin via Firestore user_roles
     const adminStatus = await isAdminInFirestore(userUid);
     if (!adminStatus) {
       console.warn(`🚨 BLOCKED upload attempt | uid=${userUid} | email=${userEmail} | origin=${req.headers.get("Origin") || "unknown"} | ip=${req.headers.get("x-forwarded-for") || "unknown"} | time=${new Date().toISOString()}`);
@@ -145,7 +232,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate content type
     const resolvedContentType = contentType || "image/webp";
     if (!ALLOWED_CONTENT_TYPES.includes(resolvedContentType)) {
       return new Response(
@@ -154,7 +240,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Validate file size (base64 is ~33% larger than binary)
     const estimatedSize = Math.ceil(fileBase64.length * 0.75);
     if (estimatedSize > MAX_FILE_SIZE) {
       return new Response(
@@ -163,7 +248,6 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Sanitize fileName — only allow safe characters
     const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._\-\/]/g, "_");
 
     // Decode base64 to bytes
@@ -173,71 +257,8 @@ Deno.serve(async (req) => {
       bytes[i] = binaryStr.charCodeAt(i);
     }
 
-    // Upload to Firebase Storage using Firebase Storage REST API
-    const accessToken = await getFirebaseAccessToken();
-    const encodedName = encodeURIComponent(sanitizedFileName);
-    
-    // Try multiple bucket names with Firebase Storage REST API
-    let uploadRes: Response | null = null;
-    let usedBucket = FIREBASE_STORAGE_BUCKET;
-    
-    const bucketsToTry = [FIREBASE_STORAGE_BUCKET, "valnix.appspot.com"];
-    
-    for (const bucket of bucketsToTry) {
-      // Use Firebase Storage REST API endpoint
-      const uploadUrl = `https://firebasestorage.googleapis.com/v0/b/${bucket}/o/${encodedName}`;
-      console.log(`Trying Firebase Storage REST API upload to bucket: ${bucket}`);
-      
-      uploadRes = await fetch(uploadUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": resolvedContentType,
-          "X-Goog-Upload-Protocol": "raw",
-        },
-        body: bytes,
-      });
-      
-      if (uploadRes.ok) {
-        usedBucket = bucket;
-        break;
-      }
-      
-      const errorText = await uploadRes.text();
-      console.error(`Bucket ${bucket} failed:`, uploadRes.status, errorText);
-      
-      // Also try GCS JSON API as fallback
-      const gcsUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodedName}`;
-      console.log(`Trying GCS JSON API upload to bucket: ${bucket}`);
-      
-      uploadRes = await fetch(gcsUrl, {
-        method: "POST",
-        headers: {
-          "Authorization": `Bearer ${accessToken}`,
-          "Content-Type": resolvedContentType,
-        },
-        body: bytes,
-      });
-      
-      if (uploadRes.ok) {
-        usedBucket = bucket;
-        break;
-      }
-      
-      const gcsErrorText = await uploadRes.text();
-      console.error(`GCS bucket ${bucket} failed:`, uploadRes.status, gcsErrorText);
-    }
-
-    if (!uploadRes || !uploadRes.ok) {
-      return new Response(
-        JSON.stringify({ error: "Upload failed to all buckets" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
-
-    // Build public URL
-    const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${usedBucket}/o/${encodedName}?alt=media`;
-    console.log(`✅ Uploaded to Firebase Storage (${usedBucket}): ${sanitizedFileName}`);
+    // Upload to Cloudflare R2
+    const fileUrl = await uploadToR2(sanitizedFileName, bytes, resolvedContentType);
 
     return new Response(
       JSON.stringify({ url: fileUrl }),
