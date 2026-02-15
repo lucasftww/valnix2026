@@ -167,7 +167,10 @@ const ProductDetail = () => {
         <meta property="og:description" content={`${product.name} por R$ ${product.price.toFixed(2).replace('.', ',')} com entrega automática via PIX.`} />
         <meta property="og:url" content={`https://www.valnix.com.br/product/${product.id}`} />
         <meta property="og:type" content="product" />
+        <meta property="og:site_name" content="VALNIX" />
         {product.image_url && <meta property="og:image" content={product.image_url} />}
+        <meta property="og:image:width" content="1200" />
+        <meta property="og:image:height" content="630" />
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`Comprar ${product.name} | VALNIX`} />
         <meta name="twitter:description" content={`${product.name} por R$ ${product.price.toFixed(2).replace('.', ',')} com entrega automática via PIX.`} />
