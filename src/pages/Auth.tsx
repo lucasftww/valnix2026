@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { isTempEmail } from "@/lib/tempEmailDomains";
+import { isBlockedEmail } from "@/lib/blockedEmails";
 import vLogo from "@/assets/v-logo-login.png";
 
 
@@ -37,6 +38,12 @@ export default function Auth() {
     e.preventDefault();
     setLoading(true);
     
+    if (isBlockedEmail(loginEmail)) {
+      toast({ title: "Acesso negado", description: "Esta conta foi suspensa.", variant: "destructive" });
+      setLoading(false);
+      return;
+    }
+
     const { error } = await signIn(loginEmail, loginPassword);
     
     if (!error) {
@@ -63,6 +70,11 @@ export default function Auth() {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (isBlockedEmail(signupEmail)) {
+      toast({ title: "Acesso negado", description: "Este email não é permitido.", variant: "destructive" });
+      return;
+    }
 
     if (isTempEmail(signupEmail)) {
       toast({

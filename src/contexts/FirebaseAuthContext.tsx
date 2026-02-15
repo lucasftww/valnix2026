@@ -11,6 +11,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
+import { isBlockedEmail } from "@/lib/blockedEmails";
 
 // ── Security: admin role is determined solely by Firestore "users" doc ──
 // No emails are hardcoded here to prevent exposure in client-side JS
@@ -82,6 +83,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
+    if (isBlockedEmail(email)) {
+      return { error: { code: 'auth/blocked', message: 'Account suspended' } };
+    }
     try {
       await signInWithEmailAndPassword(auth, email, password);
       return { error: null };
@@ -91,6 +95,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
+    if (isBlockedEmail(email)) {
+      return { error: { code: 'auth/blocked', message: 'Account suspended' } };
+    }
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       // Security: NEVER allow signUp to create admin users
@@ -115,6 +122,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const provider = new GoogleAuthProvider();
       const result = await signInWithPopup(auth, provider);
+      if (result.user.email && isBlockedEmail(result.user.email)) {
+        await firebaseSignOut(auth);
+        return { error: { code: 'auth/blocked', message: 'Account suspended' } };
+      }
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       if (!userDoc.exists()) {
         // Security: NEVER allow Google login to create admin users
