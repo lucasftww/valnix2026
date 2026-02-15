@@ -402,12 +402,26 @@ export const AdminOrders = () => {
       const itemsData = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
       setDetailItems(itemsData);
 
-      // Fetch upsell addons from Supabase
-      const { data: addons } = await supabase
-        .from("sale_addons")
-        .select("*")
-        .eq("order_id", order.id);
-      setDetailAddons(addons || []);
+      // Fetch upsell addons via edge function (service_role) since RLS restricts anon reads
+      try {
+        const firebaseToken = await (await import("@/integrations/firebase/config")).auth.currentUser?.getIdToken();
+        const res = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-post-payment`, {
+          headers: {
+            'Content-Type': 'application/json',
+            'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+            'x-firebase-token': firebaseToken || '',
+          },
+        });
+        if (res.ok) {
+          const result = await res.json();
+          const orderAddons = (result.addons || []).filter((a: any) => a.order_id === order.id);
+          setDetailAddons(orderAddons);
+        } else {
+          setDetailAddons([]);
+        }
+      } catch {
+        setDetailAddons([]);
+      }
     } catch (error: any) {
       toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
     } finally {
