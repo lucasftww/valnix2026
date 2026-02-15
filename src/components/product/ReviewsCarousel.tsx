@@ -27,11 +27,11 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
 
   return (
     <div className="mt-8 max-w-7xl mx-auto px-2 md:px-4">
-      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-4 md:px-6 py-4 md:py-6 shadow-lg">
-        <h2 className="text-base md:text-xl font-bold text-foreground mb-3">Avaliações dos clientes</h2>
+      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-2 md:px-10 py-4 md:py-6 shadow-lg overflow-hidden">
+        <h2 className="text-base md:text-xl font-bold text-foreground mb-3 px-2 md:px-0">Avaliações dos clientes</h2>
         <Carousel
           opts={{
-            align: "center",
+            align: "start",
             loop: true,
             skipSnaps: false,
             duration: 20,
@@ -39,9 +39,9 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           plugins={[autoplayRef.current]}
           className="w-full"
         >
-          <CarouselContent className="-ml-3">
+          <CarouselContent className="-ml-2">
             {reviews.map((review) => (
-              <CarouselItem key={review.id} className="pl-3 basis-full md:basis-1/2 lg:basis-1/3">
+              <CarouselItem key={review.id} className="pl-2 basis-[85%] md:basis-1/2 lg:basis-1/3">
                 <div className="rounded-lg bg-muted/40 border border-border/30 px-3 py-2.5 md:px-4 md:py-3 h-full flex flex-col gap-1.5 select-none">
                   <div className="flex items-center justify-between">
                     <div className="flex gap-0.5">
