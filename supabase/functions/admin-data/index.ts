@@ -307,6 +307,33 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      if (resource === "orders") {
+        const orders = await queryCollection("orders");
+        // Convert Firestore timestamps
+        for (const o of orders) {
+          if (o.created_at && typeof o.created_at === 'object' && o.created_at.seconds) {
+            o.created_at = new Date(o.created_at.seconds * 1000).toISOString();
+          }
+          if (o.updated_at && typeof o.updated_at === 'object' && o.updated_at.seconds) {
+            o.updated_at = new Date(o.updated_at.seconds * 1000).toISOString();
+          }
+        }
+        orders.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
+
+        return new Response(JSON.stringify({ orders }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "order-items") {
+        const orderId = url.searchParams.get("orderId");
+        if (!orderId) return new Response(JSON.stringify({ error: "orderId required" }),
+          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+        const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: orderId });
+        return new Response(JSON.stringify({ items }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       return new Response(JSON.stringify({ error: "Invalid resource" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -340,8 +367,19 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "users") {
-        // Update user balance or other profile fields
         const success = await updateFirestoreDoc("profiles", docId, body);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "orders") {
+        const success = await updateFirestoreDoc("orders", docId, body);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "order-items") {
+        const success = await updateFirestoreDoc("order_items", docId, body);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -363,11 +401,21 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "users") {
-        // Delete profile and user_roles
         await Promise.all([
           deleteFirestoreDoc("profiles", docId),
           deleteFirestoreDoc("user_roles", docId),
         ]);
+        return new Response(JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      if (resource === "orders") {
+        // Delete order and its items
+        const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: docId });
+        for (const item of items) {
+          await deleteFirestoreDoc("order_items", item.id);
+        }
+        await deleteFirestoreDoc("orders", docId);
         return new Response(JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
