@@ -145,6 +145,8 @@ const SearchBarComponent = () => {
       <div className="relative">
         <Input
           ref={inputRef}
+          id="search"
+          name="search"
           type="search"
           placeholder="O que está buscando?"
           value={query}

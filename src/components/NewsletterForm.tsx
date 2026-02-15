@@ -98,6 +98,8 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
       <form onSubmit={handleSubmit} className="flex items-end gap-2" aria-label="Formulário de newsletter">
         <div className="flex-1 relative">
           <Input
+            id="newsletter-email"
+            name="email"
             type="email"
             placeholder="Seu e-mail"
             value={email}

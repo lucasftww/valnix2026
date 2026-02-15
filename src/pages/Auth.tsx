@@ -124,6 +124,7 @@ export default function Auth() {
                       <Label htmlFor="login-email" className="text-sm font-medium">Email</Label>
                       <Input
                         id="login-email"
+                        name="email"
                         type="email"
                         placeholder="seu@email.com"
                         value={loginEmail}
@@ -137,6 +138,7 @@ export default function Auth() {
                       <Label htmlFor="login-password" className="text-sm font-medium">Senha</Label>
                       <Input
                         id="login-password"
+                        name="password"
                         type="password"
                         placeholder="••••••••"
                         value={loginPassword}
@@ -212,6 +214,7 @@ export default function Auth() {
                       <Label htmlFor="signup-email" className="text-sm font-medium">Email</Label>
                       <Input
                         id="signup-email"
+                        name="email"
                         type="email"
                         placeholder="seu@email.com"
                         value={signupEmail}
@@ -225,6 +228,7 @@ export default function Auth() {
                       <Label htmlFor="signup-password" className="text-sm font-medium">Senha</Label>
                       <Input
                         id="signup-password"
+                        name="password"
                         type="password"
                         placeholder="••••••••"
                         value={signupPassword}
