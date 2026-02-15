@@ -10,7 +10,8 @@ import { ArrowLeft, Camera, User, Package, Loader2, Check, Wallet } from "lucide
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
-import { supabase } from "@/integrations/supabase/client";
+import { storage } from "@/integrations/firebase/config";
+import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
 import { useToast } from "@/hooks/use-toast";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useRecentOrders } from "@/hooks/firebase";
@@ -135,23 +136,18 @@ export default function Profile() {
 
     try {
       const fileExt = file.name.split(".").pop();
-      const fileName = `${user.uid}/avatar.${fileExt}`;
+      const fileName = `avatars/${user.uid}/avatar.${fileExt}`;
 
-      // Upload para Supabase Storage (bucket avatars já configurado)
-      const { error: uploadError } = await supabase.storage
-        .from("avatars")
-        .upload(fileName, file, { upsert: true });
-
-      if (uploadError) throw uploadError;
+      // Upload para Firebase Storage
+      const storageRef = ref(storage, fileName);
+      await uploadBytes(storageRef, file, { contentType: file.type });
 
       // Obter URL pública
-      const { data: urlData } = supabase.storage
-        .from("avatars")
-        .getPublicUrl(fileName);
+      const downloadUrl = await getDownloadURL(storageRef);
 
       // Atualizar perfil com a nova URL
       await updateProfileMutation.mutateAsync({
-        avatar_url: urlData.publicUrl + `?t=${Date.now()}`,
+        avatar_url: downloadUrl,
       });
 
       toast({
