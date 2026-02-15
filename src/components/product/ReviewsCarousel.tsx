@@ -39,7 +39,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
     </div>
 
     <p className="text-[13px] md:text-sm text-foreground/80 leading-relaxed italic line-clamp-2">
-      &ldquo;{review.comment}&rdquo;
+      {review.comment}
     </p>
 
     <div className="flex items-center gap-2 mt-auto">
