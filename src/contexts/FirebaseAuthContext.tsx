@@ -44,8 +44,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             getDoc(doc(db, "profiles", firebaseUser.uid)),
           ]);
 
+          const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
           if (userDoc.exists()) {
-            setIsAdmin(userDoc.data()?.role === "admin");
+            const isRoleAdmin = userDoc.data()?.role === "admin";
+            const isAllowedEmail = ALLOWED_ADMIN_EMAILS.includes(firebaseUser.email?.toLowerCase() || "");
+            setIsAdmin(isRoleAdmin && isAllowedEmail);
           } else {
             await setDoc(doc(db, "users", firebaseUser.uid), {
               email: firebaseUser.email,
