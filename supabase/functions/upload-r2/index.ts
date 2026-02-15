@@ -1,10 +1,26 @@
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
-};
+const ALLOWED_ORIGINS = [
+  "https://www.valnix.com.br",
+  "https://valnix.com.br",
+  "https://valnix2026.lovable.app",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Headers":
+      "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  };
+}
+
+const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif"];
+const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
+
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
   }
@@ -25,7 +41,7 @@ Deno.serve(async (req) => {
     const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
 
     const verifyRes = await fetch(
-      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=AIzaSyAaNn-kRBPAMEMWv0MIaMaF5hy9gerVp9g`,
+      `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
       {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -60,6 +76,27 @@ Deno.serve(async (req) => {
       );
     }
 
+    // Validate content type
+    const resolvedContentType = contentType || "image/webp";
+    if (!ALLOWED_CONTENT_TYPES.includes(resolvedContentType)) {
+      return new Response(
+        JSON.stringify({ error: `Content type not allowed: ${resolvedContentType}` }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Validate file size (base64 is ~33% larger than binary)
+    const estimatedSize = Math.ceil(fileBase64.length * 0.75);
+    if (estimatedSize > MAX_FILE_SIZE) {
+      return new Response(
+        JSON.stringify({ error: "File too large. Max 5MB." }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Sanitize fileName — only allow safe characters
+    const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9._\-\/]/g, "_");
+
     // Get R2 credentials
     const accessKeyId = Deno.env.get("R2_ACCESS_KEY_ID");
     const secretAccessKey = Deno.env.get("R2_SECRET_ACCESS_KEY");
@@ -87,20 +124,20 @@ Deno.serve(async (req) => {
     const service = "s3";
     const method = "PUT";
     const host = endpoint.replace("https://", "");
-    const url = `${endpoint}/${bucketName}/${fileName}`;
+    const url = `${endpoint}/${bucketName}/${sanitizedFileName}`;
 
     const now = new Date();
     const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
     const dateStamp = amzDate.slice(0, 8);
 
     // Create canonical request
-    const canonicalUri = `/${bucketName}/${fileName}`;
+    const canonicalUri = `/${bucketName}/${sanitizedFileName}`;
     const canonicalQuerystring = "";
 
     const payloadHash = await sha256Hex(bytes);
 
     const canonicalHeaders =
-      `content-type:${contentType || "image/webp"}\n` +
+      `content-type:${resolvedContentType}\n` +
       `host:${host}\n` +
       `x-amz-content-sha256:${payloadHash}\n` +
       `x-amz-date:${amzDate}\n`;
@@ -137,7 +174,7 @@ Deno.serve(async (req) => {
     const r2Response = await fetch(url, {
       method: "PUT",
       headers: {
-        "Content-Type": contentType || "image/webp",
+        "Content-Type": resolvedContentType,
         "x-amz-content-sha256": payloadHash,
         "x-amz-date": amzDate,
         Authorization: authorizationHeader,
@@ -156,9 +193,9 @@ Deno.serve(async (req) => {
     }
 
     // Build public URL
-    const fileUrl = `${publicUrl}/${fileName}`;
+    const fileUrl = `${publicUrl}/${sanitizedFileName}`;
 
-    console.log(`✅ Uploaded to R2: ${fileName}`);
+    console.log(`✅ Uploaded to R2: ${sanitizedFileName}`);
 
     return new Response(
       JSON.stringify({ url: fileUrl }),
@@ -169,7 +206,7 @@ Deno.serve(async (req) => {
     const msg = error instanceof Error ? error.message : "Unknown error";
     return new Response(
       JSON.stringify({ error: msg }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } }
     );
   }
 });
