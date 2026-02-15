@@ -61,6 +61,22 @@ async function getFirestoreDoc(collection: string, docId: string) {
   return data.fields || null;
 }
 
+async function queryFirestore(collectionId: string, fieldPath: string, op: string, value: string) {
+  const accessToken = await getFirebaseAccessToken();
+  const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const response = await fetch(queryUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      structuredQuery: {
+        from: [{ collectionId }],
+        where: { fieldFilter: { field: { fieldPath }, op, value: { stringValue: value } } },
+      },
+    }),
+  });
+  return await response.json();
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
@@ -91,7 +107,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      // 🔒 Server-side price validation: fetch real amount from Firestore
+      // 🔒 CRITICAL: Recalculate total from REAL product prices (never trust client total_amount)
       const orderFields = await getFirestoreDoc('orders', orderId);
       if (!orderFields) {
         console.error(`❌ Order not found: ${orderId}`);
@@ -101,10 +117,75 @@ Deno.serve(async (req) => {
         );
       }
 
-      const serverAmount = orderFields.total_amount?.doubleValue
-        || orderFields.total_amount?.integerValue
-        || 0;
-      amount = Math.round(Number(serverAmount) * 100);
+      // Fetch order_items to get product_ids and quantities
+      const orderItemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+      if (!orderItemsResults || !Array.isArray(orderItemsResults) || orderItemsResults.length === 0 || !orderItemsResults[0]?.document) {
+        console.error(`❌ No order items found for order ${orderId}`);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Order items not found' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Recalculate total from real product prices
+      let recalculatedTotal = 0;
+      for (const result of orderItemsResults) {
+        if (!result.document) continue;
+        const itemFields = result.document.fields;
+        const productId = itemFields?.product_id?.stringValue;
+        const quantity = parseInt(itemFields?.quantity?.integerValue || '1');
+        
+        if (!productId) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Invalid order item' }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const productFields = await getFirestoreDoc('products', productId);
+        if (!productFields) {
+          return new Response(
+            JSON.stringify({ success: false, error: `Product ${productId} not found` }),
+            { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+
+        const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
+        recalculatedTotal += realPrice * quantity;
+        console.log(`  📦 Product ${productId}: R$${realPrice} x ${quantity}`);
+      }
+
+      // Apply coupon discount if present (server-side validation)
+      const couponId = orderFields.coupon_id?.stringValue;
+      if (couponId) {
+        const couponFields = await getFirestoreDoc('coupons', couponId);
+        if (couponFields) {
+          const discountType = couponFields.discount_type?.stringValue;
+          const discountValue = Number(couponFields.discount_value?.doubleValue || couponFields.discount_value?.integerValue || 0);
+          const isActive = couponFields.is_active?.booleanValue !== false;
+          const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null;
+          const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0;
+
+          if (isActive && (!maxUses || currentUses < maxUses)) {
+            let discountAmount = 0;
+            if (discountType === 'percentage') {
+              discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal);
+            } else {
+              discountAmount = Math.min(discountValue, recalculatedTotal);
+            }
+            recalculatedTotal -= discountAmount;
+            console.log(`🏷️ Coupon ${couponId}: -R$${discountAmount.toFixed(2)}`);
+          }
+        }
+      }
+
+      // Log if client total differs (potential manipulation)
+      const clientTotal = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
+      if (Math.abs(clientTotal - recalculatedTotal) > 0.01) {
+        console.warn(`🚨 PRICE MISMATCH! Client: R$${clientTotal}, Server: R$${recalculatedTotal} (order ${orderId})`);
+      }
+
+      amount = Math.round(recalculatedTotal * 100);
 
       if (amount < 100) {
         return new Response(
@@ -113,7 +194,7 @@ Deno.serve(async (req) => {
         );
       }
 
-      console.log(`🔒 Card charge: server-verified amount ${amount} cents (order ${orderId})`);
+      console.log(`🔒 Card charge: server-recalculated amount ${amount} cents (order ${orderId})`);
 
       const flowpayResponse = await fetch(`${FLOWPAY_CARD_URL}/create`, {
         method: 'POST',
