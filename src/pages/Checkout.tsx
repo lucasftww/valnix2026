@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -78,6 +78,7 @@ export default function Checkout() {
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
+  const isSubmittingRef = useRef(false); // Sync lock to prevent double-submit
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [userBalance, setUserBalance] = useState<number>(0);
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance" | "card">("pix");
@@ -228,7 +229,9 @@ export default function Checkout() {
   }, [couponCode, applyCoupon]);
 
   const handleSubmit = useCallback(async () => {
-    if (loading) return;
+    // Synchronous lock — prevents race condition from rapid clicks
+    if (isSubmittingRef.current || loading) return;
+    isSubmittingRef.current = true;
     
     setTouched({ name: true, document: true, email: true });
     
@@ -243,6 +246,7 @@ export default function Checkout() {
         description: errors[0] || "Preencha todos os campos corretamente.",
         variant: "destructive",
       });
+      isSubmittingRef.current = false;
       return;
     }
     
@@ -268,6 +272,7 @@ export default function Checkout() {
           variant: "destructive",
         });
         setLoading(false);
+        isSubmittingRef.current = false;
         return;
       }
 
@@ -280,6 +285,7 @@ export default function Checkout() {
             variant: "destructive",
           });
           setLoading(false);
+          isSubmittingRef.current = false;
           return;
         }
 
@@ -691,6 +697,7 @@ export default function Checkout() {
       });
     } finally {
       setLoading(false);
+      isSubmittingRef.current = false;
     }
   }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, userBalance, clearCart, navigate, user, effectiveUserId]);
 
