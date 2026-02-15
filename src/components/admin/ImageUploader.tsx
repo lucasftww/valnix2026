@@ -137,7 +137,7 @@ export const ImageUploader = ({
       const savedKB = ((file.size - compressedFile.size) / 1024).toFixed(0);
       toast({
         title: "Sucesso",
-        description: `Imagem enviada para R2! Economizou ${savedKB}KB`
+        description: `Imagem enviada! Economizou ${savedKB}KB`
       });
 
     } catch (error) {
