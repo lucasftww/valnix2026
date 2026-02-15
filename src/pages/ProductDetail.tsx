@@ -23,35 +23,6 @@ const FAQ = lazy(() => import("@/components/FAQ").then(m => ({ default: m.FAQ })
 const ReviewsCarousel = lazy(() => import("@/components/product/ReviewsCarousel"));
 const RelatedProducts = lazy(() => import("@/components/product/RelatedProducts"));
 
-// Componente de imagem otimizado inline (evita re-render)
-const ProductImage = memo(({ src, alt, className, priority = false }: { 
-  src: string; 
-  alt: string; 
-  className?: string;
-  priority?: boolean;
-}) => {
-  const [loaded, setLoaded] = useState(false);
-
-  return (
-    <div className={`relative ${className}`}>
-      {!loaded && (
-        <div className="absolute inset-0 flex items-center justify-center">
-          <div className="w-8 h-8 border-4 border-primary border-t-transparent rounded-full animate-spin" />
-        </div>
-      )}
-      <img
-        src={src}
-        alt={alt}
-        loading={priority ? "eager" : "lazy"}
-        decoding="async"
-        onLoad={() => setLoaded(true)}
-        className={`w-full h-full object-contain ${loaded ? 'opacity-100' : 'opacity-0'}`}
-      />
-    </div>
-  );
-});
-ProductImage.displayName = 'ProductImage';
-
 // Skeleton de loading mais leve
 const ProductDetailSkeleton = memo(() => (
   <div className="min-h-screen bg-background flex items-center justify-center">

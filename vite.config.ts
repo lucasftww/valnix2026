@@ -116,25 +116,31 @@ export default defineConfig(({ mode }) => ({
               }
             }
           },
-          // API calls do Supabase - NetworkFirst com cache offline
+          // API calls do Supabase - StaleWhileRevalidate for fast responses
           {
             urlPattern: /^https:\/\/.*\.supabase\.co\/rest\/v1\/.*/i,
-            handler: 'NetworkFirst',
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'supabase-api-cache',
               expiration: {
                 maxEntries: 100,
                 maxAgeSeconds: 60 * 30 // 30 minutes
               },
-              networkTimeoutSeconds: 3,
               cacheableResponse: {
                 statuses: [0, 200]
               }
             }
           },
-          // HTML pages - NetworkFirst com fallback offline
+          // Firestore REST - StaleWhileRevalidate
           {
-            // Evita cache de navegação para /~oauth/* (isso quebrava o login com Google até dar hard refresh)
+            urlPattern: /^https:\/\/firestore\.googleapis\.com\/.*/i,
+            handler: 'NetworkOnly',
+            options: {
+              cacheName: 'firestore-cache',
+            }
+          },
+          // HTML pages - NetworkFirst with short timeout
+          {
             urlPattern: ({ request, url }) => request.mode === 'navigate' && !url.pathname.startsWith('/~oauth/'),
             handler: 'NetworkFirst',
             options: {
@@ -143,7 +149,7 @@ export default defineConfig(({ mode }) => ({
                 maxEntries: 50,
                 maxAgeSeconds: 60 * 60 * 24 // 24 hours
               },
-              networkTimeoutSeconds: 10,
+              networkTimeoutSeconds: 5,
             }
           }
         ]
@@ -169,8 +175,9 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui': ['@radix-ui/react-accordion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
-          'firebase-sdk': ['firebase/app', 'firebase/auth', 'firebase/firestore', 'firebase/storage'],
+          'ui': ['@radix-ui/react-accordion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover', '@radix-ui/react-select'],
+          'firebase-core': ['firebase/app', 'firebase/auth'],
+          'firebase-db': ['firebase/firestore'],
           'charts': ['recharts'],
         },
         assetFileNames: (assetInfo) => {
