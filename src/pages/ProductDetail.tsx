@@ -225,14 +225,14 @@ const ProductDetail = () => {
                   <span className="text-[11px] font-semibold text-foreground">+{productStats.sold.toLocaleString('pt-BR')} vendidos</span>
                 </div>
                 {/* Imagem */}
-                <div className="flex items-center justify-center px-10 py-4 bg-gradient-to-b from-muted/20 to-background">
+                <div className="flex items-center justify-center px-6 py-2 bg-gradient-to-b from-muted/20 to-background">
                   {product.image_url && (
                     <img
                       src={product.image_url}
                       alt={product.name}
                       loading="eager"
                       decoding="async"
-                      className="w-full max-h-[300px] object-contain drop-shadow-2xl"
+                      className="w-full max-h-[360px] object-contain drop-shadow-2xl"
                     />
                   )}
                 </div>
