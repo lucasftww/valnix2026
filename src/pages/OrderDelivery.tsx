@@ -630,15 +630,7 @@ export default function OrderDelivery() {
           </CardContent>
         </Card>
 
-        {/* INLINE UPSELL - shown directly on the page */}
-        {upsellParam === "1" && (
-          <UpsellSequence
-            orderId={effectiveOrderId}
-            userEmail={order.email}
-            userName={order.customer_name || undefined}
-            userId={user?.uid || sessionStorage.getItem('valnix_guest_id') || undefined}
-          />
-        )}
+        {/* Upsells now happen as full-screen pages before reaching this delivery page */}
 
         {/* Order Summary */}
         <Card className="bg-[#111] border-[#1f1f1f]">

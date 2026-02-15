@@ -31,6 +31,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const orderIdParam = searchParams.get("order_id") || "";
+  const hashParam = searchParams.get("hash") || "";
   const utmSource = searchParams.get("utm_source") || null;
   const utmMedium = searchParams.get("utm_medium") || null;
   const utmCampaign = searchParams.get("utm_campaign") || null;
@@ -87,7 +88,17 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           // sale_addons update handled by webhook
           // Frontend only needs to update UI
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
-          setTimeout(() => navigate(config?.next_route || "/", { replace: true }), 2500);
+          const nextRoute = config?.next_route || "/";
+          if (nextRoute === "/order" && hashParam) {
+            setTimeout(() => navigate(`/order/${hashParam}`, { replace: true }), 2500);
+          } else if (nextRoute === "/order") {
+            setTimeout(() => navigate("/", { replace: true }), 2500);
+          } else {
+            const params = new URLSearchParams();
+            params.set("order_id", orderId);
+            if (hashParam) params.set("hash", hashParam);
+            setTimeout(() => navigate(`${nextRoute}?${params.toString()}`, { replace: true }), 2500);
+          }
         }
       } catch (err) {
         console.warn("Poll error:", err);
@@ -170,15 +181,24 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       });
     } catch (e) { /* ignore */ }
 
+    const nextRoute = config?.next_route || "/";
+    
     if (isStandalone) {
-      const nextRoute = config?.next_route || "/";
-      if (nextRoute === "/") {
+      navigate(nextRoute === "/" ? "/" : nextRoute, { replace: true });
+    } else {
+      // If next_route is "/order" and we have a hash, redirect to /order/{hash}
+      if (nextRoute === "/order" && hashParam) {
+        navigate(`/order/${hashParam}`, { replace: true });
+      } else if (nextRoute === "/order" && !hashParam) {
+        // Logged-in user without hash, go home
         navigate("/", { replace: true });
       } else {
-        navigate(nextRoute, { replace: true });
+        // Forward order_id and hash to next upsell page
+        const params = new URLSearchParams();
+        params.set("order_id", orderId);
+        if (hashParam) params.set("hash", hashParam);
+        navigate(`${nextRoute}?${params.toString()}`, { replace: true });
       }
-    } else {
-      navigate(`${config?.next_route || "/"}${config?.next_route !== "/" ? `?order_id=${orderId}` : ""}`, { replace: true });
     }
   };
 

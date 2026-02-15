@@ -207,13 +207,13 @@ export default function CardPaymentCallback() {
               });
 
               if (hash) {
-                setTimeout(() => navigate(`/order/${hash}?upsell=1&order_id=${orderId}`), 3000);
+                setTimeout(() => navigate(`/painel-pagar-entrega?order_id=${orderId}&hash=${hash}`), 3000);
                 return;
               }
             } catch (err) { console.warn('⚠️ Guest order save error (card):', err); }
           }
 
-          setTimeout(() => navigate(`/painel-pagar?order_id=${orderId}`), 3000);
+          setTimeout(() => navigate(`/painel-pagar-entrega?order_id=${orderId}`), 3000);
 
         } else if (result.status === "FAILED" || result.status === "CANCELLED") {
           setStatus("failed");
