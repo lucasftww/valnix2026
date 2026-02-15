@@ -526,7 +526,7 @@ const ProductDetail = () => {
 
       {/* Sticky CTA Mobile — com quantidade integrada */}
       <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-blur-md border-t border-border/30" style={{ transform: 'translateZ(0)' }}>
-        <div className="px-4 py-3 safe-area-inset-bottom flex items-center gap-3">
+        <div className="px-6 py-3 safe-area-inset-bottom flex items-center gap-3">
           {/* Quantidade inline */}
           <div className="flex items-center gap-1.5 shrink-0">
             <Button 
