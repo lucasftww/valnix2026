@@ -28,17 +28,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
   return (
     <div className="mt-8 max-w-7xl mx-auto">
       <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 p-6 md:p-8 shadow-lg">
-        <div className="flex items-center gap-3 mb-6">
-          <div className="flex items-center gap-1">
-            {[1, 2, 3, 4, 5].map(s => (
-              <Star key={s} className="w-5 h-5 fill-yellow-500 text-yellow-400" />
-            ))}
-          </div>
-          <h2 className="text-xl md:text-2xl font-bold text-foreground">Avaliações dos clientes</h2>
-          <span className="ml-auto text-xs text-muted-foreground bg-muted/50 px-3 py-1 rounded-full font-medium">
-            {reviews.length} avaliações
-          </span>
-        </div>
+        <h2 className="text-xl md:text-2xl font-bold text-foreground mb-6">Avaliações dos clientes</h2>
         <Carousel
           opts={{
             align: "start",
