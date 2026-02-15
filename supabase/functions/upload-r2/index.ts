@@ -38,7 +38,7 @@ Deno.serve(async (req) => {
     const idToken = authHeader.replace("Bearer ", "");
 
     // Verify Firebase token AND check admin email
-    const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
+    const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com", "valnixbr@gmail.com"];
 
     const verifyRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,

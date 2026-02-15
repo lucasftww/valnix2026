@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 const FIREBASE_PROJECT_ID = "valnix";
-const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
+const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com", "valnixbr@gmail.com"];
 
 // ── Firebase Auth ──────────────────────────────────────────────────
 let cachedAccessToken: string | null = null;
