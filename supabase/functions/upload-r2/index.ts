@@ -98,27 +98,13 @@ function toHex(buffer: ArrayBuffer): string {
 async function uploadToR2(fileName: string, body: Uint8Array, contentType: string): Promise<string> {
   const accessKeyId = Deno.env.get('R2_ACCESS_KEY_ID')!;
   const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!;
-  const endpoint = Deno.env.get('R2_ENDPOINT')!; // e.g. https://<account_id>.r2.cloudflarestorage.com
-  const publicUrl = Deno.env.get('R2_PUBLIC_URL')!; // e.g. https://pub-xxx.r2.dev or custom domain
+  const endpoint = Deno.env.get('R2_ENDPOINT')!; // https://<account_id>.r2.cloudflarestorage.com
+  const publicUrl = Deno.env.get('R2_PUBLIC_URL')!;
+  const bucket = 'valnix-upload';
 
-  // Parse endpoint to get host and bucket
   const endpointUrl = new URL(endpoint);
   const host = endpointUrl.host;
-  // The endpoint might include the bucket name in the path, or we use it as the base
-  // Typical R2 endpoint: https://<account_id>.r2.cloudflarestorage.com/<bucket>
-  // or just https://<account_id>.r2.cloudflarestorage.com with bucket in path
-  
-  const pathParts = endpointUrl.pathname.split('/').filter(Boolean);
-  let bucket = '';
-  let basePath = '';
-  
-  if (pathParts.length > 0) {
-    bucket = pathParts[0];
-    basePath = `/${bucket}`;
-  }
-
-  const encodedFileName = fileName; // already sanitized
-  const objectPath = `${basePath}/${encodedFileName}`;
+  const objectPath = `/${bucket}/${fileName}`;
   
   const now = new Date();
   const dateStamp = now.toISOString().slice(0, 10).replace(/-/g, '');
@@ -126,7 +112,6 @@ async function uploadToR2(fileName: string, body: Uint8Array, contentType: strin
   const region = 'auto';
   const service = 's3';
 
-  // Hash the payload
   const payloadHash = toHex(await crypto.subtle.digest('SHA-256', body));
 
   const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
