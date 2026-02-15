@@ -75,7 +75,7 @@ export function AdminAnalytics() {
       
       const response = await fetch(
         `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/admin-analytics?dateRange=${dateRange}`,
-        { headers: { 'Content-Type': 'application/json', 'x-firebase-token': firebaseToken } }
+        { headers: { 'Content-Type': 'application/json', 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY, 'x-firebase-token': firebaseToken } }
       );
       
       if (!response.ok) {
