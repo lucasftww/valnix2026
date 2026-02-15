@@ -21,7 +21,7 @@ interface ReviewsCarouselProps {
 }
 
 const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
-  const autoplayRef = useRef(Autoplay({ delay: 4000 }));
+  const autoplayRef = useRef(Autoplay({ delay: 4000, stopOnInteraction: true, stopOnMouseEnter: true }));
 
   if (reviews.length === 0) return null;
 
