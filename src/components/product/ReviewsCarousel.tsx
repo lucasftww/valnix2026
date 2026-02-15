@@ -26,8 +26,8 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
   if (reviews.length === 0) return null;
 
   return (
-    <div className="mt-8 max-w-7xl mx-auto px-2 md:px-8">
-      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-4 md:px-10 py-4 md:py-6 shadow-lg">
+    <div className="mt-8 max-w-7xl mx-auto px-2 md:px-4">
+      <div className="relative rounded-2xl bg-gradient-to-br from-card to-card/80 border border-border/50 px-4 md:px-6 py-4 md:py-6 shadow-lg">
         <h2 className="text-base md:text-xl font-bold text-foreground mb-3">Avaliações dos clientes</h2>
         <Carousel
           opts={{
