@@ -42,7 +42,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           <CarouselContent className="-ml-2">
             {reviews.map((review) => (
               <CarouselItem key={review.id} className="pl-2 basis-full md:basis-1/2 lg:basis-1/3">
-                <div className="rounded-lg bg-muted/40 border border-border/30 px-3 py-2.5 md:px-4 md:py-3 h-full flex flex-col gap-1.5 hover:bg-muted/60 transition-colors">
+                <div className="rounded-lg bg-muted/40 border border-border/30 px-3 py-2.5 md:px-4 md:py-3 h-full flex flex-col gap-1.5 select-none pointer-events-none">
                   <div className="flex items-center justify-between">
                     <div className="flex gap-0.5">
                       {[1, 2, 3, 4, 5].map(star => (
