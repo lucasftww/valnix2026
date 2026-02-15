@@ -90,7 +90,7 @@ const ProductCardComponent = ({
       onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
-      <Card className="relative overflow-hidden border border-primary/20 md:border-2 hover:border-primary active:border-primary transition-colors duration-200 bg-card cursor-pointer h-full md:hover:shadow-2xl md:hover:shadow-primary/20 active:scale-[0.98] rounded-xl md:rounded-2xl">
+      <Card className="relative overflow-hidden border border-primary/20 md:border-2 hover:border-primary active:border-primary transition-colors duration-200 bg-card cursor-pointer h-full md:hover:shadow-lg md:hover:shadow-primary/10 rounded-xl md:rounded-2xl">
         {/* Badge de desconto - mais visível no mobile */}
         {hasDiscount && (
           <Badge className="absolute top-2 left-2 md:top-3 md:left-3 z-10 bg-green-600 text-white font-bold text-[10px] md:text-sm px-2 py-0.5 md:px-3 md:py-1 rounded-md shadow-lg">

@@ -21,7 +21,7 @@ interface ReviewsCarouselProps {
 }
 
 const ReviewCard = ({ review }: { review: Review }) => (
-  <div className="rounded-xl bg-muted/30 backdrop-blur-sm px-5 pt-5 pb-4 md:px-6 md:pt-6 md:pb-5 h-full flex flex-col gap-3.5 select-none">
+  <div className="rounded-xl bg-muted/40 px-5 pt-5 pb-4 md:px-6 md:pt-6 md:pb-5 h-full flex flex-col gap-3.5 select-none">
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (

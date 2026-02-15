@@ -91,10 +91,10 @@ export default {
         },
         "glow-pulse": {
           "0%, 100%": {
-            boxShadow: "0 0 20px hsl(var(--card-glow)), 0 0 40px hsl(var(--card-glow))",
+            boxShadow: "0 0 15px hsl(var(--card-glow))",
           },
           "50%": {
-            boxShadow: "0 0 30px hsl(var(--card-glow)), 0 0 60px hsl(var(--card-glow))",
+            boxShadow: "0 0 25px hsl(var(--card-glow))",
           },
         },
         "fade-in": {
