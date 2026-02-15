@@ -86,6 +86,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
   const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10 * 60);
+  const [skipping, setSkipping] = useState(false);
 
   // Timer
   useEffect(() => {
@@ -121,6 +122,13 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     }, 5000);
     return () => clearInterval(poll);
   }, [pixData, paymentConfirmed, timeLeft, toast, onSkip]);
+
+  // Auto-skip disabled/missing addons
+  useEffect(() => {
+    if (!configLoading && !config) {
+      onSkip();
+    }
+  }, [configLoading, config, onSkip]);
 
   if (configLoading) {
     return (
@@ -185,7 +193,6 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     }
   };
 
-  const [skipping, setSkipping] = useState(false);
   const handleSkip = async () => {
     if (skipping) return;
     setSkipping(true);
