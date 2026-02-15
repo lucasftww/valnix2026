@@ -1,6 +1,5 @@
-import { useState, useEffect, useMemo } from "react";
-import { db } from "@/integrations/firebase/config";
-import { collection, getDocs, onSnapshot, doc, updateDoc, deleteDoc, Timestamp, query, where } from "firebase/firestore";
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { invokeFunction } from "@/lib/apiHelper";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
@@ -182,40 +181,42 @@ export const AdminOrders = () => {
     }
   }, [orders]);
   useEffect(() => {
-    const ordersRef = collection(db, "orders");
-    const unsubscribe = onSnapshot(ordersRef, () => { fetchOrders(); });
-    return () => unsubscribe();
+    fetchOrders();
+    // Poll every 30s for updates instead of onSnapshot (blocked by rules)
+    const interval = setInterval(fetchOrders, 30000);
+    return () => clearInterval(interval);
   }, []);
+
+  const getFirebaseToken = useCallback(async () => {
+    if (!user) return null;
+    return user.getIdToken();
+  }, [user]);
 
   const fetchOrders = async () => {
     try {
-      const ordersRef = collection(db, "orders");
-      const snapshot = await getDocs(ordersRef);
-      const ordersData = snapshot.docs.map(docSnapshot => {
-        const data = docSnapshot.data();
-        let createdAt: string;
-        if (data.created_at?.toDate) {
-          createdAt = data.created_at.toDate().toISOString();
-        } else if (typeof data.created_at === 'string') {
-          createdAt = data.created_at;
-        } else {
-          createdAt = new Date().toISOString();
-        }
-        return {
-          id: docSnapshot.id,
-          customer_name: data.customer_name || '',
-          customer_email: data.customer_email || '',
-          customer_phone: data.customer_phone || null,
-          total_amount: data.total_amount || 0,
-          status: data.status || 'pending',
-          payment_status: data.payment_status || 'pending',
-          payment_method: data.payment_method || null,
-          flowpay_charge_id: data.flowpay_charge_id || null,
-          created_at: createdAt,
-          user_id: data.user_id || undefined,
-          notes: data.notes || null,
-        } as Order;
+      const token = await getFirebaseToken();
+      if (!token) return;
+      const res = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "orders" },
+        headers: { "x-firebase-token": token },
       });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const ordersData: Order[] = (data.orders || []).map((o: any) => ({
+        id: o.id,
+        customer_name: o.customer_name || '',
+        customer_email: o.customer_email || '',
+        customer_phone: o.customer_phone || null,
+        total_amount: Number(o.total_amount) || 0,
+        status: o.status || 'pending',
+        payment_status: o.payment_status || 'pending',
+        payment_method: o.payment_method || null,
+        flowpay_charge_id: o.flowpay_charge_id || null,
+        created_at: o.created_at || new Date().toISOString(),
+        user_id: o.user_id || undefined,
+        notes: o.notes || null,
+      }));
       ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       setOrders(ordersData);
     } catch (error: any) {
@@ -282,7 +283,6 @@ export const AdminOrders = () => {
   const handleRestoreOrders = async () => {
     setRestoringOrders(true);
     try {
-      const { invokeFunction } = await import("@/lib/apiHelper");
       const response = await invokeFunction('restore-orders', {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
@@ -326,13 +326,13 @@ export const AdminOrders = () => {
         console.log(`⚠️ ${skipped} pedido(s) recente(s) preservado(s) (< 5min)`);
       }
 
+      const token = await getFirebaseToken();
       for (const order of toDelete) {
-        const q = query(collection(db, "order_items"), where("order_id", "==", order.id));
-        const itemsSnapshot = await getDocs(q);
-        for (const item of itemsSnapshot.docs) {
-          await deleteDoc(doc(db, "order_items", item.id));
-        }
-        await deleteDoc(doc(db, "orders", order.id));
+        await invokeFunction("admin-data", {
+          method: "DELETE",
+          queryParams: { resource: "orders", id: order.id },
+          headers: { "x-firebase-token": token || "" },
+        });
       }
 
       toast({ title: "Limpeza concluída!", description: `${toDelete.length} pedido(s) removido(s).` });
@@ -357,7 +357,6 @@ export const AdminOrders = () => {
       const headers: Record<string, string> = {};
       if (idToken && !isCard) headers['Authorization'] = `Bearer ${idToken}`;
 
-      const { invokeFunction } = await import("@/lib/apiHelper");
       const endpoint = isCard
         ? 'flowpay-card'
         : 'flowpay-pix';
@@ -372,8 +371,13 @@ export const AdminOrders = () => {
 
       const data = await response.json();
       if (data.success && data.status === 'COMPLETED') {
-        const orderRef = doc(db, "orders", order.id);
-        await updateDoc(orderRef, { payment_status: 'paid', status: 'processing', updated_at: Timestamp.now() });
+        const token = await getFirebaseToken();
+        await invokeFunction("admin-data", {
+          method: "PUT",
+          queryParams: { resource: "orders" },
+          headers: { "x-firebase-token": token || "" },
+          body: { id: order.id, payment_status: 'paid', status: 'processing' },
+        });
         toast({ title: "Pagamento confirmado! ✅", description: `Pedido #${order.id.substring(0, 8)} pago.` });
         fetchOrders();
       } else {
@@ -389,10 +393,15 @@ export const AdminOrders = () => {
   const loadOrderItems = async (orderId: string) => {
     setLoadingItems(true);
     try {
-      const q = query(collection(db, "order_items"), where("order_id", "==", orderId));
-      const snapshot = await getDocs(q);
-      const itemsData = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
-      setOrderItems(itemsData);
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "order-items", orderId },
+        headers: { "x-firebase-token": token || "" },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setOrderItems(data.items || []);
     } catch (error: any) {
       toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
     } finally {
@@ -405,18 +414,22 @@ export const AdminOrders = () => {
     setLoadingDetail(true);
     setDetailAddons([]);
     try {
-      const q = query(collection(db, "order_items"), where("order_id", "==", order.id));
-      const snapshot = await getDocs(q);
-      const itemsData = snapshot.docs.map(docSnapshot => ({ id: docSnapshot.id, ...docSnapshot.data() } as OrderItem));
-      setDetailItems(itemsData);
+      const token = await getFirebaseToken();
+      const itemsRes = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "order-items", orderId: order.id },
+        headers: { "x-firebase-token": token || "" },
+      });
+      if (!itemsRes.ok) throw new Error(`HTTP ${itemsRes.status}`);
+      const itemsData = await itemsRes.json();
+      setDetailItems(itemsData.items || []);
 
       // Fetch upsell addons via edge function (service_role) since RLS restricts anon reads
       try {
-        const firebaseToken = await (await import("@/integrations/firebase/config")).auth.currentUser?.getIdToken();
-        const { invokeFunction } = await import("@/lib/apiHelper");
+        const token = await getFirebaseToken();
         const res = await invokeFunction("admin-post-payment", {
           method: "GET",
-          headers: { "x-firebase-token": firebaseToken || "" },
+          headers: { "x-firebase-token": token || "" },
         });
         if (res.ok) {
           const result = await res.json();
@@ -442,12 +455,23 @@ export const AdminOrders = () => {
     }
     setSendingEmail(true);
     try {
-      const itemRef = doc(db, "order_items", itemId);
-      await updateDoc(itemRef, { delivery_code: deliveryCode.trim() });
+      const token = await getFirebaseToken();
+      // Update item delivery code
+      await invokeFunction("admin-data", {
+        method: "PUT",
+        queryParams: { resource: "order-items" },
+        headers: { "x-firebase-token": token || "" },
+        body: { id: itemId, delivery_code: deliveryCode.trim() },
+      });
+      // Update order status to completed
       const targetOrder = detailOrder || selectedOrder;
       if (targetOrder) {
-        const orderRef = doc(db, "orders", targetOrder.id);
-        await updateDoc(orderRef, { status: "completed", updated_at: Timestamp.now() });
+        await invokeFunction("admin-data", {
+          method: "PUT",
+          queryParams: { resource: "orders" },
+          headers: { "x-firebase-token": token || "" },
+          body: { id: targetOrder.id, status: "completed" },
+        });
       }
       toast({ title: "Código salvo!", description: "O cliente pode ver na página 'Meus Pedidos'." });
       setDeliveryCode("");
@@ -463,8 +487,13 @@ export const AdminOrders = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const orderRef = doc(db, "orders", orderId);
-      await updateDoc(orderRef, { status: newStatus, updated_at: Timestamp.now() });
+      const token = await getFirebaseToken();
+      await invokeFunction("admin-data", {
+        method: "PUT",
+        queryParams: { resource: "orders" },
+        headers: { "x-firebase-token": token || "" },
+        body: { id: orderId, status: newStatus },
+      });
       toast({ title: "Status atualizado!" });
       fetchOrders();
     } catch (error: any) {
