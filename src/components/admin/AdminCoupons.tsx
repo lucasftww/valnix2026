@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
-import { db } from "@/integrations/firebase/config";
-import { collection, getDocs, addDoc, updateDoc, deleteDoc, doc, query, orderBy, Timestamp } from "firebase/firestore";
+import { auth } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -49,6 +49,12 @@ interface Coupon {
   created_at: string;
 }
 
+const getFirebaseToken = async () => {
+  const user = auth.currentUser;
+  if (!user) throw new Error("Not authenticated");
+  return user.getIdToken();
+};
+
 export const AdminCoupons = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -70,25 +76,28 @@ export const AdminCoupons = () => {
   const fetchCoupons = async () => {
     try {
       setIsLoading(true);
-      const q = query(collection(db, "coupons"), orderBy("created_at", "desc"));
-      const snapshot = await getDocs(q);
-      const data = snapshot.docs.map(d => {
-        const raw = d.data();
-        return {
-          id: d.id,
-          code: raw.code || "",
-          description: raw.description || null,
-          discount_type: raw.discount_type || "percentage",
-          discount_value: Number(raw.discount_value) || 0,
-          min_purchase_amount: Number(raw.min_purchase_amount) || 0,
-          max_uses: raw.max_uses ?? null,
-          current_uses: Number(raw.current_uses) || 0,
-          expires_at: raw.expires_at || null,
-          is_active: raw.is_active !== false,
-          created_at: raw.created_at?.toDate?.() ? raw.created_at.toDate().toISOString() : raw.created_at || new Date().toISOString(),
-        } as Coupon;
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "coupons" },
+        headers: { "x-firebase-token": token },
       });
-      setCoupons(data);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const couponsData = (data.coupons || []).map((raw: any) => ({
+        id: raw.id,
+        code: raw.code || "",
+        description: raw.description || null,
+        discount_type: raw.discount_type || "percentage",
+        discount_value: Number(raw.discount_value) || 0,
+        min_purchase_amount: Number(raw.min_purchase_amount) || 0,
+        max_uses: raw.max_uses ?? null,
+        current_uses: Number(raw.current_uses) || 0,
+        expires_at: raw.expires_at || null,
+        is_active: raw.is_active !== false,
+        created_at: raw.created_at || new Date().toISOString(),
+      })) as Coupon[];
+      setCoupons(couponsData);
     } catch (error) {
       console.error("Error fetching coupons:", error);
       toast.error("Erro ao carregar cupons");
@@ -104,18 +113,25 @@ export const AdminCoupons = () => {
   const handleCreate = async (data: typeof formData) => {
     setIsSaving(true);
     try {
-      await addDoc(collection(db, "coupons"), {
-        code: data.code.toUpperCase(),
-        description: data.description || null,
-        discount_type: data.discount_type,
-        discount_value: parseFloat(data.discount_value),
-        min_purchase_amount: parseFloat(data.min_purchase_amount),
-        max_uses: data.max_uses ? parseInt(data.max_uses) : null,
-        current_uses: 0,
-        expires_at: data.expires_at || null,
-        is_active: data.is_active,
-        created_at: Timestamp.now(),
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "POST",
+        queryParams: { resource: "coupons" },
+        headers: { "x-firebase-token": token },
+        body: {
+          code: data.code.toUpperCase(),
+          description: data.description || null,
+          discount_type: data.discount_type,
+          discount_value: parseFloat(data.discount_value),
+          min_purchase_amount: parseFloat(data.min_purchase_amount),
+          max_uses: data.max_uses ? parseInt(data.max_uses) : null,
+          current_uses: 0,
+          expires_at: data.expires_at || null,
+          is_active: data.is_active,
+          created_at: new Date().toISOString(),
+        },
       });
+      if (!res.ok) throw new Error("Failed to create coupon");
       toast.success("Cupom criado com sucesso!");
       resetForm();
       setIsDialogOpen(false);
@@ -131,16 +147,24 @@ export const AdminCoupons = () => {
   const handleUpdate = async (id: string, data: typeof formData) => {
     setIsSaving(true);
     try {
-      await updateDoc(doc(db, "coupons", id), {
-        code: data.code.toUpperCase(),
-        description: data.description || null,
-        discount_type: data.discount_type,
-        discount_value: parseFloat(data.discount_value),
-        min_purchase_amount: parseFloat(data.min_purchase_amount),
-        max_uses: data.max_uses ? parseInt(data.max_uses) : null,
-        expires_at: data.expires_at || null,
-        is_active: data.is_active,
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "PUT",
+        queryParams: { resource: "coupons" },
+        headers: { "x-firebase-token": token },
+        body: {
+          id,
+          code: data.code.toUpperCase(),
+          description: data.description || null,
+          discount_type: data.discount_type,
+          discount_value: parseFloat(data.discount_value),
+          min_purchase_amount: parseFloat(data.min_purchase_amount),
+          max_uses: data.max_uses ? parseInt(data.max_uses) : null,
+          expires_at: data.expires_at || null,
+          is_active: data.is_active,
+        },
       });
+      if (!res.ok) throw new Error("Failed to update coupon");
       toast.success("Cupom atualizado com sucesso!");
       resetForm();
       setIsDialogOpen(false);
@@ -155,7 +179,13 @@ export const AdminCoupons = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      await deleteDoc(doc(db, "coupons", id));
+      const token = await getFirebaseToken();
+      const res = await invokeFunction("admin-data", {
+        method: "DELETE",
+        queryParams: { resource: "coupons", id },
+        headers: { "x-firebase-token": token },
+      });
+      if (!res.ok) throw new Error("Failed to delete coupon");
       toast.success("Cupom excluído com sucesso!");
       fetchCoupons();
     } catch (error) {
@@ -484,7 +514,7 @@ export const AdminCoupons = () => {
               />
             </div>
 
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center gap-3 py-2">
               <Switch
                 id="is_active"
                 checked={formData.is_active}
@@ -495,11 +525,7 @@ export const AdminCoupons = () => {
               <Label htmlFor="is_active">Cupom Ativo</Label>
             </div>
 
-            <div className="flex gap-2 pt-4">
-              <Button type="submit" disabled={isSaving}>
-                {isSaving && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-                {editingCoupon ? "Atualizar" : "Criar"} Cupom
-              </Button>
+            <div className="flex justify-end gap-2 pt-2">
               <Button
                 type="button"
                 variant="outline"
@@ -509,6 +535,10 @@ export const AdminCoupons = () => {
                 }}
               >
                 Cancelar
+              </Button>
+              <Button type="submit" disabled={isSaving}>
+                {isSaving && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+                {editingCoupon ? "Atualizar" : "Criar Cupom"}
               </Button>
             </div>
           </form>
