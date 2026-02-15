@@ -2,6 +2,7 @@ const ALLOWED_ORIGINS = [
   "https://www.valnix.com.br",
   "https://valnix.com.br",
   "https://valnix2026.lovable.app",
+  "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
 ];
 
 function getCorsHeaders(req: Request) {
@@ -17,6 +18,61 @@ function getCorsHeaders(req: Request) {
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif"];
 const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
+const FIREBASE_PROJECT_ID = "valnix";
+
+// ── Firebase Service Account Auth ──────────────────────────────────
+let cachedAccessToken: string | null = null;
+let tokenExpiresAt = 0;
+
+function base64url(data: Uint8Array): string {
+  let binary = '';
+  for (const byte of data) binary += String.fromCharCode(byte);
+  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}
+
+async function getFirebaseAccessToken(): Promise<string> {
+  if (cachedAccessToken && Date.now() < tokenExpiresAt - 60_000) return cachedAccessToken;
+  const saKeyRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
+  if (!saKeyRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY not configured');
+  const saKey = JSON.parse(saKeyRaw);
+  const now = Math.floor(Date.now() / 1000);
+  const header = { alg: 'RS256', typ: 'JWT' };
+  const payload = {
+    iss: saKey.client_email, sub: saKey.client_email,
+    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
+    scope: 'https://www.googleapis.com/auth/datastore',
+  };
+  const enc = new TextEncoder();
+  const headerB64 = base64url(enc.encode(JSON.stringify(header)));
+  const payloadB64 = base64url(enc.encode(JSON.stringify(payload)));
+  const unsignedToken = `${headerB64}.${payloadB64}`;
+  const pemBody = saKey.private_key.replace(/-----BEGIN PRIVATE KEY-----/, '').replace(/-----END PRIVATE KEY-----/, '').replace(/\n/g, '');
+  const keyBytes = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
+  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBytes, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
+  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, enc.encode(unsignedToken));
+  const jwt = `${unsignedToken}.${base64url(new Uint8Array(signature))}`;
+  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
+    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
+  });
+  if (!tokenRes.ok) throw new Error(`Firebase auth failed: ${tokenRes.status}`);
+  const tokenData = await tokenRes.json();
+  cachedAccessToken = tokenData.access_token;
+  tokenExpiresAt = Date.now() + (tokenData.expires_in * 1000);
+  return cachedAccessToken!;
+}
+
+// ── Admin check via Firestore user_roles ───────────────────────────
+async function isAdminInFirestore(uid: string): Promise<boolean> {
+  try {
+    const accessToken = await getFirebaseAccessToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (!res.ok) return false;
+    const doc = await res.json();
+    return doc.fields?.role?.stringValue === 'admin';
+  } catch { return false; }
+}
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -37,9 +93,7 @@ Deno.serve(async (req) => {
 
     const idToken = authHeader.replace("Bearer ", "");
 
-    // Verify Firebase token AND check admin email
-    const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com", "valnixbr@gmail.com"];
-
+    // Verify Firebase token
     const verifyRes = await fetch(
       `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
       {
@@ -57,10 +111,20 @@ Deno.serve(async (req) => {
     }
 
     const verifyData = await verifyRes.json();
+    const userUid = verifyData?.users?.[0]?.localId;
     const userEmail = verifyData?.users?.[0]?.email?.toLowerCase();
 
-    if (!userEmail || !ALLOWED_ADMIN_EMAILS.includes(userEmail)) {
-      console.warn(`⚠️ Unauthorized upload attempt: ${userEmail}`);
+    if (!userUid) {
+      return new Response(
+        JSON.stringify({ error: "Invalid user" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check admin via Firestore user_roles (not hardcoded emails)
+    const adminStatus = await isAdminInFirestore(userUid);
+    if (!adminStatus) {
+      console.warn(`⚠️ Unauthorized upload attempt: ${userEmail} (${userUid})`);
       return new Response(
         JSON.stringify({ error: "Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
@@ -130,10 +194,8 @@ Deno.serve(async (req) => {
     const amzDate = now.toISOString().replace(/[:-]|\.\d{3}/g, "");
     const dateStamp = amzDate.slice(0, 8);
 
-    // Create canonical request
     const canonicalUri = `/${bucketName}/${sanitizedFileName}`;
     const canonicalQuerystring = "";
-
     const payloadHash = await sha256Hex(bytes);
 
     const canonicalHeaders =
@@ -145,24 +207,15 @@ Deno.serve(async (req) => {
     const signedHeaders = "content-type;host;x-amz-content-sha256;x-amz-date";
 
     const canonicalRequest = [
-      method,
-      canonicalUri,
-      canonicalQuerystring,
-      canonicalHeaders,
-      signedHeaders,
-      payloadHash,
+      method, canonicalUri, canonicalQuerystring, canonicalHeaders, signedHeaders, payloadHash,
     ].join("\n");
 
-    // Create string to sign
     const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
     const stringToSign = [
-      "AWS4-HMAC-SHA256",
-      amzDate,
-      credentialScope,
+      "AWS4-HMAC-SHA256", amzDate, credentialScope,
       await sha256Hex(new TextEncoder().encode(canonicalRequest)),
     ].join("\n");
 
-    // Calculate signature
     const signingKey = await getSignatureKey(secretAccessKey, dateStamp, region, service);
     const signature = await hmacHex(signingKey, stringToSign);
 
@@ -170,7 +223,6 @@ Deno.serve(async (req) => {
       `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, ` +
       `SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
-    // Upload to R2
     const r2Response = await fetch(url, {
       method: "PUT",
       headers: {
@@ -192,9 +244,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Build public URL
     const fileUrl = `${publicUrl}/${sanitizedFileName}`;
-
     console.log(`✅ Uploaded to R2: ${sanitizedFileName}`);
 
     return new Response(
@@ -212,14 +262,10 @@ Deno.serve(async (req) => {
 });
 
 // ---- AWS Signature V4 helpers ----
-
 async function hmacSha256(key: ArrayBuffer | Uint8Array, data: string | Uint8Array): Promise<ArrayBuffer> {
   const cryptoKey = await crypto.subtle.importKey(
-    "raw",
-    key instanceof Uint8Array ? key : new Uint8Array(key),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"]
+    "raw", key instanceof Uint8Array ? key : new Uint8Array(key),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
   const encoded = typeof data === "string" ? new TextEncoder().encode(data) : data;
   return crypto.subtle.sign("HMAC", cryptoKey, encoded);
@@ -236,17 +282,10 @@ async function sha256Hex(data: Uint8Array): Promise<string> {
 }
 
 function arrayToHex(arr: Uint8Array): string {
-  return Array.from(arr)
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
+  return Array.from(arr).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-async function getSignatureKey(
-  key: string,
-  dateStamp: string,
-  region: string,
-  service: string
-): Promise<ArrayBuffer> {
+async function getSignatureKey(key: string, dateStamp: string, region: string, service: string): Promise<ArrayBuffer> {
   const kDate = await hmacSha256(new TextEncoder().encode("AWS4" + key), dateStamp);
   const kRegion = await hmacSha256(kDate, region);
   const kService = await hmacSha256(kRegion, service);
