@@ -8,6 +8,7 @@ const ALLOWED_ORIGINS = [
   "https://valnix.com.br",
   "https://valnix2026.lovable.app",
   "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
+  "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
 ];
 
 function getCorsHeaders(req: Request) {
