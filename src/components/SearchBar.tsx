@@ -153,6 +153,7 @@ const SearchBarComponent = () => {
           onChange={handleInputChange}
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
+          autoComplete="off"
           className="w-full pl-4 pr-12 h-12 md:h-11 bg-background/60 border-2 border-primary/40 rounded-full text-sm md:text-base text-foreground placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-lg"
           aria-label="Buscar produtos"
           aria-autocomplete="list"
