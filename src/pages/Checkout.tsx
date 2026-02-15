@@ -998,7 +998,7 @@ export default function Checkout() {
                   {/* Phone (optional) */}
                   <div>
                     <label htmlFor="checkout-phone" className="block text-[13px] text-[#888] mb-2">
-                      Telefone <span className="text-[#555]">(opcional)</span>
+                      Telefone
                     </label>
                     <Input
                       id="checkout-phone"
