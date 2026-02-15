@@ -8,20 +8,36 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import PageTransition from "@/components/PageTransition";
 
-// Componente interno para usar hooks dentro do BrowserRouter
+// Componente interno para usar hooks dentro do BrowserRouter + prefetch rotas
 const AppContent = () => {
   useBackRedirect("/");
+  
+  // Prefetch rotas comuns após idle
+  useEffect(() => {
+    const prefetch = () => {
+      import("./pages/Auth");
+      import("./pages/Cart");
+      import("./pages/ProductDetail");
+      import("./pages/Checkout");
+    };
+    if ('requestIdleCallback' in window) {
+      (window as any).requestIdleCallback(prefetch, { timeout: 3000 });
+    } else {
+      setTimeout(prefetch, 2000);
+    }
+  }, []);
+  
   return null;
 };
 
-// Carregamento prioritário das páginas principais
+// Carregamento prioritário da homepage
 import Index from "./pages/Index";
-import ProductDetail from "./pages/ProductDetail";
 
-// Lazy load de rotas secundárias
+// Lazy load de todas as rotas secundárias (incluindo ProductDetail)
+const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Valorant = lazy(() => import("./pages/Valorant"));
 const Cart = lazy(() => import("./pages/Cart"));
 const Auth = lazy(() => import("./pages/Auth"));

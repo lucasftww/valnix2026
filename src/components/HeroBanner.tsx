@@ -78,7 +78,8 @@ const HeroBannerComponent = () => {
                       src={banner.image_url}
                       alt={banner.alt_text}
                       loading={index === 0 ? "eager" : "lazy"}
-                      decoding="async"
+                      decoding={index === 0 ? "sync" : "async"}
+                      fetchPriority={index === 0 ? "high" : "auto"}
                       width={1200}
                       height={400}
                       className="w-full h-auto object-cover aspect-[16/7] md:aspect-[21/6]"
@@ -89,7 +90,8 @@ const HeroBannerComponent = () => {
                     src={banner.image_url}
                     alt={banner.alt_text}
                     loading={index === 0 ? "eager" : "lazy"}
-                    decoding="async"
+                    decoding={index === 0 ? "sync" : "async"}
+                    fetchPriority={index === 0 ? "high" : "auto"}
                     width={1200}
                     height={400}
                     className="w-full h-auto object-cover aspect-[16/7] md:aspect-[21/6]"
