@@ -74,6 +74,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
             loop: true,
             skipSnaps: false,
             duration: 20,
+            slidesToScroll: 1,
           }}
           plugins={[autoplayRef.current]}
           className="w-full"
