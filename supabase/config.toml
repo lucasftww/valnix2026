@@ -26,3 +26,15 @@ verify_jwt = false
 
 [functions.admin-data]
 verify_jwt = false
+
+[functions.firestore-diagnostic]
+verify_jwt = false
+
+[functions.upload-r2]
+verify_jwt = false
+
+[functions.restore-orders]
+verify_jwt = false
+
+[functions.restore-products]
+verify_jwt = false
