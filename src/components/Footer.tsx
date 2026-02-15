@@ -62,7 +62,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           </div>
 
           {/* Trust Badges */}
-          <div className="bg-black/40 py-8 border-b border-border/30">
+          <div className="bg-muted/30 py-8 border-b border-border/30">
             <div className="container px-4 md:px-8">
               {isMobile ? (
                 <div className="relative max-w-md mx-auto">
@@ -217,7 +217,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           {/* Copyright - Mobile */}
           <div className="px-6 py-6 text-center">
             <p className="text-xs text-muted-foreground">
-              © 2021-2025 VALNIX - Todos os direitos reservados
+              © 2021-2026 VALNIX - Todos os direitos reservados
             </p>
           </div>
         </div>
@@ -325,7 +325,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             {/* Copyright */}
             <div className="text-center">
               <p className="text-xs text-muted-foreground">
-                © 2021-2025 VALNIX - Todos os direitos reservados
+                © 2021-2026 VALNIX - Todos os direitos reservados
               </p>
             </div>
           </div>
@@ -337,7 +337,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
         <div className="container px-4 md:px-8 py-6 border-t border-border/30">
           <div className="text-center">
             <p className="text-xs text-muted-foreground">
-              © 2021-2025 VALNIX - Todos os direitos reservados
+              © 2021-2026 VALNIX - Todos os direitos reservados
             </p>
           </div>
         </div>
