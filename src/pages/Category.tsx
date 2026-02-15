@@ -103,7 +103,7 @@ export default function Category() {
             </aside>
 
             {/* Main Content */}
-            <div className="flex-1">
+            <div className="flex-1 animate-fade-in" key={categorySlug}>
               {/* Título com estilo igual ao Valorant */}
               <h1 className="text-3xl font-bold text-foreground mb-6 border-b-4 border-primary inline-block pb-2">
                 {category.name}
