@@ -1,4 +1,5 @@
 import { useParams, Link } from "react-router-dom";
+import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
@@ -8,6 +9,7 @@ import { ProductSkeleton } from "@/components/ProductSkeleton";
 import { CategorySidebar } from "@/components/CategorySidebar";
 import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/firebase";
 import { Helmet } from "react-helmet-async";
+import vIcon from "@/assets/v-icon.png";
 
 interface Category {
   id: string;
@@ -29,25 +31,36 @@ interface Product {
 }
 
 export default function Category() {
-  // A rota está definida como "/:categorySlug" em src/App.tsx
   const { categorySlug } = useParams<{ categorySlug: string }>();
+  const [showTransition, setShowTransition] = useState(false);
+  const prevSlugRef = useRef(categorySlug);
 
   const { data: category, isLoading: categoryLoading } = useCategoryBySlug(categorySlug);
-
-  // Usar hook unificado com lógica de reviews
   const { data: products = [], isLoading: productsLoading } = useProductsWithReviews(categorySlug || '');
+
+  // Show quick transition overlay when switching categories
+  useEffect(() => {
+    if (prevSlugRef.current !== categorySlug && prevSlugRef.current) {
+      setShowTransition(true);
+      const timer = setTimeout(() => setShowTransition(false), 400);
+      prevSlugRef.current = categorySlug;
+      return () => clearTimeout(timer);
+    }
+    prevSlugRef.current = categorySlug;
+  }, [categorySlug]);
 
   if (categoryLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
         <Navigation />
-        <main className="flex-1 container px-4 py-8">
-          <div className="animate-pulse">
-            <div className="h-8 bg-muted rounded w-64 mb-4" />
-            <div className="h-4 bg-muted rounded w-96" />
-          </div>
-        </main>
+        <div className="flex-1 flex items-center justify-center">
+          <img 
+            src={vIcon} 
+            alt="" 
+            className="w-10 h-10 drop-shadow-lg animate-spin" 
+          />
+        </div>
       </div>
     );
   }
@@ -86,6 +99,18 @@ export default function Category() {
       </Helmet>
       <Header />
       <Navigation />
+
+      {/* Category transition overlay */}
+      {showTransition && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" style={{ animation: 'cat-transition 400ms ease-out forwards' }}>
+          <img 
+            src={vIcon} 
+            alt="" 
+            className="w-10 h-10 drop-shadow-lg" 
+            style={{ animation: 'cat-spin 400ms ease-in-out' }} 
+          />
+        </div>
+      )}
 
       <main className="flex-1">
         <div className="container px-4 md:px-8 py-6">
