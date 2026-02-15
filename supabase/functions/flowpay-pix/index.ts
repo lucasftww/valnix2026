@@ -753,11 +753,11 @@ Deno.serve(async (req) => {
         });
       }
 
-      // Server-side amount validation: verify against Firestore order data
+      // Server-side amount validation: recalculate from real product prices
       const isUpsell = orderId.startsWith('upsell-');
       
       if (!isUpsell) {
-        // Regular order: fetch from Firestore and use server-side amount
+        // 🔒 CRITICAL: Recalculate total from REAL product prices (never trust client total_amount)
         const orderFields = await getFirestoreDoc('orders', orderId);
         if (!orderFields) {
           console.error(`❌ Order not found: ${orderId}`);
@@ -767,10 +767,73 @@ Deno.serve(async (req) => {
           });
         }
 
-        const serverAmount = orderFields.total_amount?.doubleValue 
-          || orderFields.total_amount?.integerValue 
-          || 0;
-        const serverAmountCents = Math.round(Number(serverAmount) * 100);
+        // Fetch order_items to get product_ids and quantities
+        const orderItemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+        if (!orderItemsResults || !Array.isArray(orderItemsResults) || orderItemsResults.length === 0 || !orderItemsResults[0]?.document) {
+          console.error(`❌ No order items found for order ${orderId}`);
+          return new Response(JSON.stringify({ error: 'Order items not found' }), {
+            status: 400,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
+        }
+
+        // Recalculate total from real product prices
+        let recalculatedTotal = 0;
+        for (const result of orderItemsResults) {
+          if (!result.document) continue;
+          const itemFields = result.document.fields;
+          const productId = itemFields?.product_id?.stringValue;
+          const quantity = parseInt(itemFields?.quantity?.integerValue || '1');
+          
+          if (!productId) {
+            console.error(`❌ Order item missing product_id`);
+            return new Response(JSON.stringify({ error: 'Invalid order item' }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const productFields = await getFirestoreDoc('products', productId);
+          if (!productFields) {
+            console.error(`❌ Product not found: ${productId}`);
+            return new Response(JSON.stringify({ error: `Product ${productId} not found` }), {
+              status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+            });
+          }
+
+          const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
+          recalculatedTotal += realPrice * quantity;
+          console.log(`  📦 Product ${productId}: R$${realPrice} x ${quantity}`);
+        }
+
+        // Apply coupon discount if present (server-side validation)
+        const couponId = orderFields.coupon_id?.stringValue;
+        if (couponId) {
+          const couponFields = await getFirestoreDoc('coupons', couponId);
+          if (couponFields) {
+            const discountType = couponFields.discount_type?.stringValue;
+            const discountValue = Number(couponFields.discount_value?.doubleValue || couponFields.discount_value?.integerValue || 0);
+            const isActive = couponFields.is_active?.booleanValue !== false;
+            const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null;
+            const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0;
+
+            if (isActive && (!maxUses || currentUses < maxUses)) {
+              let discountAmount = 0;
+              if (discountType === 'percentage') {
+                discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal);
+              } else {
+                discountAmount = Math.min(discountValue, recalculatedTotal);
+              }
+              recalculatedTotal -= discountAmount;
+              console.log(`🏷️ Coupon ${couponId}: -R$${discountAmount.toFixed(2)} (${discountType} ${discountValue})`);
+            } else {
+              console.warn(`⚠️ Coupon ${couponId} is inactive or maxed out, ignoring discount`);
+            }
+          } else {
+            console.warn(`⚠️ Coupon ${couponId} not found in Firestore, ignoring discount`);
+          }
+        }
+
+        const serverAmountCents = Math.round(recalculatedTotal * 100);
 
         if (serverAmountCents < 100) {
           return new Response(JSON.stringify({ error: 'Order amount too low' }), {
@@ -779,11 +842,34 @@ Deno.serve(async (req) => {
           });
         }
 
-        // Use server-verified amount, ignore client-provided amount
+        // Log if client total differs from server-calculated (potential manipulation attempt)
+        const clientTotal = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
+        if (Math.abs(clientTotal - recalculatedTotal) > 0.01) {
+          console.warn(`🚨 PRICE MISMATCH DETECTED! Client total: R$${clientTotal}, Server recalculated: R$${recalculatedTotal} (order ${orderId})`);
+        }
+
+        // Use server-recalculated amount, NEVER trust client-provided amount
         amount = serverAmountCents;
-        console.log(`🔒 Server-verified amount: ${amount} cents (order ${orderId})`);
+        console.log(`🔒 Server-recalculated amount: ${amount} cents (order ${orderId})`);
       } else {
-        // Upsell: validate amount from post_payment_pages config
+        // Upsell: validate amount from post_payment_pages config in Supabase
+        const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
+        const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+        const supa = createClient(supabaseUrl, serviceRoleKey);
+
+        // Extract addon_type from orderId pattern: upsell-{realOrderId}-{addonType} or from body
+        const addonType = body.addonType;
+        if (addonType) {
+          const { data: pageConfig } = await supa.from('post_payment_pages').select('price').eq('addon_type', addonType).eq('is_active', true).maybeSingle();
+          if (pageConfig) {
+            const serverUpsellCents = Math.round(Number(pageConfig.price) * 100);
+            if (serverUpsellCents >= 100) {
+              amount = serverUpsellCents;
+              console.log(`🔒 Upsell server-verified: ${amount} cents (type: ${addonType})`);
+            }
+          }
+        }
+
         if (!amount || amount < 100) {
           return new Response(JSON.stringify({ error: 'Amount must be at least 100 (R$ 1,00)' }), {
             status: 400,
