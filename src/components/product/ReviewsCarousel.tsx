@@ -21,7 +21,7 @@ interface ReviewsCarouselProps {
 }
 
 const ReviewCard = ({ review }: { review: Review }) => (
-  <div className="rounded-xl bg-card px-4 pt-4 pb-3.5 md:px-5 md:pt-5 md:pb-4 h-full flex flex-col gap-3 select-none">
+  <div className="rounded-xl bg-muted/30 backdrop-blur-sm px-5 pt-5 pb-4 md:px-6 md:pt-6 md:pb-5 h-full flex flex-col gap-3.5 select-none">
     <div className="flex items-center justify-between gap-2">
       <div className="flex items-center gap-0.5">
         {[1, 2, 3, 4, 5].map((star) => (
@@ -38,7 +38,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
       
     </div>
 
-    <p className="text-[13px] md:text-sm text-foreground/80 leading-relaxed italic line-clamp-2">
+    <p className="text-sm md:text-[15px] text-foreground/85 leading-[1.7] italic line-clamp-3 max-w-[42ch]">
       {review.comment}
     </p>
 
