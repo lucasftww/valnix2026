@@ -45,7 +45,7 @@ async function getFirebaseAccessToken(): Promise<string> {
   const payload = {
     iss: saKey.client_email, sub: saKey.client_email,
     aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/devstorage.read_write https://www.googleapis.com/auth/datastore',
+    scope: 'https://www.googleapis.com/auth/devstorage.full_control https://www.googleapis.com/auth/cloud-platform https://www.googleapis.com/auth/datastore',
   };
   const enc = new TextEncoder();
   const headerB64 = base64url(enc.encode(JSON.stringify(header)));
@@ -176,29 +176,43 @@ Deno.serve(async (req) => {
     // Upload to Firebase Storage using Google Cloud Storage JSON API
     const accessToken = await getFirebaseAccessToken();
     const encodedName = encodeURIComponent(sanitizedFileName);
-    const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${FIREBASE_STORAGE_BUCKET}/o?uploadType=media&name=${encodedName}`;
-
-    const uploadRes = await fetch(uploadUrl, {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${accessToken}`,
-        "Content-Type": resolvedContentType,
-      },
-      body: bytes,
-    });
-
-    if (!uploadRes.ok) {
+    
+    // Try firebasestorage.app bucket first, fall back to appspot.com
+    let uploadRes: Response | null = null;
+    let usedBucket = FIREBASE_STORAGE_BUCKET;
+    
+    for (const bucket of [FIREBASE_STORAGE_BUCKET, "valnix.appspot.com"]) {
+      const uploadUrl = `https://storage.googleapis.com/upload/storage/v1/b/${bucket}/o?uploadType=media&name=${encodedName}`;
+      console.log(`Trying upload to bucket: ${bucket}`);
+      
+      uploadRes = await fetch(uploadUrl, {
+        method: "POST",
+        headers: {
+          "Authorization": `Bearer ${accessToken}`,
+          "Content-Type": resolvedContentType,
+        },
+        body: bytes,
+      });
+      
+      if (uploadRes.ok) {
+        usedBucket = bucket;
+        break;
+      }
+      
       const errorText = await uploadRes.text();
-      console.error("Firebase Storage upload failed:", uploadRes.status, errorText);
+      console.error(`Bucket ${bucket} failed:`, uploadRes.status, errorText);
+    }
+
+    if (!uploadRes || !uploadRes.ok) {
       return new Response(
-        JSON.stringify({ error: `Upload failed: ${uploadRes.status}` }),
+        JSON.stringify({ error: `Upload failed to all buckets` }),
         { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Build public URL
-    const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${FIREBASE_STORAGE_BUCKET}/o/${encodedName}?alt=media`;
-    console.log(`✅ Uploaded to Firebase Storage: ${sanitizedFileName}`);
+    const fileUrl = `https://firebasestorage.googleapis.com/v0/b/${usedBucket}/o/${encodedName}?alt=media`;
+    console.log(`✅ Uploaded to Firebase Storage (${usedBucket}): ${sanitizedFileName}`);
 
     return new Response(
       JSON.stringify({ url: fileUrl }),
