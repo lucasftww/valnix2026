@@ -7,31 +7,37 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
 };
 
-const FIREBASE_PROJECT_ID = "valnix";
+const ALLOWED_ADMIN_EMAILS = ["valnix@gmail.com"];
 
-async function verifyFirebaseToken(token: string): Promise<{ uid: string; email: string } | null> {
+/**
+ * Securely verify Firebase ID token using Google Identity Toolkit API.
+ * This validates the token signature server-side (not just base64 decode).
+ */
+async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
   try {
-    const parts = token.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    if (payload.exp && payload.exp < Date.now() / 1000) return null;
-    if (payload.aud !== FIREBASE_PROJECT_ID) return null;
-    if (!payload.iss?.includes(FIREBASE_PROJECT_ID)) return null;
-    return { uid: payload.user_id || payload.sub, email: payload.email };
-  } catch {
+    const FIREBASE_WEB_API_KEY = 'AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw';
+    const res = await fetch(
+      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${FIREBASE_WEB_API_KEY}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ idToken }),
+      }
+    );
+
+    if (!res.ok) {
+      console.warn('❌ Firebase token verification failed:', res.status);
+      return null;
+    }
+
+    const data = await res.json();
+    const user = data.users?.[0];
+    if (!user?.localId) return null;
+
+    return { uid: user.localId, email: user.email || '' };
+  } catch (e) {
+    console.warn('❌ Firebase token verification error:', e);
     return null;
-  }
-}
-
-async function isUserAdmin(uid: string): Promise<boolean> {
-  try {
-    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${uid}`;
-    const response = await fetch(url);
-    if (!response.ok) return false;
-    const doc = await response.json();
-    return doc.fields?.role?.stringValue === 'admin';
-  } catch {
-    return false;
   }
 }
 
@@ -53,8 +59,9 @@ Deno.serve(async (req) => {
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const isAdmin = await isUserAdmin(userData.uid);
-    if (!isAdmin) {
+    // 🔒 Security: Hardcoded admin email check (cannot be bypassed via Firestore)
+    if (!ALLOWED_ADMIN_EMAILS.includes(userData.email.toLowerCase())) {
+      console.warn(`⚠️ Unauthorized admin attempt: ${userData.email}`);
       return new Response(JSON.stringify({ error: "Admin access required" }),
         { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
@@ -65,6 +72,20 @@ Deno.serve(async (req) => {
     );
 
     if (req.method === "GET") {
+      const url = new URL(req.url);
+      const orderId = url.searchParams.get("orderId");
+
+      // If orderId provided, fetch addons for that order
+      if (orderId) {
+        const { data: addons } = await supabase
+          .from("sale_addons")
+          .select("*")
+          .eq("order_id", orderId);
+
+        return new Response(JSON.stringify({ addons: addons || [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       const { data, error } = await supabase
         .from("post_payment_pages")
         .select("*")
@@ -75,7 +96,6 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // Also fetch stats
       const { data: addons } = await supabase.from("sale_addons").select("addon_type, status, amount");
 
       return new Response(JSON.stringify({ pages: data || [], addons: addons || [] }),
