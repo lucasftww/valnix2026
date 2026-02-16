@@ -66,7 +66,7 @@ export default function Valorant() {
                       price={product.price}
                       originalPrice={product.old_price || undefined}
                       discount={product.discount || undefined}
-                      priority={index < 4}
+                      priority={index < 2}
                     />
                   ))
                 )}
