@@ -20,21 +20,115 @@ function getCorsHeaders(req: Request) {
   };
 }
 
-// ── Rate limiting ──
-const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
-function checkRateLimit(ip: string): boolean {
+// ── Rate limiting (Firestore-backed, ATOMIC — consistent with PIX/Card/Balance) ──
+const RATE_LIMIT_DOC_BASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits`;
+const COMMIT_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+
+async function checkRateLimitFirestore(key: string, maxAttempts: number, windowMs: number, blockMs: number): Promise<{ allowed: boolean; attempts: number }> {
+  const docId = key.replace(/[\/\.]/g, '_');
+  const docPath = `${RATE_LIMIT_DOC_BASE}/${docId}`;
   const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (entry && entry.blockedUntil > now) return false;
-  if (!entry || entry.resetAt <= now) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
-    return true;
+  const accessToken = await getFirebaseAccessToken();
+
+  try {
+    const existing = await getFirestoreDoc('rate_limits', docId);
+
+    if (existing) {
+      const fields = existing.fields || existing;
+      const blockedUntil = Number(fields.blocked_until?.integerValue || '0');
+      if (blockedUntil > now) {
+        return { allowed: false, attempts: Number(fields.count?.integerValue || '0') };
+      }
+
+      const resetAt = Number(fields.reset_at?.integerValue || '0');
+      const count = Number(fields.count?.integerValue || '0');
+
+      if (resetAt > now) {
+        const shouldBlock = count >= maxAttempts;
+
+        const commitRes = await fetch(COMMIT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({
+            writes: [
+              {
+                update: {
+                  name: docPath,
+                  fields: {
+                    reset_at: { integerValue: String(resetAt) },
+                    blocked_until: { integerValue: String(shouldBlock ? now + blockMs : 0) },
+                    updated_at: { timestampValue: new Date().toISOString() },
+                  },
+                },
+                currentDocument: { exists: true },
+              },
+              {
+                transform: {
+                  document: docPath,
+                  fieldTransforms: [{ fieldPath: 'count', increment: { integerValue: '1' } }],
+                },
+              },
+            ],
+          }),
+        });
+        if (!commitRes.ok) {
+          console.warn(`⚠️ UTMify rate limit commit failed: ${commitRes.status}`);
+          return { allowed: true, attempts: count };
+        }
+
+        return { allowed: !shouldBlock, attempts: count + 1 };
+      }
+    }
+
+    // Window expired or doc doesn't exist — reset with count=1
+    const resetRes = await fetch(COMMIT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        writes: [{
+          update: {
+            name: docPath,
+            fields: {
+              count: { integerValue: '1' },
+              reset_at: { integerValue: String(now + windowMs) },
+              blocked_until: { integerValue: '0' },
+              updated_at: { timestampValue: new Date().toISOString() },
+            },
+          },
+        }],
+      }),
+    });
+    if (!resetRes.ok) console.warn(`⚠️ UTMify rate limit reset failed: ${resetRes.status}`);
+
+    return { allowed: true, attempts: 1 };
+  } catch (e) {
+    console.warn('⚠️ UTMify rate limit check failed, allowing request:', e);
+    return { allowed: true, attempts: 0 };
   }
-  entry.count++;
-  if (entry.count > 15) { entry.blockedUntil = now + 300_000; return false; }
-  return true;
 }
-setInterval(() => { const now = Date.now(); for (const [k, v] of rateLimitMap) { if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k); } }, 300_000);
+
+// ── Rate limit logging to Firestore ──
+async function logRateLimitBlock(source: string, ip: string, attempts: number) {
+  try {
+    const accessToken = await getFirebaseAccessToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limit_logs`;
+    const fields: Record<string, unknown> = {
+      source: { stringValue: source },
+      ip: { stringValue: ip },
+      attempts: { doubleValue: attempts },
+      blocked_at: { stringValue: new Date().toISOString() },
+      created_at: { stringValue: new Date().toISOString() },
+    };
+    await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ fields }),
+    });
+    console.warn(`🛡️ Rate limit block logged: ${source} | IP: ${ip} | Attempts: ${attempts}`);
+  } catch (e) {
+    console.warn('⚠️ Failed to log rate limit block:', e);
+  }
+}
 
 const UTMIFY_API_URL = 'https://api.utmify.com.br/api-credentials/orders';
 const FIREBASE_PROJECT_ID = 'valnix';
@@ -189,9 +283,11 @@ Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  // Rate limit
+  // Rate limit: 60/min per IP + 10/min per order_id fingerprint (Firestore-backed)
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(clientIp)) {
+  const ipRl = await checkRateLimitFirestore(`utmify_ip_${clientIp}`, 60, 60_000, 300_000);
+  if (!ipRl.allowed) {
+    logRateLimitBlock('utmify-event-ip', clientIp, ipRl.attempts);
     return new Response(JSON.stringify({ error: 'Too many requests' }),
       { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
