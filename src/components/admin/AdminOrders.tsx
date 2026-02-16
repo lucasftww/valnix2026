@@ -167,6 +167,8 @@ export const AdminOrders = () => {
   const [cleanupEmail, setCleanupEmail] = useState("");
   const [cleanupEmailDialogOpen, setCleanupEmailDialogOpen] = useState(false);
   const [cleaningEmail, setCleaningEmail] = useState(false);
+  const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
+  const [deletingOrder, setDeletingOrder] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -352,6 +354,26 @@ export const AdminOrders = () => {
     } finally {
       setCleaningActive(false);
       setCleanType(null);
+    }
+  };
+
+  const handleDeleteSingleOrder = async () => {
+    if (!deleteOrderId) return;
+    setDeletingOrder(true);
+    try {
+      const token = await getFirebaseToken();
+      await invokeFunction("admin-data", {
+        method: "DELETE",
+        queryParams: { resource: "orders", id: deleteOrderId },
+        headers: { "x-firebase-token": token || "" },
+      });
+      toast({ title: "Pedido excluído" });
+      fetchOrders();
+    } catch (error: any) {
+      toast({ title: "Erro ao excluir pedido", description: error.message, variant: "destructive" });
+    } finally {
+      setDeletingOrder(false);
+      setDeleteOrderId(null);
     }
   };
 
@@ -788,7 +810,25 @@ export const AdminOrders = () => {
           </AlertDialogContent>
         </AlertDialog>
 
-        {/* ── Orders Table ─────────────────────────────────────────── */}
+        {/* ── Delete Single Order Confirmation ──────────────────────── */}
+        <AlertDialog open={!!deleteOrderId} onOpenChange={() => setDeleteOrderId(null)}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Excluir pedido</AlertDialogTitle>
+              <AlertDialogDescription>
+                Excluir permanentemente o pedido <strong>#{deleteOrderId?.slice(0, 6)}</strong>? Essa ação não pode ser desfeita.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <AlertDialogFooter>
+              <AlertDialogCancel>Cancelar</AlertDialogCancel>
+              <AlertDialogAction onClick={handleDeleteSingleOrder} disabled={deletingOrder}>
+                {deletingOrder && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Excluir
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
+
         {filteredOrders.length === 0 ? (
           <Card className="border-border/50">
             <CardContent className="py-16 text-center">
@@ -923,6 +963,10 @@ export const AdminOrders = () => {
                                   {getStatusConfig(s).label}
                                 </DropdownMenuItem>
                               ))}
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => setDeleteOrderId(order.id)} className="text-red-500 focus:text-red-500">
+                                <Trash2 className="w-4 h-4 mr-2" /> Excluir pedido
+                              </DropdownMenuItem>
                             </DropdownMenuContent>
                           </DropdownMenu>
                         </TableCell>
