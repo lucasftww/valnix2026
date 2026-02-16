@@ -31,14 +31,16 @@ const getFirebaseToken = async () => {
 
 type Period = 'today' | '7d' | '30d';
 
-function filterByPeriod<T extends { created_at?: string }>(items: T[], period: Period): T[] {
+function filterByPeriod<T extends { created_at?: string | null }>(items: T[], period: Period): T[] {
   const now = new Date();
   const cutoff = new Date();
   if (period === 'today') { cutoff.setHours(0, 0, 0, 0); }
   else if (period === '7d') { cutoff.setDate(now.getDate() - 7); }
   else { cutoff.setDate(now.getDate() - 30); }
   return items.filter(item => {
-    const d = item.created_at ? new Date(item.created_at) : new Date(0);
+    if (!item.created_at) return false;
+    const d = new Date(item.created_at);
+    if (isNaN(d.getTime())) return false;
     return d >= cutoff;
   });
 }
@@ -79,7 +81,8 @@ export const AdminDashboard = () => {
       total_amount: Number(o.total_amount) || 0,
       payment_status: o.payment_status || 'pending',
       status: o.status || 'pending',
-      created_at: o.created_at || new Date().toISOString(),
+      created_at: o.created_at ?? o.updated_at ?? null,
+      updated_at: o.updated_at ?? o.created_at ?? null,
       payment_method: o.payment_method || null,
     }));
 
@@ -140,7 +143,9 @@ export const AdminDashboard = () => {
     
     const processingBalance = orders.filter((o: any) => o.payment_status === 'processing_balance');
     const stuckProcessing = processingBalance.filter((o: any) => {
-      const elapsed = Date.now() - new Date(o.created_at).getTime();
+      const ref = o.updated_at || o.created_at;
+      if (!ref) return true; // no date = assume stuck
+      const elapsed = Date.now() - new Date(ref).getTime();
       return elapsed > 5 * 60 * 1000; // > 5 min
     });
     if (stuckProcessing.length > 0) {
