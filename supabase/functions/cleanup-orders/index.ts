@@ -90,6 +90,17 @@ async function patchDoc(token: string, docPath: string, fields: Record<string, u
   });
 }
 
+// ── Constant-time comparison ──
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  let result = 0;
+  for (let i = 0; i < ab.length; i++) result |= ab[i] ^ bb[i];
+  return result === 0;
+}
+
 Deno.serve(async (req: Request) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -99,6 +110,15 @@ Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
     return new Response(JSON.stringify({ error: 'Method not allowed' }),
       { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
+
+  // 🔒 CRITICAL: Require cron secret — prevents unauthenticated invocation via curl/Postman
+  const cronSecret = Deno.env.get('CRON_SECRET');
+  const providedSecret = req.headers.get('x-cron-secret') || req.headers.get('authorization')?.replace('Bearer ', '');
+  if (!cronSecret || !providedSecret || !timingSafeEqual(cronSecret, providedSecret)) {
+    console.warn('🚨 cleanup-orders: unauthorized invocation attempt');
+    return new Response(JSON.stringify({ error: 'Unauthorized' }),
+      { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   try {

@@ -229,42 +229,68 @@ async function logRateLimitBlock(source: string, ip: string, attempts: number) {
   }
 }
 
-// ── Rate limiting for card charge creation (per-IP) ──
-const cardRateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
-function checkCardRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = cardRateLimitMap.get(ip);
-  if (entry && entry.blockedUntil > now) return false;
-  if (!entry || entry.resetAt <= now) {
-    cardRateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
-    return true;
-  }
-  entry.count++;
-  if (entry.count > 5) {
-    entry.blockedUntil = now + 600_000;
-    console.warn(`🚨 CARD RATE LIMIT: IP ${ip} blocked for 10min after ${entry.count} attempts`);
-    return false;
-  }
-  return true;
+// ── Constant-time comparison ──
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  let result = 0;
+  for (let i = 0; i < ab.length; i++) result |= ab[i] ^ bb[i];
+  return result === 0;
 }
-setInterval(() => {
+
+// ── Rate limiting (Firestore-backed, centralized) ──
+async function checkRateLimitFirestore(key: string, maxAttempts: number, windowMs: number, blockMs: number): Promise<{ allowed: boolean; attempts: number }> {
+  const docId = key.replace(/[\/\.]/g, '_');
   const now = Date.now();
-  for (const [k, v] of cardRateLimitMap) {
-    if (v.resetAt <= now && v.blockedUntil <= now) cardRateLimitMap.delete(k);
+  try {
+    const fields = await getFirestoreDoc('rate_limits', docId);
+    if (fields) {
+      const blockedUntil = Number(fields.blocked_until?.integerValue || '0');
+      if (blockedUntil > now) return { allowed: false, attempts: Number(fields.count?.integerValue || '0') };
+      const resetAt = Number(fields.reset_at?.integerValue || '0');
+      const count = Number(fields.count?.integerValue || '0');
+      if (resetAt > now) {
+        const newCount = count + 1;
+        if (newCount > maxAttempts) {
+          await updateRateLimitDoc(docId, newCount, resetAt, now + blockMs);
+          return { allowed: false, attempts: newCount };
+        }
+        await updateRateLimitDoc(docId, newCount, resetAt, 0);
+        return { allowed: true, attempts: newCount };
+      }
+    }
+    await updateRateLimitDoc(docId, 1, now + windowMs, 0);
+    return { allowed: true, attempts: 1 };
+  } catch (e) {
+    console.warn('⚠️ Rate limit check failed, allowing request:', e);
+    return { allowed: true, attempts: 0 };
   }
-}, 300_000);
+}
+
+async function updateRateLimitDoc(docId: string, count: number, resetAt: number, blockedUntil: number) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits/${docId}?updateMask.fieldPaths=count&updateMask.fieldPaths=reset_at&updateMask.fieldPaths=blocked_until&updateMask.fieldPaths=updated_at`;
+  await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        count: { integerValue: String(count) },
+        reset_at: { integerValue: String(resetAt) },
+        blocked_until: { integerValue: String(blockedUntil) },
+        updated_at: { stringValue: new Date().toISOString() },
+      },
+    }),
+  });
+}
 
 // ── Pending order flood protection (per user_id) ──
-const pendingOrderCount = new Map<string, { count: number; resetAt: number }>();
-function checkPendingOrderFlood(userId: string): boolean {
-  const now = Date.now();
-  const entry = pendingOrderCount.get(userId);
-  if (!entry || entry.resetAt <= now) {
-    pendingOrderCount.set(userId, { count: 1, resetAt: now + 3600_000 }); // 1h window
-    return true;
-  }
-  entry.count++;
-  if (entry.count > 10) { // Max 10 pending orders per hour per user
+// ── Pending order flood protection (Firestore-backed) ──
+async function checkPendingOrderFlood(userId: string): Promise<boolean> {
+  const rl = await checkRateLimitFirestore(`flood_${userId}`, 10, 3600_000, 3600_000);
+  if (!rl.allowed) {
     console.warn(`🚨 ORDER FLOOD: user ${userId} exceeded 10 pending orders/hour`);
     return false;
   }
@@ -291,10 +317,11 @@ Deno.serve(async (req) => {
 
     // ==================== CREATE card charge ====================
     if (action === 'create' && req.method === 'POST') {
-      // 🔒 Rate limit card creation per IP
+      // 🔒 Rate limit card creation per IP (Firestore-backed, centralized)
       const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-      if (!checkCardRateLimit(clientIp)) {
-        logRateLimitBlock('flowpay-card', clientIp, cardRateLimitMap.get(clientIp)?.count || 0);
+      const rlResult = await checkRateLimitFirestore(`card_${clientIp}`, 5, 60_000, 600_000);
+      if (!rlResult.allowed) {
+        logRateLimitBlock('flowpay-card', clientIp, rlResult.attempts);
         return new Response(
           JSON.stringify({ success: false, error: 'Muitas tentativas. Aguarde alguns minutos.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -376,7 +403,7 @@ Deno.serve(async (req) => {
 
       // 🔒 Flood protection: check if user has too many pending orders
       const orderUserId = orderFields.user_id?.stringValue;
-      if (orderUserId && !checkPendingOrderFlood(orderUserId)) {
+      if (orderUserId && !(await checkPendingOrderFlood(orderUserId))) {
         return new Response(
           JSON.stringify({ success: false, error: 'Muitos pedidos pendentes. Aguarde ou finalize os pedidos anteriores.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

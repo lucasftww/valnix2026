@@ -332,30 +332,62 @@ async function logRateLimitBlock(source: string, ip: string, attempts: number) {
   }
 }
 
-// ── Rate limiting for PIX charge creation (per-IP) ──
-const pixRateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
-function checkPixCreateRateLimit(ip: string): boolean {
-  const now = Date.now();
-  const entry = pixRateLimitMap.get(ip);
-  if (entry && entry.blockedUntil > now) return false;
-  if (!entry || entry.resetAt <= now) {
-    pixRateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
-    return true;
-  }
-  entry.count++;
-  if (entry.count > 6) {
-    entry.blockedUntil = now + 600_000;
-    console.warn(`🚨 PIX RATE LIMIT: IP ${ip} blocked after ${entry.count} attempts`);
-    return false;
-  }
-  return true;
+// ── Constant-time comparison ──
+function timingSafeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  const enc = new TextEncoder();
+  const ab = enc.encode(a);
+  const bb = enc.encode(b);
+  let result = 0;
+  for (let i = 0; i < ab.length; i++) result |= ab[i] ^ bb[i];
+  return result === 0;
 }
-setInterval(() => {
+
+// ── Rate limiting (Firestore-backed, centralized) ──
+async function checkRateLimitFirestore(key: string, maxAttempts: number, windowMs: number, blockMs: number): Promise<{ allowed: boolean; attempts: number }> {
+  const docId = key.replace(/[\/\.]/g, '_');
   const now = Date.now();
-  for (const [k, v] of pixRateLimitMap) {
-    if (v.resetAt <= now && v.blockedUntil <= now) pixRateLimitMap.delete(k);
+  try {
+    const fields = await getFirestoreDoc('rate_limits', docId);
+    if (fields) {
+      const blockedUntil = Number(fields.blocked_until?.integerValue || '0');
+      if (blockedUntil > now) return { allowed: false, attempts: Number(fields.count?.integerValue || '0') };
+      const resetAt = Number(fields.reset_at?.integerValue || '0');
+      const count = Number(fields.count?.integerValue || '0');
+      if (resetAt > now) {
+        const newCount = count + 1;
+        if (newCount > maxAttempts) {
+          await updateRateLimitDoc(docId, newCount, resetAt, now + blockMs);
+          return { allowed: false, attempts: newCount };
+        }
+        await updateRateLimitDoc(docId, newCount, resetAt, 0);
+        return { allowed: true, attempts: newCount };
+      }
+    }
+    await updateRateLimitDoc(docId, 1, now + windowMs, 0);
+    return { allowed: true, attempts: 1 };
+  } catch (e) {
+    console.warn('⚠️ Rate limit check failed, allowing request:', e);
+    return { allowed: true, attempts: 0 };
   }
-}, 300_000);
+}
+
+async function updateRateLimitDoc(docId: string, count: number, resetAt: number, blockedUntil: number) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits/${docId}?updateMask.fieldPaths=count&updateMask.fieldPaths=reset_at&updateMask.fieldPaths=blocked_until&updateMask.fieldPaths=updated_at`;
+  await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        count: { integerValue: String(count) },
+        reset_at: { integerValue: String(resetAt) },
+        blocked_until: { integerValue: String(blockedUntil) },
+        updated_at: { stringValue: new Date().toISOString() },
+      },
+    }),
+  });
+}
 
 // ════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
@@ -380,7 +412,7 @@ Deno.serve(async (req) => {
       }
 
       const receivedSecret = req.headers.get('x-webhook-secret') || req.headers.get('x-secret') || req.headers.get('authorization')?.replace('Bearer ', '') || req.headers.get('x-api-key');
-      if (receivedSecret !== webhookSecret) {
+      if (!receivedSecret || !timingSafeEqual(receivedSecret, webhookSecret)) {
         console.error('❌ Invalid webhook secret');
         return new Response(JSON.stringify({ error: 'Invalid webhook authentication' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
       }
@@ -498,10 +530,11 @@ Deno.serve(async (req) => {
 
     // ==================== CREATE PIX CHARGE ====================
     if (req.method === 'POST' && action === 'create') {
-      // 🔒 Rate limit PIX creation per IP
+      // 🔒 Rate limit PIX creation per IP (Firestore-backed, centralized)
       const createIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-      if (!checkPixCreateRateLimit(createIp)) {
-        logRateLimitBlock('flowpay-pix', createIp, pixRateLimitMap.get(createIp)?.count || 0);
+      const rlResult = await checkRateLimitFirestore(`pix_${createIp}`, 6, 60_000, 600_000);
+      if (!rlResult.allowed) {
+        logRateLimitBlock('flowpay-pix', createIp, rlResult.attempts);
         return new Response(JSON.stringify({ error: 'Muitas tentativas. Aguarde alguns minutos.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
