@@ -337,6 +337,15 @@ Deno.serve(async (req) => {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
+      // 🔒 SECURITY: Use server-recalculated prices for guest_orders display (never trust client prices)
+      const serverItemPrices = new Map<string, number>();
+      for (const item of items) {
+        const pf = await getFirestoreDoc('products', String(item.product_id));
+        if (pf) {
+          serverItemPrices.set(String(item.product_id), Number(pf.price?.doubleValue || pf.price?.integerValue || 0));
+        }
+      }
+
       const guestOrderData: Record<string, unknown> = {
         hash,
         order_id: orderId,
@@ -347,14 +356,18 @@ Deno.serve(async (req) => {
         user_id: userId.startsWith('guest_') ? null : userId,
         linked: !userId.startsWith('guest_'),
         order_data: JSON.stringify({
-          items: items.map((it: any) => ({
-            product_name: it.product_name || '',
-            product_image: it.product_image || null,
-            quantity: it.quantity || 1,
-            unit_price: it.unit_price || 0,
-            total_price: it.total_price || 0,
-            delivery_code: null,
-          })),
+          items: items.map((it: any) => {
+            const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
+            const qty = Number(it.quantity) || 1;
+            return {
+              product_name: it.product_name || '',
+              product_image: it.product_image || null,
+              quantity: qty,
+              unit_price: realPrice,
+              total_price: Math.round(realPrice * qty * 100) / 100,
+              delivery_code: null,
+            };
+          }),
           total_amount: serverTotal,
           payment_method: order.payment_method || 'pix',
           created_at: now,
