@@ -248,12 +248,14 @@ Deno.serve(async (req) => {
       const orderCreated = await createFirestoreDoc('orders', orderId, orderFields);
       if (!orderCreated) { details.push(`❌ Falha ao criar pedido ${orderId}`); continue; }
 
-      // Create order_items with rollback on failure
+      // Create order_items with deterministic IDs (idempotent on re-execution)
       const createdItemIds: string[] = [];
       let itemsFailed = false;
+      const itemsList = orderData?.items || [];
 
-      for (const item of orderData?.items || []) {
-        const itemId = `restored_${orderId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      for (let idx = 0; idx < itemsList.length; idx++) {
+        const item = itemsList[idx];
+        const itemId = `restored_${orderId}_${idx}`;
         const itemFields: Record<string, unknown> = {
           order_id: toFirestoreValue(orderId),
           product_id: toFirestoreValue('unknown'),
