@@ -115,6 +115,38 @@ async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; em
   } catch { return null; }
 }
 
+// ── Rate limiting (in-memory, best-effort) ──
+const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) return false;
+  if (!entry || entry.resetAt <= now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 8) {
+    entry.blockedUntil = now + 300_000;
+    return false;
+  }
+  return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap) {
+    if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
+  }
+}, 300_000);
+
+// ── Blocked emails ──
+const BLOCKED_EMAILS = new Set([
+  "rodrigofaro@gmail.com",
+  "test_redteam@gmail.com",
+  "silvacarolinem7@gmail.com",
+  "lucky_pentester@example.com",
+]);
+
 Deno.serve(async (req) => {
   const cors = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -126,6 +158,13 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Rate limit
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    if (!checkRateLimit(clientIp)) {
+      return new Response(JSON.stringify({ error: 'Too many requests' }),
+        { status: 429, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
     const body = await req.json();
     const { order, items } = body;
 
@@ -155,6 +194,12 @@ Deno.serve(async (req) => {
     }
     if (!order.customer_email || typeof order.customer_email !== 'string') {
       return new Response(JSON.stringify({ error: 'Invalid customer email' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    // 🔒 Block banned emails from placing orders
+    if (BLOCKED_EMAILS.has(String(order.customer_email).toLowerCase().trim())) {
+      console.warn(`🚨 BLOCKED order attempt from banned email: ${order.customer_email}`);
+      return new Response(JSON.stringify({ error: 'Account suspended' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     // 🔒 Server-side price recalculation — NEVER trust client total_amount
@@ -240,14 +285,18 @@ Deno.serve(async (req) => {
 
     // Create order items
     for (const item of items) {
+      // 🔒 Use server-side price for order_items (never trust client unit_price/total_price)
+      const productFields = await getFirestoreDoc('products', String(item.product_id));
+      const realItemPrice = productFields ? Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0) : 0;
+      const itemQty = Number(item.quantity) || 1;
       const itemData: Record<string, unknown> = {
         order_id: orderId,
         product_id: String(item.product_id || ''),
         product_name: String(item.product_name || '').slice(0, 200),
         product_image: item.product_image || null,
-        quantity: Number(item.quantity) || 1,
-        unit_price: Number(item.unit_price) || 0,
-        total_price: Number(item.total_price) || 0,
+        quantity: itemQty,
+        unit_price: realItemPrice,
+        total_price: Math.round(realItemPrice * itemQty * 100) / 100,
         delivery_code: null,
         delivery_type: item.delivery_type || 'manual',
         created_at: now,

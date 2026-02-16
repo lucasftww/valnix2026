@@ -519,6 +519,20 @@ Deno.serve(async (req) => {
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
+        // 🔒 Consume delivery_token to prevent reuse (fail-closed)
+        try {
+          await updateFirestoreDoc('orders', orderId, {
+            delivery_token: null,
+            delivery_token_created_at: null,
+            delivery_token_consumer: `card_confirm_${crypto.randomUUID()}`,
+          });
+        } catch (consumeErr) {
+          console.error(`❌ [${orderId}] Failed to consume delivery_token on card confirm — aborting`, consumeErr);
+          return new Response(
+            JSON.stringify({ success: false, error: 'Internal error: token consumption failed' }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
       }
 
       // Validate flowpay_charge_id matches

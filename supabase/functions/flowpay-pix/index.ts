@@ -607,6 +607,17 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'orderId is required for status check' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // 🔒 Auth: require Firebase token or delivery token for side-effects
+      const statusAuthHeader = req.headers.get('authorization');
+      const statusIdToken = statusAuthHeader?.replace(/^Bearer\s+/i, '');
+      let statusCallerUid: string | null = null;
+      let canAttemptSideEffects = false;
+
+      if (statusIdToken) {
+        const fbUser = await verifyFirebaseIdToken(statusIdToken);
+        if (fbUser) statusCallerUid = fbUser.uid;
+      }
+
       // Verify the orderId actually belongs to this chargeId before returning any data
       const ownershipCheck = await getFirestoreDoc('orders', expectedOrderId);
       if (!ownershipCheck || ownershipCheck.flowpay_charge_id?.stringValue !== chargeId) {
@@ -618,6 +629,22 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 🔒 Side-effects gate: only allow if caller owns the order or is a guest with matching user_id
+      if (ownershipCheck) {
+        const ownerUid = ownershipCheck.user_id?.stringValue;
+        if (statusCallerUid) {
+          // Authenticated user: must own the order
+          canAttemptSideEffects = (ownerUid === statusCallerUid);
+          if (!canAttemptSideEffects) {
+            console.warn(`🚫 PIX status side-effects blocked: caller=${statusCallerUid}, owner=${ownerUid}, order=${expectedOrderId}`);
+          }
+        } else if (ownerUid?.startsWith('guest_')) {
+          // Guest order polled without auth: allow side-effects (guest can't authenticate)
+          canAttemptSideEffects = true;
+        }
+        // If authenticated user but not owner → side-effects blocked, status still returned
+      }
+
       const response = await fetch(`${FLOWPAY_BASE_URL}/status?id=${chargeId}`, { headers: { 'x-api-key': apiKey } });
       const data = await response.json();
       if (!response.ok || !data.success) {
@@ -625,7 +652,7 @@ Deno.serve(async (req) => {
       }
 
       // Side-effects: FlowPay API is source of truth — if COMPLETED, process payment
-      if (data.charge?.status === 'COMPLETED') {
+      if (data.charge?.status === 'COMPLETED' && canAttemptSideEffects) {
         try {
           const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
           const orderDoc = queryResults?.[0]?.document;
