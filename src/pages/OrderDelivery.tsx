@@ -1,8 +1,9 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { db } from "@/integrations/firebase/config";
+import { invokeFunction } from "@/lib/apiHelper";
 import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
-import { Copy, Check, CheckCircle2, Package, Bookmark, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
+import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -104,7 +105,6 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
       try {
-        const { invokeFunction } = await import("@/lib/apiHelper");
         const response = await invokeFunction('flowpay-pix', {
           method: 'GET',
           queryParams: { action: 'status', chargeId: pixData.chargeId },
@@ -169,7 +169,6 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
       });
 
       const amountInCents = Math.round(config.price * 100);
-      const { invokeFunction } = await import("@/lib/apiHelper");
       const pixResponse = await invokeFunction('flowpay-pix', {
         method: "POST",
         queryParams: { action: 'create' },
@@ -351,7 +350,7 @@ export default function OrderDelivery() {
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  const [bookmarked, setBookmarked] = useState(false);
+  
   const [liveItems, setLiveItems] = useState<OrderItemData[] | null>(null);
 
   const upsellParam = searchParams.get("upsell");
@@ -448,13 +447,7 @@ export default function OrderDelivery() {
     toast({ title: "Copiado!", description: "Todos os códigos copiados!" });
   };
 
-  const handleBookmark = () => {
-    setBookmarked(true);
-    toast({
-      title: "💡 Dica",
-      description: "Use Ctrl+D (ou ⌘+D no Mac) para salvar nos favoritos!",
-    });
-  };
+  
 
   if (loading) {
     return (
