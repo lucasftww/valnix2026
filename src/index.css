@@ -8,17 +8,16 @@ All colors MUST be HSL.
 
 /* Mobile-First Optimizations */
 @layer base {
-  * {
+  html, body, div, section, main, header, nav, footer, article, aside {
     -webkit-tap-highlight-color: transparent;
-    -webkit-touch-callout: none;
-    touch-action: pan-x pan-y;
   }
   
   html {
+    -webkit-touch-callout: none;
+    touch-action: pan-x pan-y;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeLegibility;
-    touch-action: pan-x pan-y;
   }
   
   body {
@@ -176,35 +175,29 @@ All colors MUST be HSL.
 }
 
 
-/* Custom Scrollbar Styling */
+/* Custom Scrollbar Styling — scoped to html to avoid universal recalc */
+html {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(var(--primary)) hsl(var(--background));
+}
+
 ::-webkit-scrollbar {
-  width: 12px;
-  height: 12px;
+  width: 10px;
+  height: 10px;
 }
 
 ::-webkit-scrollbar-track {
   background: hsl(var(--background));
-  border-left: 1px solid hsl(var(--border) / 0.2);
 }
 
 ::-webkit-scrollbar-thumb {
   background: hsl(var(--primary));
-  border-radius: 6px;
+  border-radius: 5px;
   border: 2px solid hsl(var(--background));
 }
 
 ::-webkit-scrollbar-thumb:hover {
   background: hsl(var(--primary) / 0.8);
-}
-
-::-webkit-scrollbar-thumb:active {
-  background: hsl(var(--primary) / 0.9);
-}
-
-/* Firefox Scrollbar */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: hsl(var(--primary)) hsl(var(--background));
 }
 
 /* Performance: respect reduced-motion AND help non-GPU machines */
