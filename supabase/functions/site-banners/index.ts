@@ -24,6 +24,8 @@ const FIREBASE_PROJECT_ID = "valnix";
 let cachedBanners: any[] | null = null;
 let bannersCacheExpiry = 0;
 const BANNER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+// Stale cache: kept even after expiry as fallback when Firestore is unavailable
+let staleBanners: any[] | null = null;
 
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -149,13 +151,25 @@ Deno.serve(async (req) => {
         if (!res.ok) {
           const fallbackError = await res.text();
           console.error(`❌ Firestore fallback query also failed (${res.status}):`, fallbackError);
-          return new Response(JSON.stringify({ error: 'Firestore query failed' }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+          if (staleBanners) {
+            console.warn('⚠️ Serving stale banners cache due to Firestore error');
+            return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
+              headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+            });
+          }
+          return new Response(JSON.stringify({ banners: [], error: 'Firestore unavailable' }),
+            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       } else {
         console.error(`❌ Firestore query failed (${res.status}):`, errorText);
-        return new Response(JSON.stringify({ error: 'Firestore query failed' }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (staleBanners) {
+          console.warn('⚠️ Serving stale banners cache due to Firestore error');
+          return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+          });
+        }
+        return new Response(JSON.stringify({ banners: [], error: 'Firestore unavailable' }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 
@@ -170,8 +184,9 @@ Deno.serve(async (req) => {
       })
       .sort((a: any, b: any) => (a.display_order ?? 999) - (b.display_order ?? 999));
 
-    // Cache banners in-memory for 5 minutes
+    // Cache banners in-memory for 5 minutes (+ keep stale copy for fallback)
     cachedBanners = banners;
+    staleBanners = banners;
     bannersCacheExpiry = Date.now() + BANNER_CACHE_TTL;
 
     return new Response(JSON.stringify({ banners }), {
@@ -183,7 +198,13 @@ Deno.serve(async (req) => {
     });
   } catch (error) {
     console.error("❌ site-banners unhandled error:", error);
-    return new Response(JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    if (staleBanners) {
+      console.warn('⚠️ Serving stale banners cache due to unhandled error');
+      return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+      });
+    }
+    return new Response(JSON.stringify({ banners: [], error: "Service temporarily unavailable" }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
