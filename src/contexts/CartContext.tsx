@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useMemo } from "react";
+import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
 import { db } from "@/integrations/firebase/config";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { toast } from "sonner";
@@ -35,11 +35,37 @@ interface CartContextType {
   removeCoupon: () => void;
 }
 
+const CART_STORAGE_KEY = "valnix_cart_items";
+const COUPON_STORAGE_KEY = "valnix_cart_coupon";
+
+function loadFromStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = localStorage.getItem(key);
+    if (raw) return JSON.parse(raw);
+  } catch {}
+  return fallback;
+}
+
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>([]);
-  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(null);
+  const [items, setItems] = useState<CartItem[]>(() => loadFromStorage(CART_STORAGE_KEY, []));
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(() => loadFromStorage(COUPON_STORAGE_KEY, null));
+
+  // Persist cart to localStorage
+  useEffect(() => {
+    try { localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items)); } catch {}
+  }, [items]);
+
+  useEffect(() => {
+    try {
+      if (appliedCoupon) {
+        localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(appliedCoupon));
+      } else {
+        localStorage.removeItem(COUPON_STORAGE_KEY);
+      }
+    } catch {}
+  }, [appliedCoupon]);
 
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalPrice = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
