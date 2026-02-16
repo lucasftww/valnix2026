@@ -352,11 +352,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           {config.button_skip_text}
         </button>
 
-        {/* Trust */}
-        <div className="flex items-center justify-center gap-2 text-xs text-red-300/40">
-          <Shield className="w-3 h-3" />
-          <span>Pagamento seguro • Ativação imediata</span>
-        </div>
       </div>
     </div>
   );
