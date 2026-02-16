@@ -14,18 +14,7 @@ export type Database = {
   }
   public: {
     Tables: {
-      _temp_rotation: {
-        Row: {
-          val: string | null
-        }
-        Insert: {
-          val?: string | null
-        }
-        Update: {
-          val?: string | null
-        }
-        Relationships: []
-      }
+      [_ in never]: never
     }
     Views: {
       [_ in never]: never
