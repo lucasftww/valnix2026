@@ -69,8 +69,9 @@ const ProductGridComponent = () => {
           align: "start",
           loop: true,
           dragFree: true,
-          duration: 20,
+          duration: 18,
           skipSnaps: true,
+          containScroll: "trimSnaps",
         }}
         className="w-full"
       >

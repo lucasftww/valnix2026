@@ -55,12 +55,16 @@ const IndexComponent = () => {
         </div>
         <HeroBanner />
         <ProductGrid />
-        <Suspense fallback={<div className="h-20" />}>
-          <CategoryCards />
-        </Suspense>
-        <Suspense fallback={<div className="h-20" />}>
-          <FAQ />
-        </Suspense>
+        <div className="content-lazy">
+          <Suspense fallback={<div className="h-20" />}>
+            <CategoryCards />
+          </Suspense>
+        </div>
+        <div className="content-lazy">
+          <Suspense fallback={<div className="h-20" />}>
+            <FAQ />
+          </Suspense>
+        </div>
       </main>
       <Suspense fallback={null}>
         <Footer showFullVersion={true} />
