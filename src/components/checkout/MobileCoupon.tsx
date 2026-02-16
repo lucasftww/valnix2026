@@ -23,39 +23,37 @@ export const MobileCoupon = memo(function MobileCoupon({
   discount,
 }: MobileCouponProps) {
   return (
-    <div className="lg:hidden bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-4 mx-auto w-full max-w-lg">
-      <div className="flex gap-2">
+    <div className="lg:hidden mx-auto w-full max-w-lg">
+      <div className="flex items-center gap-2">
         <Input
           id="mobile-coupon-code"
           name="mobile-coupon"
           value={couponCode}
           onChange={(e) => onCouponChange(e.target.value.toUpperCase())}
-          placeholder="Código do cupom"
+          placeholder="Cupom de desconto"
           disabled={!!appliedCoupon}
-          className="h-10 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/50 rounded-xl text-[13px] flex-1"
+          className="h-9 bg-transparent border-0 border-b border-border/20 rounded-none text-foreground placeholder:text-muted-foreground/40 text-[13px] flex-1 focus-visible:ring-0 focus-visible:border-primary/50 px-0"
         />
         {appliedCoupon ? (
-          <Button
-            variant="outline"
+          <button
             onClick={onRemoveCoupon}
-            className="h-10 border-border/20 text-muted-foreground hover:bg-muted rounded-xl px-4 text-[13px]"
+            className="text-[12px] text-muted-foreground hover:text-foreground transition-colors shrink-0"
           >
             Remover
-          </Button>
+          </button>
         ) : (
-          <Button
-            variant="outline"
+          <button
             onClick={onApplyCoupon}
             disabled={applyingCoupon || !couponCode.trim()}
-            className="h-10 border-border/20 text-muted-foreground hover:bg-muted rounded-xl px-4 text-[13px]"
+            className="text-[12px] font-medium text-primary hover:text-primary/80 transition-colors disabled:opacity-30 shrink-0"
           >
-            {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Aplicar"}
-          </Button>
+            {applyingCoupon ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Aplicar"}
+          </button>
         )}
       </div>
       {appliedCoupon && (
-        <p className="text-green-500 text-[12px] mt-2">
-          Cupom {appliedCoupon.code} aplicado! -R$ {discount.toFixed(2).replace(".", ",")}
+        <p className="text-green-500/80 text-[11px] mt-1">
+          {appliedCoupon.code} · -R$ {discount.toFixed(2).replace(".", ",")}
         </p>
       )}
     </div>
