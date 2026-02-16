@@ -226,7 +226,7 @@ Deno.serve(async (req) => {
       authSource = await isAdmin(user.uid) ? 'admin' : 'user';
     }
 
-    // Only internal (webhook/server), admin, or authenticated user who owns the order can trigger
+    // Only internal (webhook/server), admin, or authenticated user can trigger
     if (authSource === 'none') {
       return new Response(JSON.stringify({ success: false, error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -237,6 +237,17 @@ Deno.serve(async (req) => {
     if (!orderDoc?.fields) {
       return new Response(JSON.stringify({ success: false, error: 'Order not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ── SECURITY: if authSource==='user', validate order ownership ──
+    if (authSource === 'user') {
+      const orderUserId = orderDoc.fields.user_id?.stringValue;
+      const callerUid = idToken ? (await verifyFirebaseIdToken(idToken))?.uid : null;
+      if (!orderUserId || orderUserId !== callerUid) {
+        console.warn(`🚫 [${orderId}] User ${callerUid} tried to deliver order owned by ${orderUserId}`);
+        return new Response(JSON.stringify({ success: false, error: 'Forbidden: not your order' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     const paymentStatus = orderDoc.fields.payment_status?.stringValue;
@@ -337,12 +348,29 @@ Deno.serve(async (req) => {
           const usedCodes = autoCodesArray.slice(0, neededCodes).map((v: any) => v.stringValue);
           const remainingCodes = autoCodesArray.slice(neededCodes);
 
-          // Write delivery code to item FIRST (safer — if crash here, codes aren't consumed yet)
           const codeStr = usedCodes.join(',');
-          await updateFirestoreDoc('order_items', itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
 
-          // Then remove codes from product
+          // Step 1: Remove codes from product FIRST (prevents double-consumption)
           await updateFirestoreArray('products', productId, 'auto_delivery_codes', remainingCodes);
+
+          // Step 2: Write delivery code to order_item
+          try {
+            await updateFirestoreDoc('order_items', itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
+          } catch (writeErr) {
+            // COMPENSATE: best-effort reinsert codes back into product
+            console.error(`❌ [${orderId}] Failed to write delivery_code to item ${itemId}, compensating...`, writeErr);
+            try {
+              const reinsertCodes = [...usedCodes.map((c: string) => ({ stringValue: c })), ...remainingCodes];
+              await updateFirestoreArray('products', productId, 'auto_delivery_codes', reinsertCodes);
+              console.log(`🔄 [${orderId}] Compensated: ${usedCodes.length} code(s) reinserted into product ${productId}`);
+            } catch (compErr) {
+              console.error(`🚨 [${orderId}] COMPENSATION FAILED for product ${productId}! Codes may be lost:`, usedCodes, compErr);
+            }
+            results.push({ itemId, productId, status: 'failed' });
+            allDelivered = false;
+            failedCount++;
+            continue;
+          }
 
           results.push({ itemId, productId, status: 'delivered', codes: codeStr });
           deliveredCount++;
