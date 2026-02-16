@@ -139,6 +139,9 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
 }
 
 // ── Delivery helpers ───────────────────────────────────────────────
+// NOTE: Auto-delivery is handled exclusively by process-delivery edge function.
+// processAutoDelivery was removed to prevent bypass of atomic locks.
+
 function generateFakeDeliveryCode(): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
   let result = '';
@@ -147,56 +150,6 @@ function generateFakeDeliveryCode(): string {
     if ((i + 1) % 4 === 0 && i < 15) result += '-';
   }
   return result;
-}
-
-async function processAutoDelivery(orderId: string) {
-  console.log(`🔄 Processing auto-delivery for order ${orderId}`);
-  const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
-  if (!itemsResults || !Array.isArray(itemsResults)) return;
-
-  let allDelivered = true;
-  for (const result of itemsResults) {
-    if (!result.document) continue;
-    const itemFields = result.document.fields;
-    const itemId = result.document.name.split('/').pop();
-    if (itemFields?.delivery_code?.stringValue) continue;
-
-    const productId = itemFields?.product_id?.stringValue;
-    if (!productId) { allDelivered = false; continue; }
-
-    const productFields = await getFirestoreDoc('products', productId);
-    if (!productFields) { allDelivered = false; continue; }
-
-    const deliveryType = productFields?.delivery_type?.stringValue || 'manual';
-    const quantity = itemFields?.quantity?.integerValue ? parseInt(itemFields.quantity.integerValue) : 1;
-
-    if (deliveryType === 'auto_fake') {
-      const codes: string[] = [];
-      for (let i = 0; i < quantity; i++) codes.push(generateFakeDeliveryCode());
-      await updateFirestoreDoc('order_items', itemId!, { delivery_code: codes.join(',') });
-      console.log(`✅ Auto-generated ${codes.length} fake code(s) for item ${itemId}`);
-    } else if (deliveryType === 'auto_real') {
-      const autoCodesArray = productFields?.auto_delivery_codes?.arrayValue?.values;
-      if (autoCodesArray && autoCodesArray.length > 0) {
-        const neededCodes = Math.min(quantity, autoCodesArray.length);
-        const codes = autoCodesArray.slice(0, neededCodes).map((v: any) => v.stringValue);
-        await updateFirestoreDoc('order_items', itemId!, { delivery_code: codes.join(',') });
-        const remainingCodes = autoCodesArray.slice(neededCodes);
-        const accessToken = await getFirebaseAccessToken();
-        await fetch(`https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products/${productId}?updateMask.fieldPaths=auto_delivery_codes`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-          body: JSON.stringify({ fields: { auto_delivery_codes: { arrayValue: { values: remainingCodes } } } }),
-        });
-        console.log(`✅ Assigned ${codes.length} real code(s) for item ${itemId}`);
-      } else { allDelivered = false; }
-    } else { allDelivered = false; }
-  }
-
-  if (allDelivered) {
-    await updateFirestoreDoc('orders', orderId, { status: 'completed', updated_at: new Date().toISOString() });
-    console.log(`✅ Order ${orderId} auto-completed`);
-  }
 }
 
 // ── Analytics → Firestore ──────────────────────────────────────────

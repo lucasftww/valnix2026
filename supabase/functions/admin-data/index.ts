@@ -199,12 +199,53 @@ async function createFirestoreDoc(col: string, docId: string, data: Record<strin
   return res.ok;
 }
 
+// ── Server-side rate limiting (per-IP, in-memory) ──────────────────
+const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+const RL_MAX = 30;          // max requests per window
+const RL_WINDOW_MS = 60_000; // 1 minute window
+const RL_BLOCK_MS = 120_000; // 2 minute block after exceeding
+
+function checkServerRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) {
+    return { allowed: false, retryAfter: Math.ceil((entry.blockedUntil - now) / 1000) };
+  }
+  if (!entry || entry.resetAt <= now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RL_WINDOW_MS, blockedUntil: 0 });
+    return { allowed: true };
+  }
+  entry.count++;
+  if (entry.count > RL_MAX) {
+    entry.blockedUntil = now + RL_BLOCK_MS;
+    return { allowed: false, retryAfter: Math.ceil(RL_BLOCK_MS / 1000) };
+  }
+  return { allowed: true };
+}
+
+// Periodic cleanup
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap) {
+    if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
+  }
+}, 300_000);
+
 // ════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // ── Rate limiting ──
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rl = checkServerRateLimit(clientIp);
+  if (!rl.allowed) {
+    console.warn(`🚫 Rate limited admin-data: ip=${clientIp}`);
+    return new Response(JSON.stringify({ error: "Too many requests" }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter || 120) } });
+  }
 
   try {
     // Auth check
@@ -385,24 +426,50 @@ Deno.serve(async (req) => {
     // ── POST: Create ─────────────────────────────────────────────
     if (req.method === "POST") {
       const body = await req.json();
+
+      // Input sanitization: strip __proto__ and constructor fields to prevent prototype pollution
+      const sanitize = (obj: Record<string, unknown>) => {
+        const dangerous = ['__proto__', 'constructor', 'prototype'];
+        for (const key of Object.keys(obj)) {
+          if (dangerous.includes(key)) delete obj[key];
+        }
+        return obj;
+      };
+
       if (resource === "products") {
+        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'price', 'original_price', 'image_url', 'images', 'category_id', 'is_active', 'stock', 'delivery_type', 'auto_delivery_codes', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
-        const success = await createFirestoreDoc("products", docId, body);
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(sanitize(body))) {
+          if (PRODUCT_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        safeBody['updated_at'] = new Date().toISOString();
+        const success = await createFirestoreDoc("products", docId, safeBody);
         return new Response(JSON.stringify({ success, id: docId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (resource === "categories") {
+        const CATEGORY_ALLOWED_FIELDS = ['name', 'slug', 'description', 'icon', 'image_url', 'display_order', 'is_active', 'created_at', 'updated_at'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
-        const success = await createFirestoreDoc("categories", docId, body);
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(sanitize(body))) {
+          if (CATEGORY_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        const success = await createFirestoreDoc("categories", docId, safeBody);
         return new Response(JSON.stringify({ success, id: docId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (resource === "coupons") {
+        const COUPON_ALLOWED_FIELDS = ['code', 'discount_type', 'discount_value', 'is_active', 'max_uses', 'current_uses', 'min_order_value', 'expires_at', 'created_at', 'updated_at'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
-        const success = await createFirestoreDoc("coupons", docId, body);
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(sanitize(body))) {
+          if (COUPON_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        const success = await createFirestoreDoc("coupons", docId, safeBody);
         return new Response(JSON.stringify({ success, id: docId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -503,13 +570,25 @@ Deno.serve(async (req) => {
       delete body.id;
 
       if (resource === "products") {
-        const success = await updateFirestoreDoc("products", docId, body);
+        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'price', 'original_price', 'image_url', 'images', 'category_id', 'is_active', 'stock', 'delivery_type', 'auto_delivery_codes', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(body)) {
+          if (PRODUCT_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        safeBody['updated_at'] = new Date().toISOString();
+        const success = await updateFirestoreDoc("products", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (resource === "users") {
-        const success = await updateFirestoreDoc("profiles", docId, body);
+        const USER_ALLOWED_FIELDS = ['full_name', 'nickname', 'phone', 'avatar_url', 'balance', 'updated_at'];
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(body)) {
+          if (USER_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        safeBody['updated_at'] = new Date().toISOString();
+        const success = await updateFirestoreDoc("profiles", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -523,7 +602,6 @@ Deno.serve(async (req) => {
           return new Response(JSON.stringify({ error: `Cannot modify immutable fields: ${rejected.join(', ')}` }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
-        // Filter to only allowed fields
         const safeBody: Record<string, unknown> = {};
         for (const key of Object.keys(body)) {
           if (ORDERS_EDITABLE_FIELDS.includes(key)) safeBody[key] = body[key];
@@ -535,19 +613,36 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "order-items") {
-        const success = await updateFirestoreDoc("order_items", docId, body);
+        const ORDER_ITEMS_ALLOWED_FIELDS = ['delivery_code', 'delivered_at', 'admin_notes'];
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(body)) {
+          if (ORDER_ITEMS_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        const success = await updateFirestoreDoc("order_items", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (resource === "categories") {
-        const success = await updateFirestoreDoc("categories", docId, body);
+        const CATEGORY_ALLOWED_FIELDS = ['name', 'slug', 'description', 'icon', 'image_url', 'display_order', 'is_active', 'updated_at'];
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(body)) {
+          if (CATEGORY_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        safeBody['updated_at'] = new Date().toISOString();
+        const success = await updateFirestoreDoc("categories", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (resource === "coupons") {
-        const success = await updateFirestoreDoc("coupons", docId, body);
+        const COUPON_ALLOWED_FIELDS = ['code', 'discount_type', 'discount_value', 'is_active', 'max_uses', 'current_uses', 'min_order_value', 'expires_at', 'updated_at'];
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(body)) {
+          if (COUPON_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        safeBody['updated_at'] = new Date().toISOString();
+        const success = await updateFirestoreDoc("coupons", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
