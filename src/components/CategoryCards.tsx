@@ -39,7 +39,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
         ref={cardRef}
         className="overflow-hidden rounded-2xl border border-border/10"
       >
-        <div className="aspect-[4/3] bg-muted overflow-hidden">
+        <div className="aspect-[4/3] bg-muted">
           {isVisible && category.image_url ? (
             <img
               src={imageUrl}
@@ -48,7 +48,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
               decoding="async"
               width={400}
               height={300}
-              className="w-full h-full object-cover"
+              className="w-full h-full object-contain"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
