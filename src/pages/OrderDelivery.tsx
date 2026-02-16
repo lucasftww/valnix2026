@@ -512,11 +512,6 @@ export default function OrderDelivery() {
         </div>
 
         {/* Order email reference */}
-        <div className="bg-card border border-border rounded-xl p-4 text-center">
-          <p className="text-xs text-muted-foreground">
-            E-mail do pedido: <span className="text-foreground font-medium">{order.email}</span>
-          </p>
-        </div>
 
         {/* Products & Delivery Codes */}
         <Card className="bg-card border-border">
