@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.create-order]
 verify_jwt = false
+
+[functions.cleanup-orders]
+verify_jwt = false
