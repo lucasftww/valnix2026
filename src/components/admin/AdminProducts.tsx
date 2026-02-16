@@ -69,6 +69,7 @@ export const AdminProducts = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
+  const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
   const { toast } = useToast();
@@ -336,11 +337,16 @@ export const AdminProducts = () => {
     }
   };
 
-  const handleToggleFeatured = async (product: Product) => {
-    const newFeatured = !product.featured;
+  const handleToggleFeatured = async (productId: string, currentFeatured: boolean) => {
+    if (togglingIds.has(productId)) return; // Prevent double-click
+    
+    const newFeatured = !currentFeatured;
+    
+    // Mark as toggling
+    setTogglingIds(prev => new Set(prev).add(productId));
     
     // Optimistic update - update only this product locally
-    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, featured: newFeatured } : p));
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, featured: newFeatured } : p));
     
     try {
       const token = await getFirebaseToken();
@@ -348,23 +354,29 @@ export const AdminProducts = () => {
         method: 'PUT',
         queryParams: { resource: 'products' },
         headers: { 'x-firebase-token': token },
-        body: { id: product.id, featured: newFeatured, updated_at: new Date().toISOString() },
+        body: { id: productId, featured: newFeatured, updated_at: new Date().toISOString() },
       });
       if (!res.ok) throw new Error('Failed to toggle featured');
       
       toast({
         title: newFeatured ? "Adicionado aos Mais Vendidos" : "Removido dos Mais Vendidos",
-        description: `${product.name} foi ${newFeatured ? "adicionado aos" : "removido de"} Mais Vendidos.`,
+        description: newFeatured ? "Produto adicionado aos Mais Vendidos." : "Produto removido dos Mais Vendidos.",
       });
       
       invalidateQueries();
     } catch (error: any) {
       // Revert on error
-      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, featured: product.featured } : p));
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, featured: currentFeatured } : p));
       toast({
         title: "Erro ao atualizar",
         description: error.message,
         variant: "destructive",
+      });
+    } finally {
+      setTogglingIds(prev => {
+        const next = new Set(prev);
+        next.delete(productId);
+        return next;
       });
     }
   };
@@ -808,7 +820,8 @@ export const AdminProducts = () => {
                 <span className="text-xs text-muted-foreground">Mais Vendidos</span>
                 <Switch
                   checked={product.featured || false}
-                  onCheckedChange={() => handleToggleFeatured(product)}
+                  onCheckedChange={() => handleToggleFeatured(product.id, product.featured || false)}
+                  disabled={togglingIds.has(product.id)}
                   className="data-[state=checked]:bg-primary"
                 />
               </div>
