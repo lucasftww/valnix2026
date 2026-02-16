@@ -919,11 +919,24 @@ Deno.serve(async (req) => {
           }
         }
 
-        // Also clean guest_orders matching this email
+        // Also clean guest_orders matching this email (including subcollection items)
         let deletedGuest = 0;
         try {
-          const guestOrders = await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: email });
+          const guestOrders = await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: email });
           for (const g of guestOrders) {
+            // Delete subcollection items first
+            try {
+              const accessToken = await getFirebaseAccessToken();
+              const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${g.id}/items`;
+              const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+              if (itemsRes.ok) {
+                const itemsData = await itemsRes.json();
+                for (const item of (itemsData.documents || [])) {
+                  const itemId = item.name.split('/').pop()!;
+                  await deleteFirestoreDoc(`guest_orders/${g.id}/items`, itemId);
+                }
+              }
+            } catch { /* subcollection may not exist */ }
             await deleteFirestoreDoc("guest_orders", g.id);
             deletedGuest++;
           }
@@ -1074,38 +1087,35 @@ Deno.serve(async (req) => {
         }
         const success = await updateFirestoreDoc("order_items", docId, safeBody);
 
-        // ── Sync guest_orders.order_data so guests see codes without onSnapshot ──
+        // ── Sync delivery_code to guest_orders/{hash}/items subcollection ──
         if (success && safeBody.delivery_code) {
           try {
-            // Read the order_item to get order_id
             const itemDoc = await getFirestoreDoc("order_items", docId);
             const orderId = itemDoc?.fields?.order_id?.stringValue;
+            const itemProductName = itemDoc?.fields?.product_name?.stringValue;
             if (orderId) {
-              // Find guest_order by order_id
               const guestResults = await queryCollectionFiltered("guest_orders", "order_id", "EQUAL", { stringValue: orderId });
               if (guestResults.length > 0) {
-                const guestOrder = guestResults[0];
-                const guestDocId = guestOrder.id;
-                if (guestDocId) {
-                  // Parse existing order_data, update the matching item's delivery_code
-                  let orderData = guestOrder.order_data;
-                  if (typeof orderData === 'string') {
-                    try { orderData = JSON.parse(orderData); } catch { orderData = null; }
-                  }
-                  if (orderData?.items && Array.isArray(orderData.items)) {
-                    // Match by product_name or index — update delivery_code
-                    const itemProductName = itemDoc?.fields?.product_name?.stringValue;
-                    for (const gItem of orderData.items) {
-                      if (!gItem.delivery_code && gItem.product_name === itemProductName) {
-                        gItem.delivery_code = safeBody.delivery_code;
-                        break;
-                      }
+                const guestHash = guestResults[0].id;
+                const accessToken = await getFirebaseAccessToken();
+                // List subcollection items
+                const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items`;
+                const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+                if (itemsRes.ok) {
+                  const itemsData = await itemsRes.json();
+                  for (const guestItem of (itemsData.documents || [])) {
+                    const gFields = guestItem.fields || {};
+                    if (!gFields.delivery_code?.stringValue && gFields.product_name?.stringValue === itemProductName) {
+                      const gItemId = guestItem.name.split('/').pop()!;
+                      const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items/${gItemId}?updateMask.fieldPaths=delivery_code`;
+                      await fetch(updateUrl, {
+                        method: 'PATCH',
+                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                        body: JSON.stringify({ fields: { delivery_code: { stringValue: safeBody.delivery_code } } }),
+                      });
+                      console.log(`📦 Synced delivery_code to guest_orders/${guestHash}/items/${gItemId}`);
+                      break;
                     }
-                    // Write back as JSON string
-                    await updateFirestoreDoc("guest_orders", guestDocId, {
-                      order_data: JSON.stringify(orderData),
-                    });
-                    console.log(`📦 Synced delivery_code to guest_orders for order ${orderId}`);
                   }
                 }
               }

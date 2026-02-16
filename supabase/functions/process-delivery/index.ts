@@ -482,37 +482,45 @@ Deno.serve(async (req) => {
       console.log(`✅ [${orderId}] Order auto-completed (all ${deliveredCount} items delivered)`);
     }
 
-    // ── Sync delivery codes to guest_orders.order_data for guest real-time visibility ──
+    // ── Sync delivery codes to guest_orders/{hash}/items subcollection ──
     if (deliveredCount > 0) {
       try {
+        // Find guest_order by order_id
         const guestResults = await queryFirestore('guest_orders', 'order_id', 'EQUAL', orderId);
         const guestDoc = Array.isArray(guestResults) ? guestResults.find((r: any) => r.document) : null;
         if (guestDoc?.document) {
-          const guestDocId = guestDoc.document.name.split('/').pop()!;
-          const guestFields = guestDoc.document.fields || {};
-          let orderData = guestFields.order_data?.stringValue;
-          if (orderData) {
-            try {
-              const parsed = JSON.parse(orderData);
-              if (parsed?.items && Array.isArray(parsed.items)) {
-                // Map delivered codes from results to items
-                for (const result of results) {
-                  if (result.status === 'delivered' && result.codes) {
-                    // Find matching item by productId
-                    for (const gItem of parsed.items) {
-                      if (!gItem.delivery_code) {
-                        gItem.delivery_code = result.codes;
-                        break;
-                      }
-                    }
+          const guestDocName = guestDoc.document.name;
+          const guestHash = guestDocName.split('/').pop()!;
+          const accessToken = await getFirebaseAccessToken();
+
+          // List items in subcollection
+          const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items`;
+          const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+          if (itemsRes.ok) {
+            const itemsData = await itemsRes.json();
+            const guestItems = itemsData.documents || [];
+
+            for (const result of results) {
+              if (result.status === 'delivered' && result.codes) {
+                // Find matching guest item by product_id or by first item without delivery_code
+                for (const guestItem of guestItems) {
+                  const fields = guestItem.fields || {};
+                  const existingCode = fields.delivery_code?.stringValue;
+                  if (!existingCode) {
+                    const guestItemId = guestItem.name.split('/').pop()!;
+                    // Update subcollection item with delivery_code
+                    const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items/${guestItemId}?updateMask.fieldPaths=delivery_code`;
+                    await fetch(updateUrl, {
+                      method: 'PATCH',
+                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+                      body: JSON.stringify({ fields: { delivery_code: { stringValue: result.codes } } }),
+                    });
+                    break;
                   }
                 }
-                await updateFirestoreDoc('guest_orders', guestDocId, {
-                  order_data: JSON.stringify(parsed),
-                });
-                console.log(`📦 [${orderId}] Synced delivery codes to guest_orders`);
               }
-            } catch { /* ignore parse errors */ }
+            }
+            console.log(`📦 [${orderId}] Synced delivery codes to guest_orders/${guestHash}/items`);
           }
         }
       } catch (syncErr) {
