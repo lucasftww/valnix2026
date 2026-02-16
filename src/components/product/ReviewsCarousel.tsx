@@ -69,6 +69,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           opts={{
             align: "start",
             loop: true,
+            dragFree: true,
             skipSnaps: false,
             duration: 20,
             slidesToScroll: 1,
