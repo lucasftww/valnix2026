@@ -638,12 +638,20 @@ Deno.serve(async (req) => {
 
       let authSource = 'none';
       let callerUid: string | null = null;
+      let isAdmin = false;
 
       if (idToken) {
         const user = await verifyFirebaseIdToken(idToken);
         if (user) {
           callerUid = user.uid;
           authSource = 'user';
+          // Check if caller is admin (allows confirming any order)
+          try {
+            const roleDoc = await getFirestoreDoc('user_roles', user.uid);
+            if (roleDoc?.role?.stringValue === 'admin') {
+              isAdmin = true;
+            }
+          } catch {}
         }
       }
       if (authSource === 'none' && deliveryTokenHeader && deliveryTokenHeader.length >= 20) {
@@ -679,8 +687,8 @@ Deno.serve(async (req) => {
         );
       }
 
-      // Validate auth against order
-      if (authSource === 'user') {
+      // Validate auth against order (admins bypass ownership check)
+      if (authSource === 'user' && !isAdmin) {
         const orderUserId = orderFields.user_id?.stringValue;
         if (orderUserId && !orderUserId.startsWith('guest_') && orderUserId !== callerUid) {
           return new Response(
