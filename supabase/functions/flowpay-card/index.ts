@@ -213,6 +213,48 @@ async function invokeEdgeFunction(functionName: string, body: Record<string, unk
   }
 }
 
+// ── Rate limiting for card charge creation (per-IP) ──
+const cardRateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+function checkCardRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = cardRateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) return false;
+  if (!entry || entry.resetAt <= now) {
+    cardRateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 5) { // Max 5 card charges per minute per IP
+    entry.blockedUntil = now + 600_000; // Block for 10 minutes
+    console.warn(`🚨 CARD RATE LIMIT: IP ${ip} blocked for 10min after ${entry.count} attempts`);
+    return false;
+  }
+  return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of cardRateLimitMap) {
+    if (v.resetAt <= now && v.blockedUntil <= now) cardRateLimitMap.delete(k);
+  }
+}, 300_000);
+
+// ── Pending order flood protection (per user_id) ──
+const pendingOrderCount = new Map<string, { count: number; resetAt: number }>();
+function checkPendingOrderFlood(userId: string): boolean {
+  const now = Date.now();
+  const entry = pendingOrderCount.get(userId);
+  if (!entry || entry.resetAt <= now) {
+    pendingOrderCount.set(userId, { count: 1, resetAt: now + 3600_000 }); // 1h window
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 10) { // Max 10 pending orders per hour per user
+    console.warn(`🚨 ORDER FLOOD: user ${userId} exceeded 10 pending orders/hour`);
+    return false;
+  }
+  return true;
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
@@ -233,11 +275,20 @@ Deno.serve(async (req) => {
 
     // ==================== CREATE card charge ====================
     if (action === 'create' && req.method === 'POST') {
+      // 🔒 Rate limit card creation per IP
+      const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+      if (!checkCardRateLimit(clientIp)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Muitas tentativas. Aguarde alguns minutos.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const body = await req.json();
-      const { orderId, description, customer } = body;
+      const { orderId, customer } = body;
       let amount: number;
 
-      if (!orderId) {
+      if (!orderId || typeof orderId !== 'string' || orderId.length > 50) {
         return new Response(
           JSON.stringify({ success: false, error: 'orderId is required' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -306,6 +357,15 @@ Deno.serve(async (req) => {
         }
       }
 
+      // 🔒 Flood protection: check if user has too many pending orders
+      const orderUserId = orderFields.user_id?.stringValue;
+      if (orderUserId && !checkPendingOrderFlood(orderUserId)) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Muitos pedidos pendentes. Aguarde ou finalize os pedidos anteriores.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
       const clientTotal = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
       if (Math.abs(clientTotal - recalculatedTotal) > 0.01) {
         console.warn(`🚨 PRICE MISMATCH! Client: R$${clientTotal}, Server: R$${recalculatedTotal} (order ${orderId})`);
@@ -321,12 +381,15 @@ Deno.serve(async (req) => {
 
       console.log(`🔒 Card charge: server-recalculated amount ${amount} cents (order ${orderId})`);
 
+      // 🔒 SECURITY: Description is ALWAYS generated server-side (never trust client input)
+      const safeDescription = `Pedido ${orderId.substring(0, 8).toUpperCase()}`;
+
       const flowpayResponse = await fetch(`${FLOWPAY_CARD_URL}/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({
           value: amount,
-          description: description || `Pedido ${orderId?.substring(0, 8) || 'VALNIX'}`,
+          description: safeDescription,
           customer: customer ? {
             name: customer.name || undefined,
             email: customer.email || undefined,
