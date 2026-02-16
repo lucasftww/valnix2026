@@ -417,15 +417,15 @@ Deno.serve(async (req) => {
         }
 
         try {
-          // Re-read product inside lock to get fresh codes
-          const freshProduct = await getFirestoreDoc('products', productId);
-          const autoCodesArray = freshProduct?.fields?.auto_delivery_codes?.arrayValue?.values;
+          // 🔒 SECURITY: Read codes from secure product_codes collection (not public products)
+          const codesDoc = await getFirestoreDoc('product_codes', productId);
+          const autoCodesArray = codesDoc?.fields?.codes?.arrayValue?.values;
 
           if (!autoCodesArray || autoCodesArray.length === 0) {
             results.push({ itemId, productId, status: 'no_codes_available' });
             allDelivered = false;
             failedCount++;
-            console.warn(`⚠️ [${orderId}] No auto_delivery_codes for product ${productId}`);
+            console.warn(`⚠️ [${orderId}] No codes in product_codes for product ${productId}`);
             continue;
           }
 
@@ -435,8 +435,8 @@ Deno.serve(async (req) => {
 
           const codeStr = usedCodes.join(',');
 
-          // Step 1: Remove codes from product FIRST (prevents double-consumption)
-          await updateFirestoreArray('products', productId, 'auto_delivery_codes', remainingCodes);
+          // Step 1: Remove codes from product_codes FIRST (prevents double-consumption)
+          await updateFirestoreArray('product_codes', productId, 'codes', remainingCodes);
 
           // Step 2: Write delivery code to order_item
           try {
@@ -446,7 +446,7 @@ Deno.serve(async (req) => {
             console.error(`❌ [${orderId}] Failed to write delivery_code to item ${itemId}, compensating...`, writeErr);
             try {
               const reinsertCodes = [...usedCodes.map((c: string) => ({ stringValue: c })), ...remainingCodes];
-              await updateFirestoreArray('products', productId, 'auto_delivery_codes', reinsertCodes);
+              await updateFirestoreArray('product_codes', productId, 'codes', reinsertCodes);
               console.log(`🔄 [${orderId}] Compensated: ${usedCodes.length} code(s) reinserted into product ${productId}`);
             } catch (compErr) {
               console.error(`🚨 [${orderId}] COMPENSATION FAILED for product ${productId}! Codes may be lost:`, usedCodes, compErr);

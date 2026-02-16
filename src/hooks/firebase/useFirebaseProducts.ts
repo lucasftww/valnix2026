@@ -109,7 +109,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
             sold: stats.sold,
             delivery_info: p.delivery_info,
             delivery_type: p.delivery_type,
-            auto_delivery_codes: p.auto_delivery_codes,
+            auto_delivery_codes: null, // 🔒 SECURITY: codes are in secure server-only collection
             instructions: p.instructions,
             terms_conditions: p.terms_conditions,
             rich_description: p.rich_description,
