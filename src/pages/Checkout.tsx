@@ -634,7 +634,10 @@ export default function Checkout() {
       });
 
     } catch (error: unknown) {
-      console.error("Error creating order:", error);
+      console.error("❌ Checkout error details:", error);
+      console.error("❌ Error name:", error instanceof Error ? error.name : 'unknown');
+      console.error("❌ Error message:", error instanceof Error ? error.message : String(error));
+      console.error("❌ Error stack:", error instanceof Error ? error.stack : 'no stack');
       const errorMessage = error instanceof Error ? error.message : "Tente novamente mais tarde.";
       toast({
         title: "Erro ao criar pedido",
