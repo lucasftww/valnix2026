@@ -20,6 +20,7 @@ function getCorsHeaders(req: Request) {
   };
 }
 
+const FIREBASE_PROJECT_ID = 'valnix';
 // ── Rate limiting (Firestore-backed, ATOMIC — consistent with PIX/Card/Balance) ──
 const RATE_LIMIT_DOC_BASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits`;
 const COMMIT_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
@@ -132,7 +133,28 @@ async function logRateLimitBlock(source: string, ip: string, attempts: number) {
 }
 
 const UTMIFY_API_URL = 'https://api.utmify.com.br/api-credentials/orders';
-const FIREBASE_PROJECT_ID = 'valnix';
+
+// ── Parse first public IP from x-forwarded-for ────────────────────
+function parsePublicIp(raw: string | undefined): string {
+  if (!raw) return 'unknown';
+  const ips = raw.split(',').map(ip => ip.trim()).filter(Boolean);
+  const privateRanges = [
+    /^10\./, /^172\.(1[6-9]|2\d|3[01])\./, /^192\.168\./, /^127\./,
+    /^::1$/, /^fd[0-9a-f]{2}:/i, /^fc[0-9a-f]{2}:/i, /^fe80:/i,
+  ];
+  for (const ip of ips) {
+    const normalized = ip.replace(/^::ffff:/i, '');
+    if (!privateRanges.some(r => r.test(normalized))) return normalized;
+  }
+  return ips[0]?.replace(/^::ffff:/i, '') || 'unknown';
+}
+
+// ── SHA-256 helper for fingerprint ────────────────────────────────
+async function sha256Short(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const hash = await crypto.subtle.digest('SHA-256', data);
+  return Array.from(new Uint8Array(hash)).map(b => b.toString(16).padStart(2, '0')).join('').slice(0, 16);
+}
 
 // ── Firebase Auth ──────────────────────────────────────────────────
 let cachedAccessToken: string | null = null;
@@ -284,11 +306,11 @@ Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  // Rate limit: 60/min per IP (Firestore-backed)
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  // Rate limit: 60/min per IP (Firestore-backed, using parsePublicIp)
+  const clientIp = parsePublicIp(req.headers.get('x-forwarded-for') || undefined);
   const ipRl = await checkRateLimitFirestore(`utmify_ip_${clientIp}`, 60, 60_000, 300_000);
   if (!ipRl.allowed) {
-    logRateLimitBlock('utmify-event-ip', clientIp, ipRl.attempts);
+    await logRateLimitBlock('utmify-event-ip', clientIp, ipRl.attempts);
     return new Response(JSON.stringify({ error: 'Too many requests' }),
       { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
@@ -306,21 +328,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Secondary rate limit: 10/min per payload fingerprint (utm/fbc/fbp/external_id/email)
+    // Secondary rate limit: 10/min per payload fingerprint (sha256-based)
     const fingerprintParts = [
       utm_source || '', utm_campaign || '', customer_email || '', order_id || '',
     ].join('|');
     if (fingerprintParts.length > 1) {
-      // Simple hash for key
-      let hash = 0;
-      for (let i = 0; i < fingerprintParts.length; i++) {
-        hash = ((hash << 5) - hash) + fingerprintParts.charCodeAt(i);
-        hash |= 0;
-      }
-      const fpKey = `utmify_fp_${Math.abs(hash).toString(36)}`;
+      const fpHash = await sha256Short(fingerprintParts);
+      const fpKey = `utmify_fp_${fpHash}`;
       const fpRl = await checkRateLimitFirestore(fpKey, 10, 60_000, 300_000);
       if (!fpRl.allowed) {
-        logRateLimitBlock('utmify-event-fingerprint', `${clientIp}|fp:${fpKey}`, fpRl.attempts);
+        await logRateLimitBlock('utmify-event-fingerprint', `${clientIp}|fp:${fpKey}`, fpRl.attempts);
         return new Response(JSON.stringify({ error: 'Too many requests (fingerprint)' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
