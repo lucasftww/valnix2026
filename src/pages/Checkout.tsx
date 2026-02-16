@@ -276,7 +276,7 @@ export default function Checkout() {
         return;
       }
 
-      // Handle balance payment
+      // Handle balance payment — ALL via server-side edge function
       if (paymentMethod === "balance") {
         if (userBalance < orderAmount) {
           toast({
@@ -289,15 +289,16 @@ export default function Checkout() {
           return;
         }
 
+        // Create order with PENDING status (server will set to paid)
         const orderId = await createOrder({
           user_id: effectiveUserId,
           customer_name: formData.name,
           customer_email: formData.email || user?.email || "",
           customer_phone: formData.phone || "",
           total_amount: orderAmount,
-          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Pago com saldo` : "Pago com saldo",
-          status: "processing",
-          payment_status: "paid",
+          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Saldo` : "Saldo",
+          status: "pending",
+          payment_status: "pending",
           payment_method: "balance",
           fbc: getCookie('_fbc'),
           fbp: getCookie('_fbp'),
@@ -308,8 +309,16 @@ export default function Checkout() {
           utm_term: utmParams.utm_term || null,
         });
 
-        // Balance: delivery is handled server-side via process-delivery (single-writer)
-        // No client-side code consumption — just create items without delivery codes
+        // Save coupon info on order
+        if (appliedCoupon) {
+          const orderRef = doc(db, "orders", orderId);
+          await updateDoc(orderRef, { 
+            coupon_id: appliedCoupon.id,
+            coupon_code: appliedCoupon.code,
+          });
+        }
+
+        // Create order items (no delivery — server handles it)
         const orderItemsData = items.map(item => ({
           order_id: orderId,
           product_id: item.id,
@@ -321,33 +330,46 @@ export default function Checkout() {
           delivery_type: item.delivery_type || 'manual',
           auto_delivery_codes: null as string[] | null,
         }));
+        await createOrderItems(orderItemsData, false);
 
-        await createOrderItems(orderItemsData, false); // Never process delivery client-side
-
-        // 🔒 Call server-side process-delivery for auto-delivery (single-writer)
-        try {
-          const idToken = user ? await user.getIdToken() : null;
-          const deliveryRes = await invokeFunction('process-delivery', {
-            method: 'POST',
-            headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
-            body: { orderId },
+        // 🔒 SERVER-SIDE: Balance deduction, payment confirmation, coupon increment, delivery
+        const idToken = user ? await user.getIdToken() : null;
+        if (!idToken) {
+          toast({
+            title: "Erro de autenticação",
+            description: "Faça login novamente para pagar com saldo.",
+            variant: "destructive",
           });
-          const deliveryResult = await deliveryRes.json();
-          console.log(`📦 Balance process-delivery for ${orderId}:`, deliveryResult);
-        } catch (deliveryErr) {
-          console.warn('⚠️ Balance process-delivery failed (will retry via admin):', deliveryErr);
+          setLoading(false);
+          isSubmittingRef.current = false;
+          return;
         }
 
-        if (user) {
-          const profileRef = doc(db, "profiles", user.uid);
-          await updateDoc(profileRef, {
-            balance: increment(-orderAmount)
+        const balanceRes = await invokeFunction('checkout-balance', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${idToken}` },
+          body: { orderId },
+        });
+
+        const balanceResult = await balanceRes.json();
+
+        if (!balanceRes.ok || !balanceResult.success) {
+          toast({
+            title: "Erro no pagamento",
+            description: balanceResult.error || "Falha ao processar pagamento com saldo.",
+            variant: "destructive",
           });
+          setLoading(false);
+          isSubmittingRef.current = false;
+          return;
         }
+
+        // Update local balance display
+        setUserBalance(balanceResult.remainingBalance ?? 0);
 
         trackPurchaseEvent(effectiveUserId, orderAmount, orderId, items.map(i => i.name).join(', '));
 
-        // Send Purchase to Meta CAPI (server-side via edge function)
+        // Meta CAPI (fire-and-forget)
         try {
           const nameParts = formData.name.split(' ');
           invokeFunctionFireAndForget('meta-capi', {
@@ -364,12 +386,10 @@ export default function Checkout() {
             external_id: effectiveUserId,
             fbc: getCookie('_fbc') || undefined,
             fbp: getCookie('_fbp') || undefined,
-          }).then(() => {
-            console.log('📡 Meta CAPI Purchase sent (balance payment)');
           });
         } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
 
-        // Send Purchase to UTMify (server-side via edge function)
+        // UTMify (fire-and-forget)
         try {
           invokeFunctionFireAndForget('utmify-event', {
             order_id: orderId,
@@ -384,17 +404,10 @@ export default function Checkout() {
             utm_campaign: utmParams.utm_campaign || undefined,
             utm_content: utmParams.utm_content || undefined,
             utm_term: utmParams.utm_term || undefined,
-          }).then(() => {
-            console.log('📡 UTMify Purchase sent (balance payment)');
           });
         } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
 
-        // Increment coupon usage only on successful order
-        if (appliedCoupon) {
-          updateDoc(doc(db, "coupons", appliedCoupon.id), {
-            current_uses: increment(1),
-          }).catch(err => console.warn('⚠️ Failed to increment coupon usage:', err));
-        }
+        // NOTE: Coupon increment is now handled server-side in checkout-balance
 
         saveCheckoutDataToProfile();
         clearCart();
@@ -414,7 +427,7 @@ export default function Checkout() {
               quantity: i.quantity,
               unit_price: i.unit_price,
               total_price: i.total_price,
-              delivery_code: null, // will be updated after auto-delivery
+              delivery_code: null,
             })),
             totalAmount: orderAmount,
             paymentMethod: "balance",

@@ -437,7 +437,7 @@ Deno.serve(async (req) => {
       };
 
       if (resource === "products") {
-        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'price', 'original_price', 'image_url', 'images', 'category_id', 'is_active', 'stock', 'delivery_type', 'auto_delivery_codes', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
+        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'auto_delivery_codes', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
         const safeBody: Record<string, unknown> = {};
@@ -450,7 +450,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (resource === "categories") {
-        const CATEGORY_ALLOWED_FIELDS = ['name', 'slug', 'description', 'icon', 'image_url', 'display_order', 'is_active', 'created_at', 'updated_at'];
+        const CATEGORY_ALLOWED_FIELDS = ['name', 'slug', 'description', 'icon', 'icon_url', 'image_url', 'display_order', 'is_active', 'show_on_homepage', 'parent_id', 'created_at', 'updated_at'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
         const safeBody: Record<string, unknown> = {};
@@ -570,7 +570,7 @@ Deno.serve(async (req) => {
       delete body.id;
 
       if (resource === "products") {
-        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'price', 'original_price', 'image_url', 'images', 'category_id', 'is_active', 'stock', 'delivery_type', 'auto_delivery_codes', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
+        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'auto_delivery_codes', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
         const safeBody: Record<string, unknown> = {};
         for (const key of Object.keys(body)) {
           if (PRODUCT_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
@@ -624,7 +624,7 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "categories") {
-        const CATEGORY_ALLOWED_FIELDS = ['name', 'slug', 'description', 'icon', 'image_url', 'display_order', 'is_active', 'updated_at'];
+        const CATEGORY_ALLOWED_FIELDS = ['name', 'slug', 'description', 'icon', 'icon_url', 'image_url', 'display_order', 'is_active', 'show_on_homepage', 'parent_id', 'updated_at'];
         const safeBody: Record<string, unknown> = {};
         for (const key of Object.keys(body)) {
           if (CATEGORY_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
