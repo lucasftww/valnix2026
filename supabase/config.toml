@@ -44,3 +44,9 @@ verify_jwt = false
 
 [functions.cleanup-ttl]
 verify_jwt = false
+
+[functions.guest-order]
+verify_jwt = false
+
+[functions.site-banners]
+verify_jwt = false

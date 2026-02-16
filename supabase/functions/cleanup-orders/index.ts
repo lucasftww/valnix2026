@@ -198,8 +198,46 @@ Deno.serve(async (req: Request) => {
       cancelled++;
     }
 
+    // ── Cleanup expired guest_orders (TTL based on expires_at) ──
+    let guestCleaned = 0;
+    try {
+      const guestResults = await runQuery(token, {
+        from: [{ collectionId: 'guest_orders' }],
+        limit: 100,
+      });
+      const nowISO = new Date().toISOString();
+      for (const r of guestResults) {
+        const expiresAt = r.document.fields?.expires_at?.stringValue;
+        if (expiresAt && expiresAt < nowISO) {
+          const guestDocPath = r.document.name;
+          const guestHash = guestDocPath.split('/').pop()!;
+          // Delete subcollection items first
+          try {
+            const itemsUrl = `${BASE}/guest_orders/${guestHash}/items`;
+            const itemsResp = await fetch(itemsUrl, { headers: { Authorization: `Bearer ${token}` } });
+            if (itemsResp.ok) {
+              const itemsData = await itemsResp.json();
+              for (const itemDoc of (itemsData.documents || [])) {
+                await fetch(`https://firestore.googleapis.com/v1/${itemDoc.name}`, {
+                  method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+                });
+              }
+            }
+          } catch { /* best effort */ }
+          // Delete parent doc
+          await fetch(`https://firestore.googleapis.com/v1/${guestDocPath}`, {
+            method: 'DELETE', headers: { Authorization: `Bearer ${token}` },
+          });
+          guestCleaned++;
+        }
+      }
+      if (guestCleaned > 0) console.log(`[cleanup-orders] Cleaned ${guestCleaned} expired guest_orders`);
+    } catch (e) {
+      console.warn('[cleanup-orders] guest_orders cleanup error:', e);
+    }
+
     const durationMs = Date.now() - startMs;
-    console.log(`[cleanup-orders] Cancelled ${cancelled} stale orders in ${durationMs}ms`);
+    console.log(`[cleanup-orders] Cancelled ${cancelled} stale orders, cleaned ${guestCleaned} guest_orders in ${durationMs}ms`);
 
     // Write audit log to Firestore (fire-and-forget)
     try {
