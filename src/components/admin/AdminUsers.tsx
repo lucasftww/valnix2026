@@ -9,8 +9,8 @@ import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Loader2, Search, Mail, Phone, Calendar, User, Users, 
-  ShoppingCart, DollarSign, TrendingUp, Crown, Star, 
-  ChevronDown, Eye, Filter, UserCheck, Clock, Wallet, Trash2, AlertTriangle, Copy, Sparkles
+  ShoppingCart, DollarSign, TrendingUp,
+  ChevronDown, Eye, Filter, UserCheck, Wallet, Trash2, AlertTriangle, Copy, Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
@@ -63,7 +63,6 @@ export const AdminUsers = () => {
   const [deletingUser, setDeletingUser] = useState(false);
   
   const [cleaningUp, setCleaningUp] = useState(false);
-  const [cleanupResult, setCleanupResult] = useState<{ removed: string[]; removedCount: number; totalChecked: number } | null>(null);
   
   const queryClient = useQueryClient();
   const { toast } = useToast();
@@ -117,7 +116,6 @@ export const AdminUsers = () => {
   const handleCleanup = useCallback(async () => {
     if (!confirm("Tem certeza? Isso vai remover perfis órfãos (sem conta no Firebase Auth) e emails bloqueados.")) return;
     setCleaningUp(true);
-    setCleanupResult(null);
     try {
       const user = auth.currentUser;
       if (!user) throw new Error("Not authenticated");
@@ -130,7 +128,6 @@ export const AdminUsers = () => {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      setCleanupResult(data);
       toast({ 
         title: "Limpeza concluída!", 
         description: `${data.removedCount} usuários removidos de ${data.totalChecked} verificados.` 
