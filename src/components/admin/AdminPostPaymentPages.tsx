@@ -48,8 +48,8 @@ const labelMap: Record<string, string> = {
 
 const routeMap: Record<string, string> = {
   premium_benefits: "/painel-pagar",
-  delivery_priority: "/painel-pagar-entrega",
-  data_swap_warranty: "/painel-pagar-trocadados",
+  delivery_priority: "/entrega-prioritaria",
+  data_swap_warranty: "/protecao-total",
 };
 
 async function callAdminPostPayment(method: string, body?: any, queryParams?: Record<string, string>) {
