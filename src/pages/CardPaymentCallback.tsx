@@ -59,21 +59,27 @@ export default function CardPaymentCallback() {
           } catch (err) { console.warn('⚠️ Order status update error (card):', err); }
 
           // 🔒 AUTO-DELIVERY: Call server-side process-delivery (single-writer)
-          // NO client-side code consumption — server handles atomicity & idempotency
-          // Frontend uses Firebase auth token ONLY — no internal keys
+          // Uses Firebase token if logged in, or order-scoped delivery_token for guests
           try {
             const currentUser = auth.currentUser;
             const idToken = currentUser ? await currentUser.getIdToken() : null;
+            const headers: Record<string, string> = {};
             if (idToken) {
+              headers['Authorization'] = `Bearer ${idToken}`;
+            } else if (stored?.deliveryToken) {
+              headers['x-delivery-token'] = stored.deliveryToken;
+            }
+
+            if (idToken || stored?.deliveryToken) {
               const deliveryRes = await invokeFunction('process-delivery', {
                 method: 'POST',
-                headers: { 'Authorization': `Bearer ${idToken}` },
+                headers,
                 body: { orderId },
               });
               const deliveryResult = await deliveryRes.json();
               console.log(`📦 process-delivery result for ${orderId}:`, deliveryResult);
             } else {
-              console.log(`ℹ️ No auth token — delivery will be handled by admin auto-verify or webhook`);
+              console.log(`ℹ️ No auth — delivery will be handled by admin auto-verify`);
             }
           } catch (deliveryErr) {
             console.warn('⚠️ process-delivery call failed (admin auto-verify will retry):', deliveryErr);

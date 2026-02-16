@@ -17,7 +17,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 const FIREBASE_PROJECT_ID = 'valnix';
@@ -208,11 +208,12 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── Auth: accept internal key OR Firebase admin token OR payment-validated call ──
+    // ── Auth: accept internal key OR Firebase token OR order-scoped delivery token ──
     const internalKey = req.headers.get('x-internal-key');
-    const expectedInternalKey = Deno.env.get('FLOWPAY_WEBHOOK_SECRET'); // Reuse webhook secret as internal key
+    const expectedInternalKey = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
     const authHeader = req.headers.get('authorization');
     const idToken = authHeader?.replace(/^Bearer\s+/i, '');
+    const deliveryToken = req.headers.get('x-delivery-token');
 
     let authSource = 'none';
     let callerUid: string | null = null;
@@ -226,9 +227,12 @@ Deno.serve(async (req) => {
       }
       callerUid = user.uid;
       authSource = await isAdmin(user.uid) ? 'admin' : 'user';
+    } else if (deliveryToken && deliveryToken.length >= 20) {
+      // Order-scoped token — validated against order doc below (after fetching order)
+      authSource = 'delivery_token';
     }
 
-    // Only internal (webhook/server), admin, or authenticated user can trigger
+    // Only authenticated requests can trigger
     if (authSource === 'none') {
       return new Response(JSON.stringify({ success: false, error: 'Authentication required' }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -241,7 +245,7 @@ Deno.serve(async (req) => {
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── SECURITY: if authSource==='user', validate order ownership ──
+    // ── SECURITY: validate auth against order ──
     if (authSource === 'user') {
       const orderUserId = orderDoc.fields.user_id?.stringValue;
       if (!orderUserId || orderUserId !== callerUid) {
@@ -249,6 +253,16 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: 'Forbidden: not your order' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+    } else if (authSource === 'delivery_token') {
+      const storedToken = orderDoc.fields.delivery_token?.stringValue;
+      if (!storedToken || storedToken !== deliveryToken) {
+        console.warn(`🚫 [${orderId}] Invalid delivery_token attempt`);
+        return new Response(JSON.stringify({ success: false, error: 'Forbidden: invalid delivery token' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // Token is single-use: clear it after validation to prevent replay
+      try { await updateFirestoreDoc('orders', orderId, { delivery_token: null }); } catch {}
+      console.log(`✅ [${orderId}] delivery_token validated and consumed`);
     }
 
     const paymentStatus = orderDoc.fields.payment_status?.stringValue;
