@@ -365,6 +365,8 @@ export default function OrderDelivery() {
     let pollTimeout: ReturnType<typeof setTimeout> | null = null;
     let currentDelay = 5000; // start at 5s
     let prevItemsJson = ''; // track changes to avoid unnecessary re-renders
+    let pollStartTime = Date.now();
+    const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10 min max polling
 
     const fetchGuestOrder = async (): Promise<'ok' | 'done' | 'error'> => {
       try {
@@ -376,10 +378,13 @@ export default function OrderDelivery() {
         if (res.status === 429) return 'error'; // rate limited
         if (res.status >= 500) return 'error'; // server error
 
-        if (!res.ok) {
+        // Only mark notFound on definitive 404/410, not network errors
+        if (res.status === 404 || res.status === 410) {
           if (!cancelled) setNotFound(true);
-          return 'done'; // 404/410 — stop polling
+          return 'done';
         }
+
+        if (!res.ok) return 'error'; // other client errors — retry
 
         const data = await res.json();
 
@@ -404,7 +409,7 @@ export default function OrderDelivery() {
             expires_at: data.expires_at || new Date().toISOString(),
           } as GuestOrderData);
 
-          // ✅ Fix #5b: Only update liveItems if data actually changed
+          // Only update liveItems if data actually changed
           if (newItemsJson !== prevItemsJson) {
             prevItemsJson = newItemsJson;
             if (data.items && data.items.length > 0) {
@@ -416,12 +421,15 @@ export default function OrderDelivery() {
           const allDelivered = (data.items || []).length > 0 &&
             (data.items as OrderItemData[]).every((i: OrderItemData) => !!i.delivery_code);
           if (allDelivered) return 'done';
+
+          // Safety: stop polling after 10 minutes
+          if (Date.now() - pollStartTime > MAX_POLL_DURATION_MS) return 'done';
         }
         return 'ok';
       } catch (err) {
         console.error("Error fetching guest order:", err);
-        if (!cancelled) setNotFound(true);
-        return 'done';
+        // Network error → don't mark notFound, just retry with backoff
+        return 'error';
       } finally {
         if (!cancelled) setLoading(false);
       }
