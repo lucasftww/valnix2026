@@ -66,7 +66,7 @@ const NavigationComponent = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-muted-foreground hover:text-foreground whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
+                        className="text-muted-foreground hover:text-foreground hover:bg-transparent whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
                         aria-label={`${category.name} - expandir subcategorias`}
                       >
                         {category.icon_url && (
@@ -107,7 +107,7 @@ const NavigationComponent = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-muted-foreground hover:text-foreground whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
+                      className="text-muted-foreground hover:text-foreground hover:bg-transparent whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
                     >
                       {category.icon_url && (
                         <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
