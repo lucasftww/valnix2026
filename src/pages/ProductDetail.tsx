@@ -92,10 +92,8 @@ const ProductDetail = () => {
       });
     }
     
-    // Track AddToCart for analytics funnel
-    if (user) {
-      trackAddToCartEvent(user.uid, Number(product.price) * quantity, product.name);
-    }
+    // Track AddToCart for analytics funnel (logged-in and guests)
+    trackAddToCartEvent(user?.uid || null, Number(product.price) * quantity, product.name);
   }, [user, product, quantity, addItem]);
   
   const handleBuyNow = useCallback(() => {

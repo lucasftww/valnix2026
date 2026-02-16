@@ -3,7 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackPurchaseEvent } from "@/lib/analytics";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs } from "firebase/firestore";
 import { db, auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 
@@ -93,7 +93,9 @@ export default function CardPaymentCallback() {
             const orderDoc = await getDoc(doc(db, "orders", orderId));
             if (orderDoc.exists()) {
               const od = orderDoc.data();
-              trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, "card");
+              const itemsSnap = await getDocs(collection(db, "orders", orderId, "items"));
+              const productNamesList = itemsSnap.docs.map(d => d.data().product_name).filter(Boolean).join(', ');
+              trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, productNamesList || "card");
             }
           } catch {}
 
