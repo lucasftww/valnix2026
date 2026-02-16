@@ -28,7 +28,9 @@ interface FooterProps {
   showFullVersion?: boolean;
 }
 
-export const Footer = ({ showFullVersion = true }: FooterProps) => {
+import { memo } from "react";
+
+const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
   const isMobile = useIsMobile();
   const { data: categories = [] } = useCategories();
 
@@ -346,3 +348,5 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
     </footer>
   );
 };
+
+export const Footer = memo(FooterComponent);
