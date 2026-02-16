@@ -157,6 +157,26 @@ function docToObj(doc: any): Record<string, any> {
   return obj;
 }
 
+async function createFirestoreDoc(col: string, docId: string, data: Record<string, unknown>) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
+  const fields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v === null || v === undefined) fields[k] = { nullValue: null };
+    else if (typeof v === 'string') fields[k] = { stringValue: v };
+    else if (typeof v === 'number') fields[k] = { doubleValue: v };
+    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
+    else if (Array.isArray(v)) fields[k] = { arrayValue: { values: v.map((s: string) => ({ stringValue: s })) } };
+    else fields[k] = { stringValue: String(v) };
+  }
+  const res = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ fields }),
+  });
+  return res.ok;
+}
+
 async function updateFirestoreDoc(col: string, docId: string, data: Record<string, unknown>) {
   const accessToken = await getFirebaseAccessToken();
   const fieldPaths = Object.keys(data).map(k => `updateMask.fieldPaths=${k}`).join('&');
@@ -254,6 +274,67 @@ Deno.serve(async (req) => {
 
       return new Response(JSON.stringify({ success: true }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
+    if (req.method === "POST") {
+      const body = await req.json();
+      
+      if (body.action === "seed") {
+        // Seed default post-payment pages if they don't exist
+        const existing = await queryFirestoreCollection('post_payment_pages');
+        if (existing.length > 0) {
+          return new Response(JSON.stringify({ message: "Pages already exist", count: existing.length }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const defaults = [
+          {
+            addon_type: "delivery_priority",
+            title: "Entrega Prioritária",
+            subtitle: "Receba seu pedido com prioridade máxima",
+            badge_text: "MAIS VENDIDO",
+            badge_color: "yellow",
+            benefits: ["Entrega em até 5 minutos", "Suporte prioritário 24h", "Garantia de entrega", "Atendimento VIP no Discord"],
+            price: 4.99,
+            original_price: 14.99,
+            button_accept_text: "SIM! EU QUERO!",
+            button_skip_text: "Não, obrigado",
+            next_route: "/painel-pagar-trocadados",
+            is_active: true,
+            display_order: 1,
+          },
+          {
+            addon_type: "data_swap_warranty",
+            title: "Proteção Total",
+            subtitle: "Garantia de troca de dados caso necessário",
+            badge_text: "RECOMENDADO",
+            badge_color: "green",
+            benefits: ["Troca de dados garantida", "Suporte dedicado para troca", "Validade de 30 dias", "Processo rápido e seguro"],
+            price: 7.99,
+            original_price: 19.99,
+            button_accept_text: "QUERO PROTEÇÃO!",
+            button_skip_text: "Não, obrigado",
+            next_route: "/order",
+            is_active: true,
+            display_order: 2,
+          },
+        ];
+
+        for (const page of defaults) {
+          const docId = page.addon_type;
+          await createFirestoreDoc('post_payment_pages', docId, {
+            ...page,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+          });
+        }
+
+        return new Response(JSON.stringify({ success: true, created: defaults.length }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      return new Response(JSON.stringify({ error: "Unknown action" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     return new Response(JSON.stringify({ error: "Method not allowed" }),
