@@ -24,6 +24,7 @@ const IndexComponent = () => {
   // Track PageView for analytics funnel
   useEffect(() => {
     trackPageView(user?.uid);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
   return (
