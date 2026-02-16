@@ -203,6 +203,18 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
 
   try {
+    // Allow public GET for page configs (not sensitive data)
+    const url = new URL(req.url);
+    const isPublicPageRequest = req.method === "GET" && !url.searchParams.get("orderId");
+    
+    if (isPublicPageRequest) {
+      // Return only page configs (no addons/stats) without auth
+      const pageResults = await queryFirestoreCollection('post_payment_pages');
+      const pages = pageResults.map(docToObj).sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+      return new Response(JSON.stringify({ pages }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     const firebaseToken = req.headers.get("x-firebase-token");
     if (!firebaseToken) {
       return new Response(JSON.stringify({ error: "Firebase token required" }),
