@@ -308,27 +308,35 @@ export default function Checkout() {
           utm_term: utmParams.utm_term || null,
         });
 
-        const productIds = items.map(i => i.id);
+        // For auto_real products, we still need to fetch codes from Firestore
+        // For auto_fake, we use the delivery_type from cart items directly
         const productsDeliveryInfo: Record<string, { delivery_type: string; auto_delivery_codes: string[] | null }> = {};
         
-        for (const productId of productIds) {
-          try {
-            const productRef = doc(db, "products", productId);
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-              const data = productSnap.data();
-              productsDeliveryInfo[productId] = {
-                delivery_type: data.delivery_type || 'manual',
-                auto_delivery_codes: data.auto_delivery_codes || null,
-              };
+        for (const item of items) {
+          const deliveryType = item.delivery_type || 'manual';
+          if (deliveryType === 'auto_real') {
+            // Only fetch from Firestore for auto_real (need actual codes)
+            try {
+              const productRef = doc(db, "products", item.id);
+              const productSnap = await getDoc(productRef);
+              if (productSnap.exists()) {
+                const data = productSnap.data();
+                productsDeliveryInfo[item.id] = {
+                  delivery_type: 'auto_real',
+                  auto_delivery_codes: data.auto_delivery_codes || null,
+                };
+              }
+            } catch (err) {
+              console.error(`Error fetching product ${item.id} codes:`, err);
+              productsDeliveryInfo[item.id] = { delivery_type: 'auto_real', auto_delivery_codes: null };
             }
-          } catch (err) {
-            console.error(`Error fetching product ${productId}:`, err);
+          } else {
+            productsDeliveryInfo[item.id] = { delivery_type: deliveryType, auto_delivery_codes: null };
           }
         }
 
         const orderItemsData = items.map(item => {
-          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: 'manual', auto_delivery_codes: null };
+          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: item.delivery_type || 'manual', auto_delivery_codes: null };
           return {
             order_id: orderId,
             product_id: item.id,
