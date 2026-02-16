@@ -25,7 +25,7 @@ const MobileStickyCheckoutComponent = ({
       {/* Dropdown summary - slides up */}
       {showSummary && (
         <div
-          className="bg-secondary/80 backdrop-blur-xl border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in"
+          className="bg-secondary/80 backdrop-blur-xl border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in max-w-lg mx-auto"
           style={{ animationDuration: "150ms" }}
         >
           <div className="space-y-3 max-h-[40vh] overflow-y-auto">
@@ -58,7 +58,7 @@ const MobileStickyCheckoutComponent = ({
       )}
 
       {/* Sticky bar */}
-      <div className="bg-background/90 backdrop-blur-xl border-t border-border/10 px-4 pt-3 pb-8 safe-area-inset-bottom">
+      <div className="bg-background/90 backdrop-blur-xl border-t border-border/10 px-4 pt-3 pb-8 safe-area-inset-bottom max-w-lg mx-auto w-full">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button

@@ -23,7 +23,7 @@ export const MobileCoupon = memo(function MobileCoupon({
   discount,
 }: MobileCouponProps) {
   return (
-    <div className="lg:hidden bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-4">
+    <div className="lg:hidden bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-4 mx-auto w-full max-w-lg">
       <div className="flex gap-2">
         <Input
           id="mobile-coupon-code"
