@@ -43,7 +43,7 @@ const iconMap: Record<string, typeof Star> = {
 const labelMap: Record<string, string> = {
   premium_benefits: "Benefícios Premium",
   delivery_priority: "Entrega Prioritária",
-  data_swap_warranty: "Garantia Troca Dados",
+  data_swap_warranty: "Proteção Total",
 };
 
 const routeMap: Record<string, string> = {
