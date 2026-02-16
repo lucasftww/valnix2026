@@ -40,7 +40,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           const { invokeFunction } = await import("@/lib/apiHelper");
           const response = await invokeFunction('flowpay-pix', {
             method: 'GET',
-            queryParams: { action: 'status', chargeId: order.flowpay_charge_id },
+            queryParams: { action: 'status', chargeId: order.flowpay_charge_id, orderId: order.id },
             headers,
           });
           const data = await response.json();

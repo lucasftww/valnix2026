@@ -601,6 +601,23 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: 'chargeId is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
+      // 🔒 Ownership verification: require orderId parameter and validate it matches the chargeId
+      const expectedOrderId = url.searchParams.get('orderId');
+      if (!expectedOrderId) {
+        return new Response(JSON.stringify({ error: 'orderId is required for status check' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Verify the orderId actually belongs to this chargeId before returning any data
+      const ownershipCheck = await getFirestoreDoc('orders', expectedOrderId);
+      if (!ownershipCheck || ownershipCheck.flowpay_charge_id?.stringValue !== chargeId) {
+        // Also check sale_addons for upsell
+        const isUpsellOwner = expectedOrderId.startsWith('upsell-');
+        if (!isUpsellOwner) {
+          console.warn(`🚨 Ownership mismatch: orderId=${expectedOrderId} chargeId=${chargeId}`);
+          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+
       const response = await fetch(`${FLOWPAY_BASE_URL}/status?id=${chargeId}`, { headers: { 'x-api-key': apiKey } });
       const data = await response.json();
       if (!response.ok || !data.success) {

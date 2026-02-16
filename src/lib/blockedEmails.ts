@@ -7,7 +7,7 @@ const BLOCKED_EMAILS = new Set([
 
 // Also block by UID for accounts where email may change
 const BLOCKED_UIDS = new Set<string>([
-  // Add UIDs of known attackers here
+  "irmJtz4yJdhHRvRdpdkTGldOBYG2",
 ]);
 
 export function isBlockedUid(uid: string): boolean {

@@ -107,7 +107,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
       try {
         const response = await invokeFunction('flowpay-pix', {
           method: 'GET',
-          queryParams: { action: 'status', chargeId: pixData.chargeId },
+          queryParams: { action: 'status', chargeId: pixData.chargeId, orderId: `upsell-${orderId}-${addonType}` },
         });
         const data = await response.json();
         if (data.success && data.status === "COMPLETED") {
