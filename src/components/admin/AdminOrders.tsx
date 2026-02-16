@@ -16,7 +16,6 @@ import {
   DialogDescription,
   DialogHeader,
   DialogTitle,
-  DialogTrigger,
 } from "@/components/ui/dialog";
 import {
   Select,
@@ -143,13 +142,10 @@ const formatCurrency = (value: number) => {
 // ── Component ─────────────────────────────────────────────────────
 export const AdminOrders = () => {
   const [orders, setOrders] = useState<Order[]>([]);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
-  const [orderItems, setOrderItems] = useState<OrderItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [sendingEmail, setSendingEmail] = useState(false);
   const [deliveryCode, setDeliveryCode] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
+  const [sendingEmail, setSendingEmail] = useState(false);
   const [filterStatus, setFilterStatus] = useState<string>("all");
   const [filterPayment, setFilterPayment] = useState<string>("all");
   const [filterMethod, setFilterMethod] = useState<string>("all");
@@ -395,24 +391,7 @@ export const AdminOrders = () => {
     }
   };
 
-  const loadOrderItems = async (orderId: string) => {
-    setLoadingItems(true);
-    try {
-      const token = await getFirebaseToken();
-      const res = await invokeFunction("admin-data", {
-        method: "GET",
-        queryParams: { resource: "order-items", orderId },
-        headers: { "x-firebase-token": token || "" },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setOrderItems(data.items || []);
-    } catch (error: any) {
-      toast({ title: "Erro ao carregar itens", description: error.message, variant: "destructive" });
-    } finally {
-      setLoadingItems(false);
-    }
-  };
+
 
   const handleViewDetail = async (order: Order) => {
     setDetailOrder(order);
@@ -469,7 +448,7 @@ export const AdminOrders = () => {
         body: { id: itemId, delivery_code: deliveryCode.trim() },
       });
       // Update order status to completed
-      const targetOrder = detailOrder || selectedOrder;
+      const targetOrder = detailOrder;
       if (targetOrder) {
         await invokeFunction("admin-data", {
           method: "PUT",

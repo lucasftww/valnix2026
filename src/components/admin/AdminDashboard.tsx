@@ -313,36 +313,8 @@ export const AdminDashboard = () => {
         </Card>
       </div>
 
-      {/* Secondary Stats */}
-      <div className="grid gap-3 grid-cols-3">
-        <div className="bg-muted/20 rounded-xl p-4 flex items-center gap-3 border border-border/30">
-          <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
-            <Users className="h-4 w-4 text-primary" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">{stats?.totalUsers || 0}</p>
-            <p className="text-xs text-muted-foreground">Usuários</p>
-          </div>
-        </div>
-        <div className="bg-muted/20 rounded-xl p-4 flex items-center gap-3 border border-border/30">
-          <div className="h-9 w-9 rounded-lg bg-green-500/10 flex items-center justify-center shrink-0">
-            <CheckCircle2 className="h-4 w-4 text-green-500" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">{stats?.periodPaidCount || 0}</p>
-            <p className="text-xs text-muted-foreground">Pagos ({periodLabel})</p>
-          </div>
-        </div>
-        <div className="bg-muted/20 rounded-xl p-4 flex items-center gap-3 border border-border/30">
-          <div className="h-9 w-9 rounded-lg bg-yellow-500/10 flex items-center justify-center shrink-0">
-            <AlertTriangle className="h-4 w-4 text-yellow-500" />
-          </div>
-          <div>
-            <p className="text-lg font-bold">{stats?.pendingDelivery || 0}</p>
-            <p className="text-xs text-muted-foreground">Aguardando entrega</p>
-          </div>
-        </div>
-      </div>
+
+
 
       {/* Charts Row */}
       <div className="grid gap-4 lg:grid-cols-3">
