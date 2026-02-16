@@ -263,10 +263,9 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
       const count = Number(fields.count?.integerValue || '0');
 
       if (resetAt > now) {
-        const newCount = count + 1;
-        const shouldBlock = newCount > maxAttempts;
+        const shouldBlock = count >= maxAttempts;
 
-        await fetch(COMMIT_URL, {
+        const commitRes = await fetch(COMMIT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
           body: JSON.stringify({
@@ -291,12 +290,16 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
             ],
           }),
         });
+        if (!commitRes.ok) {
+          console.warn(`⚠️ Rate limit commit failed: ${commitRes.status}`);
+          return { allowed: true, attempts: count };
+        }
 
-        return { allowed: !shouldBlock, attempts: newCount };
+        return { allowed: !shouldBlock, attempts: count + 1 };
       }
     }
 
-    await fetch(COMMIT_URL, {
+    const resetRes = await fetch(COMMIT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({
@@ -313,6 +316,9 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
         }],
       }),
     });
+    if (!resetRes.ok) {
+      console.warn(`⚠️ Rate limit reset commit failed: ${resetRes.status}`);
+    }
 
     return { allowed: true, attempts: 1 };
   } catch (e) {

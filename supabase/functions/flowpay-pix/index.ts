@@ -354,7 +354,6 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
   const accessToken = await getFirebaseAccessToken();
 
   try {
-    // Step 1: Read current state
     const fields = await getFirestoreDoc('rate_limits', docId);
 
     if (fields) {
@@ -367,11 +366,12 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
       const count = Number(fields.count?.integerValue || '0');
 
       if (resetAt > now) {
-        // Window still active — atomic increment
-        const newCount = count + 1;
-        const shouldBlock = newCount > maxAttempts;
+        // Block decision based on CURRENT count (before increment) — safe under concurrency
+        // If count >= maxAttempts, block. This means even if 2 concurrent reads see count=4
+        // with maxAttempts=5, both block at count=5 (not count=6).
+        const shouldBlock = count >= maxAttempts;
 
-        await fetch(COMMIT_URL, {
+        const commitRes = await fetch(COMMIT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
           body: JSON.stringify({
@@ -396,13 +396,17 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
             ],
           }),
         });
+        if (!commitRes.ok) {
+          console.warn(`⚠️ Rate limit commit failed: ${commitRes.status}`);
+          return { allowed: true, attempts: count }; // fail-open but log
+        }
 
-        return { allowed: !shouldBlock, attempts: newCount };
+        return { allowed: !shouldBlock, attempts: count + 1 };
       }
     }
 
     // Window expired or doc doesn't exist — reset with count=1
-    await fetch(COMMIT_URL, {
+    const resetRes = await fetch(COMMIT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({
@@ -419,6 +423,9 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
         }],
       }),
     });
+    if (!resetRes.ok) {
+      console.warn(`⚠️ Rate limit reset commit failed: ${resetRes.status}`);
+    }
 
     return { allowed: true, attempts: 1 };
   } catch (e) {
