@@ -47,7 +47,7 @@ function filterByPeriod<T extends { created_at?: string | null }>(items: T[], pe
 
 export const AdminDashboard = () => {
   const queryClient = useQueryClient();
-  const [period, setPeriod] = useState<Period>('7d');
+  const [period, setPeriod] = useState<Period>('today');
 
   const { data: rawData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-stats'],

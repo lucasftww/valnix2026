@@ -63,7 +63,7 @@ function getPathname(url: string | null): string {
 }
 
 export function AdminAnalytics() {
-  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
+  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('today');
   
   const { data: events = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['analytics-events', dateRange],
