@@ -198,8 +198,8 @@ export default function Admin() {
           {/* Footer */}
           <footer className="border-t border-border/40 bg-background/50 px-6 py-3">
             <div className="flex items-center justify-between text-xs text-muted-foreground">
-              <span>© 2025 VALNIX. Todos os direitos reservados.</span>
-              <span>v2.0</span>
+              <span>© 2026 VALNIX. Todos os direitos reservados.</span>
+              <span>v2.1</span>
             </div>
           </footer>
         </div>

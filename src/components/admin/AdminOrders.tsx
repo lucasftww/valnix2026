@@ -165,6 +165,7 @@ export const AdminOrders = () => {
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailAddons, setDetailAddons] = useState<any[]>([]);
   const [restoringOrders, setRestoringOrders] = useState(false);
+  const [reprocessingDelivery, setReprocessingDelivery] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -984,10 +985,42 @@ export const AdminOrders = () => {
                         {verifyingPayment === detailOrder.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-1" />}
                         Verificar
                       </Button>
+                     )}
+                    {detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && (
+                      <Button 
+                        variant="outline" 
+                        size="sm" 
+                        disabled={reprocessingDelivery}
+                        onClick={async () => {
+                          setReprocessingDelivery(true);
+                          try {
+                            const token = await user?.getIdToken();
+                            const webhookSecret = ''; // internal call uses x-internal-key
+                            const res = await invokeFunction("process-delivery", {
+                              method: "POST",
+                              headers: { "x-firebase-token": token || "" },
+                              body: { orderId: detailOrder.id },
+                            });
+                            const data = await res.json();
+                            if (data.deliveredCount > 0) {
+                              toast({ title: `Entrega reprocessada!`, description: `${data.deliveredCount} código(s) entregue(s).` });
+                              handleViewDetail(detailOrder);
+                              fetchOrders();
+                            } else {
+                              toast({ title: "Nenhum código novo entregue", description: data.skippedCount > 0 ? "Já entregue anteriormente." : "Verifique o estoque." });
+                            }
+                          } catch (err: any) {
+                            toast({ title: "Erro ao reprocessar", description: err.message, variant: "destructive" });
+                          } finally {
+                            setReprocessingDelivery(false);
+                          }
+                        }}
+                      >
+                        {reprocessingDelivery ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                        Reprocessar entrega
+                      </Button>
                     )}
                   </div>
-
-                  {/* Order Items */}
                   <div className="space-y-3">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Itens do pedido ({detailItems.length})

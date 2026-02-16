@@ -30,17 +30,16 @@ interface AdminSidebarProps {
 
 const mainMenuItems = [
   { id: "dashboard", title: "Dashboard", icon: BarChart3, badge: null },
-  { id: "analytics", title: "Analytics", icon: TrendingUp, badge: "new" },
-  { id: "orders", title: "Pedidos", icon: ShoppingCart, badge: "hot" },
+  { id: "analytics", title: "Analytics", icon: TrendingUp, badge: null },
+  { id: "orders", title: "Pedidos", icon: ShoppingCart, badge: null },
   { id: "products", title: "Produtos", icon: Package, badge: null },
   { id: "categories", title: "Categorias", icon: FolderTree, badge: null },
 ];
 
-
 const systemMenuItems = [
   { id: "users", title: "Usuários", icon: Users, badge: null },
   { id: "coupons", title: "Cupons", icon: Tag, badge: null },
-  { id: "post-payment", title: "Pós-Venda", icon: TrendingUp, badge: "new" },
+  { id: "post-payment", title: "Pós-Venda", icon: Zap, badge: null },
 ];
 
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {

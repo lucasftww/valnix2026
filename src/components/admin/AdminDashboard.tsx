@@ -4,13 +4,14 @@ import { invokeFunction } from "@/lib/apiHelper";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   DollarSign, ShoppingCart, Package, TrendingUp, RefreshCw, 
-  Clock, CheckCircle2, AlertCircle,
+  CheckCircle2, AlertTriangle, AlertCircle,
   BarChart2, Users, Zap, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
-import { useMemo } from "react";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -28,10 +29,25 @@ const getFirebaseToken = async () => {
   return user.getIdToken();
 };
 
+type Period = 'today' | '7d' | '30d';
+
+function filterByPeriod<T extends { created_at?: string }>(items: T[], period: Period): T[] {
+  const now = new Date();
+  const cutoff = new Date();
+  if (period === 'today') { cutoff.setHours(0, 0, 0, 0); }
+  else if (period === '7d') { cutoff.setDate(now.getDate() - 7); }
+  else { cutoff.setDate(now.getDate() - 30); }
+  return items.filter(item => {
+    const d = item.created_at ? new Date(item.created_at) : new Date(0);
+    return d >= cutoff;
+  });
+}
+
 export const AdminDashboard = () => {
   const queryClient = useQueryClient();
+  const [period, setPeriod] = useState<Period>('7d');
 
-  const { data: stats, isLoading, refetch, isFetching } = useQuery({
+  const { data: rawData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
       const token = await getFirebaseToken();
@@ -41,101 +57,131 @@ export const AdminDashboard = () => {
         headers: { "x-firebase-token": token },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-
-      const allOrders = (data.orders || []) as any[];
-      const allProducts = (data.products || []) as any[];
-      const allProfiles = (data.profiles || []) as any[];
-      const allOrderItems = (data.orderItems || []) as any[];
-
-      const totalUsers = allProfiles.length;
-      const totalProducts = allProducts.filter((p: any) => p.is_active !== false).length;
-
-      const orders = allOrders.map((o: any) => ({
-        id: o.id,
-        customer_name: o.customer_name || '',
-        total_amount: Number(o.total_amount) || 0,
-        payment_status: o.payment_status || 'pending',
-        status: o.status || 'pending',
-        created_at: o.created_at || new Date().toISOString(),
-      }));
-
-      const paidOrders = orders.filter((o: any) => o.payment_status === 'paid');
-      const pendingOrders = orders.filter((o: any) => o.status === 'pending' && o.payment_status === 'paid');
-      const paidOrderIds = paidOrders.map((o: any) => o.id);
-      
-      const orderItems = allOrderItems
-        .map((item: any) => ({
-          id: item.id,
-          order_id: item.order_id || '',
-          product_name: item.product_name || '',
-          quantity: Number(item.quantity) || 0,
-          total_price: Number(item.total_price) || 0,
-        }))
-        .filter((item: any) => paidOrderIds.includes(item.order_id));
-
-      const totalRevenue = paidOrders.reduce((sum: number, order: any) => sum + Number(order.total_amount), 0);
-      
-      const productSales = orderItems.reduce((acc: any, item: any) => {
-        if (!acc[item.product_name]) acc[item.product_name] = { quantity: 0, revenue: 0 };
-        acc[item.product_name].quantity += item.quantity;
-        acc[item.product_name].revenue += Number(item.total_price);
-        return acc;
-      }, {} as Record<string, { quantity: number; revenue: number }>);
-
-      const topProducts = Object.entries(productSales || {})
-        .sort((a: any, b: any) => b[1].quantity - a[1].quantity)
-        .slice(0, 5);
-
-      const today = new Date().toISOString().split('T')[0];
-      const todayOrders = orders.filter((o: any) => o.created_at?.startsWith(today));
-      const todayRevenue = todayOrders.filter((o: any) => o.payment_status === 'paid')
-        .reduce((sum: number, o: any) => sum + Number(o.total_amount), 0);
-
-      const last7Days = Array.from({ length: 7 }, (_, i) => {
-        const date = new Date();
-        date.setDate(date.getDate() - (6 - i));
-        return date.toISOString().split('T')[0];
-      });
-
-      const revenueByDay = last7Days.map(date => {
-        const dayOrders = orders.filter((o: any) => o.created_at?.startsWith(date) && o.payment_status === 'paid');
-        const revenue = dayOrders.reduce((sum: number, o: any) => sum + Number(o.total_amount), 0);
-        const dayName = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
-        return {
-          name: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3),
-          receita: revenue,
-          pedidos: dayOrders.length
-        };
-      });
-
-      const paymentDistribution = [
-        { name: 'Pago', value: paidOrders.length, color: '#10b981' },
-        { name: 'Pendente', value: orders.filter((o: any) => o.payment_status === 'pending').length, color: '#f59e0b' },
-        { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' }
-      ].filter(item => item.value > 0);
-
-      return {
-        totalRevenue,
-        totalOrders: orders.length,
-        paidOrdersCount: paidOrders.length,
-        pendingDelivery: pendingOrders.length,
-        totalProducts,
-        totalUsers,
-        topProducts,
-        recentOrders: [...orders]
-          .filter((o: any) => o.payment_status === 'paid')
-          .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-          .slice(0, 8),
-        todayOrders: todayOrders.length,
-        todayRevenue,
-        avgTicket: paidOrders.length > 0 ? totalRevenue / paidOrders.length : 0,
-        revenueByDay,
-        paymentDistribution
-      };
+      return await res.json();
     },
     refetchInterval: 30000
   });
+
+  const stats = useMemo(() => {
+    if (!rawData) return null;
+
+    const allOrders = (rawData.orders || []) as any[];
+    const allProducts = (rawData.products || []) as any[];
+    const allProfiles = (rawData.profiles || []) as any[];
+    const allOrderItems = (rawData.orderItems || []) as any[];
+
+    const totalUsers = allProfiles.length;
+    const totalProducts = allProducts.filter((p: any) => p.is_active !== false).length;
+
+    const orders = allOrders.map((o: any) => ({
+      id: o.id,
+      customer_name: o.customer_name || '',
+      total_amount: Number(o.total_amount) || 0,
+      payment_status: o.payment_status || 'pending',
+      status: o.status || 'pending',
+      created_at: o.created_at || new Date().toISOString(),
+      payment_method: o.payment_method || null,
+    }));
+
+    // Period-filtered orders
+    const periodOrders = filterByPeriod(orders, period);
+    const periodPaid = periodOrders.filter((o: any) => o.payment_status === 'paid');
+    const periodRevenue = periodPaid.reduce((sum: number, o: any) => sum + o.total_amount, 0);
+    const periodAvgTicket = periodPaid.length > 0 ? periodRevenue / periodPaid.length : 0;
+    const periodFailed = periodOrders.filter((o: any) => o.payment_status === 'failed').length;
+
+    // All-time stats for context
+    const allPaid = orders.filter((o: any) => o.payment_status === 'paid');
+    const paidOrderIds = allPaid.map((o: any) => o.id);
+
+    const orderItems = allOrderItems
+      .map((item: any) => ({
+        id: item.id, order_id: item.order_id || '',
+        product_name: item.product_name || '', quantity: Number(item.quantity) || 0,
+        total_price: Number(item.total_price) || 0,
+      }))
+      .filter((item: any) => paidOrderIds.includes(item.order_id));
+
+    const productSales = orderItems.reduce((acc: any, item: any) => {
+      if (!acc[item.product_name]) acc[item.product_name] = { quantity: 0, revenue: 0 };
+      acc[item.product_name].quantity += item.quantity;
+      acc[item.product_name].revenue += Number(item.total_price);
+      return acc;
+    }, {} as Record<string, { quantity: number; revenue: number }>);
+
+    const topProducts = Object.entries(productSales)
+      .sort((a: any, b: any) => b[1].quantity - a[1].quantity)
+      .slice(0, 5);
+
+    const pendingDelivery = orders.filter((o: any) => o.payment_status === 'paid' && o.status !== 'completed' && o.status !== 'cancelled');
+
+    // Charts: last 7 days
+    const last7Days = Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() - (6 - i));
+      return date.toISOString().split('T')[0];
+    });
+
+    const revenueByDay = last7Days.map(date => {
+      const dayOrders = orders.filter((o: any) => o.created_at?.startsWith(date) && o.payment_status === 'paid');
+      const revenue = dayOrders.reduce((sum: number, o: any) => sum + o.total_amount, 0);
+      const dayName = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
+      return { name: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3), receita: revenue, pedidos: dayOrders.length };
+    });
+
+    const paymentDistribution = [
+      { name: 'Pago', value: allPaid.length, color: '#10b981' },
+      { name: 'Pendente', value: orders.filter((o: any) => o.payment_status === 'pending').length, color: '#f59e0b' },
+      { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' }
+    ].filter(item => item.value > 0);
+
+    // Alerts
+    const alerts: { type: 'error' | 'warning'; title: string; description: string }[] = [];
+    
+    const processingBalance = orders.filter((o: any) => o.payment_status === 'processing_balance');
+    const stuckProcessing = processingBalance.filter((o: any) => {
+      const elapsed = Date.now() - new Date(o.created_at).getTime();
+      return elapsed > 5 * 60 * 1000; // > 5 min
+    });
+    if (stuckProcessing.length > 0) {
+      alerts.push({ type: 'error', title: `${stuckProcessing.length} pedido(s) travado(s) em processing_balance`, description: 'Possível falha no checkout-balance. Verificar manualmente.' });
+    }
+
+    const needsRefund = orders.filter((o: any) => o.payment_status === 'error_needs_refund');
+    if (needsRefund.length > 0) {
+      alerts.push({ type: 'error', title: `${needsRefund.length} pedido(s) com erro de reembolso`, description: 'Reembolso automático falhou. Ação manual necessária.' });
+    }
+
+    const lowStockProducts = allProducts.filter((p: any) => 
+      p.delivery_type === 'auto_real' && 
+      p.is_active !== false && 
+      (p.auto_delivery_codes?.length || 0) < 3
+    );
+    if (lowStockProducts.length > 0) {
+      alerts.push({ type: 'warning', title: `${lowStockProducts.length} produto(s) com estoque baixo`, description: `Produtos auto_real com < 3 códigos: ${lowStockProducts.map((p: any) => p.name).join(', ')}` });
+    }
+
+    if (periodFailed > 0) {
+      alerts.push({ type: 'warning', title: `${periodFailed} pagamento(s) falharam no período`, description: 'Verifique os logs de pagamento.' });
+    }
+
+    const recentOrders = [...orders]
+      .filter((o: any) => o.payment_status === 'paid')
+      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+      .slice(0, 8);
+
+    return {
+      periodRevenue, periodOrders: periodOrders.length,
+      periodPaidCount: periodPaid.length, periodAvgTicket, periodFailed,
+      totalProducts, totalUsers,
+      topProducts, recentOrders,
+      pendingDelivery: pendingDelivery.length,
+      revenueByDay, paymentDistribution,
+      alerts,
+    };
+  }, [rawData, period]);
+
+  const periodLabel = period === 'today' ? 'Hoje' : period === '7d' ? '7 dias' : '30 dias';
 
   if (isLoading) {
     return (
@@ -154,62 +200,84 @@ export const AdminDashboard = () => {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
-          <h2 className="text-2xl font-bold tracking-tight">Dashboard</h2>
-          <p className="text-sm text-muted-foreground flex items-center gap-1.5 mt-0.5">
+          <p className="text-sm text-muted-foreground flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-green-500" />
-            Visão geral em tempo real
+            Atualiza a cada 30s
           </p>
         </div>
-        <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-9">
-          <RefreshCw className={cn("h-4 w-4 mr-1.5", isFetching && "animate-spin")} />
-          Atualizar
-        </Button>
+        <div className="flex items-center gap-2">
+          <Tabs value={period} onValueChange={(v) => setPeriod(v as Period)}>
+            <TabsList className="bg-muted/50 h-9">
+              <TabsTrigger value="today" className="text-xs">Hoje</TabsTrigger>
+              <TabsTrigger value="7d" className="text-xs">7 dias</TabsTrigger>
+              <TabsTrigger value="30d" className="text-xs">30 dias</TabsTrigger>
+            </TabsList>
+          </Tabs>
+          <Button variant="outline" size="sm" onClick={() => refetch()} disabled={isFetching} className="h-9">
+            <RefreshCw className={cn("h-4 w-4 mr-1.5", isFetching && "animate-spin")} />
+            Atualizar
+          </Button>
+        </div>
       </div>
 
-      {/* Pending delivery alert */}
-      {stats?.pendingDelivery && stats.pendingDelivery > 0 && (
-        <Card className="border-orange-500/30 bg-orange-500/5">
-          <CardContent className="flex items-center gap-3 py-3">
-            <div className="h-10 w-10 rounded-xl bg-orange-500/15 flex items-center justify-center shrink-0">
-              <AlertCircle className="h-5 w-5 text-orange-500" />
-            </div>
-            <div className="flex-1">
-              <p className="font-semibold text-sm text-orange-400">
-                {stats.pendingDelivery} {stats.pendingDelivery === 1 ? 'pedido aguarda' : 'pedidos aguardam'} entrega
-              </p>
-              <p className="text-xs text-muted-foreground">Pagos e esperando código de ativação</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Alerts */}
+      {stats?.alerts && stats.alerts.length > 0 && (
+        <div className="space-y-2">
+          {stats.alerts.map((alert, i) => (
+            <Card key={i} className={cn(
+              "border",
+              alert.type === 'error' ? 'border-red-500/30 bg-red-500/5' : 'border-orange-500/30 bg-orange-500/5'
+            )}>
+              <CardContent className="flex items-center gap-3 py-3">
+                <div className={cn(
+                  "h-10 w-10 rounded-xl flex items-center justify-center shrink-0",
+                  alert.type === 'error' ? 'bg-red-500/15' : 'bg-orange-500/15'
+                )}>
+                  {alert.type === 'error' ? (
+                    <AlertCircle className="h-5 w-5 text-red-500" />
+                  ) : (
+                    <AlertTriangle className="h-5 w-5 text-orange-500" />
+                  )}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className={cn("font-semibold text-sm", alert.type === 'error' ? 'text-red-400' : 'text-orange-400')}>
+                    {alert.title}
+                  </p>
+                  <p className="text-xs text-muted-foreground truncate">{alert.description}</p>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
       )}
 
-      {/* Stats Grid */}
+      {/* KPIs Grid */}
       <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
         <Card className="border-border/50 bg-card/50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita Total</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Receita ({periodLabel})</span>
               <div className="w-8 h-8 rounded-lg bg-green-500/10 flex items-center justify-center">
                 <DollarSign className="w-4 h-4 text-green-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(stats?.totalRevenue || 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">{stats?.paidOrdersCount || 0} pedidos pagos</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats?.periodRevenue || 0)}</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats?.periodPaidCount || 0} pedidos pagos</p>
           </CardContent>
         </Card>
 
         <Card className="border-border/50 bg-card/50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Hoje</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Pedidos ({periodLabel})</span>
               <div className="w-8 h-8 rounded-lg bg-blue-500/10 flex items-center justify-center">
                 <ShoppingCart className="w-4 h-4 text-blue-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">{stats?.todayOrders || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">{formatCurrency(stats?.todayRevenue || 0)}</p>
+            <p className="text-2xl font-bold">{stats?.periodOrders || 0}</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats?.periodFailed || 0} falharam</p>
           </CardContent>
         </Card>
 
@@ -221,26 +289,26 @@ export const AdminDashboard = () => {
                 <TrendingUp className="w-4 h-4 text-purple-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">{formatCurrency(stats?.avgTicket || 0)}</p>
-            <p className="text-xs text-muted-foreground mt-1">Por pedido pago</p>
+            <p className="text-2xl font-bold">{formatCurrency(stats?.periodAvgTicket || 0)}</p>
+            <p className="text-xs text-muted-foreground mt-1">No período selecionado</p>
           </CardContent>
         </Card>
 
         <Card className="border-border/50 bg-card/50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Produtos</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Catálogo</span>
               <div className="w-8 h-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
                 <Package className="w-4 h-4 text-orange-500" />
               </div>
             </div>
             <p className="text-2xl font-bold">{stats?.totalProducts || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">Ativos no catálogo</p>
+            <p className="text-xs text-muted-foreground mt-1">{stats?.totalUsers || 0} usuários</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Secondary Stats Row */}
+      {/* Secondary Stats */}
       <div className="grid gap-3 grid-cols-3">
         <div className="bg-muted/20 rounded-xl p-4 flex items-center gap-3 border border-border/30">
           <div className="h-9 w-9 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
@@ -256,24 +324,23 @@ export const AdminDashboard = () => {
             <CheckCircle2 className="h-4 w-4 text-green-500" />
           </div>
           <div>
-            <p className="text-lg font-bold">{stats?.paidOrdersCount || 0}</p>
-            <p className="text-xs text-muted-foreground">Pagos</p>
+            <p className="text-lg font-bold">{stats?.periodPaidCount || 0}</p>
+            <p className="text-xs text-muted-foreground">Pagos ({periodLabel})</p>
           </div>
         </div>
         <div className="bg-muted/20 rounded-xl p-4 flex items-center gap-3 border border-border/30">
           <div className="h-9 w-9 rounded-lg bg-yellow-500/10 flex items-center justify-center shrink-0">
-            <Clock className="h-4 w-4 text-yellow-500" />
+            <AlertTriangle className="h-4 w-4 text-yellow-500" />
           </div>
           <div>
             <p className="text-lg font-bold">{stats?.pendingDelivery || 0}</p>
-            <p className="text-xs text-muted-foreground">Aguardando</p>
+            <p className="text-xs text-muted-foreground">Aguardando entrega</p>
           </div>
         </div>
       </div>
 
       {/* Charts Row */}
       <div className="grid gap-4 lg:grid-cols-3">
-        {/* Revenue Chart */}
         <Card className="border-border/50 bg-card/50 lg:col-span-2">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -300,12 +367,7 @@ export const AdminDashboard = () => {
                   <XAxis dataKey="name" stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} />
                   <YAxis stroke="hsl(var(--muted-foreground))" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `R$${v}`} />
                   <Tooltip 
-                    contentStyle={{ 
-                      backgroundColor: 'hsl(var(--card))', 
-                      border: '1px solid hsl(var(--border))',
-                      borderRadius: '8px',
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.2)'
-                    }}
+                    contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px', boxShadow: '0 4px 12px rgba(0,0,0,0.2)' }}
                     formatter={(value: number) => [formatCurrency(value), 'Receita']}
                   />
                   <Area type="monotone" dataKey="receita" stroke="hsl(var(--primary))" strokeWidth={2} fillOpacity={1} fill="url(#colorReceita)" />
@@ -320,7 +382,6 @@ export const AdminDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Payment Distribution */}
         <Card className="border-border/50 bg-card/50">
           <CardHeader className="pb-2">
             <div className="flex items-center gap-2">
@@ -343,10 +404,7 @@ export const AdminDashboard = () => {
                         <Cell key={i} fill={entry.color} strokeWidth={0} />
                       ))}
                     </Pie>
-                    <Tooltip 
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }}
-                      formatter={(value: number) => [value, 'Pedidos']}
-                    />
+                    <Tooltip contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: '8px' }} formatter={(value: number) => [value, 'Pedidos']} />
                   </PieChart>
                 </ResponsiveContainer>
                 <div className="flex justify-center gap-4 flex-wrap">
@@ -370,7 +428,6 @@ export const AdminDashboard = () => {
 
       {/* Bottom Row */}
       <div className="grid gap-4 lg:grid-cols-2">
-        {/* Top Products */}
         <Card className="border-border/50 bg-card/50">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -414,7 +471,6 @@ export const AdminDashboard = () => {
           </CardContent>
         </Card>
 
-        {/* Recent Orders */}
         <Card className="border-border/50 bg-card/50">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
