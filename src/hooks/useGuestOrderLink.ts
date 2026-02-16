@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { db } from "@/integrations/firebase/config";
-import { collection, getDocs, updateDoc, query, where } from "firebase/firestore";
+import { collection, getDocs, updateDoc, query, where, doc } from "firebase/firestore";
 
 /**
  * On login/signup, AUTOMATICALLY links guest orders by email.
@@ -38,8 +38,21 @@ export function useGuestOrderLinking(userId: string | undefined, userEmail: stri
         }
 
         // AUTO-LINK all of them immediately (no user action needed)
-        for (const doc of snapshot.docs) {
-          await updateDoc(doc.ref, { linked: true, user_id: userId });
+        const linkedOrderIds: string[] = [];
+        for (const guestDoc of snapshot.docs) {
+          await updateDoc(guestDoc.ref, { linked: true, user_id: userId });
+          const orderId = guestDoc.data().order_id;
+          if (orderId) linkedOrderIds.push(orderId);
+        }
+
+        // Also update the orders collection so they appear in "Meus Pedidos"
+        for (const orderId of linkedOrderIds) {
+          try {
+            const orderRef = doc(db, "orders", orderId);
+            await updateDoc(orderRef, { user_id: userId });
+          } catch (err) {
+            console.warn(`⚠️ Could not update order ${orderId} user_id:`, err);
+          }
         }
 
         console.log(`✅ Auto-linked ${snapshot.size} guest order(s) for ${userEmail}`);
