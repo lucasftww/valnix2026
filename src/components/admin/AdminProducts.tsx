@@ -337,6 +337,32 @@ export const AdminProducts = () => {
     }
   };
 
+  const handleToggleActive = async (productId: string, currentActive: boolean) => {
+    if (togglingIds.has(productId)) return;
+    const newActive = !currentActive;
+    setTogglingIds(prev => new Set(prev).add(productId));
+    setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_active: newActive } : p));
+    try {
+      const token = await getFirebaseToken();
+      const res = await invokeFunction('admin-data', {
+        method: 'PUT',
+        queryParams: { resource: 'products' },
+        headers: { 'x-firebase-token': token },
+        body: { id: productId, is_active: newActive, updated_at: new Date().toISOString() },
+      });
+      if (!res.ok) throw new Error('Failed to toggle active');
+      toast({
+        title: newActive ? "Produto ativado" : "Produto desativado",
+      });
+      invalidateQueries();
+    } catch (error: any) {
+      setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_active: currentActive } : p));
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
+    } finally {
+      setTogglingIds(prev => { const next = new Set(prev); next.delete(productId); return next; });
+    }
+  };
+
   const handleToggleFeatured = async (productId: string, currentFeatured: boolean) => {
     if (togglingIds.has(productId)) return; // Prevent double-click
     
@@ -782,7 +808,12 @@ export const AdminProducts = () => {
                       DESTAQUE
                     </span>
                   )}
-                  <Switch checked={product.is_active} disabled className="data-[state=checked]:bg-green-500" />
+                  <Switch
+                    checked={product.is_active}
+                    disabled={togglingIds.has(product.id)}
+                    onCheckedChange={() => handleToggleActive(product.id, product.is_active)}
+                    className="data-[state=checked]:bg-green-500"
+                  />
                 </div>
               </div>
             </CardHeader>
