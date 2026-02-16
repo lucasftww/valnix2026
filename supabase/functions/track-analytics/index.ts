@@ -90,10 +90,33 @@ function toFirestoreValue(val: unknown): Record<string, unknown> {
   return { stringValue: String(val) };
 }
 
+// ── Rate limiting ──
+const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) return false;
+  if (!entry || entry.resetAt <= now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 30) { entry.blockedUntil = now + 300_000; return false; }
+  return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of rateLimitMap) { if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k); } }, 300_000);
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
+  }
+
+  // Rate limit
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   try {
