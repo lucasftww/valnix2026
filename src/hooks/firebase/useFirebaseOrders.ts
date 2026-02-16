@@ -276,42 +276,12 @@ export async function createOrder(orderData: CreateOrderData): Promise<string> {
 }
 
 // Função para criar itens do pedido
-// If processAutoDelivery is true, will generate codes for auto_fake products
-export async function createOrderItems(items: CreateOrderItemData[], processAutoDelivery: boolean = false): Promise<void> {
+// IMPORTANT: Auto-delivery is now handled server-side by process-delivery edge function.
+// This function NEVER consumes auto_delivery_codes — it only creates the order_item docs.
+export async function createOrderItems(items: CreateOrderItemData[], _processAutoDelivery: boolean = false): Promise<void> {
   const itemsRef = collection(db, 'order_items');
   
   for (const item of items) {
-    let deliveryCode: string | null = null;
-    
-    // Process auto-delivery if enabled and we have delivery info
-    if (processAutoDelivery && item.delivery_type) {
-      if (item.delivery_type === 'auto_fake') {
-        // Generate fake codes for each quantity
-        const codes: string[] = [];
-        for (let i = 0; i < item.quantity; i++) {
-          codes.push(generateFakeDeliveryCode());
-        }
-        deliveryCode = codes.join(',');
-        console.log(`Auto-generated ${codes.length} fake code(s) for ${item.product_name}`);
-      } else if (item.delivery_type === 'auto_real' && item.auto_delivery_codes && item.auto_delivery_codes.length > 0) {
-        // Use pre-configured codes
-        const neededCodes = Math.min(item.quantity, item.auto_delivery_codes.length);
-        const codes = item.auto_delivery_codes.slice(0, neededCodes);
-        deliveryCode = codes.join(',');
-        console.log(`Assigned ${codes.length} real code(s) for ${item.product_name}`);
-        
-        // Remove used codes from the product to prevent double-consumption
-        try {
-          const remaining = item.auto_delivery_codes.slice(neededCodes);
-          const productDocRef = doc(db, 'products', item.product_id);
-          await updateDoc(productDocRef, { auto_delivery_codes: remaining });
-          console.log(`✅ Removed ${neededCodes} used code(s) from product ${item.product_id}, ${remaining.length} remaining`);
-        } catch (err) {
-          console.warn(`⚠️ Failed to remove used codes from product ${item.product_id}:`, err);
-        }
-      }
-    }
-    
     await addDoc(itemsRef, {
       order_id: item.order_id,
       product_id: item.product_id,
@@ -320,7 +290,7 @@ export async function createOrderItems(items: CreateOrderItemData[], processAuto
       quantity: item.quantity,
       unit_price: item.unit_price,
       total_price: item.total_price,
-      delivery_code: deliveryCode,
+      delivery_code: null, // Always null — server handles delivery
       created_at: serverTimestamp(),
     });
   }
