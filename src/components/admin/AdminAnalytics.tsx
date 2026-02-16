@@ -184,22 +184,33 @@ export function AdminAnalytics() {
   const revenueByDay = useMemo(() => {
     const days: Record<string, { date: string; revenue: number; purchases: number; checkouts: number }> = {};
     const today = new Date();
-    const daysCount = dateRange === 'today' ? 1 : dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 30;
+    const daysCount = dateRange === 'today' ? 24 : dateRange === '7d' ? 7 : dateRange === '30d' ? 30 : 30;
+    const isHourly = dateRange === 'today';
     
-    for (let i = daysCount - 1; i >= 0; i--) {
-      const date = format(subDays(today, i), 'dd/MM');
-      days[date] = { date, revenue: 0, purchases: 0, checkouts: 0 };
+    if (isHourly) {
+      for (let h = 0; h < 24; h++) {
+        const label = `${h.toString().padStart(2, '0')}h`;
+        days[label] = { date: label, revenue: 0, purchases: 0, checkouts: 0 };
+      }
+    } else {
+      for (let i = daysCount - 1; i >= 0; i--) {
+        const date = format(subDays(today, i), 'dd/MM');
+        days[date] = { date, revenue: 0, purchases: 0, checkouts: 0 };
+      }
     }
     
     events.forEach(event => {
-      const date = format(new Date(event.event_time), 'dd/MM');
-      if (days[date]) {
+      const eventDate = new Date(event.event_time);
+      const key = isHourly
+        ? `${eventDate.getHours().toString().padStart(2, '0')}h`
+        : format(eventDate, 'dd/MM');
+      if (days[key]) {
         if (event.event_name === 'Purchase') {
-          days[date].revenue += event.value || 0;
-          days[date].purchases++;
+          days[key].revenue += event.value || 0;
+          days[key].purchases++;
         }
         if (event.event_name === 'InitiateCheckout') {
-          days[date].checkouts++;
+          days[key].checkouts++;
         }
       }
     });
@@ -546,9 +557,9 @@ export function AdminAnalytics() {
                   <span className="text-lg font-bold tabular-nums">{metrics.checkouts.toLocaleString()}</span>
                 </div>
               </div>
-              <div className="h-9 bg-muted/20 rounded-lg overflow-hidden">
-                <div className="h-full rounded-lg bg-gradient-to-r from-yellow-500/50 to-yellow-500/80 flex items-center justify-end pr-3 transition-all duration-700" style={{ width: `${metrics.views > 0 ? Math.max((metrics.checkouts / metrics.views) * 100, 3) : 100}%` }}>
-                  <span className="text-[11px] font-semibold text-foreground">{metrics.viewToCheckout.toFixed(1)}%</span>
+                <div className="h-9 bg-muted/20 rounded-lg overflow-hidden">
+                <div className="h-full rounded-lg bg-gradient-to-r from-yellow-500/50 to-yellow-500/80 flex items-center justify-end pr-3 transition-all duration-700" style={{ width: `${metrics.views > 0 ? Math.max((metrics.checkouts / metrics.views) * 100, 3) : (metrics.checkouts > 0 ? 100 : 3)}%` }}>
+                  <span className="text-[11px] font-semibold text-foreground">{metrics.views > 0 ? `${metrics.viewToCheckout.toFixed(1)}%` : '—'}</span>
                 </div>
               </div>
             </div>
