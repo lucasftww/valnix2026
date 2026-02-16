@@ -6,8 +6,7 @@ import {
   CarouselItem,
 } from "@/components/ui/carousel";
 import Autoplay from "embla-carousel-autoplay";
-import { db } from "@/integrations/firebase/config";
-import { collection, getDocs, query, where, orderBy } from "firebase/firestore";
+import { invokeFunction } from "@/lib/apiHelper";
 
 interface Banner {
   id: string;
@@ -28,18 +27,11 @@ const HeroBannerComponent = () => {
   useEffect(() => {
     const fetchBanners = async () => {
       try {
-        const bannersRef = collection(db, "site_banners");
-        const q = query(
-          bannersRef,
-          where("is_active", "==", true),
-          orderBy("display_order", "asc")
-        );
-        const snapshot = await getDocs(q);
-        const data = snapshot.docs.map(doc => ({
-          id: doc.id,
-          ...doc.data(),
-        })) as Banner[];
-        setBanners(data);
+        const res = await invokeFunction('site-banners', { method: 'GET' });
+        if (res.ok) {
+          const data = await res.json();
+          setBanners(data.banners || []);
+        }
       } catch (err) {
         console.error("Error fetching banners:", err);
       }
