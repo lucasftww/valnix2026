@@ -96,9 +96,15 @@ export default function Category() {
         <meta property="og:description" content={`Compre ${category.name} com entrega automática e pagamento via PIX. Melhores preços do Brasil.`} />
         <meta property="og:url" content={`https://www.valnix.com.br/${category.slug}`} />
         <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="VALNIX" />
+        {category.image_url && <meta property="og:image" content={category.image_url} />}
+        {category.image_url && <meta property="og:image:width" content="1200" />}
+        {category.image_url && <meta property="og:image:height" content="630" />}
+        {!category.image_url && <meta property="og:image" content="https://www.valnix.com.br/images/og-home.jpg" />}
         <meta name="twitter:card" content="summary_large_image" />
         <meta name="twitter:title" content={`Comprar ${category.name} Barato | VALNIX`} />
         <meta name="twitter:description" content={`Compre ${category.name} com entrega automática e pagamento via PIX. Melhores preços do Brasil.`} />
+        {category.image_url ? <meta name="twitter:image" content={category.image_url} /> : <meta name="twitter:image" content="https://www.valnix.com.br/images/og-home.jpg" />}
       </Helmet>
       <Header />
       <Navigation />
