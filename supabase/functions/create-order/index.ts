@@ -115,6 +115,22 @@ async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; em
   } catch { return null; }
 }
 
+// ── Rate limit logging to Firestore ──
+async function logRateLimitBlock(source: string, ip: string, attempts: number) {
+  try {
+    await addFirestoreDoc('rate_limit_logs', {
+      source,
+      ip,
+      attempts,
+      blocked_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    });
+    console.warn(`🛡️ Rate limit block logged: ${source} | IP: ${ip} | Attempts: ${attempts}`);
+  } catch (e) {
+    console.warn('⚠️ Failed to log rate limit block:', e);
+  }
+}
+
 // ── Rate limiting (in-memory, best-effort) ──
 const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
 function checkRateLimit(ip: string): boolean {
@@ -161,6 +177,7 @@ Deno.serve(async (req) => {
     // Rate limit
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     if (!checkRateLimit(clientIp)) {
+      logRateLimitBlock('create-order', clientIp, rateLimitMap.get(clientIp)?.count || 0);
       return new Response(JSON.stringify({ error: 'Too many requests' }),
         { status: 429, headers: { ...cors, 'Content-Type': 'application/json' } });
     }

@@ -316,6 +316,22 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
   return true;
 }
 
+// ── Rate limit logging to Firestore ──
+async function logRateLimitBlock(source: string, ip: string, attempts: number) {
+  try {
+    await addFirestoreDoc('rate_limit_logs', {
+      source,
+      ip,
+      attempts,
+      blocked_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    });
+    console.warn(`🛡️ Rate limit block logged: ${source} | IP: ${ip} | Attempts: ${attempts}`);
+  } catch (e) {
+    console.warn('⚠️ Failed to log rate limit block:', e);
+  }
+}
+
 // ── Rate limiting for PIX charge creation (per-IP) ──
 const pixRateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
 function checkPixCreateRateLimit(ip: string): boolean {
@@ -327,8 +343,8 @@ function checkPixCreateRateLimit(ip: string): boolean {
     return true;
   }
   entry.count++;
-  if (entry.count > 6) { // Max 6 PIX charges per minute per IP
-    entry.blockedUntil = now + 600_000; // Block for 10 minutes
+  if (entry.count > 6) {
+    entry.blockedUntil = now + 600_000;
     console.warn(`🚨 PIX RATE LIMIT: IP ${ip} blocked after ${entry.count} attempts`);
     return false;
   }
@@ -485,6 +501,7 @@ Deno.serve(async (req) => {
       // 🔒 Rate limit PIX creation per IP
       const createIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
       if (!checkPixCreateRateLimit(createIp)) {
+        logRateLimitBlock('flowpay-pix', createIp, pixRateLimitMap.get(createIp)?.count || 0);
         return new Response(JSON.stringify({ error: 'Muitas tentativas. Aguarde alguns minutos.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
