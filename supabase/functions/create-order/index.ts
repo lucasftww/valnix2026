@@ -70,7 +70,7 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>): Prom
   for (const [k, v] of Object.entries(data)) {
     if (v === null || v === undefined) fields[k] = { nullValue: null };
     else if (typeof v === 'string') fields[k] = { stringValue: v };
-    else if (typeof v === 'number') fields[k] = { doubleValue: v };
+    else if (typeof v === 'number') fields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
     else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
     else fields[k] = { stringValue: String(v) };
   }
@@ -84,10 +84,18 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>): Prom
     return null;
   }
   const result = await res.json();
-  // Extract doc ID from name like "projects/valnix/databases/(default)/documents/orders/abc123"
   const name = result.name || '';
   const parts = name.split('/');
   return parts[parts.length - 1] || null;
+}
+
+async function getFirestoreDoc(col: string, docId: string) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+  if (!res.ok) return null;
+  const data = await res.json();
+  return data.fields || null;
 }
 
 // ── Firebase ID Token Verification ─────────────────────────────────
@@ -148,19 +156,63 @@ Deno.serve(async (req) => {
     if (!order.customer_email || typeof order.customer_email !== 'string') {
       return new Response(JSON.stringify({ error: 'Invalid customer email' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
-    if (typeof order.total_amount !== 'number' || order.total_amount < 0.01) {
-      return new Response(JSON.stringify({ error: 'Invalid total amount' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+
+    // 🔒 Server-side price recalculation — NEVER trust client total_amount
+    let recalculatedTotal = 0;
+    for (const item of items) {
+      const productId = item.product_id;
+      const quantity = Number(item.quantity) || 1;
+      if (!productId || typeof productId !== 'string') {
+        return new Response(JSON.stringify({ error: 'Invalid product_id in items' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      const productFields = await getFirestoreDoc('products', productId);
+      if (!productFields) {
+        return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
+      recalculatedTotal += realPrice * quantity;
+    }
+
+    // Apply coupon discount server-side
+    let discountAmount = 0;
+    if (order.coupon_id) {
+      const couponFields = await getFirestoreDoc('coupons', String(order.coupon_id));
+      if (couponFields) {
+        const discountType = couponFields.discount_type?.stringValue;
+        const discountValue = Number(couponFields.discount_value?.doubleValue || couponFields.discount_value?.integerValue || 0);
+        const isActive = couponFields.is_active?.booleanValue !== false;
+        const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null;
+        const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0;
+        const expiresAt = couponFields.expires_at?.stringValue;
+        if (isActive && (!maxUses || currentUses < maxUses) && (!expiresAt || new Date(expiresAt) > new Date())) {
+          if (discountType === 'percentage') discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal);
+          else discountAmount = Math.min(discountValue, recalculatedTotal);
+          console.log(`🏷️ Coupon ${order.coupon_id}: -R$${discountAmount.toFixed(2)}`);
+        }
+      }
+    }
+
+    const serverTotal = Math.round((recalculatedTotal - discountAmount) * 100) / 100;
+    if (serverTotal < 0.01) {
+      return new Response(JSON.stringify({ error: 'Order total too low' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+    }
+
+    const clientTotal = Number(order.total_amount) || 0;
+    if (Math.abs(clientTotal - serverTotal) > 0.01) {
+      console.warn(`🚨 CREATE-ORDER PRICE MISMATCH! Client: R$${clientTotal}, Server: R$${serverTotal}`);
     }
 
     const now = new Date().toISOString();
 
-    // Create order document
+    // Create order document with SERVER-CALCULATED total
     const orderData: Record<string, unknown> = {
       user_id: userId,
       customer_name: String(order.customer_name).trim().slice(0, 200),
       customer_email: String(order.customer_email).trim().slice(0, 255),
       customer_phone: order.customer_phone ? String(order.customer_phone).trim().slice(0, 30) : null,
-      total_amount: Number(order.total_amount),
+      total_amount: serverTotal,
+      subtotal_amount: Math.round(recalculatedTotal * 100) / 100,
+      discount_amount: Math.round(discountAmount * 100) / 100,
       notes: order.notes ? String(order.notes).slice(0, 500) : null,
       status: 'pending',
       payment_status: 'pending',
@@ -254,7 +306,7 @@ Deno.serve(async (req) => {
             total_price: it.total_price || 0,
             delivery_code: null,
           })),
-          total_amount: Number(order.total_amount),
+          total_amount: serverTotal,
           payment_method: order.payment_method || 'pix',
           created_at: now,
         }),
