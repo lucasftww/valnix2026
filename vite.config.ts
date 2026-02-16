@@ -161,10 +161,12 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui': ['@radix-ui/react-accordion', '@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover', '@radix-ui/react-select'],
+          'ui-core': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover'],
+          'ui-extra': ['@radix-ui/react-accordion', '@radix-ui/react-select', '@radix-ui/react-tabs'],
           'firebase-core': ['firebase/app', 'firebase/auth'],
           'firebase-db': ['firebase/firestore'],
           'charts': ['recharts'],
+          'carousel': ['embla-carousel-react', 'embla-carousel-autoplay'],
         },
         assetFileNames: (assetInfo) => {
           if (!assetInfo.name) return 'assets/[name]-[hash][extname]';
@@ -185,16 +187,23 @@ export default defineConfig(({ mode }) => ({
       compress: {
         drop_console: true,
         drop_debugger: true,
-        passes: 2,
-        pure_funcs: ['console.log', 'console.info'],
+        passes: 3,
+        pure_funcs: ['console.log', 'console.info', 'console.warn'],
+        dead_code: true,
+        collapse_vars: true,
+        reduce_vars: true,
+        hoist_funs: true,
       },
       mangle: {
         safari10: true,
+        toplevel: true,
       },
       format: {
         comments: false,
       }
     },
     reportCompressedSize: false,
+    target: 'es2020',
+    cssMinify: true,
   }
 }));

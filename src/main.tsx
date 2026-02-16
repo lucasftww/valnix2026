@@ -1,15 +1,15 @@
 import { createRoot } from "react-dom/client";
 
-// Self-hosted Poppins — only critical weights in initial bundle
+// Critical font weights — inlined for instant text rendering
 import "@fontsource/poppins/400.css";
 import "@fontsource/poppins/600.css";
 import "@fontsource/poppins/700.css";
 
-// Defer medium weight — rarely used in critical path
-import("@fontsource/poppins/500.css");
-
 import App from "./App.tsx";
 import "./index.css";
+
+// Defer non-critical font weight after paint
+requestAnimationFrame(() => import("@fontsource/poppins/500.css"));
 
 // Auto-reload on chunk load failures (stale cache after deploy)
 window.addEventListener("error", (e) => {
