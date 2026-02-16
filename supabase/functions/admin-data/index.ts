@@ -557,6 +557,71 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // ── Cleanup orders by email ──────────────────────────────────
+      if (resource === "cleanup-orders") {
+        const email = (body.email || '').trim().toLowerCase();
+        if (!email) {
+          return new Response(JSON.stringify({ error: "email required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Find all orders matching the email
+        const orders = await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: email });
+        if (orders.length === 0) {
+          return new Response(JSON.stringify({ success: true, deletedOrders: 0, deletedItems: 0, message: "Nenhum pedido encontrado para este email." }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        let deletedItems = 0;
+        const errors: string[] = [];
+
+        for (const order of orders) {
+          try {
+            // Delete order_items for this order
+            const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: order.id });
+            for (const item of items) {
+              await deleteFirestoreDoc("order_items", item.id);
+              deletedItems++;
+            }
+            // Delete the order itself
+            await deleteFirestoreDoc("orders", order.id);
+          } catch (err: any) {
+            errors.push(`order ${order.id}: ${err.message || err}`);
+          }
+        }
+
+        // Also clean guest_orders matching this email
+        let deletedGuest = 0;
+        try {
+          const guestOrders = await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: email });
+          for (const g of guestOrders) {
+            await deleteFirestoreDoc("guest_orders", g.id);
+            deletedGuest++;
+          }
+        } catch { /* guest_orders may not exist */ }
+
+        // Also clean sale_addons
+        let deletedAddons = 0;
+        try {
+          const addons = await queryCollectionFiltered("sale_addons", "customer_email", "EQUAL", { stringValue: email });
+          for (const a of addons) {
+            await deleteFirestoreDoc("sale_addons", a.id);
+            deletedAddons++;
+          }
+        } catch { /* sale_addons may not exist */ }
+
+        console.log(`🧹 Cleanup orders for ${email}: ${orders.length} orders, ${deletedItems} items, ${deletedGuest} guest_orders, ${deletedAddons} sale_addons`);
+
+        return new Response(JSON.stringify({
+          success: true,
+          deletedOrders: orders.length,
+          deletedItems,
+          deletedGuest,
+          deletedAddons,
+          errors: errors.length > 0 ? errors : undefined,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       return new Response(JSON.stringify({ error: "Invalid resource" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

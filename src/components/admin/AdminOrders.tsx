@@ -166,6 +166,9 @@ export const AdminOrders = () => {
   const [detailAddons, setDetailAddons] = useState<any[]>([]);
   const [restoringOrders, setRestoringOrders] = useState(false);
   const [reprocessingDelivery, setReprocessingDelivery] = useState(false);
+  const [cleanupEmail, setCleanupEmail] = useState("");
+  const [cleanupEmailDialogOpen, setCleanupEmailDialogOpen] = useState(false);
+  const [cleaningEmail, setCleaningEmail] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
 
@@ -712,10 +715,70 @@ export const AdminOrders = () => {
                 <DropdownMenuItem disabled={cleanCounts.cancelled === 0} onSelect={(e) => { e.preventDefault(); setCleanType("cancelled"); }} className="text-muted-foreground">
                   <Trash2 className="w-4 h-4 mr-2" /> Cancelados ({cleanCounts.cancelled})
                 </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onSelect={(e) => { e.preventDefault(); setCleanupEmailDialogOpen(true); }} className="text-orange-500 focus:text-orange-500">
+                  <Mail className="w-4 h-4 mr-2" /> Limpar por email
+                </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
+
+        {/* ── Cleanup by Email Dialog ──────────────────────────────── */}
+        <AlertDialog open={cleanupEmailDialogOpen} onOpenChange={setCleanupEmailDialogOpen}>
+          <AlertDialogContent>
+            <AlertDialogHeader>
+              <AlertDialogTitle>Limpar pedidos por email</AlertDialogTitle>
+              <AlertDialogDescription>
+                Todos os pedidos, itens, guest_orders e sale_addons deste email serão excluídos permanentemente.
+              </AlertDialogDescription>
+            </AlertDialogHeader>
+            <Input
+              placeholder="email@exemplo.com"
+              value={cleanupEmail}
+              onChange={(e) => setCleanupEmail(e.target.value)}
+              className="my-2"
+            />
+            <AlertDialogFooter>
+              <AlertDialogCancel onClick={() => setCleanupEmail("")}>Cancelar</AlertDialogCancel>
+              <AlertDialogAction
+                disabled={!cleanupEmail.includes("@") || cleaningEmail}
+                onClick={async (e) => {
+                  e.preventDefault();
+                  setCleaningEmail(true);
+                  try {
+                    const token = await user?.getIdToken();
+                    const res = await invokeFunction("admin-data", {
+                      method: "POST",
+                      queryParams: { resource: "cleanup-orders" },
+                      headers: { "x-firebase-token": token || "" },
+                      body: { email: cleanupEmail },
+                    });
+                    const data = await res.json();
+                    if (data.success) {
+                      toast({
+                        title: "Limpeza concluída",
+                        description: `${data.deletedOrders} pedido(s), ${data.deletedItems} item(ns), ${data.deletedGuest || 0} guest(s), ${data.deletedAddons || 0} addon(s) removidos.`,
+                      });
+                      setCleanupEmail("");
+                      setCleanupEmailDialogOpen(false);
+                      await fetchOrders();
+                    } else {
+                      toast({ title: "Erro", description: data.error || "Falha na limpeza", variant: "destructive" });
+                    }
+                  } catch (err: any) {
+                    toast({ title: "Erro", description: err.message, variant: "destructive" });
+                  } finally {
+                    setCleaningEmail(false);
+                  }
+                }}
+              >
+                {cleaningEmail && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                Excluir tudo
+              </AlertDialogAction>
+            </AlertDialogFooter>
+          </AlertDialogContent>
+        </AlertDialog>
 
         {/* ── Clean Confirmation ───────────────────────────────────── */}
         <AlertDialog open={!!cleanType} onOpenChange={() => setCleanType(null)}>
