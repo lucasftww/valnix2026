@@ -239,7 +239,7 @@ Deno.serve(async (req) => {
   try {
     // Rate limit (Firestore-backed, centralized)
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    const rlResult = await checkRateLimitFirestore(`order_${clientIp}`, 8, 60_000, 300_000);
+    const rlResult = await checkRateLimitFirestore(`order_${clientIp}`, 15, 60_000, 300_000);
     if (!rlResult.allowed) {
       logRateLimitBlock('create-order', clientIp, rlResult.attempts);
       return new Response(JSON.stringify({ error: 'Too many requests' }),
@@ -371,9 +371,8 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Order created: ${orderId} for user ${userId}`);
 
-    // Create order items (use cached product data — no extra reads)
-    for (const item of items) {
-      // 🔒 Use server-side price for order_items (never trust client unit_price/total_price)
+    // Create order items in PARALLEL (use cached product data — no extra reads)
+    await Promise.all(items.map((item: any) => {
       const cachedProduct = productCache.get(String(item.product_id));
       const realItemPrice = cachedProduct ? Number(cachedProduct.price?.doubleValue || cachedProduct.price?.integerValue || 0) : 0;
       const itemQty = Number(item.quantity) || 1;
@@ -389,8 +388,8 @@ Deno.serve(async (req) => {
         delivery_type: item.delivery_type || 'manual',
         created_at: now,
       };
-      await addFirestoreDoc('order_items', itemData);
-    }
+      return addFirestoreDoc('order_items', itemData);
+    }));
 
     console.log(`✅ ${items.length} order items created for order ${orderId}`);
 
@@ -468,9 +467,8 @@ Deno.serve(async (req) => {
       });
       if (!guestRes.ok) throw new Error(`guest_orders write failed: ${guestRes.status}`);
 
-      // Write items to subcollection: guest_orders/{hash}/items/{itemIdx}
-      for (let idx = 0; idx < items.length; idx++) {
-        const it = items[idx] as any;
+      // Write items to subcollection IN PARALLEL: guest_orders/{hash}/items/{itemIdx}
+      await Promise.all(items.map(async (it: any, idx: number) => {
         const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
         const qty = Number(it.quantity) || 1;
         const itemFields: Record<string, unknown> = {
@@ -490,7 +488,7 @@ Deno.serve(async (req) => {
           body: JSON.stringify({ fields: itemFields }),
         });
         if (!itemRes.ok) console.warn(`⚠️ guest_orders/${hash}/items/${idx} write failed: ${itemRes.status}`);
-      }
+      }));
 
       guestHash = hash;
       console.log(`✅ Guest order saved with hash as docId: ${hash} (${items.length} items in subcollection)`);
