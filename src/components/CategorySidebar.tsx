@@ -22,8 +22,8 @@ export const CategorySidebar = () => {
 
   if (isLoading) {
     return (
-      <div className="bg-card border border-border rounded-xl p-6 sticky top-32 self-start max-h-[calc(100vh-9rem)] overflow-y-auto">
-        <h3 className="text-xl font-bold mb-4 text-primary">CATEGORIAS</h3>
+       <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl p-5 sticky top-32 self-start max-h-[calc(100vh-9rem)] overflow-y-auto border border-border/10">
+        <h3 className="text-xs font-bold mb-4 text-muted-foreground tracking-widest uppercase">Categorias</h3>
         <div className="space-y-3">
           {[...Array(6)].map((_, i) => (
             <Skeleton key={i} className="h-10 w-full" />
@@ -47,12 +47,12 @@ export const CategorySidebar = () => {
       <div key={category.id} className={isChild ? "ml-6" : ""}>
         <Link
           to={`/${category.slug}`}
-          className={`flex items-center justify-between py-3 px-4 rounded-lg transition-all group ${
+          className={`flex items-center justify-between py-2.5 px-3 rounded-xl transition-all text-sm ${
             isActive
-              ? "bg-primary text-primary-foreground font-bold"
+              ? "bg-foreground text-background font-bold"
               : isChild
-              ? "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              : "text-foreground hover:text-primary hover:bg-primary/10 font-semibold"
+              ? "text-muted-foreground hover:text-foreground hover:bg-secondary"
+              : "text-foreground hover:bg-secondary font-medium"
           }`}
         >
           <div className="flex items-center gap-3">
@@ -76,8 +76,8 @@ export const CategorySidebar = () => {
   };
 
   return (
-    <div className="bg-card border border-border rounded-xl p-6 sticky top-32 self-start max-h-[calc(100vh-9rem)] overflow-y-auto">
-      <h3 className="text-xl font-bold mb-4 text-primary">CATEGORIAS</h3>
+    <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl p-5 sticky top-32 self-start max-h-[calc(100vh-9rem)] overflow-y-auto border border-border/10">
+      <h3 className="text-xs font-bold mb-4 text-muted-foreground tracking-widest uppercase">Categorias</h3>
       <div className="space-y-1">
         {categories.map((category) => renderCategory(category))}
       </div>

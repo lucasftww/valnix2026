@@ -89,10 +89,10 @@ export default function Category() {
       <main className="flex-1">
         <div className="container px-4 md:px-8 py-6">
           {/* Breadcrumb */}
-          <nav className="flex mb-6 text-sm text-muted-foreground">
-            <Link to="/" className="hover:text-primary">Início</Link>
-            <span className="mx-2">/</span>
-            <span className="text-foreground">{category.name}</span>
+          <nav className="flex mb-6 text-xs text-muted-foreground tracking-wide uppercase">
+            <Link to="/" className="hover:text-foreground transition-colors">Início</Link>
+            <span className="mx-2 opacity-40">/</span>
+            <span className="text-foreground font-medium">{category.name}</span>
           </nav>
 
           <div className="flex gap-8">
@@ -103,19 +103,20 @@ export default function Category() {
 
             {/* Main Content */}
             <div className="flex-1 animate-fade-in" key={categorySlug}>
-              {/* Título com estilo igual ao Valorant */}
-              <h1 className="text-3xl font-bold text-foreground mb-6 border-b-4 border-primary inline-block pb-2">
+              <h1 className="text-2xl md:text-3xl font-bold text-foreground mb-2 tracking-tight">
                 {category.name}
               </h1>
 
               {category.description && (
-                <p className="text-muted-foreground mb-6">
+                <p className="text-muted-foreground text-sm mb-6 max-w-xl">
                   {category.description}
                 </p>
               )}
 
+              {!category.description && <div className="mb-6" />}
+
               {/* Products Grid */}
-              <div className="grid grid-cols-2 gap-1 md:gap-6 lg:grid-cols-3 touch-manipulation">
+              <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3 touch-manipulation">
                 {productsLoading ? (
                   Array.from({ length: 6 }).map((_, i) => (
                     <ProductSkeleton key={i} />
@@ -137,12 +138,12 @@ export default function Category() {
                     />
                   ))
                 ) : (
-                  <div className="col-span-full text-center py-12 bg-muted/50 rounded-lg">
-                    <p className="text-muted-foreground text-lg mb-4">
+                  <div className="col-span-full text-center py-16 rounded-2xl bg-secondary/50 backdrop-blur-xl">
+                    <p className="text-muted-foreground mb-4">
                       Nenhum produto encontrado nesta categoria
                     </p>
-                    <Link to="/" className="text-primary hover:underline">
-                      Explorar outras categorias
+                    <Link to="/" className="text-sm font-medium text-foreground hover:opacity-70 transition-opacity">
+                      ← Explorar outras categorias
                     </Link>
                   </div>
                 )}
