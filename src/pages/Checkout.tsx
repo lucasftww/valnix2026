@@ -300,30 +300,8 @@ export default function Checkout() {
         }
 
         setUserBalance(balanceResult.remainingBalance ?? 0);
-        trackPurchaseEvent(effectiveUserId, orderAmount, orderId, items.map(i => i.name).join(', '));
-
-        // Meta CAPI + UTMify (fire-and-forget)
-        try {
-          const nameParts = formData.name.split(' ');
-          invokeFunctionFireAndForget('meta-capi', {
-            event_name: 'Purchase', event_id: `purchase_${orderId}_${Date.now()}`, order_id: orderId,
-            value: orderAmount, currency: 'BRL', content_name: items.map(i => i.name).join(', '),
-            email: formData.email || user?.email, phone: formData.phone || undefined,
-            first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
-            external_id: effectiveUserId, fbc: getCookie('_fbc') || undefined, fbp: getCookie('_fbp') || undefined,
-          });
-        } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
-
-        try {
-          invokeFunctionFireAndForget('utmify-event', {
-            order_id: orderId, event_type: 'Purchase', value: orderAmount,
-            customer_name: formData.name, customer_email: formData.email || user?.email,
-            customer_phone: formData.phone || undefined, product_name: items.map(i => i.name).join(', '),
-            utm_source: utmParams.utm_source || undefined, utm_medium: utmParams.utm_medium || undefined,
-            utm_campaign: utmParams.utm_campaign || undefined, utm_content: utmParams.utm_content || undefined,
-            utm_term: utmParams.utm_term || undefined,
-          });
-        } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
+        // 🔒 Purchase tracking is now handled server-side in checkout-balance edge function.
+        // Do NOT track here to avoid duplicate Purchase events.
 
         saveCheckoutDataToProfile();
         clearCart();
