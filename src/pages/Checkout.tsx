@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
-import { createOrder, createOrderItems } from "@/hooks/firebase";
+
 import { Loader2, Zap, Lock, Check, AlertCircle, Wallet, CreditCard, ChevronUp } from "lucide-react";
 import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
@@ -25,6 +25,28 @@ import { saveGuestOrder } from "@/lib/guestOrders";
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return match ? decodeURIComponent(match[2]) : null;
+}
+
+// Helper: create order + items via server-side edge function
+async function createOrderServerSide(
+  orderData: Record<string, unknown>,
+  items: Array<Record<string, unknown>>,
+  authToken?: string | null,
+): Promise<string> {
+  const headers: Record<string, string> = {};
+  if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+  
+  const response = await invokeFunction('create-order', {
+    method: 'POST',
+    headers,
+    body: { order: orderData, items },
+  });
+  
+  const result = await response.json();
+  if (!response.ok || !result.success || !result.orderId) {
+    throw new Error(result.error || 'Erro ao criar pedido');
+  }
+  return result.orderId;
 }
 
 interface FormData {
@@ -289,38 +311,9 @@ export default function Checkout() {
           return;
         }
 
-        // Create order with PENDING status (server will set to paid)
-        const orderId = await createOrder({
-          user_id: effectiveUserId,
-          customer_name: formData.name,
-          customer_email: formData.email || user?.email || "",
-          customer_phone: formData.phone || "",
-          total_amount: orderAmount,
-          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Saldo` : "Saldo",
-          status: "pending",
-          payment_status: "pending",
-          payment_method: "balance",
-          fbc: getCookie('_fbc'),
-          fbp: getCookie('_fbp'),
-          utm_source: utmParams.utm_source || null,
-          utm_medium: utmParams.utm_medium || null,
-          utm_campaign: utmParams.utm_campaign || null,
-          utm_content: utmParams.utm_content || null,
-          utm_term: utmParams.utm_term || null,
-        });
-
-        // Save coupon info on order
-        if (appliedCoupon) {
-          const orderRef = doc(db, "orders", orderId);
-          await updateDoc(orderRef, { 
-            coupon_id: appliedCoupon.id,
-            coupon_code: appliedCoupon.code,
-          });
-        }
-
-        // Create order items (no delivery — server handles it)
+        // Create order + items server-side
+        const balanceToken = user ? await user.getIdToken() : null;
         const orderItemsData = items.map(item => ({
-          order_id: orderId,
           product_id: item.id,
           product_name: item.name,
           product_image: item.image,
@@ -328,9 +321,26 @@ export default function Checkout() {
           unit_price: item.price,
           total_price: item.price * item.quantity,
           delivery_type: item.delivery_type || 'manual',
-          auto_delivery_codes: null as string[] | null,
         }));
-        await createOrderItems(orderItemsData, false);
+
+        const orderId = await createOrderServerSide({
+          user_id: effectiveUserId,
+          customer_name: formData.name,
+          customer_email: formData.email || user?.email || "",
+          customer_phone: formData.phone || "",
+          total_amount: orderAmount,
+          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Saldo` : "Saldo",
+          payment_method: "balance",
+          coupon_id: appliedCoupon?.id || null,
+          coupon_code: appliedCoupon?.code || null,
+          fbc: getCookie('_fbc'),
+          fbp: getCookie('_fbp'),
+          utm_source: utmParams.utm_source || null,
+          utm_medium: utmParams.utm_medium || null,
+          utm_campaign: utmParams.utm_campaign || null,
+          utm_content: utmParams.utm_content || null,
+          utm_term: utmParams.utm_term || null,
+        }, orderItemsData, balanceToken);
 
         // 🔒 SERVER-SIDE: Balance deduction, payment confirmation, coupon increment, delivery
         const idToken = user ? await user.getIdToken() : null;
@@ -453,16 +463,27 @@ export default function Checkout() {
       if (paymentMethod === "card") {
         const cpfDigits = formData.document.replace(/\D/g, '');
 
-        const orderId = await createOrder({
+        const cardToken = user ? await user.getIdToken() : null;
+        const orderItemsData = items.map(item => ({
+          product_id: item.id,
+          product_name: item.name,
+          product_image: item.image,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+          delivery_type: item.delivery_type || 'manual',
+        }));
+
+        const orderId = await createOrderServerSide({
           user_id: effectiveUserId,
           customer_name: formData.name,
           customer_email: formData.email || user?.email || "",
           customer_phone: formData.phone || "",
           total_amount: orderAmount,
           notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Cartão` : "Cartão",
-          status: "pending",
-          payment_status: "pending",
           payment_method: "card",
+          coupon_id: appliedCoupon?.id || null,
+          coupon_code: appliedCoupon?.code || null,
           fbc: getCookie('_fbc'),
           fbp: getCookie('_fbp'),
           utm_source: utmParams.utm_source || null,
@@ -470,30 +491,7 @@ export default function Checkout() {
           utm_campaign: utmParams.utm_campaign || null,
           utm_content: utmParams.utm_content || null,
           utm_term: utmParams.utm_term || null,
-        });
-
-        // Card: delivery is handled server-side (webhook/auto-verify), no need to fetch codes client-side
-        const productsDeliveryInfo: Record<string, { delivery_type: string; auto_delivery_codes: string[] | null }> = {};
-        for (const item of items) {
-          productsDeliveryInfo[item.id] = { delivery_type: item.delivery_type || 'manual', auto_delivery_codes: null };
-        }
-
-        // Create order items with delivery info
-        const orderItemsData = items.map(item => {
-          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: item.delivery_type || 'manual', auto_delivery_codes: null };
-          return {
-            order_id: orderId,
-            product_id: item.id,
-            product_name: item.name,
-            product_image: item.image,
-            quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity,
-            delivery_type: deliveryInfo.delivery_type,
-            auto_delivery_codes: deliveryInfo.auto_delivery_codes,
-          };
-        });
-        await createOrderItems(orderItemsData, false);
+        }, orderItemsData, cardToken);
 
         // Create card charge via edge function
         const cardResponse = await invokeFunction('flowpay-card', {
@@ -534,18 +532,7 @@ export default function Checkout() {
           productNames: items.map(i => i.name),
         }));
 
-        // Save coupon info on order (flowpay_charge_id and delivery_token already saved server-side)
-        if (appliedCoupon) {
-          try {
-            const orderRef = doc(db, "orders", orderId);
-            await updateDoc(orderRef, { 
-              coupon_id: appliedCoupon.id,
-              coupon_code: appliedCoupon.code,
-            });
-          } catch (err) {
-            console.warn('⚠️ Failed to save coupon info:', err);
-          }
-        }
+        // Coupon info already saved server-side in create-order
 
         // NOTE: Coupon increment + payment confirmation handled SERVER-SIDE by flowpay-card confirm.
 
@@ -558,59 +545,40 @@ export default function Checkout() {
         return;
       }
 
-      // PIX payment flow — parallelize order creation + token fetch
+      // PIX payment flow
       const cpfDigits = formData.document.replace(/\D/g, '');
-      const tokenPromise = user ? user.getIdToken() : Promise.resolve(null);
-
-      const [orderId, firebaseIdToken] = await Promise.all([
-        createOrder({
-          user_id: effectiveUserId,
-          customer_name: formData.name,
-          customer_email: formData.email || user?.email || "",
-          customer_phone: formData.phone || "",
-          total_amount: orderAmount,
-          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
-          status: "pending",
-          payment_status: "pending",
-          payment_method: "pix",
-          fbc: getCookie('_fbc'),
-          fbp: getCookie('_fbp'),
-          utm_source: utmParams.utm_source || null,
-          utm_medium: utmParams.utm_medium || null,
-          utm_campaign: utmParams.utm_campaign || null,
-          utm_content: utmParams.utm_content || null,
-          utm_term: utmParams.utm_term || null,
-        }),
-        tokenPromise,
-      ]);
-
-      // Update order with coupon info if applied
-      if (appliedCoupon) {
-        const orderRef = doc(db, "orders", orderId);
-        await updateDoc(orderRef, { 
-          coupon_id: appliedCoupon.id,
-          coupon_code: appliedCoupon.code,
-        });
-      }
+      const firebaseIdToken = user ? await user.getIdToken() : null;
 
       const orderItemsData = items.map(item => ({
-        order_id: orderId,
         product_id: item.id,
         product_name: item.name,
         product_image: item.image,
         quantity: item.quantity,
         unit_price: item.price,
         total_price: item.price * item.quantity,
+        delivery_type: item.delivery_type || 'manual',
       }));
 
-      const pixHeaders: Record<string, string> = {
-        'Content-Type': 'application/json',
-      };
-      if (firebaseIdToken) {
-        pixHeaders['Authorization'] = `Bearer ${firebaseIdToken}`;
-      }
+      const orderId = await createOrderServerSide({
+        user_id: effectiveUserId,
+        customer_name: formData.name,
+        customer_email: formData.email || user?.email || "",
+        customer_phone: formData.phone || "",
+        total_amount: orderAmount,
+        notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
+        payment_method: "pix",
+        coupon_id: appliedCoupon?.id || null,
+        coupon_code: appliedCoupon?.code || null,
+        fbc: getCookie('_fbc'),
+        fbp: getCookie('_fbp'),
+        utm_source: utmParams.utm_source || null,
+        utm_medium: utmParams.utm_medium || null,
+        utm_campaign: utmParams.utm_campaign || null,
+        utm_content: utmParams.utm_content || null,
+        utm_term: utmParams.utm_term || null,
+      }, orderItemsData, firebaseIdToken);
 
-      // Fire PIX + order items in parallel
+      // Fire PIX charge creation
       const pixPromise = invokeFunction('flowpay-pix', {
         method: 'POST',
         queryParams: { action: 'create' },
@@ -626,11 +594,6 @@ export default function Checkout() {
             taxId: cpfDigits,
           },
         },
-      });
-
-      // Fire order items creation in parallel (don't await before PIX)
-      const itemsPromise = createOrderItems(orderItemsData).catch(err => {
-        console.warn('⚠️ Order items creation failed (non-blocking):', err);
       });
 
       // Await PIX response (critical path)
@@ -656,8 +619,7 @@ export default function Checkout() {
         throw new Error(pixData.error || 'Erro ao gerar cobrança PIX');
       }
 
-      // Ensure order items are saved before showing payment screen
-      await itemsPromise;
+      // Order items already created server-side
 
       // NOTE: Coupon usage is NOT incremented here because PIX payment hasn't been confirmed yet.
       // The PixPayment component handles coupon increment after payment confirmation via polling.
