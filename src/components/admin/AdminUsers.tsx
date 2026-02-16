@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -10,7 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { 
   Loader2, Search, Mail, Phone, Calendar, User, Users, 
   ShoppingCart, DollarSign, TrendingUp,
-  ChevronDown, Eye, Filter, UserCheck, Wallet, Trash2, AlertTriangle, Copy, Sparkles
+  ChevronDown, ChevronLeft, ChevronRight, Eye, Filter, UserCheck, Wallet, Trash2, AlertTriangle, Copy, Sparkles
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { format, formatDistanceToNow } from "date-fns";
@@ -61,6 +61,8 @@ export const AdminUsers = () => {
   const [updatingBalance, setUpdatingBalance] = useState(false);
   const [deleteDialogUser, setDeleteDialogUser] = useState<FirebaseUser | null>(null);
   const [deletingUser, setDeletingUser] = useState(false);
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
   
   const [cleaningUp, setCleaningUp] = useState(false);
   
@@ -165,6 +167,15 @@ export const AdminUsers = () => {
       }
       return sortOrder === "asc" ? comparison : -comparison;
     });
+
+  // Reset page on filter changes
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filter, sortField, sortOrder]);
+
+  const totalPages = Math.max(1, Math.ceil(processedUsers.length / ITEMS_PER_PAGE));
+  const paginatedUsers = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return processedUsers.slice(start, start + ITEMS_PER_PAGE);
+  }, [processedUsers, currentPage]);
 
   const toggleSort = (field: SortField) => {
     if (sortField === field) setSortOrder(sortOrder === "asc" ? "desc" : "asc");
@@ -358,7 +369,7 @@ export const AdminUsers = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {processedUsers.map((user) => {
+                  {paginatedUsers.map((user) => {
                     return (
                       <TableRow key={user.id} className="group hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedUser(user)}>
                         <TableCell>
@@ -455,6 +466,34 @@ export const AdminUsers = () => {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-3 border-t border-border/30">
+                <p className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages} ({processedUsers.length} usuários)
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let page: number;
+                    if (totalPages <= 5) page = i + 1;
+                    else if (currentPage <= 3) page = i + 1;
+                    else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                    else page = currentPage - 2 + i;
+                    return (
+                      <Button key={page} variant={currentPage === page ? "default" : "outline"} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setCurrentPage(page)}>
+                        {page}
+                      </Button>
+                    );
+                  })}
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
 

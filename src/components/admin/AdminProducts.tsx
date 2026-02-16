@@ -1,4 +1,4 @@
-import { useState, useEffect, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, lazy, Suspense } from "react";
 import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 import { Button } from "@/components/ui/button";
@@ -7,7 +7,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, Pencil, Trash2, Video, Image as ImageIcon, Copy } from "lucide-react";
+import { Plus, Pencil, Trash2, Video, Image as ImageIcon, Copy, Search, Filter, ChevronLeft, ChevronRight, ChevronDown, Package } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -72,6 +72,11 @@ export const AdminProducts = () => {
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterCategory, setFilterCategory] = useState("all");
+  const [filterActive, setFilterActive] = useState("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 12;
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -407,6 +412,33 @@ export const AdminProducts = () => {
     });
     setEditingProduct(null);
   };
+
+  const filteredProducts = useMemo(() => {
+    let result = products;
+    if (searchTerm.trim()) {
+      const term = searchTerm.toLowerCase();
+      result = result.filter(p =>
+        p.name.toLowerCase().includes(term) ||
+        p.category.toLowerCase().includes(term) ||
+        p.id.toLowerCase().includes(term)
+      );
+    }
+    if (filterCategory !== "all") result = result.filter(p => p.category === filterCategory);
+    if (filterActive === "active") result = result.filter(p => p.is_active);
+    else if (filterActive === "inactive") result = result.filter(p => !p.is_active);
+    return result;
+  }, [products, searchTerm, filterCategory, filterActive]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
+  const paginatedProducts = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredProducts, currentPage]);
+
+  // Reset page when filters change
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterCategory, filterActive]);
+
+  const hasActiveFilters = searchTerm || filterCategory !== "all" || filterActive !== "all";
 
   if (loading) {
     return <div>Carregando...</div>;
@@ -774,100 +806,190 @@ export const AdminProducts = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-        {products.map((product) => (
-          <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow bg-card border-border/50">
-            <CardHeader className="pb-3 bg-neutral-900/50">
-              <div className="flex items-start justify-between gap-2">
-                <CardTitle className="text-lg line-clamp-2 text-foreground">{product.name}</CardTitle>
-                <div className="flex items-center gap-2">
-                  {product.featured && (
-                    <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
-                      DESTAQUE
-                    </span>
-                  )}
-                  <Switch
-                    checked={product.is_active}
-                    disabled={togglingIds.has(product.id)}
-                    onCheckedChange={() => handleToggleActive(product.id, product.is_active)}
-                    className="data-[state=checked]:bg-green-500"
-                  />
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 pt-4">
-              {product.image_url && (
-                <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-neutral-800 border border-border/30">
-                  <img
-                    src={product.image_url}
-                    alt={product.name}
-                    className="w-full h-full object-cover"
-                  />
-                </div>
-              )}
-              <div className="grid grid-cols-2 gap-3 text-sm">
-                <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                  <p className="text-muted-foreground text-xs">Preço</p>
-                  <p className="font-semibold text-primary">R$ {product.price?.toFixed(2) || "0.00"}</p>
-                </div>
-                <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                  <p className="text-muted-foreground text-xs">Vendas</p>
-                  <p className="font-medium text-foreground">{product.sold || 0}</p>
-                </div>
-                <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                  <p className="text-muted-foreground text-xs">Categoria</p>
-                  <p className="font-medium truncate text-foreground">{product.category}</p>
-                </div>
-                <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                  <p className="text-muted-foreground text-xs">Ordem</p>
-                  <p className="font-medium text-foreground">{product.display_order || 0}</p>
-                </div>
-              </div>
-              
-              {/* Toggle Mais Vendidos */}
-              <div className="flex items-center justify-between p-2 bg-neutral-900/50 rounded-lg">
-                <span className="text-xs text-muted-foreground">Mais Vendidos</span>
-                <Switch
-                  checked={product.featured || false}
-                  onCheckedChange={() => handleToggleFeatured(product.id, product.featured || false)}
-                  disabled={togglingIds.has(product.id)}
-                  className="data-[state=checked]:bg-primary"
-                />
-              </div>
-              
-              <div className="flex gap-2 pt-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleEdit(product)}
-                  className="flex-1 bg-neutral-900 border-border/50 hover:bg-neutral-800"
-                >
-                  <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                  Editar
-                </Button>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => handleDuplicate(product)}
-                  className="flex-1 bg-neutral-900 border-border/50 hover:bg-neutral-800"
-                  title="Duplicar produto"
-                >
-                  <Copy className="w-3.5 h-3.5 mr-1.5" />
-                  Duplicar
-                </Button>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => handleDelete(product.id)}
-                  className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </Button>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+      {/* Search & Filters Toolbar */}
+      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
+        <div className="flex items-center gap-2 flex-wrap flex-1">
+          <div className="relative min-w-[220px] flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome, categoria, ID..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 bg-card/50"
+            />
+          </div>
+
+          <Select value={filterCategory} onValueChange={setFilterCategory}>
+            <SelectTrigger className="w-[160px] h-9 bg-card/50">
+              <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Categoria" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas</SelectItem>
+              {categories.map(cat => (
+                <SelectItem key={cat.id} value={cat.slug}>{cat.name}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select value={filterActive} onValueChange={setFilterActive}>
+            <SelectTrigger className="w-[130px] h-9 bg-card/50">
+              <Package className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
+              <SelectValue placeholder="Status" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="active">Ativos</SelectItem>
+              <SelectItem value="inactive">Inativos</SelectItem>
+            </SelectContent>
+          </Select>
+
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => { setSearchTerm(""); setFilterCategory("all"); setFilterActive("all"); }}>
+              Limpar filtros
+            </Button>
+          )}
+        </div>
+        <span className="text-sm text-muted-foreground whitespace-nowrap">
+          {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''}
+        </span>
       </div>
+
+      {filteredProducts.length === 0 ? (
+        <Card className="border-border/50">
+          <CardContent className="py-16 text-center">
+            <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
+            <p className="text-muted-foreground font-medium">Nenhum produto encontrado</p>
+            <p className="text-xs text-muted-foreground/70 mt-1">Ajuste os filtros ou crie um novo produto</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {paginatedProducts.map((product) => (
+              <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow bg-card border-border/50">
+                <CardHeader className="pb-3 bg-neutral-900/50">
+                  <div className="flex items-start justify-between gap-2">
+                    <CardTitle className="text-lg line-clamp-2 text-foreground">{product.name}</CardTitle>
+                    <div className="flex items-center gap-2">
+                      {product.featured && (
+                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
+                          DESTAQUE
+                        </span>
+                      )}
+                      <Switch
+                        checked={product.is_active}
+                        disabled={togglingIds.has(product.id)}
+                        onCheckedChange={() => handleToggleActive(product.id, product.is_active)}
+                        className="data-[state=checked]:bg-green-500"
+                      />
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4 pt-4">
+                  {product.image_url && (
+                    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-neutral-800 border border-border/30">
+                      <img
+                        src={product.image_url}
+                        alt={product.name}
+                        className="w-full h-full object-cover"
+                      />
+                    </div>
+                  )}
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
+                      <p className="text-muted-foreground text-xs">Preço</p>
+                      <p className="font-semibold text-primary">R$ {product.price?.toFixed(2) || "0.00"}</p>
+                    </div>
+                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
+                      <p className="text-muted-foreground text-xs">Vendas</p>
+                      <p className="font-medium text-foreground">{product.sold || 0}</p>
+                    </div>
+                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
+                      <p className="text-muted-foreground text-xs">Categoria</p>
+                      <p className="font-medium truncate text-foreground">{product.category}</p>
+                    </div>
+                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
+                      <p className="text-muted-foreground text-xs">Ordem</p>
+                      <p className="font-medium text-foreground">{product.display_order || 0}</p>
+                    </div>
+                  </div>
+                  
+                  {/* Toggle Mais Vendidos */}
+                  <div className="flex items-center justify-between p-2 bg-neutral-900/50 rounded-lg">
+                    <span className="text-xs text-muted-foreground">Mais Vendidos</span>
+                    <Switch
+                      checked={product.featured || false}
+                      onCheckedChange={() => handleToggleFeatured(product.id, product.featured || false)}
+                      disabled={togglingIds.has(product.id)}
+                      className="data-[state=checked]:bg-primary"
+                    />
+                  </div>
+                  
+                  <div className="flex gap-2 pt-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleEdit(product)}
+                      className="flex-1 bg-neutral-900 border-border/50 hover:bg-neutral-800"
+                    >
+                      <Pencil className="w-3.5 h-3.5 mr-1.5" />
+                      Editar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleDuplicate(product)}
+                      className="flex-1 bg-neutral-900 border-border/50 hover:bg-neutral-800"
+                      title="Duplicar produto"
+                    >
+                      <Copy className="w-3.5 h-3.5 mr-1.5" />
+                      Duplicar
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => handleDelete(product.id)}
+                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-muted-foreground">
+                Página {currentPage} de {totalPages}
+              </p>
+              <div className="flex items-center gap-1">
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                  let page: number;
+                  if (totalPages <= 5) page = i + 1;
+                  else if (currentPage <= 3) page = i + 1;
+                  else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                  else page = currentPage - 2 + i;
+                  return (
+                    <Button key={page} variant={currentPage === page ? "default" : "outline"} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setCurrentPage(page)}>
+                      {page}
+                    </Button>
+                  );
+                })}
+                <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </div>
   );
 };
