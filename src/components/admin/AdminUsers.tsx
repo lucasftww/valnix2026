@@ -186,9 +186,6 @@ export const AdminUsers = () => {
 
   const getDisplayName = (user: FirebaseUser) => user.nickname || user.full_name || user.email?.split("@")[0] || "Usuário";
 
-  const getUserTier = (_totalSpent: number) => {
-    return null;
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -369,7 +366,6 @@ export const AdminUsers = () => {
                 </TableHeader>
                 <TableBody>
                   {processedUsers.map((user) => {
-                    const tier = getUserTier(user.total_spent);
                     return (
                       <TableRow key={user.id} className="group hover:bg-muted/20 cursor-pointer transition-colors" onClick={() => setSelectedUser(user)}>
                         <TableCell>
@@ -379,21 +375,9 @@ export const AdminUsers = () => {
                                 <AvatarImage src={user.avatar_url || ""} alt="Avatar" />
                                 <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">{getInitials(user)}</AvatarFallback>
                               </Avatar>
-                              {tier && (
-                                <div className="absolute -bottom-0.5 -right-0.5 h-4 w-4 rounded-full bg-background flex items-center justify-center border border-border/50">
-                                  <tier.icon className="h-2.5 w-2.5 text-yellow-500" />
-                                </div>
-                              )}
                             </div>
                             <div className="min-w-0">
-                              <div className="flex items-center gap-1.5">
-                                <p className="font-medium text-sm truncate max-w-[140px]">{getDisplayName(user)}</p>
-                                {tier && (
-                                  <Badge variant="outline" className={cn("text-[9px] px-1 py-0 border hidden sm:inline-flex", tier.color)}>
-                                    {tier.label}
-                                  </Badge>
-                                )}
-                              </div>
+                              <p className="font-medium text-sm truncate max-w-[140px]">{getDisplayName(user)}</p>
                               <p className="text-xs text-muted-foreground truncate max-w-[160px] select-all cursor-text">{user.email}</p>
                             </div>
                           </div>
