@@ -50,15 +50,6 @@ export async function trackAnalyticsEvent(
   }
 }
 
-export const trackPageView = (userId?: string | null) =>
-  trackAnalyticsEvent('PageView', { userId });
-
-export const trackViewContent = (userId?: string | null, contentName?: string, contentCategory?: string) =>
-  trackAnalyticsEvent('ViewContent', { userId, contentName, contentCategory });
-
-export const trackAddToCartEvent = (userId?: string | null, value?: number, contentName?: string) =>
-  trackAnalyticsEvent('AddToCart', { userId, value, contentName });
-
 export const trackInitiateCheckoutEvent = (userId?: string | null, value?: number) =>
   trackAnalyticsEvent('InitiateCheckout', { userId, value });
 
