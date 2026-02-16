@@ -509,7 +509,7 @@ export default function Checkout() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Column */}
-          <div className="flex-1 space-y-5 mx-auto w-full max-w-lg lg:max-w-none">
+          <div className="flex-1 space-y-3 sm:space-y-5 mx-auto w-full max-w-lg lg:max-w-none">
             <PaymentMethodSelector
               paymentMethod={paymentMethod}
               onMethodChange={setPaymentMethod}
