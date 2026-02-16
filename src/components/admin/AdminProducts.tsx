@@ -1,4 +1,5 @@
-import { useState, useEffect, useMemo, lazy, Suspense } from "react";
+import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 import { Button } from "@/components/ui/button";
@@ -66,9 +67,51 @@ const getFirebaseToken = async () => {
 };
 
 export const AdminProducts = () => {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+
+  const { data: products = [], isLoading: loadingProducts, refetch: refetchProducts } = useQuery({
+    queryKey: ['admin-products'],
+    queryFn: async () => {
+      const token = await getFirebaseToken();
+      const response = await invokeFunction('admin-data', {
+        method: 'GET',
+        queryParams: { resource: 'products' },
+        headers: { 'x-firebase-token': token },
+      });
+      if (!response.ok) throw new Error('Failed to fetch products');
+      const data = await response.json();
+      return (data.products || []).sort((a: any, b: any) => {
+        const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        return dateB - dateA;
+      });
+    },
+    staleTime: 60000,
+  });
+
+  const { data: categories = [], refetch: refetchCategories } = useQuery({
+    queryKey: ['admin-categories'],
+    queryFn: async () => {
+      const token = await getFirebaseToken();
+      const response = await invokeFunction('admin-data', {
+        method: 'GET',
+        queryParams: { resource: 'categories' },
+        headers: { 'x-firebase-token': token },
+      });
+      if (!response.ok) throw new Error('Failed to fetch categories');
+      const data = await response.json();
+      return (data.categories || [])
+        .filter((c: any) => c.is_active !== false)
+        .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
+    },
+    staleTime: 120000,
+  });
+
+  const loading = loadingProducts;
+  const fetchProducts = useCallback(() => { refetchProducts(); }, [refetchProducts]);
+  const fetchCategories = useCallback(() => { refetchCategories(); }, [refetchCategories]);
+
   const [togglingIds, setTogglingIds] = useState<Set<string>>(new Set());
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -77,8 +120,6 @@ export const AdminProducts = () => {
   const [filterActive, setFilterActive] = useState("all");
   const [currentPage, setCurrentPage] = useState(1);
   const ITEMS_PER_PAGE = 12;
-  const { toast } = useToast();
-  const queryClient = useQueryClient();
 
   const [formData, setFormData] = useState({
     name: "",
@@ -99,62 +140,6 @@ export const AdminProducts = () => {
     delivery_type: "manual",
     auto_delivery_codes: [] as string[],
   });
-
-  useEffect(() => {
-    fetchProducts();
-    fetchCategories();
-  }, []);
-
-  const fetchCategories = async () => {
-    try {
-      const token = await getFirebaseToken();
-      const response = await invokeFunction('admin-data', {
-        method: 'GET',
-        queryParams: { resource: 'categories' },
-        headers: { 'x-firebase-token': token },
-      });
-      if (!response.ok) throw new Error('Failed to fetch categories');
-      const data = await response.json();
-      const categoriesData = (data.categories || [])
-        .filter((c: any) => c.is_active !== false)
-        .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
-      setCategories(categoriesData);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao carregar categorias",
-        description: error.message,
-        variant: "destructive",
-      });
-    }
-  };
-
-  const fetchProducts = async () => {
-    try {
-      const token = await getFirebaseToken();
-      const response = await invokeFunction('admin-data', {
-        method: 'GET',
-        queryParams: { resource: 'products' },
-        headers: { 'x-firebase-token': token },
-      });
-      if (!response.ok) throw new Error('Failed to fetch products');
-      const data = await response.json();
-      const productsData = (data.products || [])
-        .sort((a: any, b: any) => {
-          const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
-          const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
-          return dateB - dateA;
-        });
-      setProducts(productsData);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao carregar produtos",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const invalidateQueries = () => {
     queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.BEST_SELLING] });
@@ -326,7 +311,7 @@ export const AdminProducts = () => {
     if (togglingIds.has(productId)) return;
     const newActive = !currentActive;
     setTogglingIds(prev => new Set(prev).add(productId));
-    setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_active: newActive } : p));
+    queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, is_active: newActive } : p));
     try {
       const token = await getFirebaseToken();
       const res = await invokeFunction('admin-data', {
@@ -338,7 +323,7 @@ export const AdminProducts = () => {
       if (!res.ok) throw new Error('Failed to toggle active');
       invalidateQueries();
     } catch (error: any) {
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_active: currentActive } : p));
+      queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, is_active: currentActive } : p));
       toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
     } finally {
       setTogglingIds(prev => { const next = new Set(prev); next.delete(productId); return next; });
@@ -354,7 +339,7 @@ export const AdminProducts = () => {
     setTogglingIds(prev => new Set(prev).add(productId));
     
     // Optimistic update - update only this product locally
-    setProducts(prev => prev.map(p => p.id === productId ? { ...p, featured: newFeatured } : p));
+    queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, featured: newFeatured } : p));
     
     try {
       const token = await getFirebaseToken();
@@ -369,7 +354,7 @@ export const AdminProducts = () => {
       invalidateQueries();
     } catch (error: any) {
       // Revert on error
-      setProducts(prev => prev.map(p => p.id === productId ? { ...p, featured: currentFeatured } : p));
+      queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, featured: currentFeatured } : p));
       toast({
         title: "Erro ao atualizar",
         description: error.message,

@@ -1,4 +1,5 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invokeFunction } from "@/lib/apiHelper";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
@@ -141,8 +142,50 @@ const formatCurrency = (value: number) => {
 
 // ── Component ─────────────────────────────────────────────────────
 export const AdminOrders = () => {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { user } = useAuth();
+  const { toast } = useToast();
+
+  const getFirebaseToken = useCallback(async () => {
+    if (!user) return null;
+    return user.getIdToken();
+  }, [user]);
+
+  const { data: orders = [], isLoading: loading, refetch: refetchOrders } = useQuery({
+    queryKey: ['admin-orders'],
+    queryFn: async () => {
+      const token = await getFirebaseToken();
+      if (!token) return [];
+      const res = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "orders" },
+        headers: { "x-firebase-token": token },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const ordersData: Order[] = (data.orders || []).map((o: any) => ({
+        id: o.id,
+        customer_name: o.customer_name || '',
+        customer_email: o.customer_email || '',
+        customer_phone: o.customer_phone || null,
+        total_amount: Number(o.total_amount) || 0,
+        status: o.status || 'pending',
+        payment_status: o.payment_status || 'pending',
+        payment_method: o.payment_method || null,
+        flowpay_charge_id: o.flowpay_charge_id || null,
+        created_at: o.created_at ?? o.updated_at ?? '',
+        user_id: o.user_id || undefined,
+        notes: o.notes || null,
+      }));
+      ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      return ordersData;
+    },
+    enabled: !!user,
+    refetchInterval: 60000,
+    staleTime: 30000,
+  });
+
+  const fetchOrders = useCallback(() => { refetchOrders(); }, [refetchOrders]);
+
   const [deliveryCode, setDeliveryCode] = useState("");
   const [selectedItemId, setSelectedItemId] = useState<string | null>(null);
   const [sendingEmail, setSendingEmail] = useState(false);
@@ -169,11 +212,9 @@ export const AdminOrders = () => {
   const [cleaningEmail, setCleaningEmail] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [deletingOrder, setDeletingOrder] = useState(false);
-  const { toast } = useToast();
-  const { user } = useAuth();
 
-  useAutoVerifyPixPayments(orders as any, () => fetchOrders());
-  useAutoVerifyCardPayments(orders as any, () => fetchOrders());
+  useAutoVerifyPixPayments(orders as any, fetchOrders);
+  useAutoVerifyCardPayments(orders as any, fetchOrders);
 
   // Keep detailOrder in sync with orders list
   useEffect(() => {
@@ -184,52 +225,6 @@ export const AdminOrders = () => {
       }
     }
   }, [orders]);
-  useEffect(() => {
-    fetchOrders();
-    // Poll every 30s for updates instead of onSnapshot (blocked by rules)
-    const interval = setInterval(fetchOrders, 30000);
-    return () => clearInterval(interval);
-  }, []);
-
-  const getFirebaseToken = useCallback(async () => {
-    if (!user) return null;
-    return user.getIdToken();
-  }, [user]);
-
-  const fetchOrders = async () => {
-    try {
-      const token = await getFirebaseToken();
-      if (!token) return;
-      const res = await invokeFunction("admin-data", {
-        method: "GET",
-        queryParams: { resource: "orders" },
-        headers: { "x-firebase-token": token },
-      });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const ordersData: Order[] = (data.orders || []).map((o: any) => ({
-        id: o.id,
-        customer_name: o.customer_name || '',
-        customer_email: o.customer_email || '',
-        customer_phone: o.customer_phone || null,
-        total_amount: Number(o.total_amount) || 0,
-        status: o.status || 'pending',
-        payment_status: o.payment_status || 'pending',
-        payment_method: o.payment_method || null,
-        flowpay_charge_id: o.flowpay_charge_id || null,
-        created_at: o.created_at ?? o.updated_at ?? '',
-        user_id: o.user_id || undefined,
-        notes: o.notes || null,
-      }));
-      ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-      setOrders(ordersData);
-    } catch (error: any) {
-      console.error("Error fetching orders:", error);
-      toast({ title: "Erro ao carregar pedidos", description: error.message, variant: "destructive" });
-    } finally {
-      setLoading(false);
-    }
-  };
 
   // ── Filtered & sorted list ──────────────────────────────────────
   const filteredOrders = useMemo(() => {
