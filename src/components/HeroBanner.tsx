@@ -71,7 +71,7 @@ const HeroBannerComponent = () => {
         <CarouselContent className="ml-0">
           {banners.map((banner, index) => (
             <CarouselItem key={banner.id} className="pl-0">
-              <div className="relative w-full overflow-hidden md:rounded-2xl border-0 md:border-2 border-primary/50 shadow-none md:shadow-2xl bg-muted">
+              <div className="relative w-full overflow-hidden md:rounded-2xl border-0 md:border border-border/10 shadow-none md:shadow-2xl md:shadow-black/20 bg-muted">
                 {banner.link_url ? (
                   <a href={banner.link_url}>
                     <img

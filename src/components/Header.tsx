@@ -95,8 +95,8 @@ const HeaderComponent = () => {
   }, [signOut, navigate]);
   
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/20 bg-background">
-      <div className="container h-16 md:h-[72px] flex items-center px-4 md:px-6">
+    <header className="sticky top-0 z-50 w-full border-b border-border/10 bg-background/80 backdrop-blur-xl supports-[backdrop-filter]:bg-background/60">
+      <div className="container h-14 md:h-16 flex items-center px-4 md:px-6">
         {/* Left Section - Menu (Mobile) + Logo */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Menu Mobile */}

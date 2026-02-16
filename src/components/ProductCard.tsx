@@ -90,10 +90,10 @@ const ProductCardComponent = ({
       onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
-      <Card className="relative overflow-hidden border border-primary/20 md:border-2 hover:border-primary active:border-primary transition-colors duration-200 bg-card cursor-pointer h-full md:hover:shadow-lg md:hover:shadow-primary/10 rounded-xl md:rounded-2xl">
-        {/* Badge de desconto - mais visível no mobile */}
+      <Card className="relative overflow-hidden border border-border/10 hover:border-border/30 transition-all duration-300 bg-card cursor-pointer h-full hover:shadow-xl hover:shadow-black/20 rounded-2xl group-hover:-translate-y-1">
+        {/* Badge de desconto */}
         {hasDiscount && (
-          <Badge className="absolute top-2 left-2 md:top-3 md:left-3 z-10 bg-green-600 text-white font-bold text-[10px] md:text-sm px-2 py-0.5 md:px-3 md:py-1 rounded-md shadow-lg">
+          <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-discount text-discount-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full">
             -{discount}%
           </Badge>
         )}
@@ -117,26 +117,26 @@ const ProductCardComponent = ({
           )}
         </div>
 
-        {/* Área de informações - melhor espaçamento mobile */}
-        <div className="bg-black p-3 md:p-4">
-          <h3 className="text-white font-bold text-sm sm:text-base md:text-lg line-clamp-2 leading-tight min-h-[2.5rem] sm:min-h-0">
+        {/* Info area */}
+        <div className="p-3 md:p-4 space-y-2">
+          <h3 className="text-foreground font-semibold text-sm md:text-[15px] line-clamp-2 leading-snug min-h-[2.5rem] sm:min-h-0">
             {title}
           </h3>
           
-          <div className="flex items-center gap-1 mt-2">
-            <Star className="w-3.5 h-3.5 md:w-4 md:h-4 fill-yellow-400 text-yellow-400 shrink-0" />
-            <span className="text-white/70 text-[11px] md:text-sm">
+          <div className="flex items-center gap-1">
+            <Star className="w-3 h-3 md:w-3.5 md:h-3.5 fill-amber-400 text-amber-400 shrink-0" />
+            <span className="text-muted-foreground text-[10px] md:text-xs">
               {reviewCount.toLocaleString('pt-BR')} avaliações
             </span>
           </div>
 
-          <div className="mt-2">
+          <div className="flex items-baseline gap-2">
             {hasOriginalPrice && (
-              <span className="text-[11px] md:text-sm text-white/40 line-through block">
+              <span className="text-[10px] md:text-xs text-muted-foreground line-through">
                 {formatPrice(originalPrice)}
               </span>
             )}
-            <span className={`text-lg sm:text-xl md:text-xl font-extrabold text-primary`}>
+            <span className="text-base sm:text-lg md:text-lg font-bold text-primary">
               {formatPrice(price)}
             </span>
           </div>
