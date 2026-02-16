@@ -156,7 +156,7 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
 // generateFakeDeliveryCode and processAutoDelivery were removed to prevent bypass of atomic locks.
 
 // ── Analytics → Firestore ──────────────────────────────────────────
-async function registerAnalyticsEvent(orderId: string, value: number, userId?: string, customerEmail?: string) {
+async function registerAnalyticsEvent(orderId: string, value: number, userId?: string, customerEmail?: string, contentName?: string) {
   try {
     await addFirestoreDoc('analytics_events', {
       event_name: 'Purchase',
@@ -166,7 +166,7 @@ async function registerAnalyticsEvent(orderId: string, value: number, userId?: s
       currency: 'BRL',
       order_id: orderId,
       page_url: 'https://www.valnix.com.br/checkout',
-      content_name: `Pedido #${orderId.substring(0, 8)}`,
+      content_name: contentName || `Pedido #${orderId.substring(0, 8)}`,
     });
     console.log(`📊 Analytics Purchase event registered for order ${orderId}`);
   } catch (error) {
@@ -410,7 +410,19 @@ Deno.serve(async (req) => {
       const couponId = orderFields?.coupon_id?.stringValue;
       if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
 
-      await registerAnalyticsEvent(orderId, orderValue, userId, customerEmail);
+      // Fetch real product names from order_items for analytics accuracy
+      let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+      try {
+        const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+        if (Array.isArray(itemsResults)) {
+          const names = itemsResults
+            .filter((r: any) => r.document?.fields?.product_name?.stringValue)
+            .map((r: any) => r.document.fields.product_name.stringValue);
+          if (names.length > 0) productNamesList = names.join(', ');
+        }
+      } catch {}
+
+      await registerAnalyticsEvent(orderId, orderValue, userId, customerEmail, productNamesList);
 
       // Meta CAPI
       const customerName = orderFields?.customer_name?.stringValue || '';
@@ -419,7 +431,7 @@ Deno.serve(async (req) => {
       try {
         await invokeEdgeFunction('meta-capi', {
           event_name: 'Purchase', event_id: `purchase_${orderId}_${Date.now()}`, order_id: orderId,
-          value: orderValue, currency: 'BRL', content_name: `Pedido #${orderId.substring(0, 8)}`,
+          value: orderValue, currency: 'BRL', content_name: productNamesList,
           email: customerEmail, phone: customerPhone || undefined,
           first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
           external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
@@ -432,7 +444,7 @@ Deno.serve(async (req) => {
         await invokeEdgeFunction('utmify-event', {
           order_id: orderId, event_type: 'Purchase', value: orderValue,
           customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined,
-          product_name: `Pedido #${orderId.substring(0, 8)}`,
+          product_name: productNamesList,
           utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue,
           utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue,
           utm_term: orderFields?.utm_term?.stringValue,
@@ -678,13 +690,25 @@ Deno.serve(async (req) => {
               const couponId = orderFields?.coupon_id?.stringValue;
               if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
 
-              await registerAnalyticsEvent(orderId, Number(orderValue), fbUserId, fbEmail);
+              // Fetch real product names for analytics accuracy
+              let pollingProductNames = `Pedido #${orderId.substring(0, 8)}`;
+              try {
+                const pollingItems = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+                if (Array.isArray(pollingItems)) {
+                  const names = pollingItems
+                    .filter((r: any) => r.document?.fields?.product_name?.stringValue)
+                    .map((r: any) => r.document.fields.product_name.stringValue);
+                  if (names.length > 0) pollingProductNames = names.join(', ');
+                }
+              } catch {}
+
+              await registerAnalyticsEvent(orderId, Number(orderValue), fbUserId, fbEmail, pollingProductNames);
 
               const nameParts = fbName.split(' ');
               try {
                 await invokeEdgeFunction('meta-capi', {
                   event_name: 'Purchase', event_id: `purchase_${orderId}_${Date.now()}`, order_id: orderId,
-                  value: Number(orderValue), currency: 'BRL', content_name: `Pedido #${orderId.substring(0, 8)}`,
+                  value: Number(orderValue), currency: 'BRL', content_name: pollingProductNames,
                   email: fbEmail, phone: fbPhone || undefined,
                   first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
                   external_id: fbUserId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
@@ -695,7 +719,7 @@ Deno.serve(async (req) => {
                 await invokeEdgeFunction('utmify-event', {
                   order_id: orderId, event_type: 'Purchase', value: Number(orderValue),
                   customer_name: fbName, customer_email: fbEmail, customer_phone: fbPhone || undefined,
-                  product_name: `Pedido #${orderId.substring(0, 8)}`,
+                  product_name: pollingProductNames,
                   utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue,
                   utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue,
                   utm_term: orderFields?.utm_term?.stringValue,
