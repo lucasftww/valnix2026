@@ -260,8 +260,28 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: 'Forbidden: invalid delivery token' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      // Token is single-use: clear it after validation to prevent replay
-      try { await updateFirestoreDoc('orders', orderId, { delivery_token: null }); } catch {}
+      // TTL: reject tokens older than 10 minutes
+      const tokenCreatedAt = orderDoc.fields.delivery_token_created_at?.stringValue;
+      if (tokenCreatedAt) {
+        const ageMs = Date.now() - new Date(tokenCreatedAt).getTime();
+        if (ageMs > 10 * 60 * 1000) {
+          console.warn(`🚫 [${orderId}] delivery_token expired (age: ${Math.round(ageMs / 1000)}s)`);
+          try { await updateFirestoreDoc('orders', orderId, { delivery_token: null }); } catch {}
+          return new Response(JSON.stringify({ success: false, error: 'Forbidden: delivery token expired' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+      }
+      // Anti-race: consume token BEFORE doing any delivery (prevents parallel calls)
+      try { await updateFirestoreDoc('orders', orderId, { delivery_token: null, delivery_token_created_at: null }); } catch {}
+      // Re-read to confirm we actually consumed it (another call may have raced)
+      const recheck = await getFirestoreDoc('orders', orderId);
+      const recheckToken = recheck?.fields?.delivery_token?.stringValue;
+      if (recheckToken) {
+        // Token was re-written by a concurrent call — bail
+        console.warn(`🚫 [${orderId}] delivery_token race detected`);
+        return new Response(JSON.stringify({ success: false, error: 'Forbidden: token already consumed' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
       console.log(`✅ [${orderId}] delivery_token validated and consumed`);
     }
 

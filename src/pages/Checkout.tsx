@@ -531,6 +531,7 @@ export default function Checkout() {
             coupon_id: appliedCoupon?.id || null,
             coupon_code: appliedCoupon?.code || null,
             delivery_token: deliveryToken,
+            delivery_token_created_at: new Date().toISOString(),
           });
         } catch (err) {
           console.warn('⚠️ Failed to save flowpay_charge_id/coupon:', err);
