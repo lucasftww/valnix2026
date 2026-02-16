@@ -4,7 +4,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
  * guest-order — Read-only endpoint for guest order data.
  * Validates hash and returns order + items from subcollection.
  * No auth required (hash acts as unguessable token).
- * Rate-limited by IP to prevent hash brute-forcing.
+ * Rate-limited via Firestore-backed atomic counter.
  */
 
 const ALLOWED_ORIGINS = [
@@ -69,30 +69,117 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
-// ── Simple in-memory rate limiter (per isolate) ──
-const ipAttempts = new Map<string, { count: number; resetAt: number }>();
+// ── Firestore-backed atomic rate limiter ──
+async function checkRateLimitFirestore(
+  key: string,
+  maxAttempts: number,
+  windowMs: number,
+  blockMs: number,
+  accessToken: string,
+): Promise<boolean> {
+  const docPath = `rate_limits/guest_order_${key.replace(/[^a-zA-Z0-9]/g, '_').slice(0, 60)}`;
+  const commitUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+  const now = new Date().toISOString();
 
-function checkRateLimit(ip: string, max: number, windowMs: number): boolean {
-  const now = Date.now();
-  const entry = ipAttempts.get(ip);
-  if (!entry || entry.resetAt < now) {
-    ipAttempts.set(ip, { count: 1, resetAt: now + windowMs });
+  // Atomic increment via commit + FieldTransform
+  const commitBody = {
+    writes: [
+      {
+        transform: {
+          document: `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${docPath}`,
+          fieldTransforms: [
+            { fieldPath: "count", increment: { integerValue: "1" } },
+          ],
+        },
+      },
+      {
+        update: {
+          name: `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${docPath}`,
+          fields: {
+            last_attempt: { timestampValue: now },
+            key: { stringValue: key },
+          },
+        },
+        updateMask: { fieldPaths: ["last_attempt", "key"] },
+      },
+    ],
+  };
+
+  try {
+    const commitRes = await fetch(commitUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify(commitBody),
+    });
+
+    if (!commitRes.ok) {
+      console.warn("Rate limit commit failed, allowing request");
+      return true; // fail-open for reads
+    }
+
+    // Read current count
+    const docUrl = `${firestoreBase}/${docPath}`;
+    const docRes = await fetch(docUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+    if (!docRes.ok) return true;
+
+    const docData = await docRes.json();
+    const count = Number(docData.fields?.count?.integerValue || 0);
+    const blockedUntil = docData.fields?.blocked_until?.timestampValue;
+
+    if (blockedUntil && new Date(blockedUntil).getTime() > Date.now()) {
+      return false;
+    }
+
+    if (count > maxAttempts) {
+      // Set block
+      const blockUntil = new Date(Date.now() + blockMs).toISOString();
+      await fetch(`${firestoreBase}/${docPath}?updateMask.fieldPaths=blocked_until&updateMask.fieldPaths=count`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          fields: {
+            blocked_until: { timestampValue: blockUntil },
+            count: { integerValue: "0" },
+          },
+        }),
+      });
+
+      // Log the block
+      const logUrl = `${firestoreBase}/rate_limit_logs`;
+      await fetch(logUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          fields: {
+            function_name: { stringValue: "guest-order" },
+            key: { stringValue: key },
+            blocked_until: { timestampValue: blockUntil },
+            created_at: { timestampValue: now },
+          },
+        }),
+      });
+
+      return false;
+    }
+
+    return true;
+  } catch (err) {
+    console.warn("Rate limit error, allowing:", err);
     return true;
   }
-  entry.count++;
-  return entry.count <= max;
+}
+
+// ── Helpers ──
+function readIsoTimestamp(field: any): string | null {
+  if (!field) return null;
+  return field.timestampValue || field.stringValue || null;
 }
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  // Rate limit: 30/min per IP
-  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-  if (!checkRateLimit(clientIp, 30, 60_000)) {
-    return new Response(JSON.stringify({ error: 'Too many requests' }),
-      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-  }
+  const jsonHeaders = { ...corsHeaders, 'Content-Type': 'application/json' };
 
   try {
     // Accept hash from query param (GET) or body (POST)
@@ -105,18 +192,21 @@ Deno.serve(async (req) => {
       hash = body.hash || null;
     }
 
-    if (!hash || typeof hash !== 'string' || hash.length < 8 || hash.length > 64) {
+    // ✅ Fix #4: Tighter hash validation (12–32 alnum only)
+    if (!hash || typeof hash !== 'string' || !/^[A-Za-z0-9]{12,32}$/.test(hash)) {
       return new Response(JSON.stringify({ error: 'Invalid hash' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-    }
-
-    // Sanitize hash (alphanumeric only)
-    if (!/^[a-zA-Z0-9]+$/.test(hash)) {
-      return new Response(JSON.stringify({ error: 'Invalid hash format' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        { status: 400, headers: jsonHeaders });
     }
 
     const accessToken = await getFirebaseAccessToken();
+
+    // ✅ Fix #3: Firestore-backed rate limit (30 req/min, 5min block)
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+    const allowed = await checkRateLimitFirestore(clientIp, 30, 60_000, 300_000, accessToken);
+    if (!allowed) {
+      return new Response(JSON.stringify({ error: 'Too many requests' }),
+        { status: 429, headers: jsonHeaders });
+    }
 
     // Read guest_orders/{hash}
     const docUrl = `${firestoreBase}/guest_orders/${hash}`;
@@ -124,23 +214,36 @@ Deno.serve(async (req) => {
 
     if (docRes.status === 404 || !docRes.ok) {
       return new Response(JSON.stringify({ error: 'Order not found' }),
-        { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        { status: 404, headers: jsonHeaders });
     }
 
     const docData = await docRes.json();
     const fields = docData.fields || {};
 
-    // Check expiration
-    const expiresAt = fields.expires_at?.stringValue;
-    if (expiresAt && new Date(expiresAt) < new Date()) {
+    // ✅ Fix #2: Handle timestampValue OR stringValue for expiration
+    const expiresIso = readIsoTimestamp(fields.expires_at);
+    if (expiresIso && new Date(expiresIso).getTime() < Date.now()) {
       return new Response(JSON.stringify({ error: 'Order expired' }),
-        { status: 410, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        { status: 410, headers: jsonHeaders });
     }
 
-    // Read subcollection items: guest_orders/{hash}/items
-    const itemsUrl = `${firestoreBase}/guest_orders/${hash}/items`;
-    const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    
+    // ✅ Fix #1: Use runQuery to list subcollection items reliably
+    const runQueryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+    const parent = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}`;
+
+    const itemsRes = await fetch(runQueryUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        parent,
+        structuredQuery: {
+          from: [{ collectionId: "items" }],
+          orderBy: [{ field: { fieldPath: "product_name" }, direction: "ASCENDING" }],
+          limit: 50,
+        },
+      }),
+    });
+
     const items: Array<{
       product_name: string;
       product_image: string | null;
@@ -151,9 +254,10 @@ Deno.serve(async (req) => {
     }> = [];
 
     if (itemsRes.ok) {
-      const itemsData = await itemsRes.json();
-      for (const itemDoc of (itemsData.documents || [])) {
-        const f = itemDoc.fields || {};
+      const rows = await itemsRes.json();
+      for (const r of rows) {
+        const f = r.document?.fields;
+        if (!f) continue; // skip empty results from runQuery
         items.push({
           product_name: f.product_name?.stringValue || '',
           product_image: f.product_image?.stringValue || null,
@@ -173,8 +277,8 @@ Deno.serve(async (req) => {
       customer_phone: fields.customer_phone?.stringValue || null,
       total_amount: Number(fields.total_amount?.doubleValue || fields.total_amount?.integerValue || 0),
       payment_method: fields.payment_method?.stringValue || 'pix',
-      created_at: fields.created_at?.stringValue || fields.created_at?.timestampValue || null,
-      expires_at: expiresAt || null,
+      created_at: readIsoTimestamp(fields.created_at),
+      expires_at: expiresIso,
       linked: fields.linked?.booleanValue ?? false,
       items,
     };
@@ -182,9 +286,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify(response), {
       status: 200,
       headers: {
-        ...corsHeaders,
-        'Content-Type': 'application/json',
-        'Cache-Control': 'no-store', // delivery codes change over time
+        ...jsonHeaders,
+        'Cache-Control': 'no-store',
       },
     });
   } catch (error) {
