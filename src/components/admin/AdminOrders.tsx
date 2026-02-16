@@ -372,7 +372,7 @@ export const AdminOrders = () => {
         : 'flowpay-pix';
       const qp = isCard
         ? { action: 'status', id: order.flowpay_charge_id }
-        : { action: 'status', chargeId: order.flowpay_charge_id };
+        : { action: 'status', chargeId: order.flowpay_charge_id, orderId: order.id };
       const response = await invokeFunction(endpoint, {
         method: 'GET',
         queryParams: qp,

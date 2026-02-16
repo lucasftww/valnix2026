@@ -114,7 +114,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         const idToken = user ? await user.getIdToken() : null;
         const response = await invokeFunction("flowpay-pix", {
           method: "GET",
-          queryParams: { action: "status", chargeId: pixData.chargeId },
+          queryParams: { action: "status", chargeId: pixData.chargeId, orderId: `upsell-${orderId}-${addonType}` },
           headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
         });
         const data = await response.json();

@@ -88,7 +88,7 @@ export function PixPayment({
 
         const response = await invokeFunction('flowpay-pix', {
           method: 'GET',
-          queryParams: { action: 'status', chargeId: transactionId },
+          queryParams: { action: 'status', chargeId: transactionId, orderId },
           headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
         });
         const data = await response.json();
