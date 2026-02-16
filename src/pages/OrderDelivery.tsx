@@ -362,23 +362,30 @@ export default function OrderDelivery() {
     if (!hash) { setNotFound(true); setLoading(false); return; }
 
     let cancelled = false;
-    let pollInterval: ReturnType<typeof setInterval> | null = null;
+    let pollTimeout: ReturnType<typeof setTimeout> | null = null;
+    let currentDelay = 5000; // start at 5s
+    let prevItemsJson = ''; // track changes to avoid unnecessary re-renders
 
-    const fetchGuestOrder = async () => {
+    const fetchGuestOrder = async (): Promise<'ok' | 'done' | 'error'> => {
       try {
         const res = await invokeFunction('guest-order', {
           method: 'GET',
           queryParams: { hash },
         });
 
+        if (res.status === 429) return 'error'; // rate limited
+        if (res.status >= 500) return 'error'; // server error
+
         if (!res.ok) {
           if (!cancelled) setNotFound(true);
-          return false;
+          return 'done'; // 404/410 — stop polling
         }
 
         const data = await res.json();
 
         if (!cancelled) {
+          const newItemsJson = JSON.stringify(data.items || []);
+
           setOrder({
             id: hash,
             hash: hash,
@@ -397,41 +404,56 @@ export default function OrderDelivery() {
             expires_at: data.expires_at || new Date().toISOString(),
           } as GuestOrderData);
 
-          // Update live items from server response
-          if (data.items && data.items.length > 0) {
-            setLiveItems(data.items);
+          // ✅ Fix #5b: Only update liveItems if data actually changed
+          if (newItemsJson !== prevItemsJson) {
+            prevItemsJson = newItemsJson;
+            if (data.items && data.items.length > 0) {
+              setLiveItems(data.items);
+            }
           }
+
+          // Check if all items have delivery codes → stop polling
+          const allDelivered = (data.items || []).length > 0 &&
+            (data.items as OrderItemData[]).every((i: OrderItemData) => !!i.delivery_code);
+          if (allDelivered) return 'done';
         }
-        return true;
+        return 'ok';
       } catch (err) {
         console.error("Error fetching guest order:", err);
         if (!cancelled) setNotFound(true);
-        return false;
+        return 'done';
       } finally {
         if (!cancelled) setLoading(false);
       }
     };
 
-    // Initial fetch
-    fetchGuestOrder().then((ok) => {
-      if (ok && !cancelled) {
-        // Poll every 5s for delivery code updates (replaces onSnapshot)
-        // Stop polling once all items have delivery codes
-        pollInterval = setInterval(async () => {
-          const stillOk = await fetchGuestOrder();
-          if (!stillOk || cancelled) return;
-          // Check if all items now have delivery codes → stop polling
-          const currentItems = document.querySelectorAll('[data-delivery-pending]');
-          if (currentItems.length === 0) {
-            if (pollInterval) clearInterval(pollInterval);
-          }
-        }, 5000);
+    // ✅ Fix #5a: Polling with backoff on errors
+    const schedulePoll = (result: 'ok' | 'done' | 'error') => {
+      if (cancelled || result === 'done') return;
+
+      if (result === 'error') {
+        // Backoff: double delay, cap at 30s
+        currentDelay = Math.min(currentDelay * 2, 30_000);
+      } else {
+        // Reset to normal interval on success
+        currentDelay = 5000;
       }
+
+      pollTimeout = setTimeout(async () => {
+        if (cancelled) return;
+        const nextResult = await fetchGuestOrder();
+        schedulePoll(nextResult);
+      }, currentDelay);
+    };
+
+    // Initial fetch
+    fetchGuestOrder().then((result) => {
+      if (!cancelled) schedulePoll(result);
     });
 
     return () => {
       cancelled = true;
-      if (pollInterval) clearInterval(pollInterval);
+      if (pollTimeout) clearTimeout(pollTimeout);
     };
   }, [hash]);
 
