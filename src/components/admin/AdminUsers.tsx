@@ -189,7 +189,6 @@ export const AdminUsers = () => {
   const getUserTier = (_totalSpent: number) => {
     return null;
   };
-  };
 
   const getStatusColor = (status: string) => {
     switch (status) {
