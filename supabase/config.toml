@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.cleanup-orders]
 verify_jwt = false
+
+[functions.cleanup-ttl]
+verify_jwt = false
