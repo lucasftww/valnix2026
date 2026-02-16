@@ -41,8 +41,8 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
 
     // Deterministic event_id: no timestamp to ensure dedupe across retries
     const eventId = data.order_id 
-      ? `${data.event_name.toLowerCase()}_${data.order_id}`
-      : `${data.event_name.toLowerCase()}_${Date.now()}`;
+      ? `${data.event_name.trim().toLowerCase()}_${data.order_id}`
+      : `${data.event_name.trim().toLowerCase()}_${Date.now()}`;
 
     const payload = {
       ...data,
