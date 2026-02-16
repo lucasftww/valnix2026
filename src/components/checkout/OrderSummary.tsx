@@ -175,10 +175,13 @@ export const OrderSummary = memo(function OrderSummary({
         <Button 
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-base hidden lg:flex"
+          className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-base hidden lg:flex transition-all duration-200"
         >
           {loading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <span className="flex items-center gap-2.5">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              <span className="animate-pulse">Processando pagamento...</span>
+            </span>
           ) : (
             "Finalizar Compra"
           )}

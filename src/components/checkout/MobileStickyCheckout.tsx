@@ -95,12 +95,12 @@ const MobileStickyCheckoutComponent = ({
         <Button
           onClick={onSubmit}
           disabled={loading || finalPrice < 1}
-          className="w-full h-[52px] bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-[15px]"
+          className="w-full h-[52px] bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-[15px] transition-all duration-200"
         >
           {loading ? (
-            <span className="flex items-center gap-2">
+            <span className="flex items-center gap-2.5">
               <Loader2 className="w-5 h-5 animate-spin" />
-              Processando...
+              <span className="animate-pulse">Processando pagamento...</span>
             </span>
           ) : (
             "Finalizar Compra"
