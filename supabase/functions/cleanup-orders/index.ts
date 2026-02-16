@@ -93,11 +93,21 @@ async function patchDoc(token: string, docPath: string, fields: Record<string, u
 async function addAuditLog(token: string, data: Record<string, unknown>): Promise<void> {
   const fields: Record<string, unknown> = {};
   for (const [k, v] of Object.entries(data)) {
-    if (typeof v === 'string') fields[k] = { stringValue: v };
-    else if (typeof v === 'number') fields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
-    else fields[k] = { nullValue: null };
+    if ((k === 'ran_at' || k.endsWith('_at')) && typeof v === 'string') {
+      fields[k] = { timestampValue: v };
+    } else if (typeof v === 'string') {
+      fields[k] = { stringValue: v };
+    } else if (typeof v === 'number') {
+      fields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    } else if (typeof v === 'boolean') {
+      fields[k] = { booleanValue: v };
+    } else {
+      fields[k] = { nullValue: null };
+    }
   }
+  // Add TTL: expire after 30 days
+  const expireAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString();
+  fields['expires_at'] = { timestampValue: expireAt };
   await fetch(`${BASE}/cron_audit_logs`, {
     method: 'POST',
     headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -200,6 +210,8 @@ Deno.serve(async (req: Request) => {
         cancelled_count: cancelled,
         duration_ms: durationMs,
         orders_scanned: results.length,
+        source: 'pg_cron',
+        version: 'v2-atomic',
       });
     } catch (e) {
       console.warn('[cleanup-orders] Audit log write failed:', e);
