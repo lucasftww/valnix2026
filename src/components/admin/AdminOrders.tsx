@@ -25,7 +25,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  Package, Send, Loader2, RefreshCw, Trash2, Search, ChevronDown,
+  Package, Send, Loader2, RefreshCw, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight,
   CreditCard, QrCode, Wallet, Clock, CheckCircle2, XCircle, AlertCircle,
   Eye, Copy, Hash, Mail, Phone, User, Calendar, DollarSign,
   ShoppingBag, ArrowUpDown, Filter, MoreHorizontal, ExternalLink
@@ -156,6 +156,8 @@ export const AdminOrders = () => {
   const [cleaningActive, setCleaningActive] = useState(false);
   const [sortField, setSortField] = useState<"date" | "amount">("date");
   const [sortDir, setSortDir] = useState<"asc" | "desc">("desc");
+  const [currentPage, setCurrentPage] = useState(1);
+  const ITEMS_PER_PAGE = 20;
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
@@ -256,6 +258,15 @@ export const AdminOrders = () => {
 
     return result;
   }, [orders, searchTerm, filterStatus, filterPayment, filterMethod, sortField, sortDir]);
+
+  // Reset page on filter changes
+  useEffect(() => { setCurrentPage(1); }, [searchTerm, filterStatus, filterPayment, filterMethod]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / ITEMS_PER_PAGE));
+  const paginatedOrders = useMemo(() => {
+    const start = (currentPage - 1) * ITEMS_PER_PAGE;
+    return filteredOrders.slice(start, start + ITEMS_PER_PAGE);
+  }, [filteredOrders, currentPage]);
 
   // ── Stats ───────────────────────────────────────────────────────
   const stats = useMemo(() => {
@@ -817,7 +828,7 @@ export const AdminOrders = () => {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {filteredOrders.map((order) => {
+                  {paginatedOrders.map((order) => {
                     const statusCfg = getStatusConfig(order.status);
                     const paymentCfg = getPaymentStatusConfig(order.payment_status);
 
@@ -925,6 +936,34 @@ export const AdminOrders = () => {
                 </TableBody>
               </Table>
             </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex items-center justify-between p-3 border-t border-border/30">
+                <p className="text-sm text-muted-foreground">
+                  Página {currentPage} de {totalPages} ({filteredOrders.length} pedidos)
+                </p>
+                <div className="flex items-center gap-1">
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
+                    <ChevronLeft className="h-4 w-4" />
+                  </Button>
+                  {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
+                    let page: number;
+                    if (totalPages <= 5) page = i + 1;
+                    else if (currentPage <= 3) page = i + 1;
+                    else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
+                    else page = currentPage - 2 + i;
+                    return (
+                      <Button key={page} variant={currentPage === page ? "default" : "outline"} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setCurrentPage(page)}>
+                        {page}
+                      </Button>
+                    );
+                  })}
+                  <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+                    <ChevronRight className="h-4 w-4" />
+                  </Button>
+                </div>
+              </div>
+            )}
           </Card>
         )}
 
