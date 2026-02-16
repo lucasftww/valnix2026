@@ -73,6 +73,24 @@ function toFirestoreValue(val: unknown): Record<string, unknown> {
   return { stringValue: String(val) };
 }
 
+// ── Parse first public IP from x-forwarded-for ────────────────────
+function parsePublicIp(rawIp: string | undefined): string | undefined {
+  if (!rawIp) return undefined;
+  const ips = rawIp.split(',').map(ip => ip.trim()).filter(Boolean);
+  const privateRanges = [
+    /^10\./,
+    /^172\.(1[6-9]|2\d|3[01])\./,
+    /^192\.168\./,
+    /^127\./,
+    /^::1$/,
+    /^fd[0-9a-f]{2}:/i,
+  ];
+  for (const ip of ips) {
+    if (!privateRanges.some(r => r.test(ip))) return ip;
+  }
+  return ips[0]; // fallback to first IP if all are private
+}
+
 // ── SHA-256 hash helper ────────────────────────────────────────────
 async function sha256(value: string): Promise<string> {
   const encoder = new TextEncoder();
@@ -186,8 +204,10 @@ Deno.serve(async (req) => {
       });
     }
 
-    const resolvedIp = client_ip || req.headers.get('x-forwarded-for')?.split(',')[0]?.trim()
-      || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || undefined;
+    const resolvedIp = client_ip 
+      ? parsePublicIp(client_ip) 
+      : parsePublicIp(req.headers.get('x-forwarded-for') || undefined)
+        || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || undefined;
     const resolvedUa = user_agent || req.headers.get('user-agent') || undefined;
     const resolvedEventId = event_id || `${order_id || 'evt'}_${Date.now()}`;
 
