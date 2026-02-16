@@ -355,14 +355,16 @@ async function logRateLimitBlock(source: string, ip: string, attempts: number) {
   }
 }
 
-// ── Constant-time comparison ──
+// ── Constant-time comparison (no length leak) ──
 function timingSafeEqual(a: string, b: string): boolean {
-  if (a.length !== b.length) return false;
   const enc = new TextEncoder();
   const ab = enc.encode(a);
   const bb = enc.encode(b);
-  let result = 0;
-  for (let i = 0; i < ab.length; i++) result |= ab[i] ^ bb[i];
+  const max = Math.max(ab.length, bb.length);
+  let result = ab.length ^ bb.length;
+  for (let i = 0; i < max; i++) {
+    result |= (ab[i] ?? 0) ^ (bb[i] ?? 0);
+  }
   return result === 0;
 }
 
