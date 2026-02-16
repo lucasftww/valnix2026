@@ -86,7 +86,7 @@ const ProductDetail = () => {
       });
     }
     
-  }, [user, product, quantity, addItem]);
+  }, [product, quantity, addItem]);
   
   const handleBuyNow = useCallback(() => {
     handleAddToCart();
