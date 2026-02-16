@@ -227,6 +227,10 @@ Deno.serve(async (req) => {
       if (!productId || typeof productId !== 'string') {
         return new Response(JSON.stringify({ error: 'Invalid product_id in items' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
+      // 🔒 Validate quantity bounds (prevent absurd values)
+      if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
+        return new Response(JSON.stringify({ error: 'Invalid quantity (must be 1-100)' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
       const productFields = await getFirestoreDoc('products', productId);
       if (!productFields) {
         return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
