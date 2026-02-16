@@ -866,6 +866,7 @@ Deno.serve(async (req) => {
       if (resource === "users") {
         await Promise.all([
           deleteFirestoreDoc("profiles", docId),
+          deleteFirestoreDoc("users", docId),
           deleteFirestoreDoc("user_roles", docId),
         ]);
         return new Response(JSON.stringify({ success: true }),
