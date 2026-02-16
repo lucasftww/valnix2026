@@ -88,12 +88,12 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
   return (
     <div className="space-y-4">
       {showTitle && (
-        <h3 className="text-red-500 font-bold text-sm uppercase tracking-wider">
-          NEWSLETTER
+        <h3 className="text-foreground font-semibold text-sm tracking-wide">
+          Newsletter
         </h3>
       )}
       <p className="text-muted-foreground text-sm">
-        Assine nossa newsletter e receba as melhores ofertas DE GRAÇA!
+        Receba ofertas exclusivas no seu e-mail.
       </p>
       <form onSubmit={handleSubmit} className="flex items-end gap-2" aria-label="Formulário de newsletter">
         <div className="flex-1 relative">
@@ -105,7 +105,7 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
-            className="bg-transparent border-0 border-b-2 border-red-500 rounded-none text-foreground text-sm focus:border-red-500 focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors placeholder:text-muted-foreground/50 px-0 h-12"
+            className="bg-transparent border-0 border-b border-border/30 rounded-none text-foreground text-sm focus:border-foreground/50 focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors placeholder:text-muted-foreground/50 px-0 h-10"
             required
             aria-label="Endereço de e-mail para newsletter"
           />
@@ -113,7 +113,7 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
         <Button
           type="submit"
           disabled={isLoading}
-          className="bg-red-500 hover:bg-red-600 text-white font-bold px-8 py-2 uppercase text-xs tracking-wider transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed rounded-sm h-12 min-w-[100px]"
+          className="bg-foreground hover:bg-foreground/90 text-background font-medium px-6 py-2 text-xs tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full h-10 min-w-[90px]"
           aria-label={isLoading ? "Processando assinatura" : "Assinar newsletter"}
         >
           {isLoading ? "..." : "Assinar"}

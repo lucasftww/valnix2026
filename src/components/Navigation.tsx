@@ -46,9 +46,9 @@ const NavigationComponent = () => {
   if (categories.length === 0) return null;
 
   return (
-    <nav className="hidden md:block sticky top-16 md:top-[72px] w-full border-b border-border bg-background z-40 shadow-sm">
+    <nav className="hidden md:block sticky top-16 w-full border-b border-border/10 bg-background/80 backdrop-blur-xl z-40">
       <div className="container px-4 md:px-8">
-        <div className="flex items-center justify-center gap-2 py-2 flex-wrap">
+        <div className="flex items-center justify-center gap-1 py-1.5 flex-wrap">
           {categories.map((category) => {
             const hasChildren = category.children && category.children.length > 0;
             const categoryLink = `/${category.slug}`;
@@ -66,13 +66,13 @@ const NavigationComponent = () => {
                       <Button
                         variant="ghost"
                         size="sm"
-                        className="text-foreground hover:text-primary hover:bg-primary/10 whitespace-nowrap font-medium transition-all h-9 text-sm"
+                        className="text-muted-foreground hover:text-foreground whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
                         aria-label={`${category.name} - expandir subcategorias`}
                       >
                         {category.icon_url && (
-                          <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-2" width={16} height={16} loading="lazy" />
+                          <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
                         )}
-                        {category.name.toUpperCase()}
+                        {category.name}
                         <ChevronDown 
                           className={`ml-1 h-3 w-3 transition-transform duration-200 ${
                             openDropdown === category.id ? 'rotate-180' : ''
@@ -83,12 +83,12 @@ const NavigationComponent = () => {
                     </Link>
                     {openDropdown === category.id && (
                       <div className="absolute left-0 top-full pt-2 z-50" role="menu">
-                        <div className="bg-background border-2 border-primary/50 rounded-lg shadow-2xl min-w-[220px]">
+                        <div className="bg-card border border-border/20 rounded-xl shadow-2xl shadow-black/20 min-w-[200px] py-1 backdrop-blur-xl">
                           {category.children!.map((child) => (
                             <Link
                               key={child.id}
                               to={`/${child.slug}`}
-                              className="w-full px-6 py-3 text-left text-foreground hover:bg-primary hover:text-primary-foreground transition-colors font-medium border-b border-border last:border-b-0 block"
+                              className="w-full px-4 py-2.5 text-left text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm font-medium block"
                               role="menuitem"
                               aria-label={`Ver produtos de ${child.name}`}
                             >
@@ -107,12 +107,12 @@ const NavigationComponent = () => {
                     <Button
                       variant="ghost"
                       size="sm"
-                      className="text-foreground hover:text-primary hover:bg-primary/10 whitespace-nowrap font-medium transition-all h-9 text-sm"
+                      className="text-muted-foreground hover:text-foreground whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
                     >
                       {category.icon_url && (
-                        <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-2" width={16} height={16} loading="lazy" />
+                        <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
                       )}
-                      {category.name.toUpperCase()}
+                      {category.name}
                     </Button>
                   </Link>
                 )}

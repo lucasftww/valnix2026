@@ -67,10 +67,10 @@ const FAQComponent = ({ productName, productCategory }: FAQProps) => {
     <section className="container px-4 md:px-8 py-8 md:py-12">
       <div className="max-w-4xl mx-auto">
         <div className="mb-6 md:mb-10">
-          <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
-            DÚVIDAS FREQUENTES
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+            Dúvidas frequentes
           </h2>
-          <p className="text-muted-foreground text-sm md:text-base mt-3">
+          <p className="text-muted-foreground text-sm mt-1">
             Tudo o que você precisa saber antes de comprar
           </p>
         </div>
@@ -82,17 +82,19 @@ const FAQComponent = ({ productName, productCategory }: FAQProps) => {
               <AccordionItem 
                 key={index} 
                 value={`item-${index}`}
-                className="border border-primary/30 md:border-2 rounded-lg px-4 md:px-6 bg-card/50 hover:border-primary transition-colors"
+                className="border border-border/10 rounded-xl px-4 md:px-5 bg-card/30 hover:bg-card/50 transition-colors"
               >
-                <AccordionTrigger className="text-left hover:no-underline py-4 md:py-6">
+                <AccordionTrigger className="text-left hover:no-underline py-4 md:py-5">
                   <div className="flex items-center gap-3">
-                    <Icon className="w-4 h-4 md:w-5 md:h-5 text-primary shrink-0" />
-                    <span className="text-sm md:text-lg font-semibold text-primary">
+                    <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center shrink-0">
+                      <Icon className="w-4 h-4 text-primary" />
+                    </div>
+                    <span className="text-sm md:text-base font-medium text-foreground">
                       {faq.question}
                     </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground text-sm md:text-base pb-4 md:pb-6 pl-7 md:pl-8">
+                <AccordionContent className="text-muted-foreground text-sm pb-4 md:pb-5 pl-11">
                   {faq.answer}
                 </AccordionContent>
               </AccordionItem>

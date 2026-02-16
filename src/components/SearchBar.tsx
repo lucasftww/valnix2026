@@ -154,7 +154,7 @@ const SearchBarComponent = () => {
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           autoComplete="off"
-          className="w-full pl-4 pr-12 h-12 md:h-11 bg-background/60 border-2 border-primary/40 rounded-full text-sm md:text-base text-foreground placeholder:text-muted-foreground/70 focus:ring-2 focus:ring-primary focus:border-primary transition-all shadow-lg"
+          className="w-full pl-4 pr-12 h-11 md:h-10 bg-muted/50 border border-border/20 rounded-full text-sm text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/50 focus:border-primary/30 focus:bg-muted/70 transition-all"
           aria-label="Buscar produtos"
           aria-autocomplete="list"
           aria-controls="search-results"
@@ -171,7 +171,7 @@ const SearchBarComponent = () => {
             <X className="h-4 w-4" />
           </Button>
         ) : (
-          <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-5 w-5 text-primary pointer-events-none" aria-hidden="true" />
+          <Search className="absolute right-4 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" aria-hidden="true" />
         )}
       </div>
 

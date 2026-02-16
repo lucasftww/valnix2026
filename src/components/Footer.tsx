@@ -44,7 +44,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
   ];
 
   return (
-    <footer className="w-full bg-background border-t border-border mt-16">
+    <footer className="w-full bg-muted/20 border-t border-border/10 mt-16">
       {/* Main Footer Content */}
       {showFullVersion && (
         <>
@@ -53,7 +53,8 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             <div className="container px-4 md:px-8 flex justify-center">
               <Button 
                 onClick={scrollToTop}
-                className="bg-primary hover:bg-primary/90 text-primary-foreground font-semibold px-8 transition-colors rounded-full"
+                variant="ghost"
+                className="text-muted-foreground hover:text-foreground font-medium px-6 transition-colors rounded-full text-sm"
               >
                 <ArrowUp className="w-4 h-4 mr-2" />
                 Voltar ao topo
@@ -111,7 +112,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           <Accordion type="single" collapsible className="w-full">
             {/* Atendimento ao Cliente */}
             <AccordionItem value="item-1" className="border-b border-border/30">
-              <AccordionTrigger className="px-6 py-4 text-primary font-bold text-base uppercase tracking-wide hover:no-underline">
+              <AccordionTrigger className="px-6 py-4 text-foreground font-semibold text-sm tracking-wide hover:no-underline">
                 Atendimento ao Cliente
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-4">
@@ -133,7 +134,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
 
             {/* Políticas */}
             <AccordionItem value="item-2" className="border-b border-border/30">
-              <AccordionTrigger className="px-6 py-4 text-primary font-bold text-base uppercase tracking-wide hover:no-underline">
+              <AccordionTrigger className="px-6 py-4 text-foreground font-semibold text-sm tracking-wide hover:no-underline">
                 Políticas
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-4">
@@ -154,7 +155,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
 
             {/* Categorias */}
             <AccordionItem value="item-3" className="border-b border-border/30">
-              <AccordionTrigger className="px-6 py-4 text-primary font-bold text-base uppercase tracking-wide hover:no-underline">
+              <AccordionTrigger className="px-6 py-4 text-foreground font-semibold text-sm tracking-wide hover:no-underline">
                 Categorias
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-4">
@@ -172,7 +173,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
 
             {/* Newsletter */}
             <AccordionItem value="item-4" className="border-b border-border/30">
-              <AccordionTrigger className="px-6 py-4 text-primary font-bold text-base uppercase tracking-wide hover:no-underline">
+              <AccordionTrigger className="px-6 py-4 text-foreground font-semibold text-sm tracking-wide hover:no-underline">
                 Newsletter
               </AccordionTrigger>
               <AccordionContent className="px-6 pb-4">
@@ -228,7 +229,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
           {/* Atendimento ao Cliente */}
           <div>
-            <h3 className="text-primary font-bold text-sm uppercase mb-4 tracking-wider">
+            <h3 className="text-foreground font-semibold text-sm mb-4 tracking-wide">
               Atendimento ao Cliente
             </h3>
             <ul className="space-y-3">
@@ -248,7 +249,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
 
           {/* Políticas */}
           <div>
-            <h3 className="text-primary font-bold text-sm uppercase mb-4 tracking-wider">
+            <h3 className="text-foreground font-semibold text-sm mb-4 tracking-wide">
               Políticas
             </h3>
             <ul className="space-y-3">
@@ -267,7 +268,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
 
           {/* Categorias */}
           <div>
-            <h3 className="text-primary font-bold text-sm uppercase mb-4 tracking-wider">
+            <h3 className="text-foreground font-semibold text-sm mb-4 tracking-wide">
               Categorias
             </h3>
             <ul className="space-y-2">

@@ -37,7 +37,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
     >
       <div 
         ref={cardRef}
-        className="overflow-hidden rounded-2xl border border-border/20 hover:border-primary/50 transition-all duration-300 hover:shadow-xl hover:shadow-primary/10"
+        className="overflow-hidden rounded-2xl border border-border/10 hover:border-border/30 transition-all duration-300 hover:shadow-xl hover:shadow-black/20"
       >
         <div className="aspect-[4/3] bg-muted overflow-hidden">
           {isVisible && category.image_url ? (
@@ -93,10 +93,10 @@ const CategoryCardsComponent = () => {
   return (
     <section className="container px-4 md:px-8 py-8 md:py-12">
       <div className="mb-6 md:mb-10">
-        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
-          CATEGORIAS
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+          Categorias
         </h2>
-        <p className="text-muted-foreground mt-2 md:mt-3 text-xs md:text-sm">
+        <p className="text-muted-foreground mt-1 text-xs md:text-sm">
           Explore nossos produtos por categoria
         </p>
       </div>

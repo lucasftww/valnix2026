@@ -11,8 +11,8 @@ const ProductGridComponent = () => {
     return (
       <section className="container px-4 md:px-8 py-12">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
-            MAIS VENDIDOS
+          <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
+            Mais vendidos
           </h2>
         </div>
         <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
@@ -40,8 +40,8 @@ const ProductGridComponent = () => {
     return (
       <section className="container px-4 md:px-8 py-12">
         <div className="mb-8">
-          <h2 className="text-3xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
-            MAIS VENDIDOS
+          <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
+            Mais vendidos
           </h2>
         </div>
         <div className="text-center py-12">
@@ -56,10 +56,10 @@ const ProductGridComponent = () => {
   return (
     <section className="container px-4 md:px-8 py-8 md:py-16">
       <div className="mb-6 md:mb-10">
-        <h2 className="text-2xl md:text-3xl lg:text-4xl font-bold text-foreground border-b-4 border-primary inline-block pb-2">
-          MAIS VENDIDOS
+        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+          Mais vendidos
         </h2>
-        <p className="text-muted-foreground mt-2 md:mt-3 text-xs md:text-sm">
+        <p className="text-muted-foreground mt-1 text-xs md:text-sm">
           Os produtos mais populares da nossa loja
         </p>
       </div>

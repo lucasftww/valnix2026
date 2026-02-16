@@ -49,7 +49,7 @@ const IndexComponent = () => {
       <Navigation />
       <main className="flex-1">
         {/* Search Bar Mobile */}
-        <div className="md:hidden px-4 py-4 bg-background border-b border-border/30">
+        <div className="md:hidden px-4 py-3 bg-background">
           <SearchBar />
         </div>
         <HeroBanner />
