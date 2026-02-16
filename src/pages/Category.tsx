@@ -8,7 +8,7 @@ import { ProductSkeleton } from "@/components/ProductSkeleton";
 import { CategorySidebar } from "@/components/CategorySidebar";
 import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/firebase";
 import { Helmet } from "react-helmet-async";
-import vIcon from "@/assets/v-icon.png";
+
 
 interface Category {
   id: string;
@@ -35,18 +35,35 @@ export default function Category() {
   const { data: category, isLoading: categoryLoading } = useCategoryBySlug(categorySlug);
   const { data: products = [], isLoading: productsLoading } = useProductsWithReviews(categorySlug || '');
 
+  // Show skeleton layout instead of spinner for faster perceived loading
   if (categoryLoading) {
     return (
       <div className="min-h-screen flex flex-col bg-background">
         <Header />
         <Navigation />
-        <div className="flex-1 flex items-center justify-center">
-          <img 
-            src={vIcon} 
-            alt="" 
-            className="w-10 h-10 drop-shadow-lg animate-spin" 
-          />
-        </div>
+        <main className="flex-1">
+          <div className="container px-4 md:px-8 py-6">
+            <div className="h-4 w-32 bg-muted rounded animate-pulse mb-6" />
+            <div className="flex gap-8">
+              <aside className="hidden lg:block w-64 flex-shrink-0">
+                <div className="bg-secondary/50 rounded-2xl p-5 space-y-3">
+                  <div className="h-3 w-20 bg-muted rounded animate-pulse" />
+                  {Array.from({ length: 3 }).map((_, i) => (
+                    <div key={i} className="h-9 bg-muted rounded-xl animate-pulse" />
+                  ))}
+                </div>
+              </aside>
+              <div className="flex-1">
+                <div className="h-8 w-48 bg-muted rounded animate-pulse mb-6" />
+                <div className="grid grid-cols-2 gap-3 md:gap-6 lg:grid-cols-3">
+                  {Array.from({ length: 6 }).map((_, i) => (
+                    <ProductSkeleton key={i} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        </main>
       </div>
     );
   }

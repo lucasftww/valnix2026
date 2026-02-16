@@ -22,11 +22,12 @@ const AppContent = () => {
       import("./pages/Cart");
       import("./pages/ProductDetail");
       import("./pages/Checkout");
+      import("./pages/Category"); // Prefetch category chunk for instant navigation
     };
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(prefetch, { timeout: 3000 });
+      (window as any).requestIdleCallback(prefetch, { timeout: 2000 });
     } else {
-      setTimeout(prefetch, 2000);
+      setTimeout(prefetch, 1500);
     }
   }, []);
   
