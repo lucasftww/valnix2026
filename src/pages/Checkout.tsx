@@ -447,9 +447,9 @@ export default function Checkout() {
         });
         
         if (orderHash) {
-          navigate(`/painel-pagar-entrega?order_id=${orderId}&hash=${orderHash}`);
+          navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${orderHash}`);
         } else {
-          navigate(`/painel-pagar-entrega?order_id=${orderId}`);
+          navigate(`/entrega-prioritaria?order_id=${orderId}`);
         }
         return;
       }

@@ -107,6 +107,9 @@ const App = () => {
                         <Route path="/seized" element={<Seized />} />
                         <Route path="/valorant" element={<Valorant />} />
                         <Route path="/painel-pagar" element={<PainelPagar />} />
+                        <Route path="/entrega-prioritaria" element={<PainelPagarEntrega />} />
+                        <Route path="/protecao-total" element={<PainelPagarTrocaDados />} />
+                        {/* Legacy redirects */}
                         <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
                         <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
 

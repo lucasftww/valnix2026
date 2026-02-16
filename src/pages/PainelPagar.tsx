@@ -8,7 +8,7 @@ export default function PainelPagar() {
 
   useEffect(() => {
     const params = new URLSearchParams(searchParams);
-    navigate(`/painel-pagar-entrega?${params.toString()}`, { replace: true });
+    navigate(`/entrega-prioritaria?${params.toString()}`, { replace: true });
   }, [navigate, searchParams]);
 
   return null;

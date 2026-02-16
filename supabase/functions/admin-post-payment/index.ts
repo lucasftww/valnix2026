@@ -311,7 +311,7 @@ Deno.serve(async (req) => {
             original_price: 14.99,
             button_accept_text: "SIM! EU QUERO!",
             button_skip_text: "Não, obrigado",
-            next_route: "/painel-pagar-trocadados",
+            next_route: "/protecao-total",
             is_active: true,
             display_order: 1,
           },
