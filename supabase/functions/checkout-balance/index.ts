@@ -670,65 +670,36 @@ Deno.serve(async (req) => {
       const customerEmail = orderFields.customer_email?.stringValue || '';
       const customerPhone = orderFields.customer_phone?.stringValue || '';
 
-      // Analytics event
-      try {
-        await addFirestoreDoc('analytics_events', {
-          event_name: 'Purchase',
-          event_time: new Date().toISOString(),
-          user_id: firebaseUser.uid,
-          value: recalculatedTotal,
-          currency: 'BRL',
-          order_id: orderId,
-          page_url: 'https://www.valnix.com.br/checkout',
-          content_name: productNamesList,
-        });
-        console.log(`📊 Analytics Purchase event registered for balance order ${orderId}`);
-      } catch {}
-
-      // Meta CAPI (idempotent via meta_purchase_events/{orderId})
+      // 🚀 Fire all analytics in PARALLEL (non-blocking)
       const nameParts = customerName.split(' ');
-      try {
-        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'balance', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
-        if (capiGuardRes) {
-          await invokeEdgeFunction('meta-capi', {
-            event_name: 'Purchase',
-            event_id: `purchase_${orderId}`,
-            order_id: orderId,
-            value: recalculatedTotal,
-            currency: 'BRL',
-            content_name: productNamesList,
-            email: customerEmail,
-            phone: customerPhone || undefined,
-            first_name: nameParts[0] || undefined,
-            last_name: nameParts.slice(1).join(' ') || undefined,
-            external_id: firebaseUser.uid,
-            fbc: orderFields.fbc?.stringValue,
-            fbp: orderFields.fbp?.stringValue,
-          });
-          console.log(`📡 Meta CAPI Purchase sent for balance order ${orderId}`);
-        } else {
-          console.log(`ℹ️ Meta CAPI Purchase already sent for balance order ${orderId}, skipping`);
-        }
-      } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
-
-      // UTMify
-      try {
-        await invokeEdgeFunction('utmify-event', {
-          order_id: orderId,
-          event_type: 'Purchase',
-          value: recalculatedTotal,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone || undefined,
+      await Promise.allSettled([
+        addFirestoreDoc('analytics_events', {
+          event_name: 'Purchase', event_time: new Date().toISOString(),
+          user_id: firebaseUser.uid, value: recalculatedTotal, currency: 'BRL',
+          order_id: orderId, page_url: 'https://www.valnix.com.br/checkout',
+          content_name: productNamesList,
+        }),
+        (async () => {
+          const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'balance', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
+          if (capiGuardRes) {
+            await invokeEdgeFunction('meta-capi', {
+              event_name: 'Purchase', event_id: `purchase_${orderId}`, order_id: orderId,
+              value: recalculatedTotal, currency: 'BRL', content_name: productNamesList,
+              email: customerEmail, phone: customerPhone || undefined,
+              first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+              external_id: firebaseUser.uid, fbc: orderFields.fbc?.stringValue, fbp: orderFields.fbp?.stringValue,
+            });
+          }
+        })(),
+        invokeEdgeFunction('utmify-event', {
+          order_id: orderId, event_type: 'Purchase', value: recalculatedTotal,
+          customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined,
           product_name: productNamesList,
-          utm_source: orderFields.utm_source?.stringValue,
-          utm_medium: orderFields.utm_medium?.stringValue,
-          utm_campaign: orderFields.utm_campaign?.stringValue,
-          utm_content: orderFields.utm_content?.stringValue,
+          utm_source: orderFields.utm_source?.stringValue, utm_medium: orderFields.utm_medium?.stringValue,
+          utm_campaign: orderFields.utm_campaign?.stringValue, utm_content: orderFields.utm_content?.stringValue,
           utm_term: orderFields.utm_term?.stringValue,
-        });
-        console.log(`📡 UTMify Purchase sent for balance order ${orderId}`);
-      } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
+        }),
+      ]);
 
       return new Response(JSON.stringify({
         success: true,

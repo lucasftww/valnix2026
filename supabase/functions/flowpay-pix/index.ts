@@ -565,40 +565,35 @@ Deno.serve(async (req) => {
         }
       } catch {}
 
-      await registerAnalyticsEvent(orderId, orderValue, userId, customerEmail, productNamesList);
-
-      // Meta CAPI (idempotent via meta_purchase_events/{orderId})
+      // 🚀 Fire all analytics in PARALLEL (non-blocking, fire-and-forget)
       const customerName = orderFields?.customer_name?.stringValue || '';
       const customerPhone = orderFields?.customer_phone?.stringValue || '';
       const nameParts = customerName.split(' ');
-      try {
-        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'webhook', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
-        if (capiGuardRes) {
-          await invokeEdgeFunction('meta-capi', {
-            event_name: 'Purchase', event_id: `purchase_${orderId}`, order_id: orderId,
-            value: orderValue, currency: 'BRL', content_name: productNamesList,
-            email: customerEmail, phone: customerPhone || undefined,
-            first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
-            external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
-          });
-          console.log(`📡 Meta CAPI Purchase sent for order ${orderId}`);
-        } else {
-          console.log(`ℹ️ Meta CAPI Purchase already sent for order ${orderId}, skipping`);
-        }
-      } catch (e) { console.warn('⚠️ Meta CAPI failed:', e); }
 
-      // UTMify
-      try {
-        await invokeEdgeFunction('utmify-event', {
+      await Promise.allSettled([
+        registerAnalyticsEvent(orderId, orderValue, userId, customerEmail, productNamesList),
+        (async () => {
+          const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'webhook', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
+          if (capiGuardRes) {
+            await invokeEdgeFunction('meta-capi', {
+              event_name: 'Purchase', event_id: `purchase_${orderId}`, order_id: orderId,
+              value: orderValue, currency: 'BRL', content_name: productNamesList,
+              email: customerEmail, phone: customerPhone || undefined,
+              first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+              external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+            });
+            console.log(`📡 Meta CAPI Purchase sent for order ${orderId}`);
+          }
+        })(),
+        invokeEdgeFunction('utmify-event', {
           order_id: orderId, event_type: 'Purchase', value: orderValue,
           customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined,
           product_name: productNamesList,
           utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue,
           utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue,
           utm_term: orderFields?.utm_term?.stringValue,
-        });
-        console.log(`📡 UTMify Purchase sent for order ${orderId}`);
-      } catch (e) { console.warn('⚠️ UTMify failed:', e); }
+        }),
+      ]);
 
       return new Response(JSON.stringify({ success: true, orderId }), { headers: { 'Content-Type': 'application/json' } });
     }
@@ -652,6 +647,8 @@ Deno.serve(async (req) => {
           return new Response(JSON.stringify({ error: 'Order items not found' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
+        // 🔒 Server-side price recalculation with product cache
+        const productCache = new Map<string, any>();
         let recalculatedTotal = 0;
         for (const result of orderItemsResults) {
           if (!result.document) continue;
@@ -661,9 +658,13 @@ Deno.serve(async (req) => {
           if (!productId) {
             return new Response(JSON.stringify({ error: 'Invalid order item' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
           }
-          const productFields = await getFirestoreDoc('products', productId);
+          let productFields = productCache.get(productId);
           if (!productFields) {
-            return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            productFields = await getFirestoreDoc('products', productId);
+            if (!productFields) {
+              return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+            }
+            productCache.set(productId, productFields);
           }
           const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
           recalculatedTotal += realPrice * quantity;
