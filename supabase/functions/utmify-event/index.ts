@@ -115,15 +115,16 @@ async function logRateLimitBlock(source: string, ip: string, attempts: number) {
     const fields: Record<string, unknown> = {
       source: { stringValue: source },
       ip: { stringValue: ip },
-      attempts: { doubleValue: attempts },
-      blocked_at: { stringValue: new Date().toISOString() },
-      created_at: { stringValue: new Date().toISOString() },
+      attempts: { integerValue: String(attempts) },
+      blocked_at: { timestampValue: new Date().toISOString() },
+      created_at: { timestampValue: new Date().toISOString() },
     };
-    await fetch(url, {
+    const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({ fields }),
     });
+    if (!res.ok) console.warn(`⚠️ Rate limit log POST failed: ${res.status}`);
     console.warn(`🛡️ Rate limit block logged: ${source} | IP: ${ip} | Attempts: ${attempts}`);
   } catch (e) {
     console.warn('⚠️ Failed to log rate limit block:', e);
@@ -283,7 +284,7 @@ Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
-  // Rate limit: 60/min per IP + 10/min per order_id fingerprint (Firestore-backed)
+  // Rate limit: 60/min per IP (Firestore-backed)
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
   const ipRl = await checkRateLimitFirestore(`utmify_ip_${clientIp}`, 60, 60_000, 300_000);
   if (!ipRl.allowed) {
@@ -303,6 +304,26 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'order_id is required' }), {
         status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
+    }
+
+    // Secondary rate limit: 10/min per payload fingerprint (utm/fbc/fbp/external_id/email)
+    const fingerprintParts = [
+      utm_source || '', utm_campaign || '', customer_email || '', order_id || '',
+    ].join('|');
+    if (fingerprintParts.length > 1) {
+      // Simple hash for key
+      let hash = 0;
+      for (let i = 0; i < fingerprintParts.length; i++) {
+        hash = ((hash << 5) - hash) + fingerprintParts.charCodeAt(i);
+        hash |= 0;
+      }
+      const fpKey = `utmify_fp_${Math.abs(hash).toString(36)}`;
+      const fpRl = await checkRateLimitFirestore(fpKey, 10, 60_000, 300_000);
+      if (!fpRl.allowed) {
+        logRateLimitBlock('utmify-event-fingerprint', `${clientIp}|fp:${fpKey}`, fpRl.attempts);
+        return new Response(JSON.stringify({ error: 'Too many requests (fingerprint)' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     const eventId = `${event_type}_${order_id}`;
