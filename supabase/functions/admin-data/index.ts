@@ -821,7 +821,53 @@ Deno.serve(async (req) => {
         for (const key of Object.keys(body)) {
           if (ORDER_ITEMS_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
         }
+        // Auto-set delivered_at when delivery_code is provided
+        if (safeBody.delivery_code && !safeBody.delivered_at) {
+          safeBody.delivered_at = new Date().toISOString();
+        }
         const success = await updateFirestoreDoc("order_items", docId, safeBody);
+
+        // ── Sync guest_orders.order_data so guests see codes without onSnapshot ──
+        if (success && safeBody.delivery_code) {
+          try {
+            // Read the order_item to get order_id
+            const itemDoc = await getFirestoreDoc("order_items", docId);
+            const orderId = itemDoc?.fields?.order_id?.stringValue;
+            if (orderId) {
+              // Find guest_order by order_id
+              const guestResults = await queryCollectionFiltered("guest_orders", "order_id", "EQUAL", { stringValue: orderId });
+              if (guestResults.length > 0) {
+                const guestOrder = guestResults[0];
+                const guestDocId = guestOrder.id;
+                if (guestDocId) {
+                  // Parse existing order_data, update the matching item's delivery_code
+                  let orderData = guestOrder.order_data;
+                  if (typeof orderData === 'string') {
+                    try { orderData = JSON.parse(orderData); } catch { orderData = null; }
+                  }
+                  if (orderData?.items && Array.isArray(orderData.items)) {
+                    // Match by product_name or index — update delivery_code
+                    const itemProductName = itemDoc?.fields?.product_name?.stringValue;
+                    for (const gItem of orderData.items) {
+                      if (!gItem.delivery_code && gItem.product_name === itemProductName) {
+                        gItem.delivery_code = safeBody.delivery_code;
+                        break;
+                      }
+                    }
+                    // Write back as JSON string
+                    await updateFirestoreDoc("guest_orders", guestDocId, {
+                      order_data: JSON.stringify(orderData),
+                    });
+                    console.log(`📦 Synced delivery_code to guest_orders for order ${orderId}`);
+                  }
+                }
+              }
+            }
+          } catch (syncErr) {
+            console.warn('⚠️ guest_orders sync failed (non-blocking):', syncErr);
+          }
+        }
+
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
