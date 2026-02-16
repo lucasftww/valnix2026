@@ -9,7 +9,6 @@ import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense, useEffect } from "react";
-import PageTransition from "@/components/PageTransition";
 
 // Componente interno para usar hooks dentro do BrowserRouter + prefetch rotas
 const AppContent = () => {
@@ -93,8 +92,7 @@ const App = () => {
                       </div>
                     </div>
                   }>
-                    <PageTransition>
-                      <Routes>
+                    <Routes>
                         <Route path="/" element={<Index />} />
                         <Route path="/auth/*" element={<Auth />} />
                         <Route path="/cart" element={<Cart />} />
@@ -121,8 +119,7 @@ const App = () => {
                         <Route path="/:categorySlug" element={<Category />} />
 
                         <Route path="*" element={<NotFound />} />
-                      </Routes>
-                    </PageTransition>
+                    </Routes>
                   </Suspense>
                 </BrowserRouter>
             </CartProvider>

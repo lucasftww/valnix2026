@@ -8,7 +8,7 @@ export const ProductSkeleton = () => {
         <Skeleton className="w-full h-full" />
       </div>
       
-      <div className="bg-black/95 p-1 md:p-4 space-y-1 md:space-y-2">
+      <div className="bg-card p-1 md:p-4 space-y-1 md:space-y-2">
         <Skeleton className="h-3 md:h-5 w-3/4" />
         <Skeleton className="h-2 md:h-4 w-16" />
         <Skeleton className="h-4 md:h-6 w-20" />

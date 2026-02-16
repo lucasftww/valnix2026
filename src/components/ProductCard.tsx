@@ -11,8 +11,10 @@ import { db } from "@/integrations/firebase/config";
 interface ProductCardProps {
   id: string | number;
   image: string;
-  gameIcon: string;
-  gameName: string;
+  /** @deprecated No longer rendered — kept for call-site compat */
+  gameIcon?: string;
+  /** @deprecated No longer rendered — kept for call-site compat */
+  gameName?: string;
   title: string;
   reviewCount: number;
   price: number;
