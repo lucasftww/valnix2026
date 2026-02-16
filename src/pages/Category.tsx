@@ -1,5 +1,4 @@
 import { useParams, Link } from "react-router-dom";
-import { useState, useEffect, useRef } from "react";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
 import { Footer } from "@/components/Footer";
@@ -32,22 +31,9 @@ interface Product {
 
 export default function Category() {
   const { categorySlug } = useParams<{ categorySlug: string }>();
-  const [showTransition, setShowTransition] = useState(false);
-  const prevSlugRef = useRef(categorySlug);
 
   const { data: category, isLoading: categoryLoading } = useCategoryBySlug(categorySlug);
   const { data: products = [], isLoading: productsLoading } = useProductsWithReviews(categorySlug || '');
-
-  // Show quick transition overlay when switching categories
-  useEffect(() => {
-    if (prevSlugRef.current !== categorySlug && prevSlugRef.current) {
-      setShowTransition(true);
-      const timer = setTimeout(() => setShowTransition(false), 400);
-      prevSlugRef.current = categorySlug;
-      return () => clearTimeout(timer);
-    }
-    prevSlugRef.current = categorySlug;
-  }, [categorySlug]);
 
   if (categoryLoading) {
     return (
@@ -99,18 +85,6 @@ export default function Category() {
       </Helmet>
       <Header />
       <Navigation />
-
-      {/* Category transition overlay */}
-      {showTransition && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm" style={{ animation: 'cat-transition 400ms ease-out forwards' }}>
-          <img 
-            src={vIcon} 
-            alt="" 
-            className="w-10 h-10 drop-shadow-lg" 
-            style={{ animation: 'cat-spin 400ms ease-in-out' }} 
-          />
-        </div>
-      )}
 
       <main className="flex-1">
         <div className="container px-4 md:px-8 py-6">
