@@ -55,7 +55,7 @@ async function getFirebaseAccessToken(): Promise<string> {
 async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
   try {
     const res = await fetch(
-      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw`,
+      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${Deno.env.get('FIREBASE_WEB_API_KEY') || ''}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
     );
     if (!res.ok) return null;
@@ -127,17 +127,35 @@ async function createFirestoreDoc(col: string, docId: string, fields: Record<str
   return res.ok;
 }
 
-async function queryAllFirestore(col: string) {
+async function queryAllFirestore(col: string, filters?: { field: string; op: string; value: unknown }[]) {
   const accessToken = await getFirebaseAccessToken();
   const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const structuredQuery: any = { from: [{ collectionId: col }], limit: 10000 };
+  if (filters && filters.length > 0) {
+    structuredQuery.where = {
+      compositeFilter: {
+        op: 'AND',
+        filters: filters.map(f => ({
+          fieldFilter: { field: { fieldPath: f.field }, op: f.op, value: toFirestoreValue(f.value) }
+        }))
+      }
+    };
+  }
   const res = await fetch(queryUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-    body: JSON.stringify({ structuredQuery: { from: [{ collectionId: col }], limit: 10000 } }),
+    body: JSON.stringify({ structuredQuery }),
   });
   if (!res.ok) return [];
   const results = await res.json();
   return Array.isArray(results) ? results.filter((r: any) => r.document) : [];
+}
+
+async function deleteFirestoreDoc(col: string, docId: string): Promise<boolean> {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
+  const res = await fetch(url, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } });
+  return res.ok || res.status === 404;
 }
 
 Deno.serve(async (req) => {
@@ -167,12 +185,14 @@ Deno.serve(async (req) => {
     // Get all guest_orders from Firestore
     const guestOrderDocs = await queryAllFirestore('guest_orders');
 
-    // Also get all analytics_events for Purchase to check confirmed paid
-    const analyticsResults = await queryAllFirestore('analytics_events');
+    // Query ONLY Purchase events (filtered server-side, not full table scan)
+    const analyticsResults = await queryAllFirestore('analytics_events', [
+      { field: 'event_name', op: 'EQUAL', value: 'Purchase' }
+    ]);
     const paidOrderIds = new Set<string>();
     for (const r of analyticsResults) {
       const f = r.document?.fields;
-      if (f?.event_name?.stringValue === 'Purchase' && f?.order_id?.stringValue) {
+      if (f?.order_id?.stringValue) {
         paidOrderIds.add(f.order_id.stringValue);
       }
     }
@@ -198,6 +218,7 @@ Deno.serve(async (req) => {
 
       if (!hasDeliveryCode && !confirmedPaid) { skipped++; continue; }
 
+      // Idempotency: check if order already exists
       const existing = await getFirestoreDoc('orders', orderId);
       if (existing) { details.push(`⏭️ ${orderId} já existe`); skipped++; continue; }
 
@@ -227,6 +248,10 @@ Deno.serve(async (req) => {
       const orderCreated = await createFirestoreDoc('orders', orderId, orderFields);
       if (!orderCreated) { details.push(`❌ Falha ao criar pedido ${orderId}`); continue; }
 
+      // Create order_items with rollback on failure
+      const createdItemIds: string[] = [];
+      let itemsFailed = false;
+
       for (const item of orderData?.items || []) {
         const itemId = `restored_${orderId}_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
         const itemFields: Record<string, unknown> = {
@@ -240,7 +265,20 @@ Deno.serve(async (req) => {
           delivery_code: toFirestoreValue(item.delivery_code || null),
           created_at: toFirestoreValue(orderData?.created_at || new Date().toISOString()),
         };
-        await createFirestoreDoc('order_items', itemId, itemFields);
+        const itemCreated = await createFirestoreDoc('order_items', itemId, itemFields);
+        if (!itemCreated) {
+          itemsFailed = true;
+          details.push(`❌ Falha ao criar item ${itemId} do pedido ${orderId} — rollback`);
+          break;
+        }
+        createdItemIds.push(itemId);
+      }
+
+      // Rollback: if any item failed, delete order + created items
+      if (itemsFailed) {
+        await deleteFirestoreDoc('orders', orderId);
+        for (const iid of createdItemIds) await deleteFirestoreDoc('order_items', iid);
+        continue;
       }
 
       restored++;

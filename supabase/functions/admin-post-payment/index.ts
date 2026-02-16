@@ -64,9 +64,10 @@ async function getFirebaseAccessToken(): Promise<string> {
 
 async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
   try {
-    const FIREBASE_WEB_API_KEY = 'AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw';
+    const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY');
+    if (!apiKey) throw new Error('FIREBASE_WEB_API_KEY not configured');
     const res = await fetch(
-      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${FIREBASE_WEB_API_KEY}`,
+      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
     );
     if (!res.ok) return null;

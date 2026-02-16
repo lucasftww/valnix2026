@@ -21,7 +21,7 @@ function getCorsHeaders(req: Request) {
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif"];
-const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
+const FIREBASE_API_KEY = Deno.env.get('FIREBASE_WEB_API_KEY') || '';
 const FIREBASE_PROJECT_ID = "valnix";
 
 // ── Firebase Service Account Auth (for admin check) ───────────────

@@ -13,7 +13,8 @@ const SUPABASE_FUNCTIONS_URL = Deno.env.get('SUPABASE_URL') + '/functions/v1';
 // ── Firebase ID Token Verification ─────────────────────────────────
 async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; email?: string } | null> {
   try {
-    const res = await fetch(`https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw`, {
+    const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY') || '';
+    const res = await fetch(`https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ idToken }),
