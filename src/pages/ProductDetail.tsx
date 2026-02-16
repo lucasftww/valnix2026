@@ -43,6 +43,15 @@ const ProductDetail = () => {
   // Buscar produto com Firebase
   const { data: product, isLoading } = useProductById(id);
 
+  // Track ViewContent when product loads
+  useEffect(() => {
+    if (product?.name) {
+      import("@/lib/analytics").then(({ trackViewContentEvent }) => {
+        trackViewContentEvent(user?.uid || null, product.name, product.category || undefined);
+      });
+    }
+  }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Buscar avaliações com Firebase - defer até produto carregar
   const { data: reviews = [] } = useProductReviews(product?.category);
 

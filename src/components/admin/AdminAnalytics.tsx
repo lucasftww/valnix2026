@@ -9,7 +9,7 @@ import {
   CreditCard, RefreshCw, ArrowDown, AlertTriangle,
   Smartphone, Monitor, Globe, DollarSign,
   Activity, Target, Zap, Tablet, Trash2,
-  Clock, Package, Users, ArrowUpRight, Percent
+  Clock, Package, Users, ArrowUpRight, Percent, Eye
 } from "lucide-react";
 import { 
   AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -69,7 +69,7 @@ function formatCurrency(value: number): string {
 }
 
 export function AdminAnalytics() {
-  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('7d');
+  const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('today');
   const [cleanupFrom, setCleanupFrom] = useState('');
   const [cleanupTo, setCleanupTo] = useState('');
   const [cleanupLoading, setCleanupLoading] = useState(false);
@@ -157,20 +157,24 @@ export function AdminAnalytics() {
 
   // ── Computed Metrics ──────────────────────────────────────────────
   const metrics = useMemo(() => {
+    const views = events.filter(e => e.event_name === 'ViewContent');
     const checkouts = events.filter(e => e.event_name === 'InitiateCheckout');
     const purchases = events.filter(e => e.event_name === 'Purchase');
     const revenue = purchases.reduce((sum, e) => sum + (e.value || 0), 0);
     const avgTicket = purchases.length > 0 ? revenue / purchases.length : 0;
     const conversionRate = checkouts.length > 0 ? (purchases.length / checkouts.length) * 100 : 0;
+    const viewToCheckout = views.length > 0 ? (checkouts.length / views.length) * 100 : 0;
     const uniqueUsers = new Set(events.filter(e => e.user_id).map(e => e.user_id)).size;
     const dropOff = checkouts.length > 0 ? ((checkouts.length - purchases.length) / checkouts.length) * 100 : 0;
     
     return {
+      views: views.length,
       checkouts: checkouts.length,
       purchases: purchases.length,
       revenue,
       avgTicket,
       conversionRate,
+      viewToCheckout,
       uniqueUsers,
       dropOff,
     };
@@ -392,8 +396,16 @@ export function AdminAnalytics() {
       </div>
 
       {/* ── KPI Cards ────────────────────────────────────────────── */}
-      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
         {[
+          { 
+            label: 'Visualizações', 
+            value: metrics.views.toLocaleString(), 
+            icon: Eye, 
+            bgColor: 'bg-cyan-500/10', 
+            textColor: 'text-cyan-500',
+            subtitle: metrics.viewToCheckout > 0 ? `${metrics.viewToCheckout.toFixed(1)}% → checkout` : null,
+          },
           { 
             label: 'Receita', 
             value: metrics.revenue > 0 ? formatCurrency(metrics.revenue) : 'R$ 0', 
@@ -483,7 +495,7 @@ export function AdminAnalytics() {
               </div>
               <div>
                 <CardTitle className="text-base">Funil de Conversão</CardTitle>
-                <CardDescription className="text-xs">Checkout → Compra</CardDescription>
+                <CardDescription className="text-xs">Visualização → Checkout → Compra</CardDescription>
               </div>
             </div>
             <Badge variant="outline" className="text-[10px]">
@@ -493,6 +505,36 @@ export function AdminAnalytics() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
+            {/* ViewContent */}
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <div className="p-1.5 rounded-lg bg-cyan-500/10">
+                  <Eye className="h-4 w-4 text-cyan-500" />
+                </div>
+                <div className="flex-1 flex items-center justify-between">
+                  <span className="text-sm font-medium">Viram Produto</span>
+                  <span className="text-lg font-bold tabular-nums">{metrics.views.toLocaleString()}</span>
+                </div>
+              </div>
+              <div className="h-9 bg-muted/20 rounded-lg overflow-hidden">
+                <div className="h-full rounded-lg bg-gradient-to-r from-cyan-500/50 to-cyan-500/80 flex items-center justify-end pr-3" style={{ width: '100%' }}>
+                  <span className="text-[11px] font-semibold text-foreground">100%</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-center">
+              <div className="flex items-center gap-2">
+                <ArrowDown className="h-4 w-4 text-muted-foreground/40" />
+                {metrics.viewToCheckout > 0 && metrics.viewToCheckout < 100 && (
+                  <Badge variant="outline" className="text-[10px]">
+                    <TrendingDown className="h-3 w-3 mr-0.5" />
+                    -{(100 - metrics.viewToCheckout).toFixed(0)}%
+                  </Badge>
+                )}
+              </div>
+            </div>
+
             {/* InitiateCheckout */}
             <div>
               <div className="flex items-center gap-3 mb-2">
@@ -505,8 +547,8 @@ export function AdminAnalytics() {
                 </div>
               </div>
               <div className="h-9 bg-muted/20 rounded-lg overflow-hidden">
-                <div className="h-full rounded-lg bg-gradient-to-r from-yellow-500/50 to-yellow-500/80 flex items-center justify-end pr-3" style={{ width: '100%' }}>
-                  <span className="text-[11px] font-semibold text-foreground">100%</span>
+                <div className="h-full rounded-lg bg-gradient-to-r from-yellow-500/50 to-yellow-500/80 flex items-center justify-end pr-3 transition-all duration-700" style={{ width: `${metrics.views > 0 ? Math.max((metrics.checkouts / metrics.views) * 100, 3) : 100}%` }}>
+                  <span className="text-[11px] font-semibold text-foreground">{metrics.viewToCheckout.toFixed(1)}%</span>
                 </div>
               </div>
             </div>
