@@ -21,7 +21,7 @@ import {
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const PIE_COLORS = ['#10b981', '#f59e0b', '#ef4444'];
+
 
 const getFirebaseToken = async () => {
   const user = auth.currentUser;

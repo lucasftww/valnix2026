@@ -285,8 +285,6 @@ export const AdminProducts = () => {
       });
       if (!res.ok) throw new Error('Failed to duplicate product');
 
-      if (!res.ok) throw new Error('Failed to duplicate product');
-
       const newProduct = { id: newId, ...duplicatedProduct } as Product;
       handleEdit(newProduct);
       
@@ -311,8 +309,6 @@ export const AdminProducts = () => {
         queryParams: { resource: 'products', id },
         headers: { 'x-firebase-token': token },
       });
-      if (!res.ok) throw new Error('Failed to delete product');
-
       if (!res.ok) throw new Error('Failed to delete product');
 
       fetchProducts();
@@ -368,8 +364,6 @@ export const AdminProducts = () => {
         headers: { 'x-firebase-token': token },
         body: { id: productId, featured: newFeatured, updated_at: new Date().toISOString() },
       });
-      if (!res.ok) throw new Error('Failed to toggle featured');
-      
       if (!res.ok) throw new Error('Failed to toggle featured');
       
       invalidateQueries();
