@@ -3,21 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <!-- Critical CSS inlined to avoid render-blocking -->
     <style>
-      * {
-        touch-action: pan-x pan-y;
-        -webkit-user-select: none;
-        user-select: none;
-      }
-      html, body {
-        overscroll-behavior-x: none;
-        -webkit-text-size-adjust: 100%;
-        touch-action: pan-x pan-y;
-      }
-      img {
-        pointer-events: none;
-        -webkit-user-drag: none;
-      }
+      *{touch-action:pan-x pan-y;-webkit-user-select:none;user-select:none;box-sizing:border-box}
+      html,body{overscroll-behavior-x:none;-webkit-text-size-adjust:100%;touch-action:pan-x pan-y;margin:0;padding:0}
+      img{pointer-events:none;-webkit-user-drag:none}
+      body{background:#000;color:#fafafa;font-family:'Poppins',system-ui,sans-serif}
+      #root{min-height:100vh;display:flex;flex-direction:column}
     </style>
     <meta name="theme-color" content="#EE4444" />
     
@@ -31,15 +23,12 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     
-    <!-- Preconnect to critical domains -->
-    <link rel="preconnect" href="https://fonts.googleapis.com" crossorigin />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <!-- Preconnect to critical domains (fonts are now self-hosted) -->
     <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
     <link rel="dns-prefetch" href="https://tiupdhnjdcmgbqifwkrd.supabase.co" />
     <link rel="dns-prefetch" href="https://media.discordapp.net" />
     <link rel="dns-prefetch" href="https://www.googleapis.com" />
     <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
-    
     
     <!-- Prefetch páginas principais -->
     <link rel="prefetch" href="/valorant" as="document" />
@@ -165,9 +154,7 @@
     }
     </script>
     
-    <!-- Fonts & Icons - Non-render-blocking -->
-    <link rel="preload" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" as="style" onload="this.onload=null;this.rel='stylesheet'" />
-    <noscript><link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700;800&display=swap" /></noscript>
+    <!-- Fonts are self-hosted via @fontsource/poppins (bundled in JS) -->
     
     <!-- Apple Touch Icon -->
     <link rel="icon" type="image/png" href="/favicon.png">
