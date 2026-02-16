@@ -295,21 +295,10 @@ Deno.serve(async (req) => {
         { status: 410, headers: jsonHeaders });
     }
 
-    // Use runQuery to list subcollection items reliably
-    const runQueryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
-    const parent = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}`;
-
-    const itemsRes = await fetch(runQueryUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-      body: JSON.stringify({
-        parent,
-        structuredQuery: {
-          from: [{ collectionId: "items" }],
-          orderBy: [{ field: { fieldPath: "product_name" }, direction: "ASCENDING" }],
-          limit: 50,
-        },
-      }),
+    // List subcollection items — try simple GET first (more reliable), fallback to runQuery
+    const listUrl = `${firestoreBase}/guest_orders/${hash}/items?pageSize=50`;
+    const itemsRes = await fetch(listUrl, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
 
     const items: Array<{
@@ -322,10 +311,11 @@ Deno.serve(async (req) => {
     }> = [];
 
     if (itemsRes.ok) {
-      const rows = await itemsRes.json();
-      for (const r of rows) {
-        const f = r.document?.fields;
-        if (!f) continue; // skip empty results from runQuery
+      const itemsData = await itemsRes.json();
+      const docs = itemsData.documents || [];
+      console.log(`📦 Found ${docs.length} items in guest_orders/${hash}/items`);
+      for (const itemDoc of docs) {
+        const f = itemDoc.fields || {};
         items.push({
           product_name: f.product_name?.stringValue || '',
           product_image: f.product_image?.stringValue || null,
@@ -336,7 +326,8 @@ Deno.serve(async (req) => {
         });
       }
     } else {
-      await itemsRes.text(); // consume
+      const errText = await itemsRes.text();
+      console.warn(`⚠️ Failed to list items: ${itemsRes.status} ${errText.slice(0, 200)}`);
     }
 
     // Build response (only safe fields)
