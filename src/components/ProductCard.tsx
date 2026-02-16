@@ -83,12 +83,13 @@ const ProductCardComponent = ({
     <Link 
       ref={cardRef}
       to={ROUTES.PRODUCT(productId)} 
-      className={`group block touch-manipulation transition-all duration-500 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
+      className={`group block touch-manipulation ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      style={{ transition: 'opacity 0.3s ease-out' }}
       onMouseEnter={triggerPrefetch}
       onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
-      <Card className="relative overflow-hidden border border-border/10 md:hover:border-border/30 transition-colors duration-300 bg-card cursor-pointer h-full md:hover:shadow-xl md:hover:shadow-black/20 rounded-2xl md:group-hover:-translate-y-1 contain-layout">
+      <Card className="relative overflow-hidden border border-border/10 md:hover:border-border/30 bg-card cursor-pointer h-full rounded-2xl contain-layout" style={{ transition: 'border-color 0.3s' }}>
         {/* Badge de desconto */}
         {hasDiscount && (
           <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-discount text-discount-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full">
@@ -108,7 +109,8 @@ const ProductCardComponent = ({
               decoding="async"
               {...(priority ? { fetchPriority: "high" as const } : {})}
               onLoad={() => setImageLoaded(true)}
-              className={`w-full h-full object-cover ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
+              className="w-full h-full object-cover"
+              style={{ opacity: imageLoaded ? 1 : 0, transition: 'opacity 0.2s' }}
             />
           ) : (
             <div className="w-full h-full bg-muted animate-pulse" />
