@@ -88,7 +88,8 @@ async function deleteByQuery(
 
     // If orderBy fails (missing index), retry without it
     if (!res.ok) {
-      console.warn(`⚠️ ${collection} [${valueType}] orderBy query failed (${res.status}), retrying without orderBy`);
+      const errBody = await res.text().catch(() => '');
+      console.warn(`⚠️ ${collection} [${valueType}] orderBy query failed (${res.status}): ${errBody.slice(0, 200)}`);
       const fallbackBody = { ...queryBody };
       delete (fallbackBody.structuredQuery as any).orderBy;
       res = await fetch(queryUrl, {
@@ -97,7 +98,8 @@ async function deleteByQuery(
         body: JSON.stringify(fallbackBody),
       });
       if (!res.ok) {
-        console.warn(`⚠️ ${collection} [${valueType}] query failed entirely: ${res.status}`);
+        const errBody2 = await res.text().catch(() => '');
+        console.warn(`⚠️ ${collection} [${valueType}] query failed entirely (${res.status}): ${errBody2.slice(0, 200)}`);
         break;
       }
     }
