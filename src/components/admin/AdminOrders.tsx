@@ -214,7 +214,7 @@ export const AdminOrders = () => {
         payment_status: o.payment_status || 'pending',
         payment_method: o.payment_method || null,
         flowpay_charge_id: o.flowpay_charge_id || null,
-        created_at: o.created_at || new Date().toISOString(),
+        created_at: o.created_at ?? o.updated_at ?? '',
         user_id: o.user_id || undefined,
         notes: o.notes || null,
       }));
@@ -990,25 +990,28 @@ export const AdminOrders = () => {
                       <Button 
                         variant="outline" 
                         size="sm" 
-                        disabled={reprocessingDelivery}
+                        disabled={reprocessingDelivery || detailItems.every(i => !!i.delivery_code)}
                         onClick={async () => {
                           setReprocessingDelivery(true);
                           try {
                             const token = await user?.getIdToken();
-                            const webhookSecret = ''; // internal call uses x-internal-key
                             const res = await invokeFunction("process-delivery", {
                               method: "POST",
                               headers: { "x-firebase-token": token || "" },
                               body: { orderId: detailOrder.id },
                             });
                             const data = await res.json();
-                            if (data.deliveredCount > 0) {
+                            if (data.failedCount > 0) {
+                              toast({ title: `Entrega parcial`, description: `${data.deliveredCount || 0} entregue(s), ${data.failedCount} falha(s). Verifique os logs.`, variant: "destructive" });
+                            } else if (data.deliveredCount > 0) {
                               toast({ title: `Entrega reprocessada!`, description: `${data.deliveredCount} código(s) entregue(s).` });
-                              handleViewDetail(detailOrder);
-                              fetchOrders();
+                            } else if (data.skippedCount > 0) {
+                              toast({ title: "Já entregue", description: "Todos os itens já possuem código." });
                             } else {
-                              toast({ title: "Nenhum código novo entregue", description: data.skippedCount > 0 ? "Já entregue anteriormente." : "Verifique o estoque." });
+                              toast({ title: "Sem códigos disponíveis", description: "Verifique o estoque dos produtos.", variant: "destructive" });
                             }
+                            handleViewDetail(detailOrder);
+                            fetchOrders();
                           } catch (err: any) {
                             toast({ title: "Erro ao reprocessar", description: err.message, variant: "destructive" });
                           } finally {
@@ -1017,7 +1020,7 @@ export const AdminOrders = () => {
                         }}
                       >
                         {reprocessingDelivery ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-                        Reprocessar entrega
+                        {detailItems.every(i => !!i.delivery_code) ? "Já entregue" : "Reprocessar entrega"}
                       </Button>
                     )}
                   </div>
