@@ -379,6 +379,141 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ==================== WEBHOOK (auto-confirm from FlowPay) ====================
+    if (req.method === 'POST' && action === 'webhook') {
+      console.log('🔔 FlowPay card webhook received');
+
+      const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
+      if (!webhookSecret) {
+        console.error('❌ FLOWPAY_WEBHOOK_SECRET not configured');
+        return new Response(JSON.stringify({ error: 'Webhook authentication not configured' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const receivedSecret = req.headers.get('x-webhook-secret') || req.headers.get('x-secret') || req.headers.get('authorization')?.replace('Bearer ', '') || req.headers.get('x-api-key');
+      if (!receivedSecret || !timingSafeEqual(receivedSecret, webhookSecret)) {
+        console.error('❌ Invalid card webhook secret');
+        return new Response(JSON.stringify({ error: 'Invalid webhook authentication' }), { status: 401, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const body = await req.json();
+      console.log('🔔 Card webhook payload:', JSON.stringify(body));
+
+      const event = body.event || body.type || body.status;
+      const chargeData = body.data || body.charge || body;
+      const paidEvents = ['card.paid', 'charge.paid', 'COMPLETED', 'paid', 'approved'];
+      const isPaidEvent = paidEvents.includes(event) || chargeData?.status === 'COMPLETED' || chargeData?.status === 'paid';
+
+      if (!isPaidEvent) {
+        console.log(`ℹ️ Ignoring card webhook event: ${event}`);
+        return new Response(JSON.stringify({ success: true, message: 'Event ignored' }), { headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const chargeId = chargeData.chargeId || chargeData.id;
+      if (!chargeId) {
+        return new Response(JSON.stringify({ error: 'Missing chargeId' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      console.log(`💳 Card payment confirmed via webhook for charge: ${chargeId}`);
+
+      // Find order by flowpay_charge_id
+      const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+      if (!queryResults || !queryResults[0]?.document) {
+        console.error(`❌ No order found for card chargeId: ${chargeId}`);
+        return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const orderDoc = queryResults[0].document;
+      const orderId = orderDoc.name.split('/').pop()!;
+      const orderFields = orderDoc.fields;
+
+      // Idempotency: skip if already paid
+      if (orderFields?.payment_status?.stringValue === 'paid') {
+        console.log(`ℹ️ Card order ${orderId} already paid, skipping webhook`);
+        return new Response(JSON.stringify({ success: true, message: 'Already processed' }), { headers: { 'Content-Type': 'application/json' } });
+      }
+
+      // Verify payment status with FlowPay API (never trust webhook alone)
+      try {
+        const statusResponse = await fetch(`${FLOWPAY_CARD_URL}/status?id=${chargeId}`, {
+          headers: { 'x-api-key': apiKey },
+        });
+        const statusData = await statusResponse.json();
+        if (!statusResponse.ok || statusData.payment?.status !== 'COMPLETED') {
+          console.warn(`⚠️ Card webhook: FlowPay status not COMPLETED for ${chargeId}: ${statusData.payment?.status}`);
+          return new Response(JSON.stringify({ success: false, error: 'Payment not confirmed by FlowPay API' }), { status: 400, headers: { 'Content-Type': 'application/json' } });
+        }
+      } catch (verifyErr) {
+        console.error(`❌ Card webhook: Failed to verify with FlowPay API:`, verifyErr);
+        return new Response(JSON.stringify({ error: 'Failed to verify payment' }), { status: 500, headers: { 'Content-Type': 'application/json' } });
+      }
+
+      const orderValue = Number(orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0);
+      const customerEmail = orderFields?.customer_email?.stringValue;
+      const userId = orderFields?.user_id?.stringValue;
+
+      // Mark as paid
+      await updateFirestoreDoc('orders', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+      console.log(`✅ Card order ${orderId} marked as paid via webhook`);
+
+      // Process delivery
+      try {
+        await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret });
+        console.log(`📦 process-delivery called for card order ${orderId} (webhook)`);
+      } catch (e) { console.error(`⚠️ process-delivery call failed:`, e); }
+
+      // Increment coupon usage
+      const couponId = orderFields?.coupon_id?.stringValue;
+      if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
+
+      // Fetch real product names
+      let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+      try {
+        const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+        if (Array.isArray(itemsResults)) {
+          const names = itemsResults
+            .filter((r: any) => r.document?.fields?.product_name?.stringValue)
+            .map((r: any) => r.document.fields.product_name.stringValue);
+          if (names.length > 0) productNamesList = names.join(', ');
+        }
+      } catch {}
+
+      // 🚀 Fire all analytics in PARALLEL
+      const customerName = orderFields?.customer_name?.stringValue || '';
+      const customerPhone = orderFields?.customer_phone?.stringValue || '';
+      const nameParts = customerName.split(' ');
+
+      await Promise.allSettled([
+        addFirestoreDocWithId('analytics_events', `card_purchase_${orderId}`, {
+          event_name: 'Purchase', event_time: new Date().toISOString(),
+          user_id: userId || null, value: orderValue, currency: 'BRL',
+          order_id: orderId, content_name: productNamesList, source: 'card_webhook',
+        }),
+        (async () => {
+          const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_webhook', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
+          if (capiGuardRes) {
+            await invokeEdgeFunction('meta-capi', {
+              event_name: 'Purchase', event_id: `purchase_${orderId}`, order_id: orderId,
+              value: orderValue, currency: 'BRL', content_name: productNamesList,
+              email: customerEmail, phone: customerPhone || undefined,
+              first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+              external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+            });
+            console.log(`📡 Meta CAPI Purchase sent for card order ${orderId} (webhook)`);
+          }
+        })(),
+        invokeEdgeFunction('utmify-event', {
+          order_id: orderId, event_type: 'Purchase', value: orderValue,
+          customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined,
+          product_name: productNamesList,
+          utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue,
+          utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue,
+          utm_term: orderFields?.utm_term?.stringValue,
+        }),
+      ]);
+
+      return new Response(JSON.stringify({ success: true, orderId }), { headers: { 'Content-Type': 'application/json' } });
+    }
+
     // ==================== CREATE card charge ====================
     if (action === 'create' && req.method === 'POST') {
       // 🔒 Rate limit card creation per IP (Firestore-backed, centralized)
