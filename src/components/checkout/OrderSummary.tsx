@@ -54,7 +54,7 @@ export const OrderSummary = memo(function OrderSummary({
   return (
     <div className="hidden lg:block w-full lg:w-[340px] space-y-5">
       {/* Cupom de desconto */}
-      <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5">
+      <div className="bg-secondary/50 rounded-2xl border border-border/10 p-5">
         <h3 className="text-[15px] font-semibold text-foreground mb-4">Cupom de desconto</h3>
         <div className="flex gap-2">
           <Input
@@ -93,7 +93,7 @@ export const OrderSummary = memo(function OrderSummary({
       </div>
 
       {/* Resumo */}
-      <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5">
+      <div className="bg-secondary/50 rounded-2xl border border-border/10 p-5">
         <h3 className="text-[15px] font-semibold text-foreground mb-4">Resumo</h3>
         
         {/* Items */}

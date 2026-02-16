@@ -46,7 +46,7 @@ const NavigationComponent = () => {
   if (categories.length === 0) return null;
 
   return (
-    <nav className="hidden md:block sticky top-16 w-full border-b border-border/10 bg-background/80 backdrop-blur-xl z-40">
+    <nav className="hidden md:block sticky top-16 w-full border-b border-border/10 bg-background z-40">
       <div className="container px-4 md:px-8">
         <div className="flex items-center justify-center gap-1 py-1.5 flex-wrap">
           {categories.map((category) => {
@@ -83,7 +83,7 @@ const NavigationComponent = () => {
                     </Link>
                     {openDropdown === category.id && (
                       <div className="absolute left-0 top-full pt-2 z-50" role="menu">
-                        <div className="bg-card border border-border/20 rounded-xl shadow-2xl shadow-black/20 min-w-[200px] py-1 backdrop-blur-xl">
+                        <div className="bg-card border border-border/20 rounded-xl shadow-2xl shadow-black/20 min-w-[200px] py-1">
                           {category.children!.map((child) => (
                             <Link
                               key={child.id}

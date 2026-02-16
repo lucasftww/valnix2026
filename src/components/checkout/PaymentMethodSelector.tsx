@@ -18,7 +18,7 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
   finalPrice,
 }: PaymentMethodSelectorProps) {
   return (
-    <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-4 sm:p-6 mx-auto w-full max-w-lg lg:max-w-none">
+    <div className="bg-secondary/50 rounded-2xl border border-border/10 p-4 sm:p-6 mx-auto w-full max-w-lg lg:max-w-none">
       <h2 className="text-[15px] font-semibold text-foreground mb-4 md:mb-5">Pagamento</h2>
 
       <RadioGroup
