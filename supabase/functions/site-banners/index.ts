@@ -110,11 +110,17 @@ Deno.serve(async (req) => {
       }),
     });
 
-    // Fallback: if composite index is missing (400 FAILED_PRECONDITION), query without orderBy
+    // Fallback ONLY for missing composite index (FAILED_PRECONDITION + "requires an index")
     if (!res.ok) {
       const errorText = await res.text();
-      if (errorText.includes('FAILED_PRECONDITION') || errorText.includes('requires an index')) {
-        console.warn('⚠️ Composite index missing for site_banners, falling back to unordered query');
+      const isIndexMissing = res.status === 400 &&
+        errorText.includes('FAILED_PRECONDITION') &&
+        errorText.includes('requires an index');
+
+      if (isIndexMissing) {
+        // Extract index link if available for easier debugging
+        const indexLinkMatch = errorText.match(/https:\/\/console\.firebase\.google\.com[^\s"')]+/);
+        console.warn(`⚠️ Composite index missing for site_banners. Falling back to unordered query.${indexLinkMatch ? ` Create index: ${indexLinkMatch[0]}` : ''}`);
         res = await fetch(queryUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -128,11 +134,17 @@ Deno.serve(async (req) => {
             },
           }),
         });
-      }
-      if (!res.ok) {
-        console.error('Firestore query failed:', errorText);
-        return new Response(JSON.stringify({ banners: [] }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!res.ok) {
+          const fallbackError = await res.text();
+          console.error(`❌ Firestore fallback query also failed (${res.status}):`, fallbackError);
+          return new Response(JSON.stringify({ error: 'Firestore query failed' }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+      } else {
+        // Any other error (auth, typo, permission, etc.) → surface as 500
+        console.error(`❌ Firestore query failed (${res.status}):`, errorText);
+        return new Response(JSON.stringify({ error: 'Firestore query failed' }),
+          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
     }
 

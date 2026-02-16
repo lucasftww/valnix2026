@@ -642,14 +642,17 @@ Deno.serve(async (req) => {
         const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
         if (!isInternalCall && queryResults?.[0]?.document) {
           const ownerUid = queryResults[0].document.fields?.user_id?.stringValue;
-          // For authenticated users: must match UID
-          if (authenticatedUid && ownerUid && !ownerUid.startsWith('guest_') && ownerUid !== authenticatedUid) {
-            console.warn(`🚨 PIX status ownership mismatch: caller=${authenticatedUid}, owner=${ownerUid}, chargeId=${chargeId}`);
+
+          // INVARIANT 1: Guest orders (user_id absent or guest_*) — side-effects ONLY via webhook/internal key
+          // Authenticated users polling status can NEVER trigger side-effects on guest orders
+          const isGuestOrder = !ownerUid || ownerUid.startsWith('guest_');
+          if (isGuestOrder) {
+            console.warn(`🚨 PIX status: blocking side-effects on guest order (owner=${ownerUid || 'none'}, caller=${authenticatedUid}, chargeId=${chargeId}). Only webhook/internal key can process guest orders.`);
             ownershipValid = false;
           }
-          // For guest orders: authenticated users cannot trigger side-effects on guest orders they don't own
-          if (authenticatedUid && ownerUid && ownerUid.startsWith('guest_')) {
-            console.warn(`🚨 PIX status: authenticated user ${authenticatedUid} tried to process guest order, chargeId=${chargeId}`);
+          // INVARIANT 2: Authenticated orders — caller UID must match order owner
+          else if (authenticatedUid && ownerUid !== authenticatedUid) {
+            console.warn(`🚨 PIX status ownership mismatch: caller=${authenticatedUid}, owner=${ownerUid}, chargeId=${chargeId}`);
             ownershipValid = false;
           }
         }
