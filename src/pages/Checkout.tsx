@@ -498,7 +498,7 @@ export default function Checkout() {
     <div className="min-h-screen bg-background">
       <CheckoutHeader currentStep={1} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-10 pb-36 lg:pb-10">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 lg:py-10 pb-36 lg:pb-10">
         <MobileStickyCheckout
           items={items}
           finalPrice={finalPrice}
@@ -509,7 +509,7 @@ export default function Checkout() {
 
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Column */}
-          <div className="flex-1 space-y-5">
+          <div className="flex-1 space-y-5 mx-auto w-full max-w-lg lg:max-w-none">
             <PaymentMethodSelector
               paymentMethod={paymentMethod}
               onMethodChange={setPaymentMethod}

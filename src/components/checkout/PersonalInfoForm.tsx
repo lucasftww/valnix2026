@@ -103,7 +103,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
     "h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[14px]";
 
   return (
-    <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5 sm:p-6">
+    <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5 sm:p-6 mx-auto w-full max-w-lg lg:max-w-none">
       <h2 className="text-[15px] font-semibold text-foreground mb-6">Informações do comprador</h2>
 
       <div className="space-y-4">
