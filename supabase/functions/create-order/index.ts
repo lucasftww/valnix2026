@@ -284,6 +284,8 @@ Deno.serve(async (req) => {
     }
 
     // 🔒 Server-side price recalculation — NEVER trust client total_amount
+    // Cache product data to avoid N+1 reads (reused for order_items + guest_orders below)
+    const productCache = new Map<string, Record<string, unknown>>();
     let recalculatedTotal = 0;
     for (const item of items) {
       const productId = item.product_id;
@@ -299,6 +301,7 @@ Deno.serve(async (req) => {
       if (!productFields) {
         return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
+      productCache.set(productId, productFields);
       const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
       recalculatedTotal += realPrice * quantity;
     }
@@ -368,11 +371,11 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Order created: ${orderId} for user ${userId}`);
 
-    // Create order items
+    // Create order items (use cached product data — no extra reads)
     for (const item of items) {
       // 🔒 Use server-side price for order_items (never trust client unit_price/total_price)
-      const productFields = await getFirestoreDoc('products', String(item.product_id));
-      const realItemPrice = productFields ? Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0) : 0;
+      const cachedProduct = productCache.get(String(item.product_id));
+      const realItemPrice = cachedProduct ? Number(cachedProduct.price?.doubleValue || cachedProduct.price?.integerValue || 0) : 0;
       const itemQty = Number(item.quantity) || 1;
       const itemData: Record<string, unknown> = {
         order_id: orderId,
@@ -423,12 +426,12 @@ Deno.serve(async (req) => {
       const expiresAt = new Date();
       expiresAt.setDate(expiresAt.getDate() + 30);
 
-      // 🔒 SECURITY: Use server-recalculated prices for guest_orders display (never trust client prices)
+      // 🔒 SECURITY: Use cached server-recalculated prices for guest_orders display (no extra reads)
       const serverItemPrices = new Map<string, number>();
       for (const item of items) {
-        const pf = await getFirestoreDoc('products', String(item.product_id));
-        if (pf) {
-          serverItemPrices.set(String(item.product_id), Number(pf.price?.doubleValue || pf.price?.integerValue || 0));
+        const cached = productCache.get(String(item.product_id));
+        if (cached) {
+          serverItemPrices.set(String(item.product_id), Number(cached.price?.doubleValue || cached.price?.integerValue || 0));
         }
       }
 

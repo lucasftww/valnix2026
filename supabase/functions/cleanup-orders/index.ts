@@ -170,7 +170,7 @@ Deno.serve(async (req: Request) => {
             ],
           },
         },
-        limit: 200,
+        limit: 500,
       });
     } catch {
       results = await runQuery(token, {
