@@ -1,33 +1,29 @@
 import { useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { collection, getDocs } from 'firebase/firestore';
-import { db } from '@/integrations/firebase/config';
 import { QUERY_KEYS } from '@/lib/constants';
 
 /**
- * Hook que pré-carrega APENAS categorias em background (lightweight).
- * Produtos de cada categoria são carregados sob demanda ao navegar.
- * Isso evita waterfall de Firestore reads competindo com dados críticos.
+ * Hook that ensures category data is warm in the React Query cache.
+ * Instead of making its own Firestore call, it relies on the shared
+ * useCategories hook (triggered by Header) and just seeds per-slug
+ * cache entries once that data arrives.
  */
 export const useCategoryPrefetch = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
-    const prefetchCategories = async () => {
-      const existingCategories = queryClient.getQueryData([QUERY_KEYS.CATEGORIES]);
-      if (existingCategories) return;
+    // Wait for the shared categories query to resolve (triggered by Header/Navigation)
+    const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
+      if (
+        event?.type === 'updated' &&
+        event.query.queryKey[0] === QUERY_KEYS.CATEGORIES &&
+        event.query.state.status === 'success'
+      ) {
+        const categories = event.query.state.data as any[] | undefined;
+        if (!categories?.length) return;
 
-      try {
-        const snapshot = await getDocs(collection(db, 'categories'));
-        const categories = snapshot.docs
-          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
-          .filter((c) => c?.is_active)
-          .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0));
-
-        queryClient.setQueryData([QUERY_KEYS.CATEGORIES], categories);
-
-        // Cache each category by slug for instant navigation
-        categories.forEach((cat) => {
+        // Seed per-slug cache for instant category page navigation
+        categories.forEach((cat: any) => {
           if (cat.slug) {
             queryClient.setQueryData(['category', cat.slug], {
               id: cat.id,
@@ -43,13 +39,11 @@ export const useCategoryPrefetch = () => {
             });
           }
         });
-      } catch (err) {
-        // Silent fail — prefetch is best-effort
-      }
-    };
 
-    // Defer to avoid competing with critical initial data (banners + products)
-    const timeoutId = setTimeout(prefetchCategories, 3000);
-    return () => clearTimeout(timeoutId);
+        unsubscribe();
+      }
+    });
+
+    return unsubscribe;
   }, [queryClient]);
 };
