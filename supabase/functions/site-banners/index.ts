@@ -23,7 +23,7 @@ const FIREBASE_PROJECT_ID = "valnix";
 // ── In-memory banner cache (survives across requests within same instance) ──
 let cachedBanners: any[] | null = null;
 let bannersCacheExpiry = 0;
-const BANNER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+const BANNER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes (banners rarely change)
 // Stale cache: kept even after expiry as fallback when Firestore is unavailable
 let staleBanners: any[] | null = null;
 
@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
         headers: {
           ...corsHeaders,
           "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+          "Cache-Control": "public, max-age=600, s-maxage=900, stale-while-revalidate=1800",
         },
       });
     }
@@ -193,7 +193,7 @@ Deno.serve(async (req) => {
       headers: {
         ...corsHeaders,
         "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": "public, max-age=600, s-maxage=900, stale-while-revalidate=1800",
       },
     });
   } catch (error) {
