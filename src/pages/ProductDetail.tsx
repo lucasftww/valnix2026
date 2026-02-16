@@ -34,7 +34,7 @@ ProductDetailSkeleton.displayName = 'ProductDetailSkeleton';
 const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
-  const { addItem } = useCart();
+  const { addItem, updateQuantity: updateCartQuantity } = useCart();
   const { user } = useAuth();
   const [quantity, setQuantity] = useState(1);
   const [mobileSection, setMobileSection] = useState<string | null>(null);
@@ -75,18 +75,20 @@ const ProductDetail = () => {
   const handleAddToCart = useCallback(() => {
     if (!product) return;
     
-    for (let i = 0; i < quantity; i++) {
-      addItem({
-        id: product.id,
-        name: product.name,
-        price: Number(product.price),
-        image: product.image_url || '',
-        delivery_type: product.delivery_type || 'manual',
-        type: 'product'
-      });
-    }
+    addItem({
+      id: product.id,
+      name: product.name,
+      price: Number(product.price),
+      image: product.image_url || '',
+      delivery_type: product.delivery_type || 'manual',
+      type: 'product'
+    });
     
-  }, [product, quantity, addItem]);
+    // Set exact quantity if > 1 (addItem adds 1, then we correct)
+    if (quantity > 1) {
+      updateCartQuantity(product.id, quantity);
+    }
+  }, [product, quantity, addItem, updateCartQuantity]);
   
   const handleBuyNow = useCallback(() => {
     handleAddToCart();
@@ -515,7 +517,7 @@ const ProductDetail = () => {
       </main>
 
       {/* Sticky CTA Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-blur-xl border-t border-border/10 pb-6">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-saturate-150 border-t border-border/10 pb-6">
         <div className="px-4 py-3 safe-area-inset-bottom flex items-center justify-between gap-4">
           {/* Preço */}
           <div className="flex flex-col min-w-0">
