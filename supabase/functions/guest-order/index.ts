@@ -145,8 +145,6 @@ async function checkRateLimitFirestore(
     }
 
     // Window active → increment atomically
-    const shouldBlock = count + 1 > maxAttempts;
-
     const commitRes = await fetch(commitUrl, {
       method: "POST",
       headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
@@ -158,10 +156,10 @@ async function checkRateLimitFirestore(
               fields: {
                 key: { stringValue: key },
                 reset_at: { integerValue: String(resetAt) },
-                blocked_until: { integerValue: String(shouldBlock ? now + blockMs : 0) },
                 updated_at: { timestampValue: new Date().toISOString() },
               },
             },
+            updateMask: { fieldPaths: ["key", "reset_at", "updated_at"] },
             currentDocument: { exists: true },
           },
           {
@@ -173,29 +171,61 @@ async function checkRateLimitFirestore(
         ],
       }),
     });
-    await commitRes.text(); // consume
+    await commitRes.text();
 
-    if (!commitRes.ok) return true; // fail-open for reads
+    if (!commitRes.ok) return true; // fail-open
 
-    if (shouldBlock) {
-      // Log the block
-      const logUrl = `${firestoreBase}/rate_limit_logs`;
-      const logRes = await fetch(logUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
-        body: JSON.stringify({
-          fields: {
-            function_name: { stringValue: "guest-order" },
-            key: { stringValue: key },
-            blocked_until: { integerValue: String(now + blockMs) },
-            created_at: { timestampValue: new Date().toISOString() },
-          },
-        }),
-      });
-      await logRes.text(); // consume
+    // Fix A: read-after-write near limit to close race condition
+    if (count + 1 >= maxAttempts - 2) {
+      const verifyRes = await fetch(docUrl, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (verifyRes.ok) {
+        const verifyData = await verifyRes.json();
+        const realCount = Number(verifyData.fields?.count?.integerValue || "0");
+        if (realCount > maxAttempts) {
+          // Block now
+          const blockUntilMs = now + blockMs;
+          const blockRes = await fetch(commitUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              writes: [{
+                update: {
+                  name: docPath,
+                  fields: {
+                    blocked_until: { integerValue: String(blockUntilMs) },
+                    count: { integerValue: "0" },
+                  },
+                },
+                updateMask: { fieldPaths: ["blocked_until", "count"] },
+              }],
+            }),
+          });
+          await blockRes.text();
+
+          // Fix B: log with consistent field name (epoch ms, not timestamp)
+          const logUrl = `${firestoreBase}/rate_limit_logs`;
+          const logRes = await fetch(logUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              fields: {
+                function_name: { stringValue: "guest-order" },
+                key: { stringValue: key },
+                blocked_until_ms: { integerValue: String(blockUntilMs) },
+                created_at: { timestampValue: new Date().toISOString() },
+              },
+            }),
+          });
+          await logRes.text();
+
+          return false;
+        }
+      } else {
+        await verifyRes.text();
+      }
     }
 
-    return !shouldBlock;
+    return true;
   } catch (e) {
     console.warn("Rate limit failed (allowing):", e);
     return true;
