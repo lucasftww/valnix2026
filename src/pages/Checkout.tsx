@@ -470,7 +470,9 @@ export default function Checkout() {
   if (paymentData) {
     return (
       <div className="min-h-screen bg-background">
-        <CheckoutHeader currentStep={2} />
+        <div className="hidden sm:block">
+          <CheckoutHeader currentStep={2} />
+        </div>
         <main className="max-w-xl mx-auto px-4 py-8">
           <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-6">
             <PixPayment
@@ -496,7 +498,9 @@ export default function Checkout() {
   // ─── CHECKOUT FORM ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
-      <CheckoutHeader currentStep={1} />
+      <div className="hidden sm:block">
+        <CheckoutHeader currentStep={1} />
+      </div>
 
       <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 lg:py-10 pb-36 lg:pb-10">
         <MobileStickyCheckout
