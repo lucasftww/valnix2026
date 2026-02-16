@@ -60,16 +60,21 @@ export default function CardPaymentCallback() {
 
           // 🔒 AUTO-DELIVERY: Call server-side process-delivery (single-writer)
           // NO client-side code consumption — server handles atomicity & idempotency
+          // Frontend uses Firebase auth token ONLY — no internal keys
           try {
             const currentUser = auth.currentUser;
             const idToken = currentUser ? await currentUser.getIdToken() : null;
-            const deliveryRes = await invokeFunction('process-delivery', {
-              method: 'POST',
-              headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : { 'x-internal-key': 'card-callback' },
-              body: { orderId },
-            });
-            const deliveryResult = await deliveryRes.json();
-            console.log(`📦 process-delivery result for ${orderId}:`, deliveryResult);
+            if (idToken) {
+              const deliveryRes = await invokeFunction('process-delivery', {
+                method: 'POST',
+                headers: { 'Authorization': `Bearer ${idToken}` },
+                body: { orderId },
+              });
+              const deliveryResult = await deliveryRes.json();
+              console.log(`📦 process-delivery result for ${orderId}:`, deliveryResult);
+            } else {
+              console.log(`ℹ️ No auth token — delivery will be handled by admin auto-verify or webhook`);
+            }
           } catch (deliveryErr) {
             console.warn('⚠️ process-delivery call failed (admin auto-verify will retry):', deliveryErr);
           }
