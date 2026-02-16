@@ -3,7 +3,6 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 const FIREBASE_PROJECT_ID = 'valnix';
 const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
 
-// Collections to clean and their retention in days
 const CLEANUP_CONFIG = [
   { collection: 'cron_audit_logs', retentionDays: 30 },
   { collection: 'rate_limits', retentionDays: 7 },
@@ -54,93 +53,14 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
-// ── Cleanup logic with PAGINATION + orderBy + dual-type filter ──
-async function cleanupCollection(collection: string, retentionDays: number, accessToken: string): Promise<number> {
-  const cutoff = new Date();
-  cutoff.setDate(cutoff.getDate() - retentionDays);
-  const cutoffIso = cutoff.toISOString();
-
-  let totalDeleted = 0;
-
-  while (true) {
-    const queryUrl = `${FIRESTORE_BASE}:runQuery`;
-
-    // Query using compositeFilter (OR) to match BOTH stringValue and timestampValue created_at
-    // This ensures cleanup works regardless of how the doc was written
-    const queryBody = {
-      structuredQuery: {
-        from: [{ collectionId: collection }],
-        where: {
-          compositeFilter: {
-            op: 'OR',
-            filters: [
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'created_at' },
-                  op: 'LESS_THAN',
-                  value: { stringValue: cutoffIso },
-                },
-              },
-              {
-                fieldFilter: {
-                  field: { fieldPath: 'created_at' },
-                  op: 'LESS_THAN',
-                  value: { timestampValue: cutoffIso },
-                },
-              },
-            ],
-          },
-        },
-        orderBy: [{ field: { fieldPath: 'created_at' }, direction: 'ASCENDING' }],
-        limit: BATCH_SIZE,
-      },
-    };
-
-    const res = await fetch(queryUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify(queryBody),
-    });
-
-    if (!res.ok) {
-      // Fallback: if compositeFilter/orderBy fails (missing index), try simple stringValue filter
-      console.warn(`⚠️ OR query failed for ${collection} (${res.status}), falling back to simple filter`);
-      const fallbackDeleted = await cleanupCollectionFallback(collection, cutoffIso, accessToken);
-      totalDeleted += fallbackDeleted;
-      break;
-    }
-
-    const results = await res.json();
-    const docs = results.filter((r: any) => r.document?.name);
-
-    if (docs.length === 0) break;
-
-    // Batch delete via :commit
-    const commitUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
-    const writes = docs.map((r: any) => ({ delete: r.document.name }));
-
-    const commitRes = await fetch(commitUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify({ writes }),
-    });
-
-    if (!commitRes.ok) {
-      console.warn(`⚠️ Batch delete failed for ${collection}: ${commitRes.status}`);
-      break;
-    }
-
-    totalDeleted += docs.length;
-    console.log(`🧹 ${collection}: deleted batch of ${docs.length} docs (total: ${totalDeleted})`);
-
-    if (docs.length < BATCH_SIZE) break;
-  }
-
-  return totalDeleted;
-}
-
-// Fallback: simple stringValue filter without orderBy (no index needed)
-async function cleanupCollectionFallback(collection: string, cutoffIso: string, accessToken: string): Promise<number> {
+// ── Single-pass delete: query + paginated batch delete ──
+async function deleteByQuery(
+  collection: string,
+  cutoffIso: string,
+  valueType: 'stringValue' | 'timestampValue',
+  accessToken: string,
+  alreadyDeleted: Set<string>,
+): Promise<number> {
   let totalDeleted = 0;
 
   while (true) {
@@ -152,30 +72,45 @@ async function cleanupCollectionFallback(collection: string, cutoffIso: string, 
           fieldFilter: {
             field: { fieldPath: 'created_at' },
             op: 'LESS_THAN',
-            value: { stringValue: cutoffIso },
+            value: { [valueType]: cutoffIso },
           },
         },
+        orderBy: [{ field: { fieldPath: 'created_at' }, direction: 'ASCENDING' }],
         limit: BATCH_SIZE,
       },
     };
 
-    const res = await fetch(queryUrl, {
+    let res = await fetch(queryUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify(queryBody),
     });
 
+    // If orderBy fails (missing index), retry without it
     if (!res.ok) {
-      console.warn(`⚠️ Fallback query failed for ${collection}: ${res.status}`);
-      break;
+      console.warn(`⚠️ ${collection} [${valueType}] orderBy query failed (${res.status}), retrying without orderBy`);
+      const fallbackBody = { ...queryBody };
+      delete (fallbackBody.structuredQuery as any).orderBy;
+      res = await fetch(queryUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+        body: JSON.stringify(fallbackBody),
+      });
+      if (!res.ok) {
+        console.warn(`⚠️ ${collection} [${valueType}] query failed entirely: ${res.status}`);
+        break;
+      }
     }
 
     const results = await res.json();
-    const docs = results.filter((r: any) => r.document?.name);
+    // Deduplicate: skip docs already deleted in the other pass
+    const docs = results.filter((r: any) => r.document?.name && !alreadyDeleted.has(r.document.name));
+
     if (docs.length === 0) break;
 
     const commitUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
     const writes = docs.map((r: any) => ({ delete: r.document.name }));
+
     const commitRes = await fetch(commitUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -183,33 +118,56 @@ async function cleanupCollectionFallback(collection: string, cutoffIso: string, 
     });
 
     if (!commitRes.ok) {
-      console.warn(`⚠️ Fallback batch delete failed for ${collection}: ${commitRes.status}`);
+      console.warn(`⚠️ Batch delete failed for ${collection} [${valueType}]: ${commitRes.status}`);
       break;
     }
 
+    for (const r of docs) alreadyDeleted.add(r.document.name);
     totalDeleted += docs.length;
-    console.log(`🧹 ${collection} (fallback): deleted batch of ${docs.length} (total: ${totalDeleted})`);
+    console.log(`🧹 ${collection} [${valueType}]: deleted batch of ${docs.length} (total: ${totalDeleted})`);
+
     if (docs.length < BATCH_SIZE) break;
   }
 
   return totalDeleted;
 }
 
+// ── 2-pass cleanup: stringValue first, then timestampValue ──
+async function cleanupCollection(collection: string, retentionDays: number, accessToken: string): Promise<number> {
+  const cutoff = new Date();
+  cutoff.setDate(cutoff.getDate() - retentionDays);
+  const cutoffIso = cutoff.toISOString();
+
+  const alreadyDeleted = new Set<string>();
+
+  // Pass 1: docs with created_at stored as stringValue (ISO 8601)
+  const deletedString = await deleteByQuery(collection, cutoffIso, 'stringValue', accessToken, alreadyDeleted);
+  console.log(`  Pass 1 (string): ${deletedString} docs`);
+
+  // Pass 2: docs with created_at stored as timestampValue
+  const deletedTimestamp = await deleteByQuery(collection, cutoffIso, 'timestampValue', accessToken, alreadyDeleted);
+  console.log(`  Pass 2 (timestamp): ${deletedTimestamp} docs`);
+
+  return deletedString + deletedTimestamp;
+}
+
 // ── Write audit doc ──
-async function writeAuditDoc(accessToken: string, runId: string, results: Record<string, number>, totalDeleted: number, durationMs: number, success: boolean) {
+async function writeAuditDoc(
+  accessToken: string, runId: string, results: Record<string, number>,
+  totalDeleted: number, durationMs: number, success: boolean,
+  startedIso: string,
+) {
+  const finishedIso = new Date().toISOString();
   const url = `${FIRESTORE_BASE}/cron_audit_logs?documentId=${encodeURIComponent(runId)}`;
-  const nowIso = new Date().toISOString();
   const fields: Record<string, unknown> = {
     type: { stringValue: 'cleanup-ttl' },
     run_id: { stringValue: runId },
     total_deleted: { integerValue: String(totalDeleted) },
     duration_ms: { integerValue: String(durationMs) },
     success: { booleanValue: success },
-    // Use timestampValue for created_at so TTL filter works consistently
-    created_at: { timestampValue: nowIso },
-    started_at: { stringValue: nowIso },
-    finished_at: { stringValue: new Date().toISOString() },
-    server_time_utc: { stringValue: nowIso },
+    created_at: { timestampValue: finishedIso },
+    started_at: { timestampValue: startedIso },
+    finished_at: { timestampValue: finishedIso },
   };
   for (const [col, count] of Object.entries(results)) {
     fields[`deleted_${col}`] = { integerValue: String(count) };
@@ -228,22 +186,19 @@ async function writeAuditDoc(accessToken: string, runId: string, results: Record
 }
 
 Deno.serve(async (req) => {
-  // Auth via CRON_SECRET
   const cronSecret = Deno.env.get('CRON_SECRET');
   const authHeader = req.headers.get('X-Cron-Secret') || req.headers.get('Authorization')?.replace('Bearer ', '');
   if (!cronSecret || authHeader !== cronSecret) {
     return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-      status: 401,
-      headers: { 'Content-Type': 'application/json' },
+      status: 401, headers: { 'Content-Type': 'application/json' },
     });
   }
 
   const runId = crypto.randomUUID();
   const startMs = Date.now();
-  const serverNow = new Date();
-  console.log(`🕐 cleanup-ttl [${runId}] started at ${serverNow.toISOString()} (UTC) | Timezone offset: ${serverNow.getTimezoneOffset()}min`);
+  const startedIso = new Date().toISOString();
+  console.log(`🕐 cleanup-ttl [${runId}] started at ${startedIso} (UTC) | Timezone offset: ${new Date().getTimezoneOffset()}min`);
 
-  let success = false;
   const results: Record<string, number> = {};
 
   try {
@@ -257,37 +212,24 @@ Deno.serve(async (req) => {
 
     const durationMs = Date.now() - startMs;
     const totalDeleted = Object.values(results).reduce((a, b) => a + b, 0);
-    success = true;
 
     console.log(`✅ TTL cleanup [${runId}] complete: ${totalDeleted} docs deleted in ${durationMs}ms`);
-
-    // Write audit doc for observability
-    await writeAuditDoc(accessToken, runId, results, totalDeleted, durationMs, true);
+    await writeAuditDoc(accessToken, runId, results, totalDeleted, durationMs, true, startedIso);
 
     return new Response(JSON.stringify({
-      success: true,
-      run_id: runId,
-      deleted: results,
-      total_deleted: totalDeleted,
-      duration_ms: durationMs,
-      server_time_utc: serverNow.toISOString(),
-    }), {
-      status: 200,
-      headers: { 'Content-Type': 'application/json' },
-    });
+      success: true, run_id: runId, deleted: results,
+      total_deleted: totalDeleted, duration_ms: durationMs,
+      server_time_utc: startedIso,
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     const durationMs = Date.now() - startMs;
     console.error(`❌ cleanup-ttl [${runId}] error:`, err);
-
-    // Best-effort: write failed audit doc
     try {
       const accessToken = await getFirebaseAccessToken();
-      await writeAuditDoc(accessToken, runId, results, 0, durationMs, false);
+      await writeAuditDoc(accessToken, runId, results, 0, durationMs, false, startedIso);
     } catch {}
-
     return new Response(JSON.stringify({ error: 'Internal server error', run_id: runId }), {
-      status: 500,
-      headers: { 'Content-Type': 'application/json' },
+      status: 500, headers: { 'Content-Type': 'application/json' },
     });
   }
 });
