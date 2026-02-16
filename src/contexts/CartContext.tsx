@@ -9,6 +9,7 @@ export interface CartItem {
   price: number;
   quantity: number;
   image: string;
+  delivery_type?: string;
 }
 
 interface AppliedCoupon {
