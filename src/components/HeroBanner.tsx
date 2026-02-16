@@ -63,7 +63,8 @@ const HeroBannerComponent = () => {
         opts={{
           loop: true,
           align: "start",
-          duration: 25,
+          duration: 18,
+          containScroll: "trimSnaps",
         }}
         plugins={imagesReady ? [autoplayPlugin.current] : []}
         className="w-full"

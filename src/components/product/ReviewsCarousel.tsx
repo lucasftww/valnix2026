@@ -70,9 +70,10 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
             align: "start",
             loop: true,
             dragFree: true,
-            skipSnaps: false,
-            duration: 20,
+            skipSnaps: true,
+            duration: 18,
             slidesToScroll: 1,
+            containScroll: "trimSnaps",
           }}
           plugins={[autoplayRef.current]}
           className="w-full"
