@@ -100,11 +100,11 @@ async function uploadToR2(fileName: string, body: Uint8Array, contentType: strin
   const secretAccessKey = Deno.env.get('R2_SECRET_ACCESS_KEY')!;
   const endpoint = Deno.env.get('R2_ENDPOINT')!; // https://<account_id>.r2.cloudflarestorage.com
   const publicUrl = Deno.env.get('R2_PUBLIC_URL')!;
-  const bucket = 'valnix-upload';
+  const bucket = 'valnix-assets';
 
   const endpointUrl = new URL(endpoint);
   const host = endpointUrl.host;
-  const objectPath = `/${bucket}/${fileName}`;
+  const objectPath = `/${bucket}/valnix-upload/${fileName}`;
   
   const now = new Date();
   const dateStamp = now.toISOString().slice(0, 10).replace(/-/g, '');
