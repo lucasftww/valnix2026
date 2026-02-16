@@ -77,8 +77,6 @@ All colors MUST be HSL.
     --discount: 142 76% 36%;
     --discount-foreground: 0 0% 100%;
     
-    --glow: 0 84% 60%;
-    --card-glow: 0 84% 60% / 0.2;
     
     /* Social colors - HSL approximations */
     --discord: 235 86% 65%;
@@ -123,11 +121,6 @@ All colors MUST be HSL.
     aspect-ratio: 1/1;
   }
   
-  /* GPU hint — only apply when hardware acceleration is available */
-  .gpu-accelerated {
-    transform: translateZ(0);
-  }
-  
   /* Content visibility for below-fold sections */
   .content-lazy {
     content-visibility: auto;
@@ -137,18 +130,6 @@ All colors MUST be HSL.
   /* Layout containment for repeated items */
   .contain-layout {
     contain: layout style paint;
-  }
-  
-  /* Better mobile scrolling */
-  .smooth-scroll {
-    -webkit-overflow-scrolling: touch;
-    scroll-behavior: smooth;
-  }
-  
-  /* Prevent text selection on interactive elements */
-  .no-select {
-    -webkit-user-select: none;
-    user-select: none;
   }
 }
 
@@ -194,16 +175,6 @@ All colors MUST be HSL.
   padding-bottom: env(safe-area-inset-bottom);
 }
 
-/* Optimized touch interactions */
-@layer utilities {
-  .touch-manipulation {
-    touch-action: manipulation;
-  }
-  
-  .tap-highlight-none {
-    -webkit-tap-highlight-color: transparent;
-  }
-}
 
 /* Custom Scrollbar Styling */
 ::-webkit-scrollbar {
@@ -236,16 +207,3 @@ All colors MUST be HSL.
   scrollbar-color: hsl(var(--primary)) hsl(var(--background));
 }
 
-/* Category transition animation */
-@keyframes cat-transition {
-  0% { opacity: 1; }
-  70% { opacity: 1; }
-  100% { opacity: 0; pointer-events: none; }
-}
-
-@keyframes cat-spin {
-  0% { transform: scale(0.5) rotate(0deg); opacity: 0; }
-  30% { transform: scale(1) rotate(180deg); opacity: 1; }
-  70% { transform: scale(1) rotate(360deg); opacity: 1; }
-  100% { transform: scale(0.5) rotate(540deg); opacity: 0; }
-}
