@@ -390,6 +390,7 @@ export default function Checkout() {
           quantities: items.map(i => i.quantity),
           prices: items.map(i => i.price),
           amount: orderAmount,
+          eventSourceUrl: window.location.href,
         }));
 
         saveCheckoutDataToProfile();
