@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
-import { db } from '@/integrations/firebase/config';
-import { collection, query, where, getDocs } from 'firebase/firestore';
+import { invokeFunction } from '@/lib/apiHelper';
 
 export interface PostPaymentPageConfig {
   id: string;
@@ -27,33 +26,34 @@ export function usePostPaymentPage(addonType: string) {
   useEffect(() => {
     const fetchConfig = async () => {
       try {
-        const pagesRef = collection(db, 'post_payment_pages');
-        const q = query(
-          pagesRef,
-          where('addon_type', '==', addonType),
-          where('is_active', '==', true)
+        // Fetch via edge function (public GET, no auth needed)
+        const res = await invokeFunction('admin-post-payment', { method: 'GET' });
+        if (!res.ok) throw new Error('Failed to fetch post-payment pages');
+        
+        const result = await res.json();
+        const page = (result.pages || []).find(
+          (p: any) => p.addon_type === addonType && p.is_active !== false
         );
-        const snapshot = await getDocs(q);
 
-        if (!snapshot.empty) {
-          const doc = snapshot.docs[0];
-          const data = doc.data();
+        if (page) {
           setConfig({
-            id: doc.id,
-            addon_type: data.addon_type,
-            title: data.title || 'Oferta Especial',
-            subtitle: data.subtitle || null,
-            badge_text: data.badge_text || null,
-            badge_color: data.badge_color || 'yellow',
-            benefits: Array.isArray(data.benefits) ? data.benefits as string[] : [],
-            price: Number(data.price) || 0,
-            original_price: data.original_price ? Number(data.original_price) : null,
-            button_accept_text: data.button_accept_text || 'SIM! EU QUERO!',
-            button_skip_text: data.button_skip_text || 'Não, obrigado',
-            next_route: data.next_route || '/',
-            is_active: data.is_active ?? true,
-            display_order: data.display_order || 0,
+            id: page.id || addonType,
+            addon_type: page.addon_type || addonType,
+            title: page.title || 'Oferta Especial',
+            subtitle: page.subtitle || null,
+            badge_text: page.badge_text || null,
+            badge_color: page.badge_color || 'yellow',
+            benefits: Array.isArray(page.benefits) ? page.benefits : [],
+            price: Number(page.price) || 0,
+            original_price: page.original_price ? Number(page.original_price) : null,
+            button_accept_text: page.button_accept_text || 'SIM! EU QUERO!',
+            button_skip_text: page.button_skip_text || 'Não, obrigado',
+            next_route: page.next_route || '/',
+            is_active: page.is_active ?? true,
+            display_order: page.display_order || 0,
           });
+        } else {
+          console.warn(`Post-payment page "${addonType}" not found or inactive`);
         }
       } catch (err: any) {
         console.error('Error fetching post-payment page config:', err);
