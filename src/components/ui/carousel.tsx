@@ -157,7 +157,6 @@ const CarouselItem = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLD
       <div
         ref={ref}
         className={cn("min-w-0 shrink-0 grow-0 basis-full", orientation === "horizontal" ? "pl-4" : "pt-4", className)}
-        style={{ willChange: 'transform', backfaceVisibility: 'hidden' }}
         {...props}
       />
     );
