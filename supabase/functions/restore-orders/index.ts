@@ -1,10 +1,11 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
-// Restore orders — reads from Firestore guest_orders collection (no Supabase)
+// Restore orders — reads from Firestore guest_orders collection
+// Now requires admin authentication via Firebase token
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-firebase-token',
 };
 
 const FIREBASE_PROJECT_ID = 'valnix';
@@ -50,6 +51,33 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
+// ── Auth helpers ──────────────────────────────────────────────────
+async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
+  try {
+    const res = await fetch(
+      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw`,
+      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
+    );
+    if (!res.ok) return null;
+    const data = await res.json();
+    const user = data.users?.[0];
+    if (!user?.localId) return null;
+    return { uid: user.localId, email: user.email || '' };
+  } catch { return null; }
+}
+
+async function isAdminInFirestore(uid: string): Promise<boolean> {
+  try {
+    const accessToken = await getFirebaseAccessToken();
+    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (!res.ok) return false;
+    const doc = await res.json();
+    return doc.fields?.role?.stringValue === 'admin';
+  } catch { return false; }
+}
+
+// ── Firestore helpers ──────────────────────────────────────────────
 function toFirestoreValue(val: unknown): Record<string, unknown> {
   if (val === null || val === undefined) return { nullValue: null };
   if (typeof val === 'string') return { stringValue: val };
@@ -116,6 +144,26 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
+    // ── Admin authentication required ──
+    const firebaseToken = req.headers.get('x-firebase-token');
+    if (!firebaseToken) {
+      return new Response(JSON.stringify({ success: false, error: 'Authentication required' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const userData = await verifyFirebaseToken(firebaseToken);
+    if (!userData) {
+      return new Response(JSON.stringify({ success: false, error: 'Invalid token' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    const isAdmin = await isAdminInFirestore(userData.uid);
+    if (!isAdmin) {
+      console.warn(`⚠️ Unauthorized restore attempt: ${userData.email} (${userData.uid})`);
+      return new Response(JSON.stringify({ success: false, error: 'Admin access required' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // Get all guest_orders from Firestore
     const guestOrderDocs = await queryAllFirestore('guest_orders');
 

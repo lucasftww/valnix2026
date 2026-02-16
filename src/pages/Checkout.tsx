@@ -485,29 +485,34 @@ export default function Checkout() {
           utm_term: utmParams.utm_term || null,
         });
 
-        // Fetch delivery info for auto-delivery
-        const productIds = items.map(i => i.id);
+        // Use delivery_type from cart items (same pattern as balance checkout)
         const productsDeliveryInfo: Record<string, { delivery_type: string; auto_delivery_codes: string[] | null }> = {};
         
-        for (const productId of productIds) {
-          try {
-            const productRef = doc(db, "products", productId);
-            const productSnap = await getDoc(productRef);
-            if (productSnap.exists()) {
-              const data = productSnap.data();
-              productsDeliveryInfo[productId] = {
-                delivery_type: data.delivery_type || 'manual',
-                auto_delivery_codes: data.auto_delivery_codes || null,
-              };
+        for (const item of items) {
+          const deliveryType = item.delivery_type || 'manual';
+          if (deliveryType === 'auto_real') {
+            try {
+              const productRef = doc(db, "products", item.id);
+              const productSnap = await getDoc(productRef);
+              if (productSnap.exists()) {
+                const data = productSnap.data();
+                productsDeliveryInfo[item.id] = {
+                  delivery_type: 'auto_real',
+                  auto_delivery_codes: data.auto_delivery_codes || null,
+                };
+              }
+            } catch (err) {
+              console.error(`Error fetching product ${item.id} codes:`, err);
+              productsDeliveryInfo[item.id] = { delivery_type: 'auto_real', auto_delivery_codes: null };
             }
-          } catch (err) {
-            console.error(`Error fetching product ${productId}:`, err);
+          } else {
+            productsDeliveryInfo[item.id] = { delivery_type: deliveryType, auto_delivery_codes: null };
           }
         }
 
-        // Create order items with auto-delivery
+        // Create order items with delivery info
         const orderItemsData = items.map(item => {
-          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: 'manual', auto_delivery_codes: null };
+          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: item.delivery_type || 'manual', auto_delivery_codes: null };
           return {
             order_id: orderId,
             product_id: item.id,
