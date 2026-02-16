@@ -3,8 +3,7 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { trackPurchaseEvent } from "@/lib/analytics";
-import { saveGuestOrder } from "@/lib/guestOrders";
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc } from "firebase/firestore";
 import { db, auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 
@@ -57,7 +56,7 @@ export default function CardPaymentCallback() {
           setStatus("paid");
           if (intervalRef.current) clearInterval(intervalRef.current);
 
-          // 🔒 P0 FIX: Call server-side confirm endpoint instead of client-side writes
+          // 🔒 Call server-side confirm endpoint instead of client-side writes
           if (!confirmCalledRef.current) {
             confirmCalledRef.current = true;
             try {
@@ -98,42 +97,15 @@ export default function CardPaymentCallback() {
             }
           } catch {}
 
-          // Save guest order for /order/:hash
-          try {
-            const orderDoc = await getDoc(doc(db, "orders", orderId));
-            if (orderDoc.exists()) {
-              const od = orderDoc.data();
-              const itemsSnap = await getDocs(query(collection(db, "order_items"), where("order_id", "==", orderId)));
-              const items = itemsSnap.docs.map(d => {
-                const data = d.data();
-                return {
-                  product_name: data.product_name,
-                  product_image: data.product_image || null,
-                  quantity: data.quantity,
-                  unit_price: data.unit_price,
-                  total_price: data.total_price,
-                  delivery_code: data.delivery_code || null,
-                };
-              });
-
-              const hash = await saveGuestOrder({
-                orderId,
-                email: od.customer_email || "",
-                customerName: od.customer_name || "",
-                customerPhone: od.customer_phone || undefined,
-                items,
-                totalAmount: od.total_amount,
-                paymentMethod: "card",
-              });
-
-              if (hash) {
-                setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${hash}`), 3000);
-                return;
-              }
-            }
-          } catch (err) { console.warn('⚠️ Guest order save error (card):', err); }
-
-          setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 3000);
+          // 🔒 FIX: Guest order is already created server-side by create-order edge function.
+          // Do NOT call saveGuestOrder() here — it creates duplicates.
+          // Use the guestHash from stored session data or from create-order response.
+          const guestHash = stored?.guestHash;
+          if (guestHash) {
+            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 3000);
+          } else {
+            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 3000);
+          }
 
         } else if (result.status === "FAILED" || result.status === "CANCELLED") {
           setStatus("failed");
@@ -169,12 +141,12 @@ export default function CardPaymentCallback() {
 
   if (!orderId || !paymentId) {
     return (
-      <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <XCircle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-xl font-bold text-white mb-2">Link inválido</h1>
-          <p className="text-[#888] text-sm mb-6">Não foi possível encontrar informações do pagamento.</p>
-          <Button onClick={() => navigate("/")} variant="outline" className="border-[#333]">
+          <XCircle className="w-16 h-16 text-destructive mx-auto mb-4" />
+          <h1 className="text-xl font-bold text-foreground mb-2">Link inválido</h1>
+          <p className="text-muted-foreground text-sm mb-6">Não foi possível encontrar informações do pagamento.</p>
+          <Button onClick={() => navigate("/")} variant="outline">
             Voltar à loja
           </Button>
         </div>
@@ -183,19 +155,19 @@ export default function CardPaymentCallback() {
   }
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center px-4">
-      <div className="max-w-md w-full bg-[#111] border border-[#1f1f1f] rounded-xl p-8 text-center">
+    <div className="min-h-screen bg-background flex items-center justify-center px-4">
+      <div className="max-w-md w-full bg-card border border-border rounded-xl p-8 text-center">
         {status === "checking" || status === "pending" ? (
           <>
             <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
             </div>
-            <h1 className="text-xl font-bold text-white mb-2">Verificando pagamento...</h1>
-            <p className="text-[#888] text-sm">
+            <h1 className="text-xl font-bold text-foreground mb-2">Verificando pagamento...</h1>
+            <p className="text-muted-foreground text-sm">
               Aguarde enquanto confirmamos seu pagamento com cartão.
             </p>
             {status === "pending" && pollCount > 2 && (
-              <p className="text-[#666] text-xs mt-4">
+              <p className="text-muted-foreground/60 text-xs mt-4">
                 Se você já pagou, aguarde alguns instantes...
               </p>
             )}
@@ -205,22 +177,22 @@ export default function CardPaymentCallback() {
             <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center">
               <CheckCircle className="w-8 h-8 text-green-500" />
             </div>
-            <h1 className="text-xl font-bold text-white mb-2">Pagamento confirmado!</h1>
-            <p className="text-[#888] text-sm">
+            <h1 className="text-xl font-bold text-foreground mb-2">Pagamento confirmado!</h1>
+            <p className="text-muted-foreground text-sm">
               Redirecionando para a entrega do seu pedido...
             </p>
           </>
         ) : (
           <>
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-500/10 flex items-center justify-center">
-              <XCircle className="w-8 h-8 text-red-500" />
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-destructive/10 flex items-center justify-center">
+              <XCircle className="w-8 h-8 text-destructive" />
             </div>
-            <h1 className="text-xl font-bold text-white mb-2">Pagamento não confirmado</h1>
-            <p className="text-[#888] text-sm mb-6">
+            <h1 className="text-xl font-bold text-foreground mb-2">Pagamento não confirmado</h1>
+            <p className="text-muted-foreground text-sm mb-6">
               O pagamento com cartão não foi concluído ou foi recusado.
             </p>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate("/checkout")} variant="outline" className="border-[#333]">
+              <Button onClick={() => navigate("/checkout")} variant="outline">
                 Tentar novamente
               </Button>
               <Button onClick={() => navigate("/")} variant="ghost">

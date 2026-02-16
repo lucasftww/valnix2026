@@ -504,6 +504,7 @@ export default function Checkout() {
           orderId,
           paymentId: cardData.paymentId,
           deliveryToken,
+          guestHash: _cardHash, // Pass server-generated guestHash to callback
           customerName: formData.name,
           customerEmail: formData.email || user?.email || "",
           customerPhone: formData.phone || "",
