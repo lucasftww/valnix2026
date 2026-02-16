@@ -186,11 +186,9 @@ export const AdminUsers = () => {
 
   const getDisplayName = (user: FirebaseUser) => user.nickname || user.full_name || user.email?.split("@")[0] || "Usuário";
 
-  const getUserTier = (totalSpent: number) => {
-    if (totalSpent >= 1000) return { label: "Diamante", color: "bg-cyan-500/15 text-cyan-400 border-cyan-500/20", icon: Crown };
-    if (totalSpent >= 500) return { label: "Ouro", color: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20", icon: Star };
-    if (totalSpent >= 100) return { label: "Prata", color: "bg-gray-400/15 text-gray-400 border-gray-400/20", icon: Star };
+  const getUserTier = (_totalSpent: number) => {
     return null;
+  };
   };
 
   const getStatusColor = (status: string) => {
@@ -223,7 +221,7 @@ export const AdminUsers = () => {
       const d = safeDate(u.created_at); const now = new Date();
       return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
     }).length,
-    vipUsers: users.filter(u => u.total_spent >= 500).length,
+    
     conversionRate: users.length > 0 ? ((users.filter(u => u.total_orders > 0).length / users.length) * 100).toFixed(0) : '0',
   };
 
@@ -245,7 +243,7 @@ export const AdminUsers = () => {
     <TooltipProvider>
       <div className="space-y-6">
         {/* Stats Grid */}
-        <div className="grid gap-3 grid-cols-2 lg:grid-cols-4">
+        <div className="grid gap-3 grid-cols-2 lg:grid-cols-3">
           <Card className="border-border/50 bg-card/50">
             <CardContent className="p-4">
               <div className="flex items-center justify-between mb-3">
@@ -285,18 +283,6 @@ export const AdminUsers = () => {
             </CardContent>
           </Card>
 
-          <Card className="border-border/50 bg-card/50">
-            <CardContent className="p-4">
-              <div className="flex items-center justify-between mb-3">
-                <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">VIP</span>
-                <div className="w-8 h-8 rounded-lg bg-yellow-500/10 flex items-center justify-center">
-                  <Crown className="w-4 h-4 text-yellow-500" />
-                </div>
-              </div>
-              <p className="text-2xl font-bold text-yellow-500">{stats.vipUsers}</p>
-              <p className="text-xs text-muted-foreground mt-1">Gastaram R$ 500+</p>
-            </CardContent>
-          </Card>
         </div>
 
         {/* Toolbar */}
