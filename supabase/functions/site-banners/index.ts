@@ -162,8 +162,8 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({ banners }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });
   } catch (error) {
-    console.error("Error:", error);
-    return new Response(JSON.stringify({ banners: [] }),
+    console.error("❌ site-banners unhandled error:", error);
+    return new Response(JSON.stringify({ error: "Internal server error" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 });
