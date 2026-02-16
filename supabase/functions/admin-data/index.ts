@@ -726,6 +726,16 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       delete body.id;
 
+      // 🔒 P1 FIX: Apply sanitize() to all PUT requests (prevent prototype pollution)
+      const sanitizePut = (obj: Record<string, unknown>) => {
+        const dangerous = ['__proto__', 'constructor', 'prototype'];
+        for (const key of Object.keys(obj)) {
+          if (dangerous.includes(key)) delete obj[key];
+        }
+        return obj;
+      };
+      sanitizePut(body);
+
       if (resource === "products") {
         const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'auto_delivery_codes', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
         const safeBody: Record<string, unknown> = {};
@@ -745,6 +755,42 @@ Deno.serve(async (req) => {
           if (USER_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
         }
         safeBody['updated_at'] = new Date().toISOString();
+
+        // 🔒 P1 FIX: Audit log for balance changes
+        if (body.balance !== undefined) {
+          try {
+            // Read current balance before update
+            const accessToken = await getFirebaseAccessToken();
+            const profileUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/profiles/${docId}`;
+            const profileRes = await fetch(profileUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            const profileData = profileRes.ok ? await profileRes.json() : null;
+            const previousBalance = profileData?.fields?.balance?.doubleValue ?? profileData?.fields?.balance?.integerValue ?? 0;
+
+            // Write audit log
+            const auditId = crypto.randomUUID();
+            const auditUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/admin_audit_logs/${auditId}`;
+            await fetch(auditUrl, {
+              method: 'PATCH',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+              body: JSON.stringify({
+                fields: {
+                  action: { stringValue: 'balance_update' },
+                  target_user_id: { stringValue: docId },
+                  admin_uid: { stringValue: userData.uid },
+                  admin_email: { stringValue: userData.email },
+                  previous_balance: { doubleValue: Number(previousBalance) },
+                  new_balance: { doubleValue: Number(body.balance) },
+                  ip: { stringValue: clientIp },
+                  created_at: { stringValue: new Date().toISOString() },
+                },
+              }),
+            });
+            console.log(`📝 AUDIT: Balance update by ${userData.email} for user ${docId}: ${previousBalance} → ${body.balance}`);
+          } catch (auditErr) {
+            console.error('⚠️ Audit log failed (non-blocking):', auditErr);
+          }
+        }
+
         const success = await updateFirestoreDoc("profiles", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });

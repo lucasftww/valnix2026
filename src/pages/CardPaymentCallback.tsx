@@ -36,9 +36,20 @@ export default function CardPaymentCallback() {
 
     const checkStatus = async () => {
       try {
+        // 🔒 Pass auth token or delivery token for ownership validation
+        const currentUser = auth.currentUser;
+        const idToken = currentUser ? await currentUser.getIdToken() : null;
+        const statusHeaders: Record<string, string> = {};
+        if (idToken) {
+          statusHeaders['Authorization'] = `Bearer ${idToken}`;
+        } else if (stored?.deliveryToken) {
+          statusHeaders['x-delivery-token'] = stored.deliveryToken;
+        }
+
         const res = await invokeFunction('flowpay-card', {
           method: 'GET',
           queryParams: { action: 'status', id: paymentId },
+          headers: statusHeaders,
         });
         const result = await res.json();
 
