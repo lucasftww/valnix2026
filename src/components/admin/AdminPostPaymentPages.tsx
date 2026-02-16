@@ -78,7 +78,8 @@ export function AdminPostPaymentPages() {
     setUtmParams(prev => ({ ...prev, [addonType]: { ...getUtm(addonType), [field]: value } }));
   };
   const buildLink = (addonType: string) => {
-    const base = `${window.location.origin}${routeMap[addonType] || "/painel-pagar"}`;
+    const prodOrigin = "https://www.valnix.com.br";
+    const base = `${prodOrigin}${routeMap[addonType] || "/painel-pagar"}`;
     const utm = getUtm(addonType);
     const params = new URLSearchParams();
     if (utm.source) params.set("utm_source", utm.source);
