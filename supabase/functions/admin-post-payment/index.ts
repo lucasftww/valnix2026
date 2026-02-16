@@ -209,11 +209,24 @@ Deno.serve(async (req) => {
     const isPublicPageRequest = req.method === "GET" && !url.searchParams.get("orderId");
     
     if (isPublicPageRequest) {
-      // Return only page configs (no addons/stats) without auth
+      // Return only public schema fields (whitelist), with cache
       const pageResults = await queryFirestoreCollection('post_payment_pages');
-      const pages = pageResults.map(docToObj).sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
-      return new Response(JSON.stringify({ pages }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const PUBLIC_FIELDS = ['addon_type', 'title', 'subtitle', 'badge_text', 'badge_color', 'benefits', 'price', 'original_price', 'button_accept_text', 'button_skip_text', 'next_route', 'is_active', 'display_order'];
+      const pages = pageResults.map((r: any) => {
+        const full = docToObj(r);
+        const filtered: Record<string, any> = { id: full.id };
+        for (const key of PUBLIC_FIELDS) {
+          if (full[key] !== undefined) filtered[key] = full[key];
+        }
+        return filtered;
+      }).sort((a: any, b: any) => (a.display_order || 0) - (b.display_order || 0));
+      return new Response(JSON.stringify({ pages }), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=60, s-maxage=120",
+        },
+      });
     }
 
     const firebaseToken = req.headers.get("x-firebase-token");

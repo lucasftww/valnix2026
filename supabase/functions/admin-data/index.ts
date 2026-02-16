@@ -515,7 +515,21 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "orders") {
-        const success = await updateFirestoreDoc("orders", docId, body);
+        // WHITELIST: only allow safe fields — financial/payment fields are immutable
+        const ORDERS_EDITABLE_FIELDS = ['status', 'customer_name', 'customer_email', 'customer_phone', 'notes', 'admin_notes', 'tracking_code'];
+        const ORDERS_IMMUTABLE_FIELDS = ['payment_status', 'payment_method', 'total_amount', 'subtotal', 'discount_amount', 'flowpay_charge_id', 'coupon_id', 'user_id', 'created_at'];
+        const rejected = Object.keys(body).filter(k => ORDERS_IMMUTABLE_FIELDS.includes(k));
+        if (rejected.length > 0) {
+          return new Response(JSON.stringify({ error: `Cannot modify immutable fields: ${rejected.join(', ')}` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        // Filter to only allowed fields
+        const safeBody: Record<string, unknown> = {};
+        for (const key of Object.keys(body)) {
+          if (ORDERS_EDITABLE_FIELDS.includes(key)) safeBody[key] = body[key];
+        }
+        safeBody['updated_at'] = new Date().toISOString();
+        const success = await updateFirestoreDoc("orders", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

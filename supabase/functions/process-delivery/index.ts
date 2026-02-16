@@ -215,6 +215,7 @@ Deno.serve(async (req) => {
     const idToken = authHeader?.replace(/^Bearer\s+/i, '');
 
     let authSource = 'none';
+    let callerUid: string | null = null;
     if (internalKey && internalKey === expectedInternalKey) {
       authSource = 'internal';
     } else if (idToken) {
@@ -223,6 +224,7 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }),
           { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
+      callerUid = user.uid;
       authSource = await isAdmin(user.uid) ? 'admin' : 'user';
     }
 
@@ -242,7 +244,6 @@ Deno.serve(async (req) => {
     // ── SECURITY: if authSource==='user', validate order ownership ──
     if (authSource === 'user') {
       const orderUserId = orderDoc.fields.user_id?.stringValue;
-      const callerUid = idToken ? (await verifyFirebaseIdToken(idToken))?.uid : null;
       if (!orderUserId || orderUserId !== callerUid) {
         console.warn(`🚫 [${orderId}] User ${callerUid} tried to deliver order owned by ${orderUserId}`);
         return new Response(JSON.stringify({ success: false, error: 'Forbidden: not your order' }),
