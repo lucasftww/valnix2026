@@ -38,7 +38,7 @@ import Index from "./pages/Index";
 
 // Lazy load de todas as rotas secundárias (incluindo ProductDetail)
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
-const Valorant = lazy(() => import("./pages/Valorant"));
+
 const Cart = lazy(() => import("./pages/Cart"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Admin = lazy(() => import("./pages/Admin"));
@@ -102,7 +102,7 @@ const App = () => {
                         <Route path="/about" element={<About />} />
                         <Route path="/terms" element={<Terms />} />
                         <Route path="/seized" element={<Seized />} />
-                        <Route path="/valorant" element={<Valorant />} />
+                        
                         <Route path="/painel-pagar" element={<PainelPagar />} />
                         <Route path="/entrega-prioritaria" element={<PainelPagarEntrega />} />
                         <Route path="/protecao-total" element={<PainelPagarTrocaDados />} />
