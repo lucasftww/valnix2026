@@ -48,7 +48,6 @@ const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Category = lazy(() => import("./pages/Category"));
 const Seized = lazy(() => import("./pages/Seized"));
-const Profile = lazy(() => import("./pages/Profile"));
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PainelPagar = lazy(() => import("./pages/PainelPagar"));
 const PainelPagarEntrega = lazy(() => import("./pages/PainelPagarEntrega"));
@@ -98,7 +97,6 @@ const App = () => {
                         <Route path="/cart" element={<Cart />} />
                         <Route path="/checkout" element={<Checkout />} />
                         <Route path="/my-orders" element={<MyOrders />} />
-                        <Route path="/profile" element={<Profile />} />
                         <Route path="/admin/*" element={<Admin />} />
 
                         <Route path="/about" element={<About />} />

@@ -167,52 +167,6 @@ export function useUserOrders(userId: string | undefined) {
   return { orders, loading, error };
 }
 
-// Hook para buscar pedidos recentes (últimos 5)
-export function useRecentOrders(userId: string | undefined) {
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (!userId) {
-      setOrders([]);
-      setLoading(false);
-      return;
-    }
-
-    const fetchRecentOrders = async () => {
-      try {
-        const ordersRef = collection(db, 'orders');
-        const q = query(
-          ordersRef,
-          where('user_id', '==', userId),
-          orderBy('created_at', 'desc')
-        );
-        
-        const snapshot = await getDocs(q);
-        const ordersData = snapshot.docs.slice(0, 5).map(doc => {
-          const data = doc.data();
-          return {
-            id: doc.id,
-            ...data,
-            created_at: data.created_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-            updated_at: data.updated_at?.toDate?.()?.toISOString() || new Date().toISOString(),
-          } as Order;
-        });
-        
-        setOrders(ordersData);
-      } catch (err) {
-        console.error('Error fetching recent orders:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchRecentOrders();
-  }, [userId]);
-
-  return { orders, loading };
-}
-
 // Hook para buscar itens de um pedido (realtime)
 export function useOrderItems(orderId: string | undefined) {
   const [items, setItems] = useState<OrderItem[]>([]);
