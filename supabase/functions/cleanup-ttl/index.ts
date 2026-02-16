@@ -221,7 +221,7 @@ Deno.serve(async (req) => {
     return new Response(JSON.stringify({
       success: true, run_id: runId, deleted: results,
       total_deleted: totalDeleted, duration_ms: durationMs,
-      server_time_utc: startedIso,
+      started_at_utc: startedIso,
     }), { status: 200, headers: { 'Content-Type': 'application/json' } });
   } catch (err) {
     const durationMs = Date.now() - startMs;
