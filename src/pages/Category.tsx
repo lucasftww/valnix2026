@@ -10,25 +10,6 @@ import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/firebase";
 import { Helmet } from "react-helmet-async";
 
 
-interface Category {
-  id: string;
-  name: string;
-  slug: string;
-  description: string | null;
-  icon_url: string | null;
-  image_url: string | null;
-}
-
-interface Product {
-  id: string;
-  name: string;
-  price: number;
-  old_price: number | null;
-  discount: number | null;
-  image_url: string | null;
-  category: string;
-}
-
 export default function Category() {
   const { categorySlug } = useParams<{ categorySlug: string }>();
 

@@ -49,14 +49,6 @@ export const CACHE_TIMES = {
   },
 } as const;
 
-export const BREAKPOINTS = {
-  SM: 640,
-  MD: 768,
-  LG: 1024,
-  XL: 1280,
-  XXL: 1536,
-} as const;
-
 export const ROUTES = {
   HOME: '/',
   AUTH: '/auth',
@@ -67,13 +59,8 @@ export const ROUTES = {
   ABOUT: '/about',
   TERMS: '/terms',
   SEIZED: '/seized',
-  VALORANT: '/valorant',
   PRODUCT: (id: string) => `/product/${id}`,
   CATEGORY: (slug: string) => `/${slug}`,
-} as const;
-
-export const EXTERNAL_LINKS = {
-  DISCORD: 'https://discord.gg/ZYdz9xYdq5',
 } as const;
 
 // Configurações de UI
@@ -86,13 +73,6 @@ export const UI_CONFIG = {
 } as const;
 
 // Formatadores
-export const formatCurrency = (value: number): string => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-};
-
 export const formatPrice = (value: number): string => {
   return `R$ ${value.toFixed(2).replace('.', ',')}`;
 };
