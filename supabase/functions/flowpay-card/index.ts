@@ -240,28 +240,80 @@ function timingSafeEqual(a: string, b: string): boolean {
   return result === 0;
 }
 
-// ── Rate limiting (Firestore-backed, centralized) ──
+// ── Rate limiting (Firestore-backed, ATOMIC via :commit + increment) ──
+const RATE_LIMIT_DOC_BASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits`;
+const COMMIT_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+
 async function checkRateLimitFirestore(key: string, maxAttempts: number, windowMs: number, blockMs: number): Promise<{ allowed: boolean; attempts: number }> {
   const docId = key.replace(/[\/\.]/g, '_');
+  const docPath = `${RATE_LIMIT_DOC_BASE}/${docId}`;
   const now = Date.now();
+  const accessToken = await getFirebaseAccessToken();
+
   try {
     const fields = await getFirestoreDoc('rate_limits', docId);
+
     if (fields) {
       const blockedUntil = Number(fields.blocked_until?.integerValue || '0');
-      if (blockedUntil > now) return { allowed: false, attempts: Number(fields.count?.integerValue || '0') };
+      if (blockedUntil > now) {
+        return { allowed: false, attempts: Number(fields.count?.integerValue || '0') };
+      }
+
       const resetAt = Number(fields.reset_at?.integerValue || '0');
       const count = Number(fields.count?.integerValue || '0');
+
       if (resetAt > now) {
         const newCount = count + 1;
-        if (newCount > maxAttempts) {
-          await updateRateLimitDoc(docId, newCount, resetAt, now + blockMs);
-          return { allowed: false, attempts: newCount };
-        }
-        await updateRateLimitDoc(docId, newCount, resetAt, 0);
-        return { allowed: true, attempts: newCount };
+        const shouldBlock = newCount > maxAttempts;
+
+        await fetch(COMMIT_URL, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({
+            writes: [
+              {
+                update: {
+                  name: docPath,
+                  fields: {
+                    reset_at: { integerValue: String(resetAt) },
+                    blocked_until: { integerValue: String(shouldBlock ? now + blockMs : 0) },
+                    updated_at: { timestampValue: new Date().toISOString() },
+                  },
+                },
+                currentDocument: { exists: true },
+              },
+              {
+                transform: {
+                  document: docPath,
+                  fieldTransforms: [{ fieldPath: 'count', increment: { integerValue: '1' } }],
+                },
+              },
+            ],
+          }),
+        });
+
+        return { allowed: !shouldBlock, attempts: newCount };
       }
     }
-    await updateRateLimitDoc(docId, 1, now + windowMs, 0);
+
+    await fetch(COMMIT_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        writes: [{
+          update: {
+            name: docPath,
+            fields: {
+              count: { integerValue: '1' },
+              reset_at: { integerValue: String(now + windowMs) },
+              blocked_until: { integerValue: '0' },
+              updated_at: { timestampValue: new Date().toISOString() },
+            },
+          },
+        }],
+      }),
+    });
+
     return { allowed: true, attempts: 1 };
   } catch (e) {
     console.warn('⚠️ Rate limit check failed, allowing request:', e);
@@ -269,24 +321,6 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
   }
 }
 
-async function updateRateLimitDoc(docId: string, count: number, resetAt: number, blockedUntil: number) {
-  const accessToken = await getFirebaseAccessToken();
-  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits/${docId}?updateMask.fieldPaths=count&updateMask.fieldPaths=reset_at&updateMask.fieldPaths=blocked_until&updateMask.fieldPaths=updated_at`;
-  await fetch(url, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-    body: JSON.stringify({
-      fields: {
-        count: { integerValue: String(count) },
-        reset_at: { integerValue: String(resetAt) },
-        blocked_until: { integerValue: String(blockedUntil) },
-        updated_at: { stringValue: new Date().toISOString() },
-      },
-    }),
-  });
-}
-
-// ── Pending order flood protection (per user_id) ──
 // ── Pending order flood protection (Firestore-backed) ──
 async function checkPendingOrderFlood(userId: string): Promise<boolean> {
   const rl = await checkRateLimitFirestore(`flood_${userId}`, 10, 3600_000, 3600_000);
