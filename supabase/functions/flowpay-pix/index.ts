@@ -1,10 +1,24 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // FlowPay PIX Edge Function v4 — fully Firestore-based (zero Supabase client)
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-};
+const ALLOWED_ORIGINS = [
+  "https://www.valnix.com.br",
+  "https://valnix.com.br",
+  "https://valnix2026.lovable.app",
+  "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
+  "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
+];
+
+function getCorsHeadersPix(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  // Allow internal calls (no Origin) from webhook
+  const allowedOrigin = !origin || ALLOWED_ORIGINS.includes(origin) ? (origin || "*") : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-webhook-secret, x-secret, x-api-key',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  };
+}
 
 const FLOWPAY_BASE_URL = 'https://flowpayments.net/api/pix';
 const FIREBASE_PROJECT_ID = 'valnix';
@@ -292,8 +306,8 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
 // MAIN HANDLER
 // ════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeadersPix(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
-
   const apiKey = Deno.env.get('FLOWPAY_API_KEY');
 
   try {
