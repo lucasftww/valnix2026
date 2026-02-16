@@ -779,7 +779,7 @@ Deno.serve(async (req) => {
       // 9. Meta CAPI (idempotent via meta_purchase_events/{orderId})
       const nameParts = customerName.split(' ');
       try {
-        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_confirm' });
+        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_confirm', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
         if (capiGuardRes) {
           await invokeEdgeFunction('meta-capi', {
             event_name: 'Purchase',

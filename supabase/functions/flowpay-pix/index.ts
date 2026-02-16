@@ -570,7 +570,7 @@ Deno.serve(async (req) => {
       const customerPhone = orderFields?.customer_phone?.stringValue || '';
       const nameParts = customerName.split(' ');
       try {
-        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'webhook' });
+        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'webhook', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
         if (capiGuardRes) {
           await invokeEdgeFunction('meta-capi', {
             event_name: 'Purchase', event_id: `purchase_${orderId}`, order_id: orderId,
@@ -873,7 +873,7 @@ Deno.serve(async (req) => {
 
               const nameParts = fbName.split(' ');
               try {
-                const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'polling' });
+                const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'polling', event_id: `purchase_${orderId}`, created_at: new Date().toISOString() });
                 if (capiGuardRes) {
                   await invokeEdgeFunction('meta-capi', {
                     event_name: 'Purchase', event_id: `purchase_${orderId}`, order_id: orderId,
