@@ -500,23 +500,28 @@ Deno.serve(async (req) => {
             const itemsData = await itemsRes.json();
             const guestItems = itemsData.documents || [];
 
-            for (const result of results) {
+          for (const result of results) {
               if (result.status === 'delivered' && result.codes) {
-                // Find matching guest item by product_id or by first item without delivery_code
+                // Match guest item by product_id (not by "first empty") to avoid wrong assignment
+                let matched = false;
                 for (const guestItem of guestItems) {
                   const fields = guestItem.fields || {};
+                  const guestProductId = fields.product_id?.stringValue;
                   const existingCode = fields.delivery_code?.stringValue;
-                  if (!existingCode) {
+                  if (guestProductId === result.productId && !existingCode) {
                     const guestItemId = guestItem.name.split('/').pop()!;
-                    // Update subcollection item with delivery_code
                     const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items/${guestItemId}?updateMask.fieldPaths=delivery_code`;
                     await fetch(updateUrl, {
                       method: 'PATCH',
                       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
                       body: JSON.stringify({ fields: { delivery_code: { stringValue: result.codes } } }),
                     });
+                    matched = true;
                     break;
                   }
+                }
+                if (!matched) {
+                  console.warn(`⚠️ [${orderId}] No matching guest item for product ${result.productId}`);
                 }
               }
             }

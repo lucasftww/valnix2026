@@ -416,8 +416,15 @@ export default function OrderDelivery() {
     fetchGuestOrder().then((ok) => {
       if (ok && !cancelled) {
         // Poll every 5s for delivery code updates (replaces onSnapshot)
-        pollInterval = setInterval(() => {
-          fetchGuestOrder();
+        // Stop polling once all items have delivery codes
+        pollInterval = setInterval(async () => {
+          const stillOk = await fetchGuestOrder();
+          if (!stillOk || cancelled) return;
+          // Check if all items now have delivery codes → stop polling
+          const currentItems = document.querySelectorAll('[data-delivery-pending]');
+          if (currentItems.length === 0) {
+            if (pollInterval) clearInterval(pollInterval);
+          }
         }, 5000);
       }
     });
@@ -590,7 +597,7 @@ export default function OrderDelivery() {
                         </div>
                       </div>
                     ) : (
-                      <div className="border-t border-border bg-orange-500/5 p-4">
+                      <div className="border-t border-border bg-orange-500/5 p-4" data-delivery-pending>
                         <div className="flex items-center gap-3">
                           <div className="bg-orange-500/15 p-2 rounded-full shrink-0">
                             <Package className="w-4 h-4 text-orange-500" />
