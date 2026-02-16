@@ -19,7 +19,7 @@ import pixLogo from "@/assets/pix-logo.png";
 import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 import { sendInitiateCheckout } from "@/lib/metaCapi";
-import { saveGuestOrder } from "@/lib/guestOrders";
+
 
 // Read Facebook cookies for CAPI match quality
 function getCookie(name: string): string | null {
@@ -32,7 +32,7 @@ async function createOrderServerSide(
   orderData: Record<string, unknown>,
   items: Array<Record<string, unknown>>,
   authToken?: string | null,
-): Promise<string> {
+): Promise<{ orderId: string; guestHash: string | null }> {
   const headers: Record<string, string> = {};
   if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
   
@@ -46,7 +46,7 @@ async function createOrderServerSide(
   if (!response.ok || !result.success || !result.orderId) {
     throw new Error(result.error || 'Erro ao criar pedido');
   }
-  return result.orderId;
+  return { orderId: result.orderId as string, guestHash: result.guestHash as string | null };
 }
 
 interface FormData {
@@ -61,6 +61,7 @@ interface PaymentData {
   transactionId: string;
   amount: number;
   orderId: string;
+  guestHash?: string | null;
 }
 
 // CPF mask helper
@@ -323,7 +324,7 @@ export default function Checkout() {
           delivery_type: item.delivery_type || 'manual',
         }));
 
-        const orderId = await createOrderServerSide({
+        const { orderId, guestHash } = await createOrderServerSide({
           user_id: effectiveUserId,
           customer_name: formData.name,
           customer_email: formData.email || user?.email || "",
@@ -422,37 +423,15 @@ export default function Checkout() {
         saveCheckoutDataToProfile();
         clearCart();
 
-        // Save guest order for /order/:hash access
-        let orderHash: string | null = null;
-        try {
-          orderHash = await saveGuestOrder({
-            orderId,
-            email: formData.email || user?.email || "",
-            customerName: formData.name,
-            customerPhone: formData.phone || undefined,
-            guestSessionId: guestId,
-            items: orderItemsData.map(i => ({
-              product_name: i.product_name,
-              product_image: i.product_image || null,
-              quantity: i.quantity,
-              unit_price: i.unit_price,
-              total_price: i.total_price,
-              delivery_code: null,
-            })),
-            totalAmount: orderAmount,
-            paymentMethod: "balance",
-          });
-        } catch (err) {
-          console.warn("⚠️ Failed to save guest order:", err);
-        }
+        // Guest order already created server-side in create-order edge function
 
         toast({
           title: "Pagamento confirmado!",
           description: `Pedido #${orderId.substring(0, 8)} pago com saldo. R$ ${orderAmount.toFixed(2)} debitados.`,
         });
         
-        if (orderHash) {
-          navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${orderHash}`);
+        if (guestHash) {
+          navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`);
         } else {
           navigate(`/entrega-prioritaria?order_id=${orderId}`);
         }
@@ -474,7 +453,7 @@ export default function Checkout() {
           delivery_type: item.delivery_type || 'manual',
         }));
 
-        const orderId = await createOrderServerSide({
+        const { orderId, guestHash: _cardHash } = await createOrderServerSide({
           user_id: effectiveUserId,
           customer_name: formData.name,
           customer_email: formData.email || user?.email || "",
@@ -559,7 +538,7 @@ export default function Checkout() {
         delivery_type: item.delivery_type || 'manual',
       }));
 
-      const orderId = await createOrderServerSide({
+      const { orderId, guestHash: pixGuestHash } = await createOrderServerSide({
         user_id: effectiveUserId,
         customer_name: formData.name,
         customer_email: formData.email || user?.email || "",
@@ -631,6 +610,7 @@ export default function Checkout() {
         transactionId: pixData.chargeId,
         amount: orderAmount,
         orderId,
+        guestHash: pixGuestHash,
       });
 
     } catch (error: unknown) {
@@ -662,12 +642,12 @@ export default function Checkout() {
               transactionId={paymentData.transactionId}
               amount={paymentData.amount}
               orderId={paymentData.orderId}
+              guestHash={paymentData.guestHash || undefined}
               customerEmail={formData.email || user?.email || undefined}
               customerName={formData.name || undefined}
               customerId={effectiveUserId}
               productNames={items.map(item => item.name)}
               productIds={items.map(item => item.id)}
-              // Coupon usage is now handled server-side via webhook or client-side polling fallback in PixPayment
               couponId={appliedCoupon?.id || undefined} 
               onPaymentConfirmed={clearCart}
             />
