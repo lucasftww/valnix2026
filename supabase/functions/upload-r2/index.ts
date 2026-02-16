@@ -147,7 +147,7 @@ async function uploadToR2(fileName: string, body: Uint8Array, contentType: strin
   }
 
   // Build public URL
-  const fileUrl = `${publicUrl.replace(/\/$/, '')}/${fileName}`;
+  const fileUrl = `${publicUrl.replace(/\/$/, '')}/valnix-upload/${fileName}`;
   console.log(`✅ Uploaded to R2: ${fileUrl}`);
   return fileUrl;
 }
