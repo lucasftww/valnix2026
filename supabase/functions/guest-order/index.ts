@@ -197,12 +197,14 @@ async function checkRateLimitFirestore(
                   },
                 },
                 updateMask: { fieldPaths: ["blocked_until", "count"] },
+                currentDocument: { exists: true },
               }],
             }),
           });
           await blockRes.text();
+          if (!blockRes.ok) console.warn("⚠️ Block commit failed for", key);
 
-          // Fix B: log with consistent field name (epoch ms, not timestamp)
+          // Log with consistent schema (epoch ms + ip for debug)
           const logUrl = `${firestoreBase}/rate_limit_logs`;
           const logRes = await fetch(logUrl, {
             method: "POST",
@@ -211,6 +213,7 @@ async function checkRateLimitFirestore(
               fields: {
                 function_name: { stringValue: "guest-order" },
                 key: { stringValue: key },
+                ip: { stringValue: key },
                 blocked_until_ms: { integerValue: String(blockUntilMs) },
                 created_at: { timestampValue: new Date().toISOString() },
               },
