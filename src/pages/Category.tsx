@@ -144,8 +144,6 @@ export default function Category() {
                       key={product.id}
                       id={product.id}
                       image={product.image_url || ""}
-                      gameIcon={category.icon_url || ""}
-                      gameName={category.name}
                       title={product.name}
                       reviewCount={product.reviewCount || 0}
                       price={Number(product.price)}

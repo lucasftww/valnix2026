@@ -84,8 +84,6 @@ const ProductGridComponent = () => {
               <ProductCard 
                 id={product.id}
                 image={product.image_url || ""}
-                gameIcon={product.icon_url || ""}
-                gameName=""
                 title={product.name}
                 reviewCount={product.reviewCount || 0}
                 price={product.price}

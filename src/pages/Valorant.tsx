@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import { CategorySidebar } from "@/components/CategorySidebar";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductSkeleton } from "@/components/ProductSkeleton";
-import valorantIcon from "@/assets/valorant-icon.png";
+
 import { useProductsWithReviews } from "@/hooks/firebase";
 export default function Valorant() {
   const { data: valorantProducts = [], isLoading } = useProductsWithReviews('valorant');
@@ -61,8 +61,6 @@ export default function Valorant() {
                       key={product.id}
                       id={product.id}
                       image={product.image_url || ""}
-                      gameIcon={valorantIcon}
-                      gameName="VALORANT"
                       title={product.name}
                       reviewCount={product.reviewCount || 0}
                       price={product.price}
