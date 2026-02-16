@@ -625,6 +625,11 @@ Deno.serve(async (req) => {
                 const webhookSecret2 = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
                 await invokeEdgeFunction('process-delivery', { orderId: fbOrderId }, { 'x-internal-key': webhookSecret2 });
               } catch {}
+
+              // 🔒 P0 FIX: Increment coupon usage in fallback (was missing)
+              const couponId = orderFields?.coupon_id?.stringValue;
+              if (couponId) { try { await incrementCouponUsage(couponId); } catch {} }
+
               await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
 
               const nameParts = fbName.split(' ');

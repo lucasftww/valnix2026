@@ -2,12 +2,11 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { updateOrderStatus } from "@/hooks/firebase";
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { saveGuestOrder } from "@/lib/guestOrders";
-import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db, auth } from "@/integrations/firebase/config";
-import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
+import { invokeFunction } from "@/lib/apiHelper";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
 
@@ -17,6 +16,7 @@ export default function CardPaymentCallback() {
   const [status, setStatus] = useState<PaymentStatus>("checking");
   const [pollCount, setPollCount] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const confirmCalledRef = useRef(false); // Prevent double confirm
 
   const urlOrderId = searchParams.get("order_id");
   const urlPaymentId = searchParams.get("payment_id");
@@ -45,105 +45,53 @@ export default function CardPaymentCallback() {
         if (result.success && result.status === "COMPLETED") {
           setStatus("paid");
           if (intervalRef.current) clearInterval(intervalRef.current);
-          sessionStorage.removeItem('valnix_card_payment');
 
-          // Mark order as paid (only if not already paid by webhook)
-          try {
-            const orderDoc2 = await getDoc(doc(db, "orders", orderId));
-            if (orderDoc2.exists() && orderDoc2.data()?.payment_status !== 'paid') {
-              await updateOrderStatus(orderId, "processing", "paid");
-              console.log(`✅ Card order ${orderId} marked as paid (client-side)`);
-            } else {
-              console.log(`ℹ️ Card order ${orderId} already paid (webhook handled it)`);
-            }
-          } catch (err) { console.warn('⚠️ Order status update error (card):', err); }
+          // 🔒 P0 FIX: Call server-side confirm endpoint instead of client-side writes
+          if (!confirmCalledRef.current) {
+            confirmCalledRef.current = true;
+            try {
+              const currentUser = auth.currentUser;
+              const idToken = currentUser ? await currentUser.getIdToken() : null;
+              const headers: Record<string, string> = {};
+              if (idToken) {
+                headers['Authorization'] = `Bearer ${idToken}`;
+              } else if (stored?.deliveryToken) {
+                headers['x-delivery-token'] = stored.deliveryToken;
+              }
 
-          // 🔒 AUTO-DELIVERY: Call server-side process-delivery (single-writer)
-          // Uses Firebase token if logged in, or order-scoped delivery_token for guests
-          try {
-            const currentUser = auth.currentUser;
-            const idToken = currentUser ? await currentUser.getIdToken() : null;
-            const headers: Record<string, string> = {};
-            if (idToken) {
-              headers['Authorization'] = `Bearer ${idToken}`;
-            } else if (stored?.deliveryToken) {
-              headers['x-delivery-token'] = stored.deliveryToken;
+              if (idToken || stored?.deliveryToken) {
+                const confirmRes = await invokeFunction('flowpay-card', {
+                  method: 'POST',
+                  queryParams: { action: 'confirm' },
+                  headers,
+                  body: { orderId, paymentId },
+                });
+                const confirmResult = await confirmRes.json();
+                console.log(`🔒 Server-side card confirm result for ${orderId}:`, confirmResult);
+              } else {
+                console.log(`ℹ️ No auth — card payment will be handled by admin auto-verify`);
+              }
+            } catch (confirmErr) {
+              console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
             }
-
-            if (idToken || stored?.deliveryToken) {
-              const deliveryRes = await invokeFunction('process-delivery', {
-                method: 'POST',
-                headers,
-                body: { orderId },
-              });
-              const deliveryResult = await deliveryRes.json();
-              console.log(`📦 process-delivery result for ${orderId}:`, deliveryResult);
-            } else {
-              console.log(`ℹ️ No auth — delivery will be handled by admin auto-verify`);
-            }
-          } catch (deliveryErr) {
-            console.warn('⚠️ process-delivery call failed (admin auto-verify will retry):', deliveryErr);
           }
 
-          // Track purchase
-          const orderDoc = await getDoc(doc(db, "orders", orderId));
-          if (orderDoc.exists()) {
-            const od = orderDoc.data();
-            trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, "card");
+          sessionStorage.removeItem('valnix_card_payment');
 
-            // Increment coupon usage (client-side for card — no card webhook exists)
-            if (stored?.couponId) {
-              try {
-                await updateDoc(doc(db, "coupons", stored.couponId), { current_uses: increment(1) });
-                console.log(`✅ Coupon ${stored.couponId} usage incremented (card client-side)`);
-              } catch (err) {
-                console.warn('⚠️ Failed to increment coupon usage:', err);
-              }
+          // Track purchase (client-side analytics only — no Firestore writes)
+          try {
+            const orderDoc = await getDoc(doc(db, "orders", orderId));
+            if (orderDoc.exists()) {
+              const od = orderDoc.data();
+              trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, "card");
             }
+          } catch {}
 
-            // Send Meta CAPI Purchase event
-            try {
-              const nameParts = (stored?.customerName || od.customer_name || '').split(' ');
-              invokeFunctionFireAndForget('meta-capi', {
-                event_name: 'Purchase',
-                event_id: `purchase_${orderId}_${Date.now()}`,
-                order_id: orderId,
-                value: od.total_amount,
-                currency: 'BRL',
-                content_name: stored?.productNames?.join(', ') || 'card purchase',
-                email: stored?.customerEmail || od.customer_email,
-                phone: stored?.customerPhone || od.customer_phone || undefined,
-                first_name: nameParts[0] || undefined,
-                last_name: nameParts.slice(1).join(' ') || undefined,
-                external_id: stored?.userId || od.user_id || 'guest',
-              }).then(() => {
-                console.log('📡 Meta CAPI Purchase sent (card payment)');
-              });
-            } catch (e) { console.warn('⚠️ Meta CAPI card error:', e); }
-
-            // Send UTMify Purchase event
-            try {
-              const utmParams = JSON.parse(sessionStorage.getItem('valnix_utm_params') || '{}');
-              invokeFunctionFireAndForget('utmify-event', {
-                order_id: orderId,
-                event_type: 'Purchase',
-                value: od.total_amount,
-                customer_name: stored?.customerName || od.customer_name,
-                customer_email: stored?.customerEmail || od.customer_email,
-                customer_phone: stored?.customerPhone || od.customer_phone || undefined,
-                product_name: stored?.productNames?.join(', ') || 'card purchase',
-                utm_source: utmParams.utm_source || undefined,
-                utm_medium: utmParams.utm_medium || undefined,
-                utm_campaign: utmParams.utm_campaign || undefined,
-                utm_content: utmParams.utm_content || undefined,
-                utm_term: utmParams.utm_term || undefined,
-              }).then(() => {
-                console.log('📡 UTMify Purchase sent (card payment)');
-              });
-            } catch (e) { console.warn('⚠️ UTMify card error:', e); }
-
-            // Save guest order for /order/:hash
-            try {
+          // Save guest order for /order/:hash
+          try {
+            const orderDoc = await getDoc(doc(db, "orders", orderId));
+            if (orderDoc.exists()) {
+              const od = orderDoc.data();
               const itemsSnap = await getDocs(query(collection(db, "order_items"), where("order_id", "==", orderId)));
               const items = itemsSnap.docs.map(d => {
                 const data = d.data();
@@ -171,8 +119,8 @@ export default function CardPaymentCallback() {
                 setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${hash}`), 3000);
                 return;
               }
-            } catch (err) { console.warn('⚠️ Guest order save error (card):', err); }
-          }
+            }
+          } catch (err) { console.warn('⚠️ Guest order save error (card):', err); }
 
           setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 3000);
 
