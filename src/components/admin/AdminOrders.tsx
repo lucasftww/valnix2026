@@ -29,7 +29,7 @@ import {
   Package, Send, Loader2, RefreshCw, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight,
   CreditCard, QrCode, Wallet, Clock, CheckCircle2, XCircle, AlertCircle,
   Eye, Copy, Hash, Mail, Phone, User, Calendar, DollarSign,
-  ShoppingBag, ArrowUpDown, Filter, MoreHorizontal, ExternalLink
+  ShoppingBag, ArrowUpDown, Filter, MoreHorizontal, ExternalLink, Pencil
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -212,6 +212,8 @@ export const AdminOrders = () => {
   const [cleaningEmail, setCleaningEmail] = useState(false);
   const [deleteOrderId, setDeleteOrderId] = useState<string | null>(null);
   const [deletingOrder, setDeletingOrder] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editDeliveryCode, setEditDeliveryCode] = useState("");
 
   useAutoVerifyPixPayments(orders as any, fetchOrders);
   useAutoVerifyCardPayments(orders as any, fetchOrders);
@@ -466,14 +468,12 @@ export const AdminOrders = () => {
     setSendingEmail(true);
     try {
       const token = await getFirebaseToken();
-      // Update item delivery code
       await invokeFunction("admin-data", {
         method: "PUT",
         queryParams: { resource: "order-items" },
         headers: { "x-firebase-token": token || "" },
         body: { id: itemId, delivery_code: deliveryCode.trim() },
       });
-      // Update order status to completed
       const targetOrder = detailOrder;
       if (targetOrder) {
         await invokeFunction("admin-data", {
@@ -490,6 +490,32 @@ export const AdminOrders = () => {
       fetchOrders();
     } catch (error: any) {
       toast({ title: "Erro ao adicionar código", description: error.message, variant: "destructive" });
+    } finally {
+      setSendingEmail(false);
+    }
+  };
+
+  const handleEditDeliveryCode = async (itemId: string) => {
+    if (!editDeliveryCode.trim()) {
+      toast({ title: "Código inválido", description: "Insira um código de entrega", variant: "destructive" });
+      return;
+    }
+    setSendingEmail(true);
+    try {
+      const token = await getFirebaseToken();
+      await invokeFunction("admin-data", {
+        method: "PUT",
+        queryParams: { resource: "order-items" },
+        headers: { "x-firebase-token": token || "" },
+        body: { id: itemId, delivery_code: editDeliveryCode.trim() },
+      });
+      
+      toast({ title: "Código atualizado", description: "O código foi alterado e sincronizado em tempo real" });
+      setEditingItemId(null);
+      setEditDeliveryCode("");
+      if (detailOrder) handleViewDetail(detailOrder);
+    } catch (error: any) {
+      toast({ title: "Erro ao editar código", description: error.message, variant: "destructive" });
     } finally {
       setSendingEmail(false);
     }
@@ -1180,17 +1206,49 @@ export const AdminOrders = () => {
                                 </div>
                               </div>
 
-                              {item.delivery_code ? (
+                              {item.delivery_code && editingItemId !== item.id ? (
                                 <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-2.5">
                                   <div className="flex items-center justify-between mb-1">
                                     <span className="text-xs font-medium text-green-500 flex items-center gap-1">
                                       <CheckCircle2 className="w-3 h-3" /> Código entregue
                                     </span>
-                                    <button onClick={() => copyToClipboard(item.delivery_code!, "Código")} className="text-green-500/70 hover:text-green-500 transition-colors">
-                                      <Copy className="w-3.5 h-3.5" />
-                                    </button>
+                                    <div className="flex items-center gap-1.5">
+                                      <button 
+                                        onClick={() => { setEditingItemId(item.id); setEditDeliveryCode(item.delivery_code!); }}
+                                        className="text-muted-foreground hover:text-primary transition-colors" 
+                                        title="Editar código"
+                                      >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                      </button>
+                                      <button onClick={() => copyToClipboard(item.delivery_code!, "Código")} className="text-green-500/70 hover:text-green-500 transition-colors">
+                                        <Copy className="w-3.5 h-3.5" />
+                                      </button>
+                                    </div>
                                   </div>
                                   <code className="text-xs font-mono text-green-400 break-all select-all">{item.delivery_code}</code>
+                                </div>
+                              ) : editingItemId === item.id ? (
+                                <div className="space-y-2">
+                                  <div className="text-xs font-medium text-primary flex items-center gap-1 mb-1">
+                                    <Pencil className="w-3 h-3" /> Editando código
+                                  </div>
+                                  <Textarea
+                                    placeholder="Novo código de entrega..."
+                                    value={editDeliveryCode}
+                                    onChange={(e) => setEditDeliveryCode(e.target.value)}
+                                    rows={3}
+                                    className="font-mono text-sm"
+                                    autoFocus
+                                  />
+                                  <div className="flex gap-2">
+                                    <Button size="sm" onClick={() => handleEditDeliveryCode(item.id)} disabled={sendingEmail} className="flex-1">
+                                      {sendingEmail ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
+                                      Salvar alteração
+                                    </Button>
+                                    <Button size="sm" variant="outline" onClick={() => { setEditingItemId(null); setEditDeliveryCode(""); }}>
+                                      Cancelar
+                                    </Button>
+                                  </div>
                                 </div>
                               ) : selectedItemId === item.id ? (
                                 <div className="space-y-2">
