@@ -48,6 +48,7 @@ interface MetaCapiEventData {
   first_name?: string;
   last_name?: string;
   external_id?: string;
+  event_source_url?: string;
 }
 
 // ── Core sender ────────────────────────────────────────────────────
@@ -66,7 +67,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       ...data,
       event_id: eventId,
       currency: 'BRL',
-      event_source_url: window.location.href,
+      event_source_url: data.event_source_url || window.location.href,
       user_agent: navigator.userAgent,
       fbc: fbc || undefined,
       fbp: fbp || undefined,
@@ -153,6 +154,7 @@ export function sendPurchaseFromClient(params: {
   productIds?: string[];
   quantities?: number[];
   prices?: number[];
+  eventSourceUrl?: string;
 }) {
   const nameParts = (params.name || '').split(' ');
   const { contents, numItems } = buildContents(
@@ -173,5 +175,6 @@ export function sendPurchaseFromClient(params: {
     first_name: nameParts[0],
     last_name: nameParts.slice(1).join(' ') || undefined,
     external_id: params.userId,
+    event_source_url: params.eventSourceUrl,
   });
 }
