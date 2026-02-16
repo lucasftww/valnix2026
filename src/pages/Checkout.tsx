@@ -425,10 +425,7 @@ export default function Checkout() {
 
         // Guest order already created server-side in create-order edge function
 
-        toast({
-          title: "Pagamento confirmado!",
-          description: `Pedido #${orderId.substring(0, 8)} pago com saldo. R$ ${orderAmount.toFixed(2)} debitados.`,
-        });
+        // Toast removed — user is redirected to delivery page immediately
         
         if (guestHash) {
           navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`);
@@ -693,13 +690,13 @@ export default function Checkout() {
           {/* Left Column */}
           <div className="flex-1 space-y-5">
             {/* Payment Method Card */}
-            <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5 sm:p-6">
-              <h2 className="text-[15px] font-semibold text-foreground mb-5">Pagamento</h2>
+            <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-4 sm:p-6">
+              <h2 className="text-[15px] font-semibold text-foreground mb-4 md:mb-5">Pagamento</h2>
               
               <RadioGroup 
                 value={paymentMethod} 
                 onValueChange={(value) => setPaymentMethod(value as "pix" | "balance" | "card")}
-                className="space-y-2.5"
+                className="space-y-2"
               >
                 {/* PIX Option */}
                 <div 
@@ -794,8 +791,8 @@ export default function Checkout() {
                 )}
               </RadioGroup>
 
-              {/* Payment info */}
-              <div className="bg-muted/50 rounded-xl p-4 border border-border/10 mt-5">
+              {/* Payment info - hidden on mobile for cleaner look */}
+              <div className="hidden md:block bg-muted/50 rounded-xl p-4 border border-border/10 mt-4">
                 {paymentMethod === "pix" ? (
                   <>
                     <h3 className="text-[14px] font-semibold text-foreground mb-2">Pagamento com Pix</h3>

@@ -57,10 +57,7 @@ export function PixPayment({
     
     onPaymentConfirmed?.();
     
-    toast({
-      title: "Pagamento Confirmado! 🎉",
-      description: "Seu pagamento foi aprovado. Redirecionando...",
-    });
+    // Toast removed — visual confirmation on screen is sufficient
     
     // Use the server-side generated guestHash for redirect
     setTimeout(() => {
@@ -142,10 +139,6 @@ export function PixPayment({
     try {
       await navigator.clipboard.writeText(qrCodeText);
       setCopied(true);
-      toast({
-        title: "Copiado!",
-        description: "Código PIX copiado para a área de transferência",
-      });
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
       toast({
@@ -160,11 +153,11 @@ export function PixPayment({
   const logoSize = isMobile ? 30 : 36;
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-3 md:space-y-4">
       {/* Payment Confirmed */}
       {paymentConfirmed && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-center space-y-3">
-          <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
+        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-center space-y-2">
+          <CheckCircle className="w-10 h-10 text-green-500 mx-auto" />
           <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
           <p className="text-sm text-muted-foreground">
             Seu pagamento foi aprovado. Redirecionando em instantes...
@@ -174,8 +167,8 @@ export function PixPayment({
       
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-xl md:text-2xl font-bold text-foreground mb-1">Pagamento via PIX</h2>
-        <p className="text-2xl md:text-3xl font-bold text-primary">
+        <h2 className="text-lg md:text-2xl font-bold text-foreground mb-1">Pagamento via PIX</h2>
+        <p className="text-xl md:text-3xl font-bold text-primary">
           R$ {(amount || 0).toFixed(2).replace('.', ',')}
         </p>
       </div>
