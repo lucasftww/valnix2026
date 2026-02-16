@@ -13,15 +13,16 @@ function getCorsHeaders(req: Request) {
   const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-delivery-token",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   };
 }
 
 const FLOWPAY_CARD_URL = 'https://flowpayments.net/api/card';
 const FIREBASE_PROJECT_ID = 'valnix';
+const SUPABASE_FUNCTIONS_URL = Deno.env.get('SUPABASE_URL') + '/functions/v1';
 
-// ── Firebase Service Account Auth (for Firestore price validation) ──
+// ── Firebase Service Account Auth ──
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
 
@@ -74,6 +75,30 @@ async function getFirestoreDoc(collection: string, docId: string) {
   return data.fields || null;
 }
 
+async function updateFirestoreDoc(collection: string, docId: string, fields: Record<string, unknown>) {
+  const accessToken = await getFirebaseAccessToken();
+  const fieldPaths = Object.keys(fields).map(k => `updateMask.fieldPaths=${k}`).join('&');
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${collection}/${docId}?${fieldPaths}`;
+  const firestoreFields: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(fields)) {
+    if (typeof value === 'string') firestoreFields[key] = { stringValue: value };
+    else if (typeof value === 'number') firestoreFields[key] = { doubleValue: value };
+    else if (typeof value === 'boolean') firestoreFields[key] = { booleanValue: value };
+    else if (value === null || value === undefined) firestoreFields[key] = { nullValue: null };
+    else firestoreFields[key] = { stringValue: String(value) };
+  }
+  const response = await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ fields: firestoreFields }),
+  });
+  if (!response.ok) {
+    console.error(`❌ Firestore update failed for ${collection}/${docId}:`, await response.text());
+    throw new Error(`Firestore update failed: ${response.status}`);
+  }
+  return true;
+}
+
 async function queryFirestore(collectionId: string, fieldPath: string, op: string, value: string) {
   const accessToken = await getFirebaseAccessToken();
   const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
@@ -88,6 +113,78 @@ async function queryFirestore(collectionId: string, fieldPath: string, op: strin
     }),
   });
   return await response.json();
+}
+
+// ── Firebase ID Token Verification ──
+async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; email?: string } | null> {
+  try {
+    const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY') || '';
+    const res = await fetch(`https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ idToken }),
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    const user = data.users?.[0];
+    if (!user?.localId) return null;
+    return { uid: user.localId, email: user.email || undefined };
+  } catch { return null; }
+}
+
+// ── Coupon increment (atomic) ──
+async function incrementCouponUsage(couponId: string) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+  const body = {
+    writes: [{
+      transform: {
+        document: `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/coupons/${couponId}`,
+        fieldTransforms: [{ fieldPath: 'current_uses', increment: { integerValue: "1" } }]
+      }
+    }]
+  };
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify(body),
+  });
+  if (!response.ok) console.error(`❌ Coupon increment error:`, await response.text());
+  else console.log(`✅ Coupon ${couponId} incremented (card server-side)`);
+}
+
+// ── Analytics ──
+async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}`;
+  const fields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v === null || v === undefined) fields[k] = { nullValue: null };
+    else if (typeof v === 'string') fields[k] = { stringValue: v };
+    else if (typeof v === 'number') fields[k] = { doubleValue: v };
+    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
+    else fields[k] = { stringValue: String(v) };
+  }
+  await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ fields }),
+  });
+}
+
+async function invokeEdgeFunction(functionName: string, body: Record<string, unknown>, extraHeaders?: Record<string, string>) {
+  try {
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${functionName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...extraHeaders },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) console.warn(`⚠️ ${functionName} returned ${res.status}`);
+    return res;
+  } catch (e) {
+    console.warn(`⚠️ ${functionName} invoke error:`, e);
+    return null;
+  }
 }
 
 Deno.serve(async (req) => {
@@ -108,7 +205,7 @@ Deno.serve(async (req) => {
       );
     }
 
-    // CREATE card charge
+    // ==================== CREATE card charge ====================
     if (action === 'create' && req.method === 'POST') {
       const body = await req.json();
       const { orderId, description, customer } = body;
@@ -124,38 +221,32 @@ Deno.serve(async (req) => {
       // 🔒 CRITICAL: Recalculate total from REAL product prices (never trust client total_amount)
       const orderFields = await getFirestoreDoc('orders', orderId);
       if (!orderFields) {
-        console.error(`❌ Order not found: ${orderId}`);
         return new Response(
           JSON.stringify({ success: false, error: 'Order not found' }),
           { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Fetch order_items to get product_ids and quantities
       const orderItemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
       if (!orderItemsResults || !Array.isArray(orderItemsResults) || orderItemsResults.length === 0 || !orderItemsResults[0]?.document) {
-        console.error(`❌ No order items found for order ${orderId}`);
         return new Response(
           JSON.stringify({ success: false, error: 'Order items not found' }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
 
-      // Recalculate total from real product prices
       let recalculatedTotal = 0;
       for (const result of orderItemsResults) {
         if (!result.document) continue;
         const itemFields = result.document.fields;
         const productId = itemFields?.product_id?.stringValue;
         const quantity = parseInt(itemFields?.quantity?.integerValue || '1');
-        
         if (!productId) {
           return new Response(
             JSON.stringify({ success: false, error: 'Invalid order item' }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
         const productFields = await getFirestoreDoc('products', productId);
         if (!productFields) {
           return new Response(
@@ -163,13 +254,11 @@ Deno.serve(async (req) => {
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-
         const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
         recalculatedTotal += realPrice * quantity;
-        console.log(`  📦 Product ${productId}: R$${realPrice} x ${quantity}`);
       }
 
-      // Apply coupon discount if present (server-side validation)
+      // Apply coupon discount (server-side validation)
       const couponId = orderFields.coupon_id?.stringValue;
       if (couponId) {
         const couponFields = await getFirestoreDoc('coupons', couponId);
@@ -179,7 +268,6 @@ Deno.serve(async (req) => {
           const isActive = couponFields.is_active?.booleanValue !== false;
           const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null;
           const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0;
-
           if (isActive && (!maxUses || currentUses < maxUses)) {
             let discountAmount = 0;
             if (discountType === 'percentage') {
@@ -188,19 +276,16 @@ Deno.serve(async (req) => {
               discountAmount = Math.min(discountValue, recalculatedTotal);
             }
             recalculatedTotal -= discountAmount;
-            console.log(`🏷️ Coupon ${couponId}: -R$${discountAmount.toFixed(2)}`);
           }
         }
       }
 
-      // Log if client total differs (potential manipulation)
       const clientTotal = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
       if (Math.abs(clientTotal - recalculatedTotal) > 0.01) {
         console.warn(`🚨 PRICE MISMATCH! Client: R$${clientTotal}, Server: R$${recalculatedTotal} (order ${orderId})`);
       }
 
       amount = Math.round(recalculatedTotal * 100);
-
       if (amount < 100) {
         return new Response(
           JSON.stringify({ success: false, error: 'Valor mínimo é R$ 1,00' }),
@@ -212,10 +297,7 @@ Deno.serve(async (req) => {
 
       const flowpayResponse = await fetch(`${FLOWPAY_CARD_URL}/create`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey,
-        },
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
         body: JSON.stringify({
           value: amount,
           description: description || `Pedido ${orderId?.substring(0, 8) || 'VALNIX'}`,
@@ -229,7 +311,6 @@ Deno.serve(async (req) => {
       });
 
       const flowpayData = await flowpayResponse.json();
-
       if (!flowpayResponse.ok || !flowpayData.success) {
         console.error('FlowPay card create error:', flowpayData);
         return new Response(
@@ -238,18 +319,31 @@ Deno.serve(async (req) => {
         );
       }
 
+      // 🔒 P0 FIX: Generate delivery_token SERVER-SIDE (never trust client-generated tokens)
+      const deliveryToken = crypto.randomUUID();
+      try {
+        await updateFirestoreDoc('orders', orderId, {
+          flowpay_charge_id: flowpayData.payment.id,
+          delivery_token: deliveryToken,
+          delivery_token_created_at: new Date().toISOString(),
+        });
+      } catch (err) {
+        console.warn('⚠️ Failed to save flowpay_charge_id/delivery_token:', err);
+      }
+
       return new Response(
         JSON.stringify({
           success: true,
           paymentId: flowpayData.payment.id,
           paymentUrl: flowpayData.payment.paymentUrl,
           status: flowpayData.payment.status,
+          deliveryToken, // Return to client for callback use
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // CHECK STATUS
+    // ==================== CHECK STATUS ====================
     if (action === 'status' && req.method === 'GET') {
       const paymentId = url.searchParams.get('id');
       if (!paymentId) {
@@ -264,7 +358,6 @@ Deno.serve(async (req) => {
       });
 
       const statusData = await statusResponse.json();
-
       if (!statusResponse.ok) {
         return new Response(
           JSON.stringify({ success: false, error: statusData.error || 'Erro ao consultar status' }),
@@ -282,8 +375,194 @@ Deno.serve(async (req) => {
       );
     }
 
+    // ==================== CONFIRM (server-side payment confirmation) ====================
+    // 🔒 P0 FIX: All payment confirmation logic moved from CardPaymentCallback to server
+    if (action === 'confirm' && req.method === 'POST') {
+      const body = await req.json();
+      const { orderId, paymentId } = body;
+
+      if (!orderId || !paymentId) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'orderId and paymentId are required' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Auth: accept Firebase token OR delivery_token
+      const authHeader = req.headers.get('authorization');
+      const idToken = authHeader?.replace(/^Bearer\s+/i, '');
+      const deliveryTokenHeader = req.headers.get('x-delivery-token');
+
+      let authSource = 'none';
+      let callerUid: string | null = null;
+
+      if (idToken) {
+        const user = await verifyFirebaseIdToken(idToken);
+        if (user) {
+          callerUid = user.uid;
+          authSource = 'user';
+        }
+      }
+      if (authSource === 'none' && deliveryTokenHeader && deliveryTokenHeader.length >= 20) {
+        authSource = 'delivery_token';
+      }
+      if (authSource === 'none') {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 1. Verify payment status with FlowPay API (never trust client)
+      const statusResponse = await fetch(`${FLOWPAY_CARD_URL}/status?id=${paymentId}`, {
+        headers: { 'x-api-key': apiKey },
+      });
+      const statusData = await statusResponse.json();
+
+      if (!statusResponse.ok || statusData.payment?.status !== 'COMPLETED') {
+        const currentStatus = statusData.payment?.status || 'unknown';
+        return new Response(
+          JSON.stringify({ success: false, error: 'Payment not confirmed', status: currentStatus }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 2. Fetch order and validate ownership
+      const orderFields = await getFirestoreDoc('orders', orderId);
+      if (!orderFields) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Order not found' }),
+          { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Validate auth against order
+      if (authSource === 'user') {
+        const orderUserId = orderFields.user_id?.stringValue;
+        if (orderUserId && !orderUserId.startsWith('guest_') && orderUserId !== callerUid) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Forbidden: not your order' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      } else if (authSource === 'delivery_token') {
+        const storedToken = orderFields.delivery_token?.stringValue;
+        if (!storedToken || storedToken !== deliveryTokenHeader) {
+          return new Response(
+            JSON.stringify({ success: false, error: 'Forbidden: invalid delivery token' }),
+            { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          );
+        }
+      }
+
+      // Validate flowpay_charge_id matches
+      const storedChargeId = orderFields.flowpay_charge_id?.stringValue;
+      if (storedChargeId !== paymentId) {
+        console.warn(`🚨 Card confirm: chargeId mismatch! stored=${storedChargeId}, provided=${paymentId}`);
+        return new Response(
+          JSON.stringify({ success: false, error: 'Payment ID mismatch' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 3. Idempotency: if already paid, return success
+      if (orderFields.payment_status?.stringValue === 'paid') {
+        console.log(`ℹ️ Card order ${orderId} already paid`);
+        return new Response(
+          JSON.stringify({ success: true, message: 'Already processed' }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // 4. Mark as paid (server-side only)
+      await updateFirestoreDoc('orders', orderId, {
+        payment_status: 'paid',
+        status: 'processing',
+        updated_at: new Date().toISOString(),
+      });
+      console.log(`✅ Card order ${orderId} marked as paid (server-side confirm)`);
+
+      // 5. Process delivery via internal key
+      try {
+        const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+        await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret });
+        console.log(`📦 process-delivery called for card order ${orderId}`);
+      } catch (e) { console.warn('⚠️ process-delivery call failed:', e); }
+
+      // 6. Increment coupon usage (server-side only)
+      const couponId = orderFields.coupon_id?.stringValue;
+      if (couponId) {
+        try { await incrementCouponUsage(couponId); } catch {}
+      }
+
+      // 7. Analytics
+      const orderValue = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
+      const userId = orderFields.user_id?.stringValue;
+      const customerEmail = orderFields.customer_email?.stringValue;
+      const customerName = orderFields.customer_name?.stringValue || '';
+      const customerPhone = orderFields.customer_phone?.stringValue || '';
+
+      try {
+        await addFirestoreDoc('analytics_events', {
+          event_name: 'Purchase',
+          event_time: new Date().toISOString(),
+          user_id: userId || null,
+          value: orderValue,
+          currency: 'BRL',
+          order_id: orderId,
+          page_url: 'https://www.valnix.com.br/card-callback',
+          content_name: `Pedido #${orderId.substring(0, 8)}`,
+        });
+      } catch {}
+
+      // 8. Meta CAPI
+      const nameParts = customerName.split(' ');
+      try {
+        await invokeEdgeFunction('meta-capi', {
+          event_name: 'Purchase',
+          event_id: `purchase_${orderId}_${Date.now()}`,
+          order_id: orderId,
+          value: orderValue,
+          currency: 'BRL',
+          content_name: `Pedido #${orderId.substring(0, 8)}`,
+          email: customerEmail,
+          phone: customerPhone || undefined,
+          first_name: nameParts[0] || undefined,
+          last_name: nameParts.slice(1).join(' ') || undefined,
+          external_id: userId,
+          fbc: orderFields.fbc?.stringValue,
+          fbp: orderFields.fbp?.stringValue,
+        });
+        console.log(`📡 Meta CAPI Purchase sent for card order ${orderId}`);
+      } catch (e) { console.warn('⚠️ Meta CAPI card error:', e); }
+
+      // 9. UTMify
+      try {
+        await invokeEdgeFunction('utmify-event', {
+          order_id: orderId,
+          event_type: 'Purchase',
+          value: orderValue,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone || undefined,
+          product_name: `Pedido #${orderId.substring(0, 8)}`,
+          utm_source: orderFields.utm_source?.stringValue,
+          utm_medium: orderFields.utm_medium?.stringValue,
+          utm_campaign: orderFields.utm_campaign?.stringValue,
+          utm_content: orderFields.utm_content?.stringValue,
+          utm_term: orderFields.utm_term?.stringValue,
+        });
+        console.log(`📡 UTMify Purchase sent for card order ${orderId}`);
+      } catch (e) { console.warn('⚠️ UTMify card error:', e); }
+
+      return new Response(
+        JSON.stringify({ success: true, orderId }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     return new Response(
-      JSON.stringify({ success: false, error: 'Invalid action. Use ?action=create or ?action=status&id=...' }),
+      JSON.stringify({ success: false, error: 'Invalid action. Use ?action=create, ?action=status&id=..., or ?action=confirm' }),
       { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {

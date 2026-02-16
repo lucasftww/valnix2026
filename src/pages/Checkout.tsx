@@ -518,17 +518,15 @@ export default function Checkout() {
           throw new Error(cardData.error || 'Erro ao criar cobrança de cartão');
         }
 
-        // Generate order-scoped delivery token for guest card callback
-        const deliveryToken = crypto.randomUUID();
+        // 🔒 P0 FIX: delivery_token is now generated SERVER-SIDE by flowpay-card create endpoint
+        // cardData.deliveryToken is returned from the server
+        const deliveryToken = cardData.deliveryToken || null;
 
-        // Store card payment info for callback
+        // Store card payment info for callback (deliveryToken comes from server)
         sessionStorage.setItem('valnix_card_payment', JSON.stringify({
           orderId,
           paymentId: cardData.paymentId,
           deliveryToken,
-          couponId: appliedCoupon?.id || null,
-          couponCode: appliedCoupon?.code || null,
-          discountAmount: discount || 0,
           customerName: formData.name,
           customerEmail: formData.email || user?.email || "",
           customerPhone: formData.phone || "",
@@ -536,21 +534,20 @@ export default function Checkout() {
           productNames: items.map(i => i.name),
         }));
 
-        // Save flowpay_charge_id, coupon info, and delivery_token on the order
-        try {
-          const orderRef = doc(db, "orders", orderId);
-          await updateDoc(orderRef, { 
-            flowpay_charge_id: cardData.paymentId,
-            coupon_id: appliedCoupon?.id || null,
-            coupon_code: appliedCoupon?.code || null,
-            delivery_token: deliveryToken,
-            delivery_token_created_at: new Date().toISOString(),
-          });
-        } catch (err) {
-          console.warn('⚠️ Failed to save flowpay_charge_id/coupon:', err);
+        // Save coupon info on order (flowpay_charge_id and delivery_token already saved server-side)
+        if (appliedCoupon) {
+          try {
+            const orderRef = doc(db, "orders", orderId);
+            await updateDoc(orderRef, { 
+              coupon_id: appliedCoupon.id,
+              coupon_code: appliedCoupon.code,
+            });
+          } catch (err) {
+            console.warn('⚠️ Failed to save coupon info:', err);
+          }
         }
 
-        // NOTE: Coupon increment is handled by CardPaymentCallback after payment confirmation.
+        // NOTE: Coupon increment + payment confirmation handled SERVER-SIDE by flowpay-card confirm.
 
         saveCheckoutDataToProfile();
         clearCart();
