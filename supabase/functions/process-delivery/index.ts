@@ -193,15 +193,30 @@ async function releaseProductLock(productId: string): Promise<void> {
   } catch { /* best effort */ }
 }
 
-// ── Fake code generation ──
-function generateFakeDeliveryCode(): string {
+// ── Fake code generation (format varies by category) ──
+function generateFakeDeliveryCode(category?: string): string {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 16; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-    if ((i + 1) % 4 === 0 && i < 15) result += '-';
+  const rand = (len: number) => {
+    let r = '';
+    for (let i = 0; i < len; i++) r += chars.charAt(Math.floor(Math.random() * chars.length));
+    return r;
+  };
+
+  const cat = (category || '').toLowerCase();
+
+  // Valorant: RA-XXXXXXXXXXXXXXXX (16 alphanumeric after prefix)
+  if (cat.includes('valorant') || cat.includes('vp')) {
+    return `RA-${rand(16)}`;
   }
-  return result;
+
+  // LOL / Riot Points: RA-XXXXXXXXXXXXXXX (15 alphanumeric after prefix)
+  if (cat.includes('lol') || cat.includes('riot') || cat.includes('league') || cat.includes('rp')) {
+    return `RA-${rand(15)}`;
+  }
+
+  // Roblox: XXXX-XXXX-XXXX-XXXX
+  // Default format for all other categories
+  return `${rand(4)}-${rand(4)}-${rand(4)}-${rand(4)}`;
 }
 
 // ── Internal auth validation ──
@@ -384,12 +399,13 @@ Deno.serve(async (req) => {
       }
 
       const deliveryType = productDoc.fields.delivery_type?.stringValue || 'manual';
+      const productCategory = productDoc.fields.category?.stringValue || '';
       const quantity = itemFields?.quantity?.integerValue ? parseInt(itemFields.quantity.integerValue) : 1;
 
       if (deliveryType === 'auto_fake') {
         // Generate fake codes — no concurrency concern
         const codes: string[] = [];
-        for (let i = 0; i < quantity; i++) codes.push(generateFakeDeliveryCode());
+        for (let i = 0; i < quantity; i++) codes.push(generateFakeDeliveryCode(productCategory));
         const codeStr = codes.join(',');
         await updateFirestoreDoc('order_items', itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
         results.push({ itemId, productId, status: 'delivered', codes: codeStr });
