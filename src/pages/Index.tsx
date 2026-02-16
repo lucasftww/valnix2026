@@ -1,5 +1,5 @@
 import { lazy, Suspense, memo, useEffect } from "react";
-import { GuestOrderLinkBanner } from "@/components/GuestOrderLinkBanner";
+
 import { Helmet } from "react-helmet-async";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
@@ -53,9 +53,6 @@ const IndexComponent = () => {
           <SearchBar />
         </div>
         <HeroBanner />
-        <div className="container mx-auto mt-4">
-          <GuestOrderLinkBanner />
-        </div>
         <ProductGrid />
         <Suspense fallback={<div className="h-20" />}>
           <CategoryCards />
