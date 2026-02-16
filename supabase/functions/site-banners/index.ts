@@ -31,7 +31,8 @@ let staleBanners: any[] | null = null;
 let inflight: Promise<any[]> | null = null;
 
 function getTTLWithJitter(): number {
-  return BANNER_CACHE_TTL + Math.floor((Math.random() - 0.5) * BANNER_JITTER * 2);
+  const ttl = BANNER_CACHE_TTL + Math.floor((Math.random() - 0.5) * BANNER_JITTER * 2);
+  return Math.max(60_000, ttl); // never less than 1 minute
 }
 
 let cachedAccessToken: string | null = null;
