@@ -271,18 +271,29 @@ Deno.serve(async (req) => {
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
       }
-      // Anti-race: consume token BEFORE doing any delivery (prevents parallel calls)
-      try { await updateFirestoreDoc('orders', orderId, { delivery_token: null, delivery_token_created_at: null }); } catch {}
-      // Re-read to confirm we actually consumed it (another call may have raced)
+      // Anti-race: claim token with unique consumer ID, then verify ownership
+      const consumerId = crypto.randomUUID();
+      try {
+        await updateFirestoreDoc('orders', orderId, {
+          delivery_token: null,
+          delivery_token_created_at: null,
+          delivery_token_consumer: consumerId,
+        });
+      } catch (consumeErr) {
+        // FAIL-CLOSED: cannot consume token → abort, no delivery
+        console.error(`❌ [${orderId}] Failed to consume delivery_token — aborting`, consumeErr);
+        return new Response(JSON.stringify({ success: false, error: 'Internal error: token consumption failed' }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      // Verify we won the race (last-writer-wins → only our consumerId should be there)
       const recheck = await getFirestoreDoc('orders', orderId);
-      const recheckToken = recheck?.fields?.delivery_token?.stringValue;
-      if (recheckToken) {
-        // Token was re-written by a concurrent call — bail
-        console.warn(`🚫 [${orderId}] delivery_token race detected`);
-        return new Response(JSON.stringify({ success: false, error: 'Forbidden: token already consumed' }),
+      const actualConsumer = recheck?.fields?.delivery_token_consumer?.stringValue;
+      if (actualConsumer !== consumerId) {
+        console.warn(`🚫 [${orderId}] delivery_token race lost (winner: ${actualConsumer}, ours: ${consumerId})`);
+        return new Response(JSON.stringify({ success: false, error: 'Forbidden: token claimed by another request' }),
           { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
-      console.log(`✅ [${orderId}] delivery_token validated and consumed`);
+      console.log(`✅ [${orderId}] delivery_token validated, consumed by ${consumerId}`);
     }
 
     const paymentStatus = orderDoc.fields.payment_status?.stringValue;
