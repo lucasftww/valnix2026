@@ -596,9 +596,9 @@ Deno.serve(async (req) => {
       // ── Cleanup: remove blocked emails + orphan profiles ──────
       if (resource === "cleanup-users") {
         const BLOCKED_EMAILS = [
-          "lucaseucontato@gmail.com",
           "rodrigofaro@gmail.com",
           "test_redteam@gmail.com",
+          "silvacarolinem7@gmail.com",
         ];
 
         const accessToken = await getFirebaseAccessToken();
