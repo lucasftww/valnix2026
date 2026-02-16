@@ -43,7 +43,6 @@ export const OrderSummary = memo(function OrderSummary({
   paymentMethod = "pix",
 }: OrderSummaryProps) {
   
-  // Memoize formatted prices
   const formattedPrices = useMemo(() => ({
     total: totalPrice.toFixed(2).replace('.', ','),
     discount: discount.toFixed(2).replace('.', ','),
@@ -55,8 +54,8 @@ export const OrderSummary = memo(function OrderSummary({
   return (
     <div className="hidden lg:block w-full lg:w-[340px] space-y-5">
       {/* Cupom de desconto */}
-      <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5">
-        <h3 className="text-[15px] font-semibold text-white mb-4">Cupom de desconto</h3>
+      <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5">
+        <h3 className="text-[15px] font-semibold text-foreground mb-4">Cupom de desconto</h3>
         <div className="flex gap-2">
           <Input
             id="desktop-coupon-code"
@@ -65,13 +64,13 @@ export const OrderSummary = memo(function OrderSummary({
             onChange={(e) => onCouponChange(e.target.value.toUpperCase())}
             placeholder="Digite o código do cupom"
             disabled={!!appliedCoupon}
-            className="h-10 bg-[#161616] border-[#222] text-white placeholder:text-[#555] rounded-lg text-[13px] flex-1"
+            className="h-10 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/50 rounded-xl text-[13px] flex-1"
           />
           {appliedCoupon ? (
             <Button 
               variant="outline" 
               onClick={onRemoveCoupon}
-              className="h-10 border-[#333] text-[#888] hover:bg-[#1a1a1a] rounded-lg px-4 text-[13px]"
+              className="h-10 border-border/20 text-muted-foreground hover:bg-muted rounded-xl px-4 text-[13px]"
             >
               Remover
             </Button>
@@ -80,7 +79,7 @@ export const OrderSummary = memo(function OrderSummary({
               variant="outline" 
               onClick={onApplyCoupon}
               disabled={applyingCoupon || !couponCode.trim()}
-              className="h-10 border-primary text-primary hover:bg-primary/10 rounded-lg px-5 text-[13px] font-medium"
+              className="h-10 border-primary/30 text-primary hover:bg-primary/10 rounded-xl px-5 text-[13px] font-medium"
             >
               {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Aplicar"}
             </Button>
@@ -94,14 +93,14 @@ export const OrderSummary = memo(function OrderSummary({
       </div>
 
       {/* Resumo */}
-      <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5">
-        <h3 className="text-[15px] font-semibold text-white mb-4">Resumo</h3>
+      <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5">
+        <h3 className="text-[15px] font-semibold text-foreground mb-4">Resumo</h3>
         
         {/* Items */}
         <div className="space-y-4 mb-5">
           {items.map((item) => (
             <div key={item.id} className="flex gap-3">
-              <div className="w-14 h-14 rounded-lg bg-[#1a1a1a] overflow-hidden flex-shrink-0 border border-[#222]">
+              <div className="w-14 h-14 rounded-xl bg-muted overflow-hidden flex-shrink-0 border border-border/10">
                 <img 
                   src={item.image} 
                   alt={item.name} 
@@ -111,22 +110,22 @@ export const OrderSummary = memo(function OrderSummary({
               </div>
               
               <div className="flex-1 min-w-0">
-                <p className="text-white text-[13px] font-medium leading-tight line-clamp-2">{item.name}</p>
+                <p className="text-foreground text-[13px] font-medium leading-tight line-clamp-2">{item.name}</p>
                 <div className="flex items-center gap-3 mt-2">
                   {/* Quantity Controls */}
                   <div className="flex items-center gap-1">
                     <button 
                       onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
                       disabled={item.quantity <= 1}
-                      className="w-6 h-6 rounded-md bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#888] hover:text-white hover:border-[#444] transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="w-6 h-6 rounded-lg bg-muted border border-border/10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border/20 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
                       aria-label="Diminuir quantidade"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
-                    <span className="w-7 text-center text-[12px] text-white font-medium">{item.quantity}</span>
+                    <span className="w-7 text-center text-[12px] text-foreground font-medium">{item.quantity}</span>
                     <button 
                       onClick={() => onUpdateQuantity(item.id, item.quantity + 1)}
-                      className="w-6 h-6 rounded-md bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#888] hover:text-white hover:border-[#444] transition-colors"
+                      className="w-6 h-6 rounded-lg bg-muted border border-border/10 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border/20 transition-colors"
                       aria-label="Aumentar quantidade"
                     >
                       <Plus className="w-3 h-3" />
@@ -135,7 +134,7 @@ export const OrderSummary = memo(function OrderSummary({
                   {/* Remove Button */}
                   <button 
                     onClick={() => onRemoveItem(item.id)}
-                    className="w-6 h-6 rounded-md bg-[#1a1a1a] border border-[#333] flex items-center justify-center text-[#666] hover:text-red-500 hover:border-red-500/50 transition-colors"
+                    className="w-6 h-6 rounded-lg bg-muted border border-border/10 flex items-center justify-center text-muted-foreground hover:text-red-500 hover:border-red-500/30 transition-colors"
                     aria-label={`Remover ${item.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -144,7 +143,7 @@ export const OrderSummary = memo(function OrderSummary({
               </div>
               
               <div className="text-right flex-shrink-0">
-                <p className="text-white text-[13px] font-medium">
+                <p className="text-foreground text-[13px] font-medium">
                   R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}
                 </p>
               </div>
@@ -153,19 +152,19 @@ export const OrderSummary = memo(function OrderSummary({
         </div>
 
         {/* Totals */}
-        <div className="space-y-2 border-t border-[#1f1f1f] pt-4 mb-5">
+        <div className="space-y-2 border-t border-border/10 pt-4 mb-5">
           <div className="flex justify-between text-[13px]">
-            <span className="text-[#888]">Preço oficial</span>
-            <span className="text-white">R$ {formattedPrices.total}</span>
+            <span className="text-muted-foreground">Preço oficial</span>
+            <span className="text-foreground">R$ {formattedPrices.total}</span>
           </div>
           <div className="flex justify-between text-[13px]">
-            <span className="text-[#888]">Desconto</span>
-            <span className={discount > 0 ? "text-green-500" : "text-white"}>
+            <span className="text-muted-foreground">Desconto</span>
+            <span className={discount > 0 ? "text-green-500" : "text-foreground"}>
               {discount > 0 ? `-R$ ${formattedPrices.discount}` : "R$ 0,00"}
             </span>
           </div>
           <div className="flex justify-between items-center pt-2">
-            <span className="text-[14px] text-white font-medium">Total</span>
+            <span className="text-[14px] text-foreground font-medium">Total</span>
             <span className="text-[22px] text-primary font-bold">
               R$ {formattedPrices.final}
             </span>
@@ -176,7 +175,7 @@ export const OrderSummary = memo(function OrderSummary({
         <Button 
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="w-full h-14 bg-[#c0392b] hover:bg-[#a93226] text-white font-bold rounded-xl text-base hidden lg:flex"
+          className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-base hidden lg:flex"
         >
           {loading ? (
             <Loader2 className="w-5 h-5 animate-spin" />
@@ -186,7 +185,7 @@ export const OrderSummary = memo(function OrderSummary({
         </Button>
 
         {/* Terms */}
-        <p className="text-[11px] text-[#666] text-center mt-4 leading-relaxed">
+        <p className="text-[11px] text-muted-foreground/60 text-center mt-4 leading-relaxed">
           Ao clicar em "Pagar", reconheço que li e aceito os{" "}
           <Link to="/terms" className="text-primary hover:underline">termos e condições</Link>
           , e a{" "}
@@ -194,8 +193,8 @@ export const OrderSummary = memo(function OrderSummary({
         </p>
 
         {/* Security Badge */}
-        <div className="flex items-center justify-center gap-2 mt-4 text-[#666] text-[12px]">
-          <div className="w-4 h-4 rounded-full border border-[#444] flex items-center justify-center">
+        <div className="flex items-center justify-center gap-2 mt-4 text-muted-foreground text-[12px]">
+          <div className="w-4 h-4 rounded-full border border-border/20 flex items-center justify-center">
             <Lock className="w-2.5 h-2.5" />
           </div>
           <span>Compra 100% segura</span>

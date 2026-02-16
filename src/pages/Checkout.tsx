@@ -688,10 +688,10 @@ export default function Checkout() {
   // Payment screen
   if (paymentData) {
     return (
-      <div className="min-h-screen bg-[#0d0d0d]">
+      <div className="min-h-screen bg-background">
         <CheckoutHeader currentStep={2} />
         <main className="max-w-xl mx-auto px-4 py-8">
-          <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-6">
+          <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-6">
             <PixPayment
               qrCodeText={paymentData.qrCodeText}
               transactionId={paymentData.transactionId}
@@ -730,7 +730,7 @@ export default function Checkout() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0d0d0d]">
+    <div className="min-h-screen bg-background">
       <CheckoutHeader currentStep={1} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 lg:py-10 pb-36 lg:pb-10">
@@ -747,8 +747,8 @@ export default function Checkout() {
           {/* Left Column */}
           <div className="flex-1 space-y-5">
             {/* Payment Method Card */}
-            <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5 sm:p-6">
-              <h2 className="text-[15px] font-semibold text-white mb-5">Pagamento</h2>
+            <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5 sm:p-6">
+              <h2 className="text-[15px] font-semibold text-foreground mb-5">Pagamento</h2>
               
               <RadioGroup 
                 value={paymentMethod} 
@@ -757,10 +757,10 @@ export default function Checkout() {
               >
                 {/* PIX Option */}
                 <div 
-                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all ${
                     paymentMethod === "pix" 
-                      ? "border-primary bg-primary/5" 
-                      : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
+                      ? "border-primary/40 bg-primary/5" 
+                      : "border-border/10 bg-background hover:border-border/20"
                   }`}
                   onClick={() => setPaymentMethod("pix")}
                 >
@@ -768,17 +768,17 @@ export default function Checkout() {
                   <Label htmlFor="pix" className="flex items-center gap-3 cursor-pointer flex-1 min-w-0">
                     <img src={pixLogo} alt="PIX" className="w-7 h-7 object-contain shrink-0" />
                     <div className="min-w-0">
-                      <p className="text-[13px] sm:text-[14px] font-medium text-white">PIX</p>
+                      <p className="text-[13px] sm:text-[14px] font-medium text-foreground">PIX</p>
                     </div>
                   </Label>
                 </div>
 
                 {/* Card Option */}
                 <div 
-                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-xl border cursor-pointer transition-all ${
                     paymentMethod === "card" 
-                      ? "border-blue-500 bg-blue-500/5" 
-                      : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
+                      ? "border-blue-500/40 bg-blue-500/5" 
+                      : "border-border/10 bg-background hover:border-border/20"
                   }`}
                   onClick={() => setPaymentMethod("card")}
                 >
@@ -789,7 +789,7 @@ export default function Checkout() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <p className="text-[13px] sm:text-[14px] font-medium text-white whitespace-nowrap">Crédito ou débito</p>
+                        <p className="text-[13px] sm:text-[14px] font-medium text-foreground whitespace-nowrap">Crédito ou débito</p>
                         <div className="flex items-center gap-0.5 shrink-0">
                           <div className="h-[16px] w-[24px] rounded-sm bg-[#1a1f71] flex items-center justify-center">
                             <span className="text-[5px] font-bold text-white italic">VISA</span>
@@ -813,10 +813,10 @@ export default function Checkout() {
                 {/* Balance Option */}
                 {userBalance > 0 && (
                   <div 
-                    className={`relative flex items-center gap-4 p-4 rounded-lg border-2 cursor-pointer transition-all ${
+                    className={`relative flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
                       paymentMethod === "balance" 
-                        ? "border-primary bg-primary/5" 
-                        : "border-[#222] bg-[#0d0d0d] hover:border-[#333]"
+                        ? "border-primary/40 bg-primary/5" 
+                        : "border-border/10 bg-background hover:border-border/20"
                     } ${userBalance < finalPrice ? "opacity-60" : ""}`}
                     onClick={() => userBalance >= finalPrice && setPaymentMethod("balance")}
                   >
@@ -832,12 +832,12 @@ export default function Checkout() {
                       </div>
                       <div className="flex-1">
                         <div className="flex items-center gap-2">
-                          <p className="text-[14px] font-medium text-white">Saldo da conta</p>
+                          <p className="text-[14px] font-medium text-foreground">Saldo da conta</p>
                           <span className="text-[12px] font-semibold text-green-500">
                             R$ {userBalance.toFixed(2)}
                           </span>
                         </div>
-                        <p className="text-[11px] text-[#888] mt-1.5">
+                        <p className="text-[11px] text-muted-foreground mt-1.5">
                           {userBalance >= finalPrice 
                             ? "Pagamento imediato" 
                             : "Saldo insuficiente"}
@@ -849,26 +849,26 @@ export default function Checkout() {
               </RadioGroup>
 
               {/* Payment info */}
-              <div className="bg-[#161616] rounded-lg p-4 border border-[#222] mt-5">
+              <div className="bg-muted/50 rounded-xl p-4 border border-border/10 mt-5">
                 {paymentMethod === "pix" ? (
                   <>
-                    <h3 className="text-[14px] font-semibold text-white mb-2">Pagamento com Pix</h3>
-                    <p className="text-[13px] text-[#888] leading-relaxed">
+                    <h3 className="text-[14px] font-semibold text-foreground mb-2">Pagamento com Pix</h3>
+                    <p className="text-[13px] text-muted-foreground leading-relaxed">
                       Ao confirmar o pedido, você receberá um QR Code para realizar o pagamento. 
                       Utilize o aplicativo do seu banco para escanear o QR Code ou copie o código.
                     </p>
                   </>
                 ) : paymentMethod === "card" ? (
                   <>
-                    <h3 className="text-[14px] font-semibold text-white mb-2">Pagamento com Cartão</h3>
-                    <p className="text-[13px] text-[#888] leading-relaxed">
+                    <h3 className="text-[14px] font-semibold text-foreground mb-2">Pagamento com Cartão</h3>
+                    <p className="text-[13px] text-muted-foreground leading-relaxed">
                       Ao finalizar a compra, você será redirecionado para um site seguro para inserir os dados do seu cartão e completar o pagamento.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h3 className="text-[14px] font-semibold text-white mb-2">Pagamento com Saldo</h3>
-                    <p className="text-[13px] text-[#888] leading-relaxed">
+                    <h3 className="text-[14px] font-semibold text-foreground mb-2">Pagamento com Saldo</h3>
+                    <p className="text-[13px] text-muted-foreground leading-relaxed">
                       O valor será debitado imediatamente do seu saldo. 
                       Saldo após compra: <span className="text-green-500 font-medium">R$ {(userBalance - finalPrice).toFixed(2)}</span>
                     </p>
@@ -878,9 +878,9 @@ export default function Checkout() {
             </div>
 
             {/* Personal Info Card */}
-            <div className="bg-[#111] rounded-lg border border-[#1f1f1f] p-5 sm:p-6">
+            <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-5 sm:p-6">
               <div className="flex flex-wrap items-center justify-between gap-3 mb-6">
-                <h2 className="text-[15px] font-semibold text-white">Informações do comprador</h2>
+                <h2 className="text-[15px] font-semibold text-foreground">Informações do comprador</h2>
               </div>
 
               <div className="space-y-4">
@@ -888,7 +888,7 @@ export default function Checkout() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Name */}
                   <div>
-                    <label htmlFor="checkout-name" className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-name" className="block text-[13px] text-muted-foreground mb-2">
                       Nome completo <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -900,7 +900,7 @@ export default function Checkout() {
                         onBlur={() => handleBlur('name')}
                         placeholder="NOME SOBRENOME"
                         autoComplete="name"
-                        className={getInputClassName('name', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px] uppercase")}
+                        className={getInputClassName('name', "h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[14px] uppercase")}
                       />
                       <ValidationIcon isValid={validation.name} show={touched.name || false} />
                     </div>
@@ -911,7 +911,7 @@ export default function Checkout() {
                   
                   {/* CPF */}
                   <div>
-                    <label htmlFor="checkout-cpf" className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-cpf" className="block text-[13px] text-muted-foreground mb-2">
                       CPF <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -924,7 +924,7 @@ export default function Checkout() {
                         placeholder="000.000.000-00"
                         inputMode="numeric"
                         autoComplete="off"
-                        className={getInputClassName('document', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]")}
+                        className={getInputClassName('document', "h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[14px]")}
                       />
                       <ValidationIcon isValid={validation.document} show={touched.document || false} />
                     </div>
@@ -938,7 +938,7 @@ export default function Checkout() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* Email */}
                   <div>
-                    <label htmlFor="checkout-email" className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-email" className="block text-[13px] text-muted-foreground mb-2">
                       E-mail <span className="text-red-500">*</span>
                     </label>
                     <div className="relative">
@@ -951,7 +951,7 @@ export default function Checkout() {
                         placeholder="seuemail@exemplo.com"
                         type="email"
                         autoComplete="email"
-                        className={getInputClassName('email', "h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]")}
+                        className={getInputClassName('email', "h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[14px]")}
                       />
                       <ValidationIcon isValid={validation.email} show={touched.email || false} />
                     </div>
@@ -962,7 +962,7 @@ export default function Checkout() {
 
                   {/* Phone (optional) */}
                   <div>
-                    <label htmlFor="checkout-phone" className="block text-[13px] text-[#888] mb-2">
+                    <label htmlFor="checkout-phone" className="block text-[13px] text-muted-foreground mb-2">
                       Telefone
                     </label>
                     <Input
@@ -974,13 +974,13 @@ export default function Checkout() {
                       type="tel"
                       inputMode="tel"
                       autoComplete="tel"
-                      className="h-12 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#444] rounded-lg text-[14px]"
+                      className="h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[14px]"
                     />
                   </div>
                 </div>
 
                 {/* Security microcopy */}
-                <p className="text-[12px] text-[#555] flex items-center gap-1.5 mt-1">
+                <p className="text-[12px] text-muted-foreground/60 flex items-center gap-1.5 mt-1">
                   <Lock className="w-3.5 h-3.5 flex-shrink-0" />
                   Seus dados são seguros e usados apenas para processar seu pedido.
                 </p>
@@ -989,7 +989,7 @@ export default function Checkout() {
             </div>
 
             {/* Mobile Coupon - minimal */}
-            <div className="lg:hidden bg-[#111] rounded-lg border border-[#1f1f1f] p-4">
+            <div className="lg:hidden bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-4">
               <div className="flex gap-2">
                 <Input
                   id="mobile-coupon-code"
@@ -998,13 +998,13 @@ export default function Checkout() {
                   onChange={(e) => setCouponCode(e.target.value.toUpperCase())}
                   placeholder="Código do cupom"
                   disabled={!!appliedCoupon}
-                  className="h-10 bg-[#0a0a0a] border-[#1a1a1a] text-white placeholder:text-[#555] rounded-lg text-[13px] flex-1"
+                  className="h-10 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/50 rounded-xl text-[13px] flex-1"
                 />
                 {appliedCoupon ? (
                   <Button
                     variant="outline"
                     onClick={removeCoupon}
-                    className="h-10 border-[#333] text-[#888] hover:bg-[#1a1a1a] rounded-lg px-4 text-[13px]"
+                    className="h-10 border-border/20 text-muted-foreground hover:bg-muted rounded-xl px-4 text-[13px]"
                   >
                     Remover
                   </Button>
@@ -1013,7 +1013,7 @@ export default function Checkout() {
                     variant="outline"
                     onClick={handleApplyCoupon}
                     disabled={applyingCoupon || !couponCode.trim()}
-                    className="h-10 border-[#333] text-[#aaa] hover:bg-[#1a1a1a] rounded-lg px-4 text-[13px]"
+                    className="h-10 border-border/20 text-muted-foreground hover:bg-muted rounded-xl px-4 text-[13px]"
                   >
                     {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Aplicar"}
                   </Button>

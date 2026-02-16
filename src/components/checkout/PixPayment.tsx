@@ -3,7 +3,6 @@ import { Button } from "@/components/ui/button";
 import { Copy, Check, Clock, AlertCircle, CheckCircle } from "lucide-react";
 import { useState, useEffect, useRef } from "react";
 import { useToast } from "@/hooks/use-toast";
-import { Progress } from "@/components/ui/progress";
 import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -39,8 +38,6 @@ export function PixPayment({
   couponId,
   onPaymentConfirmed 
 }: PixPaymentProps) {
-  // Debug log removed for production
-  
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(15 * 60);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -48,21 +45,14 @@ export function PixPayment({
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
-
   // Callback de confirmação de pagamento
   const handlePaymentSuccess = async () => {
     if (paymentConfirmed) return;
     setPaymentConfirmed(true);
     
-    // NOTE: Order status update, auto-delivery, coupon increment, and Purchase 
-    // tracking are ALL handled server-side by the FlowPay webhook or polling fallback.
-    // Client-side does NOT update order status to avoid race conditions with the webhook.
-    // The server-side code has idempotency checks (skips if already 'paid').
-
     // Save guest order for /order/:hash access
     let orderHash: string | null = null;
     try {
-      // Collect order items with delivery codes
       const itemsRef2 = collection(db, "order_items");
       const q2 = query(itemsRef2, where('order_id', '==', orderId));
       const itemsSnap = await getDocs(q2);
@@ -100,7 +90,6 @@ export function PixPayment({
     });
     
     setTimeout(() => {
-      // Redirect to full-screen upsell funnel first
       if (orderHash) {
         navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${orderHash}`);
       } else {
@@ -113,7 +102,7 @@ export function PixPayment({
   const expiredRef = useRef(false);
   useEffect(() => { expiredRef.current = timeLeft === 0; }, [timeLeft]);
 
-  // Poll FlowPay for payment status (stable interval, not affected by timer)
+  // Poll FlowPay for payment status
   useEffect(() => {
     if (paymentConfirmed || !transactionId) return;
 
@@ -201,10 +190,10 @@ export function PixPayment({
     <div className="space-y-4">
       {/* Payment Confirmed */}
       {paymentConfirmed && (
-        <div className="bg-green-500/10 border border-green-500/30 rounded-xl p-4 text-center space-y-3">
+        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-center space-y-3">
           <CheckCircle className="w-12 h-12 text-green-500 mx-auto" />
           <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
-          <p className="text-sm text-gray-400">
+          <p className="text-sm text-muted-foreground">
             Seu pagamento foi aprovado. Redirecionando em instantes...
           </p>
         </div>
@@ -212,7 +201,7 @@ export function PixPayment({
       
       {/* Header */}
       <div className="text-center">
-        <h2 className="text-xl md:text-2xl font-bold text-white mb-1">Pagamento via PIX</h2>
+        <h2 className="text-xl md:text-2xl font-bold text-foreground mb-1">Pagamento via PIX</h2>
         <p className="text-2xl md:text-3xl font-bold text-primary">
           R$ {(amount || 0).toFixed(2).replace('.', ',')}
         </p>
@@ -221,10 +210,10 @@ export function PixPayment({
       {/* Timer */}
       <div className={`p-3 rounded-xl border transition-all ${
         isExpired 
-          ? 'bg-red-500/10 border-red-500/30' 
+          ? 'bg-red-500/10 border-red-500/20' 
           : isExpiring 
-            ? 'bg-yellow-500/10 border-yellow-500/30 animate-pulse' 
-            : 'bg-[#2a2a2a] border-[#3a3a3a]'
+            ? 'bg-yellow-500/10 border-yellow-500/20 animate-pulse' 
+            : 'bg-muted/50 border-border/10'
       }`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
@@ -233,7 +222,7 @@ export function PixPayment({
             ) : (
               <Clock className={`w-4 h-4 ${isExpiring ? 'text-yellow-500' : 'text-primary'}`} />
             )}
-            <span className="font-medium text-sm text-gray-300">
+            <span className="font-medium text-sm text-muted-foreground">
               {isExpired ? 'QR Code Expirado' : 'Tempo restante'}
             </span>
           </div>
@@ -247,7 +236,7 @@ export function PixPayment({
             {formatTime(timeLeft)}
           </span>
         </div>
-        <div className="w-full h-2 bg-[#1a1a1a] rounded-full overflow-hidden">
+        <div className="w-full h-2 bg-background rounded-full overflow-hidden">
           <div 
             className={`h-full rounded-full transition-all duration-1000 ease-linear ${
               isExpired 
@@ -263,7 +252,7 @@ export function PixPayment({
           <Button 
             onClick={() => window.location.reload()} 
             variant="destructive" 
-            className="w-full mt-3"
+            className="w-full mt-3 rounded-xl"
             size="sm"
           >
             Gerar Novo QR Code
@@ -273,7 +262,7 @@ export function PixPayment({
 
       {/* QR Code */}
       <div className={`flex justify-center transition-opacity ${isExpired ? 'opacity-30' : ''}`}>
-        <div className="relative bg-white p-5 rounded-2xl shadow-[0_0_30px_rgba(239,68,68,0.15)]">
+        <div className="relative bg-white p-5 rounded-2xl shadow-[0_0_30px_hsl(var(--primary)/0.1)]">
           <QRCodeSVG
             value={qrCodeText}
             size={qrSize}
@@ -298,8 +287,8 @@ export function PixPayment({
 
       {/* Copy Code */}
       <div className={`space-y-3 transition-opacity ${isExpired ? 'opacity-30' : ''}`}>
-        <p className="text-sm font-medium text-gray-300">PIX Copia e Cola:</p>
-        <div className="p-3 bg-[#2a2a2a] rounded-xl text-xs break-all font-mono max-h-20 overflow-y-auto border border-[#3a3a3a] text-gray-400">
+        <p className="text-sm font-medium text-muted-foreground">PIX Copia e Cola:</p>
+        <div className="p-3 bg-muted/50 rounded-xl text-xs break-all font-mono max-h-20 overflow-y-auto border border-border/10 text-muted-foreground">
           {qrCodeText}
         </div>
         <Button
@@ -327,11 +316,11 @@ export function PixPayment({
       </div>
 
       {/* Instructions */}
-      <div className="bg-[#2a2a2a] rounded-xl p-4 border border-[#3a3a3a]">
-        <p className="font-semibold text-sm text-gray-300 mb-3 flex items-center gap-2">
+      <div className="bg-muted/50 rounded-xl p-4 border border-border/10">
+        <p className="font-semibold text-sm text-muted-foreground mb-3 flex items-center gap-2">
           📱 Como pagar:
         </p>
-        <ol className="list-decimal list-inside space-y-2 text-xs text-gray-400">
+        <ol className="list-decimal list-inside space-y-2 text-xs text-muted-foreground">
           <li>Abra o app do seu banco</li>
           <li>Escolha pagar via PIX</li>
           <li>Escaneie o QR Code ou cole o código</li>
@@ -340,7 +329,7 @@ export function PixPayment({
       </div>
 
       {/* Transaction ID */}
-      <div className="text-center text-xs text-gray-500 bg-[#2a2a2a]/50 p-2 rounded-lg">
+      <div className="text-center text-xs text-muted-foreground/60 bg-muted/30 p-2 rounded-xl">
         <p className="font-medium mb-0.5">ID da Transação</p>
         <p className="font-mono break-all">{transactionId}</p>
       </div>

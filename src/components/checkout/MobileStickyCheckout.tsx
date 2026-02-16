@@ -25,13 +25,13 @@ const MobileStickyCheckoutComponent = ({
       {/* Dropdown summary - slides up */}
       {showSummary && (
         <div
-          className="bg-[#111] border-t border-[#1f1f1f] px-4 pt-4 pb-2 animate-fade-in"
+          className="bg-secondary/80 backdrop-blur-xl border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in"
           style={{ animationDuration: "150ms" }}
         >
           <div className="space-y-3 max-h-[40vh] overflow-y-auto">
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-lg bg-[#1a1a1a] overflow-hidden flex-shrink-0 border border-[#222]">
+                <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden flex-shrink-0 border border-border/10">
                   <img
                     src={item.image}
                     alt={item.name}
@@ -40,14 +40,14 @@ const MobileStickyCheckoutComponent = ({
                   />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="text-white text-[13px] font-medium truncate">
+                  <p className="text-foreground text-[13px] font-medium truncate">
                     {item.name}
                   </p>
-                  <p className="text-[#888] text-[11px]">
+                  <p className="text-muted-foreground text-[11px]">
                     Quantity: {item.quantity}
                   </p>
                 </div>
-                <p className="text-white text-[13px] font-medium shrink-0">
+                <p className="text-foreground text-[13px] font-medium shrink-0">
                   R${" "}
                   {(item.price * item.quantity).toFixed(2).replace(".", ",")}
                 </p>
@@ -58,12 +58,12 @@ const MobileStickyCheckoutComponent = ({
       )}
 
       {/* Sticky bar */}
-      <div className="bg-[#0d0d0d] border-t border-[#1f1f1f] px-4 pt-3 pb-8 safe-area-inset-bottom">
+      <div className="bg-background/90 backdrop-blur-xl border-t border-border/10 px-4 pt-3 pb-8 safe-area-inset-bottom">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setShowSummary(!showSummary)}
-            className="flex items-center gap-1.5 text-[13px] text-[#888] underline underline-offset-2"
+            className="flex items-center gap-1.5 text-[13px] text-muted-foreground underline underline-offset-2"
           >
             Resumo do Pedido
             <ChevronUp
@@ -73,7 +73,7 @@ const MobileStickyCheckoutComponent = ({
             />
           </button>
           <div className="flex items-center gap-2">
-            <span className="text-[13px] text-[#888]">Total</span>
+            <span className="text-[13px] text-muted-foreground">Total</span>
             <span className="text-[18px] text-primary font-bold">
               R$ {finalPrice.toFixed(2).replace(".", ",")}
             </span>
@@ -84,7 +84,7 @@ const MobileStickyCheckoutComponent = ({
         <Button
           onClick={onSubmit}
           disabled={loading || finalPrice < 1}
-          className="w-full h-[52px] bg-[#c0392b] hover:bg-[#a93226] text-white font-bold rounded-xl text-[15px]"
+          className="w-full h-[52px] bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-[15px]"
         >
           {loading ? (
             <span className="flex items-center gap-2">
