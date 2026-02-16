@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
     const body = await req.json();
     const {
       event_name, event_id, order_id, value, currency = 'BRL',
-      content_name, content_ids, content_type = 'product', num_items = 1,
+      content_name, content_ids, contents, content_type = 'product', num_items,
       event_source_url, email, phone, first_name, last_name,
       external_id, client_ip, user_agent, fbc, fbp, test_event_code,
     } = body;
@@ -226,12 +226,15 @@ Deno.serve(async (req) => {
     };
     if (event_source_url) eventPayload.event_source_url = event_source_url;
     if (value !== undefined) {
-      eventPayload.custom_data = {
+      const customData: Record<string, unknown> = {
         value: Number(value), currency,
         ...(content_name ? { content_name } : {}),
         ...(content_ids ? { content_ids } : {}),
-        content_type, num_items,
+        ...(contents && Array.isArray(contents) && contents.length > 0 ? { contents } : {}),
+        content_type,
+        ...(num_items ? { num_items: Number(num_items) } : {}),
       };
+      eventPayload.custom_data = customData;
     }
 
     console.log(`📡 Sending ${event_name} to Meta CAPI (event_id: ${resolvedEventId})`);

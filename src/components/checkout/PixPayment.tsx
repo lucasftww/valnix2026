@@ -22,6 +22,8 @@ interface PixPaymentProps {
   customerId?: string;
   productNames?: string[];
   productIds?: string[];
+  quantities?: number[];
+  prices?: number[];
   couponId?: string;
   onPaymentConfirmed?: () => void;
 }
@@ -37,6 +39,8 @@ export function PixPayment({
   customerId,
   productNames,
   productIds,
+  quantities,
+  prices,
   couponId,
   onPaymentConfirmed 
 }: PixPaymentProps) {
@@ -63,6 +67,9 @@ export function PixPayment({
       email: customerEmail,
       name: customerName,
       productNames,
+      productIds,
+      quantities,
+      prices,
     });
     
     onPaymentConfirmed?.();

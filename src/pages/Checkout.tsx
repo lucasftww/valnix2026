@@ -16,7 +16,7 @@ import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError
 import { MobileCoupon } from "@/components/checkout/MobileCoupon";
 import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
-import { sendInitiateCheckout, sendPurchaseFromClient } from "@/lib/metaCapi";
+import { sendInitiateCheckout, sendPurchaseFromClient, clearCheckoutSessionId } from "@/lib/metaCapi";
 
 // Read Facebook cookies for CAPI match quality
 function getCookie(name: string): string | null {
@@ -111,10 +111,23 @@ export default function Checkout() {
     }
   }, [items.length, paymentData, navigate]);
 
-  // Track InitiateCheckout once on mount
+  // Track InitiateCheckout once on mount (aligned: both analytics + Meta CAPI fire here)
+  const initiateCheckoutFiredRef = useRef(false);
   useEffect(() => {
-    if (items.length > 0) {
+    if (items.length > 0 && !initiateCheckoutFiredRef.current) {
+      initiateCheckoutFiredRef.current = true;
       trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
+      sendInitiateCheckout({
+        userId: effectiveUserId,
+        email: formData.email || user?.email || undefined,
+        phone: formData.phone || undefined,
+        name: formData.name,
+        value: finalPrice,
+        productNames: items.map(i => i.name),
+        productIds: items.map(i => i.id),
+        quantities: items.map(i => i.quantity),
+        prices: items.map(i => i.price),
+      });
     }
   }, []); // fire once on mount
 
@@ -231,15 +244,7 @@ export default function Checkout() {
     
     setLoading(true);
 
-    // Send InitiateCheckout to Meta CAPI (fire-and-forget, don't block checkout)
-    sendInitiateCheckout({
-      userId: effectiveUserId,
-      email: formData.email || user?.email || undefined,
-      phone: formData.phone || undefined,
-      name: formData.name,
-      value: finalPrice,
-      productNames: items.map(i => i.name),
-    });
+    // InitiateCheckout already fired on mount — no duplicate here
     
     try {
       const orderAmount = finalPrice;
@@ -315,6 +320,9 @@ export default function Checkout() {
           email: formData.email || user?.email || undefined,
           name: formData.name,
           productNames: items.map(i => i.name),
+          productIds: items.map(i => i.id),
+          quantities: items.map(i => i.quantity),
+          prices: items.map(i => i.price),
         });
 
         saveCheckoutDataToProfile();
@@ -377,6 +385,10 @@ export default function Checkout() {
           customerName: formData.name, customerEmail: formData.email || user?.email || "",
           customerPhone: formData.phone || "", userId: effectiveUserId,
           productNames: items.map(i => i.name),
+          productIds: items.map(i => i.id),
+          quantities: items.map(i => i.quantity),
+          prices: items.map(i => i.price),
+          amount: orderAmount,
         }));
 
         saveCheckoutDataToProfile();
@@ -478,6 +490,8 @@ export default function Checkout() {
               customerId={effectiveUserId}
               productNames={items.map(item => item.name)}
               productIds={items.map(item => item.id)}
+              quantities={items.map(item => item.quantity)}
+              prices={items.map(item => item.price)}
               couponId={appliedCoupon?.id || undefined}
               onPaymentConfirmed={clearCart}
             />
