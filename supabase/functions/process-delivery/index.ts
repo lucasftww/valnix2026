@@ -482,6 +482,44 @@ Deno.serve(async (req) => {
       console.log(`✅ [${orderId}] Order auto-completed (all ${deliveredCount} items delivered)`);
     }
 
+    // ── Sync delivery codes to guest_orders.order_data for guest real-time visibility ──
+    if (deliveredCount > 0) {
+      try {
+        const guestResults = await queryFirestore('guest_orders', 'order_id', 'EQUAL', orderId);
+        const guestDoc = Array.isArray(guestResults) ? guestResults.find((r: any) => r.document) : null;
+        if (guestDoc?.document) {
+          const guestDocId = guestDoc.document.name.split('/').pop()!;
+          const guestFields = guestDoc.document.fields || {};
+          let orderData = guestFields.order_data?.stringValue;
+          if (orderData) {
+            try {
+              const parsed = JSON.parse(orderData);
+              if (parsed?.items && Array.isArray(parsed.items)) {
+                // Map delivered codes from results to items
+                for (const result of results) {
+                  if (result.status === 'delivered' && result.codes) {
+                    // Find matching item by productId
+                    for (const gItem of parsed.items) {
+                      if (!gItem.delivery_code) {
+                        gItem.delivery_code = result.codes;
+                        break;
+                      }
+                    }
+                  }
+                }
+                await updateFirestoreDoc('guest_orders', guestDocId, {
+                  order_data: JSON.stringify(parsed),
+                });
+                console.log(`📦 [${orderId}] Synced delivery codes to guest_orders`);
+              }
+            } catch { /* ignore parse errors */ }
+          }
+        }
+      } catch (syncErr) {
+        console.warn(`⚠️ [${orderId}] guest_orders sync failed (non-blocking):`, syncErr);
+      }
+    }
+
     return new Response(JSON.stringify({
       success: true,
       orderId,
