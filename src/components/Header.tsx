@@ -195,12 +195,6 @@ const HeaderComponent = () => {
                 </div>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link to="/profile" className="cursor-pointer flex items-center">
-                    <User className="w-4 h-4 mr-2" />
-                    Meu Perfil
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuItem asChild>
                   <Link to="/my-orders" className="cursor-pointer flex items-center">
                     <Package className="w-4 h-4 mr-2" />
                     Meus Pedidos

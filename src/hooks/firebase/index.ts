@@ -12,7 +12,6 @@ export {
 } from "./useFirebaseProductsWithReviews";
 export {
   useUserOrders,
-  useRecentOrders,
   useOrderItems,
   useAllOrders,
   createOrder,
