@@ -99,7 +99,7 @@ function buildContents(
       : { id, quantity: qty, item_price: 0 }; // Meta requires the field but 0 signals "unknown"
   });
 
-  // If ALL prices are 0 (no real data), strip item_price entirely
+  // If ALL prices are 0 (no real data), keep item_price: 0 (Meta requires the field; 0 signals "unknown")
   const hasAnyPrice = contents.some(c => c.item_price > 0);
   const cleanContents = hasAnyPrice
     ? contents
