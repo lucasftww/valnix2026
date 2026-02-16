@@ -190,8 +190,9 @@ Deno.serve(async (req) => {
       const lockAge = lockTime ? Date.now() - new Date(lockTime).getTime() : Infinity;
       // TTL: 5 minutes — if lock is older, consider it stale
       if (lockAge < 5 * 60 * 1000) {
-        return new Response(JSON.stringify({ success: false, error: 'Restore already running. Try again in a few minutes.' }),
-          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        const retryAfter = Math.ceil((5 * 60 * 1000 - lockAge) / 1000);
+        return new Response(JSON.stringify({ success: false, error: 'Restore already running. Try again in a few minutes.', retry_after_seconds: retryAfter }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': String(retryAfter) } });
       }
     }
     // Acquire lock
@@ -306,16 +307,12 @@ Deno.serve(async (req) => {
       details.push(`✅ ${orderId} → ${customerName || email} (R$ ${orderData?.total_amount})`);
     }
 
-    // Release lock
-    await deleteFirestoreDoc('restore_locks', LOCK_DOC);
-
     return new Response(JSON.stringify({ success: true, restored, skipped, total: uniqueOrders.size, details }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
-    } catch (innerErr: any) {
-      // Release lock on error
+    } finally {
+      // ALWAYS release lock (success or error)
       await deleteFirestoreDoc('restore_locks', LOCK_DOC);
-      throw innerErr;
     }
   } catch (err: any) {
     console.error('❌ Restore error:', err);
