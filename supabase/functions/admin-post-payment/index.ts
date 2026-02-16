@@ -281,11 +281,21 @@ Deno.serve(async (req) => {
 
     if (req.method === "PUT") {
       const body = await req.json();
-      const { id, ...updates } = body;
+      const { id, ...rawUpdates } = body;
 
       if (!id) {
         return new Response(JSON.stringify({ error: "Page ID required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // 🔒 Sanitize: strip prototype pollution keys and whitelist fields
+      const ALLOWED_FIELDS = ['title', 'subtitle', 'badge_text', 'badge_color', 'benefits', 'price', 'original_price', 'button_accept_text', 'button_skip_text', 'next_route', 'is_active', 'display_order', 'addon_type'];
+      const dangerous = ['__proto__', 'constructor', 'prototype'];
+      const updates: Record<string, unknown> = {};
+      for (const key of Object.keys(rawUpdates)) {
+        if (!dangerous.includes(key) && ALLOWED_FIELDS.includes(key)) {
+          updates[key] = rawUpdates[key];
+        }
       }
 
       const success = await updateFirestoreDoc('post_payment_pages', id, {

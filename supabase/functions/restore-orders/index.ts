@@ -3,10 +3,22 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 // Restore orders — reads from Firestore guest_orders collection
 // Now requires admin authentication via Firebase token
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-firebase-token',
-};
+const ALLOWED_ORIGINS = [
+  "https://www.valnix.com.br",
+  "https://valnix.com.br",
+  "https://valnix2026.lovable.app",
+  "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
+  "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-firebase-token',
+  };
+}
 
 const FIREBASE_PROJECT_ID = 'valnix';
 
@@ -159,6 +171,7 @@ async function deleteFirestoreDoc(col: string, docId: string): Promise<boolean> 
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {

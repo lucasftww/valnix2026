@@ -2,10 +2,39 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 // UTMify Event Edge Function — now uses Firestore for dedup/logging
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
+const ALLOWED_ORIGINS = [
+  "https://www.valnix.com.br",
+  "https://valnix.com.br",
+  "https://valnix2026.lovable.app",
+  "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
+  "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
+];
+
+function getCorsHeaders(req: Request) {
+  const origin = req.headers.get("Origin") || "";
+  // Allow internal calls (no Origin) from other edge functions
+  const allowedOrigin = !origin || ALLOWED_ORIGINS.includes(origin) ? (origin || "*") : ALLOWED_ORIGINS[0];
+  return {
+    'Access-Control-Allow-Origin': allowedOrigin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  };
+}
+
+// ── Rate limiting ──
+const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) return false;
+  if (!entry || entry.resetAt <= now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 15) { entry.blockedUntil = now + 300_000; return false; }
+  return true;
+}
+setInterval(() => { const now = Date.now(); for (const [k, v] of rateLimitMap) { if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k); } }, 300_000);
 
 const UTMIFY_API_URL = 'https://api.utmify.com.br/api-credentials/orders';
 const FIREBASE_PROJECT_ID = 'valnix';
@@ -157,8 +186,15 @@ async function updateLockStatus(eventId: string, result: { success: boolean; err
 }
 
 Deno.serve(async (req) => {
+  const corsHeaders = getCorsHeaders(req);
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
+  // Rate limit
+  const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  if (!checkRateLimit(clientIp)) {
+    return new Response(JSON.stringify({ error: 'Too many requests' }),
+      { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+  }
   try {
     const body = await req.json();
     const {
