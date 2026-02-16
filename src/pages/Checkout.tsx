@@ -12,7 +12,7 @@ import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
-import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail } from "@/components/checkout/PersonalInfoForm";
+import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError } from "@/components/checkout/PersonalInfoForm";
 import { MobileCoupon } from "@/components/checkout/MobileCoupon";
 import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
@@ -172,8 +172,14 @@ export default function Checkout() {
     nameError: formData.name.trim().length < 3 ? 'Nome deve ter pelo menos 3 caracteres' : formData.name.trim().split(' ').length < 2 ? 'Digite nome e sobrenome' : undefined,
     document: isValidCPF(formData.document),
     documentError: formData.document.replace(/\D/g, '').length === 11 && !isValidCPF(formData.document) ? 'CPF inválido' : formData.document.replace(/\D/g, '').length < 11 ? 'CPF incompleto' : undefined,
-    email: isValidEmail(formData.email),
-    emailError: formData.email.trim().length > 0 && !isValidEmail(formData.email) ? 'E-mail inválido' : formData.email.trim().length === 0 ? 'E-mail é obrigatório' : undefined,
+    email: isValidEmail(formData.email) && !getEmailTLDError(formData.email),
+    emailError: (() => {
+      if (formData.email.trim().length === 0) return 'E-mail é obrigatório';
+      if (!isValidEmail(formData.email)) return 'E-mail inválido';
+      const tldErr = getEmailTLDError(formData.email);
+      if (tldErr) return tldErr;
+      return undefined;
+    })(),
   }), [formData]);
 
   const isFormValid = validation.name && validation.document && validation.email;
