@@ -213,6 +213,22 @@ async function invokeEdgeFunction(functionName: string, body: Record<string, unk
   }
 }
 
+// ── Rate limit logging to Firestore ──
+async function logRateLimitBlock(source: string, ip: string, attempts: number) {
+  try {
+    await addFirestoreDoc('rate_limit_logs', {
+      source,
+      ip,
+      attempts,
+      blocked_at: new Date().toISOString(),
+      created_at: new Date().toISOString(),
+    });
+    console.warn(`🛡️ Rate limit block logged: ${source} | IP: ${ip} | Attempts: ${attempts}`);
+  } catch (e) {
+    console.warn('⚠️ Failed to log rate limit block:', e);
+  }
+}
+
 // ── Rate limiting for card charge creation (per-IP) ──
 const cardRateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
 function checkCardRateLimit(ip: string): boolean {
@@ -224,8 +240,8 @@ function checkCardRateLimit(ip: string): boolean {
     return true;
   }
   entry.count++;
-  if (entry.count > 5) { // Max 5 card charges per minute per IP
-    entry.blockedUntil = now + 600_000; // Block for 10 minutes
+  if (entry.count > 5) {
+    entry.blockedUntil = now + 600_000;
     console.warn(`🚨 CARD RATE LIMIT: IP ${ip} blocked for 10min after ${entry.count} attempts`);
     return false;
   }
@@ -278,6 +294,7 @@ Deno.serve(async (req) => {
       // 🔒 Rate limit card creation per IP
       const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
       if (!checkCardRateLimit(clientIp)) {
+        logRateLimitBlock('flowpay-card', clientIp, cardRateLimitMap.get(clientIp)?.count || 0);
         return new Response(
           JSON.stringify({ success: false, error: 'Muitas tentativas. Aguarde alguns minutos.' }),
           { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
