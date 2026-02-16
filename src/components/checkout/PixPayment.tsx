@@ -39,7 +39,7 @@ export function PixPayment({
   couponId,
   onPaymentConfirmed 
 }: PixPaymentProps) {
-  console.log("🔵 PixPayment rendering with:", { qrCodeText: qrCodeText?.substring(0, 30) + "...", amount, transactionId, orderId });
+  // Debug log removed for production
   
   const [copied, setCopied] = useState(false);
   const [timeLeft, setTimeLeft] = useState(15 * 60);
@@ -125,11 +125,6 @@ export function PixPayment({
       try {
         const currentUser = auth.currentUser;
         const idToken = currentUser ? await currentUser.getIdToken() : null;
-
-        const headers: Record<string, string> = {};
-        if (idToken) {
-          headers['Authorization'] = `Bearer ${idToken}`;
-        }
 
         const { invokeFunction } = await import("@/lib/apiHelper");
         const response = await invokeFunction('flowpay-pix', {
