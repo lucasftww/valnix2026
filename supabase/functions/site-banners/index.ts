@@ -20,6 +20,11 @@ function getCorsHeaders(req: Request) {
 
 const FIREBASE_PROJECT_ID = "valnix";
 
+// ── In-memory banner cache (survives across requests within same instance) ──
+let cachedBanners: any[] | null = null;
+let bannersCacheExpiry = 0;
+const BANNER_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
 
@@ -88,6 +93,17 @@ Deno.serve(async (req) => {
   }
 
   try {
+    // Return cached banners if available (avoids Firestore REST roundtrip)
+    if (cachedBanners && Date.now() < bannersCacheExpiry) {
+      return new Response(JSON.stringify({ banners: cachedBanners }), {
+        headers: {
+          ...corsHeaders,
+          "Content-Type": "application/json",
+          "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+        },
+      });
+    }
+
     const accessToken = await getFirebaseAccessToken();
     const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
 
@@ -115,7 +131,6 @@ Deno.serve(async (req) => {
         errorText.includes('requires an index');
 
       if (isIndexMissing) {
-        // Extract index link if available for easier debugging
         const indexLinkMatch = errorText.match(/https:\/\/console\.firebase\.google\.com[^\s"')]+/);
         console.warn(`⚠️ Composite index missing for site_banners. Falling back to unordered query.${indexLinkMatch ? ` Create index: ${indexLinkMatch[0]}` : ''}`);
         res = await fetch(queryUrl, {
@@ -138,7 +153,6 @@ Deno.serve(async (req) => {
             { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
       } else {
-        // Any other error (auth, typo, permission, etc.) → surface as 500
         console.error(`❌ Firestore query failed (${res.status}):`, errorText);
         return new Response(JSON.stringify({ error: 'Firestore query failed' }),
           { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -156,8 +170,17 @@ Deno.serve(async (req) => {
       })
       .sort((a: any, b: any) => (a.display_order ?? 999) - (b.display_order ?? 999));
 
-    return new Response(JSON.stringify({ banners }),
-      { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    // Cache banners in-memory for 5 minutes
+    cachedBanners = banners;
+    bannersCacheExpiry = Date.now() + BANNER_CACHE_TTL;
+
+    return new Response(JSON.stringify({ banners }), {
+      headers: {
+        ...corsHeaders,
+        "Content-Type": "application/json",
+        "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
+      },
+    });
   } catch (error) {
     console.error("❌ site-banners unhandled error:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }),

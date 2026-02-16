@@ -16,21 +16,29 @@ interface Banner {
   display_order: number;
 }
 
+// Session-level cache to avoid refetching on SPA navigation
+let bannerCache: Banner[] | null = null;
+
 const HeroBannerComponent = () => {
-  const [banners, setBanners] = useState<Banner[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [imagesReady, setImagesReady] = useState(false);
+  const [banners, setBanners] = useState<Banner[]>(bannerCache || []);
+  const [isLoading, setIsLoading] = useState(!bannerCache);
+  const [imagesReady, setImagesReady] = useState(!!bannerCache);
   const autoplayPlugin = useRef(
     Autoplay({ delay: 3000, stopOnInteraction: false })
   );
 
   useEffect(() => {
+    // Skip fetch if we already have cached banners
+    if (bannerCache) return;
+
     const fetchBanners = async () => {
       try {
         const res = await invokeFunction('site-banners', { method: 'GET' });
         if (res.ok) {
           const data = await res.json();
-          setBanners(data.banners || []);
+          const fetched = data.banners || [];
+          bannerCache = fetched;
+          setBanners(fetched);
         }
       } catch (err) {
         console.error("Error fetching banners:", err);
