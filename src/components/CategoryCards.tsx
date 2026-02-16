@@ -37,7 +37,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
     >
       <div 
         ref={cardRef}
-        className="overflow-hidden rounded-2xl border border-border/10 hover:border-border/30 transition-all duration-300 hover:shadow-xl hover:shadow-black/20"
+        className="overflow-hidden rounded-2xl border border-border/10"
       >
         <div className="aspect-[4/3] bg-muted overflow-hidden">
           {isVisible && category.image_url ? (
@@ -48,7 +48,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
               decoding="async"
               width={400}
               height={300}
-              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+              className="w-full h-full object-cover"
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">
