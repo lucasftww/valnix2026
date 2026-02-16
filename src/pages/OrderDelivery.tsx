@@ -55,7 +55,7 @@ function UpsellSequence({ orderId, userEmail, userName, userId }: {
   const [currentIndex, setCurrentIndex] = useState(0);
   const currentType = UPSELL_SEQUENCE[currentIndex];
   
-  if (!currentType) return null; // All upsells done
+  if (!currentType) return null;
 
   return (
     <InlineUpsell
@@ -114,7 +114,6 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
           clearInterval(poll);
           setPaymentConfirmed(true);
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
-          // After payment confirmed, advance to next upsell after delay
           setTimeout(() => onSkip(), 2500);
         }
       } catch (err) {
@@ -133,7 +132,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
 
   if (configLoading) {
     return (
-      <Card className="bg-[#111] border-[#1f1f1f]">
+      <Card className="bg-card border-border">
         <CardContent className="p-5 flex justify-center py-8">
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </CardContent>
@@ -224,7 +223,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
   // PIX payment view (inline)
   if (pixData) {
     return (
-      <Card className="bg-[#111] border-[#1f1f1f] overflow-hidden">
+      <Card className="bg-card border-border overflow-hidden">
         <CardContent className="p-5 space-y-4">
           {paymentConfirmed ? (
             <div className="text-center space-y-3 py-6">
@@ -232,18 +231,18 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
                 <Check className="w-8 h-8 text-green-500" />
               </div>
               <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
-              <p className="text-sm text-gray-400">Benefício ativado com sucesso. 🎉</p>
+              <p className="text-sm text-muted-foreground">Benefício ativado com sucesso. 🎉</p>
             </div>
           ) : (
             <>
               <div className="text-center">
-                <h2 className="text-lg font-bold text-white">{config.title}</h2>
+                <h2 className="text-lg font-bold text-foreground">{config.title}</h2>
                 <p className="text-2xl font-bold text-primary mt-1">
                   R$ {config.price.toFixed(2).replace(".", ",")}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between text-sm text-gray-400">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span><Clock className="w-4 h-4 inline mr-1" />Expira em</span>
                 <span className="font-mono text-primary font-bold">{formatTime(timeLeft)}</span>
               </div>
@@ -274,7 +273,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     );
   }
 
-  // Offer view (inline) — NO X button
+  // Offer view (inline)
   return (
     <Card className="bg-gradient-to-br from-yellow-500/5 to-orange-500/5 border-yellow-500/20 overflow-hidden">
       <CardContent className="p-5 space-y-4">
@@ -290,8 +289,8 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
           <div className="w-12 h-12 bg-primary/20 rounded-xl flex items-center justify-center mx-auto">
             <Icon className="w-6 h-6 text-primary" />
           </div>
-          <h3 className="text-lg font-bold text-white">{config.title}</h3>
-          {config.subtitle && <p className="text-xs text-gray-400">{config.subtitle}</p>}
+          <h3 className="text-lg font-bold text-foreground">{config.title}</h3>
+          {config.subtitle && <p className="text-xs text-muted-foreground">{config.subtitle}</p>}
         </div>
 
         {/* Benefits */}
@@ -301,7 +300,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
               <div className="w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center mt-0.5 shrink-0">
                 <Check className="w-2.5 h-2.5 text-green-500" />
               </div>
-              <span className="text-xs text-gray-300">{benefit}</span>
+              <span className="text-xs text-muted-foreground">{benefit}</span>
             </div>
           ))}
         </div>
@@ -309,14 +308,14 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
         {/* Price */}
         <div className="text-center space-y-0.5">
           {config.original_price && (
-            <p className="text-gray-500 line-through text-xs">
+            <p className="text-muted-foreground/60 line-through text-xs">
               De R$ {config.original_price.toFixed(2).replace(".", ",")}
             </p>
           )}
           <p className="text-2xl font-bold text-primary">
             R$ {config.price.toFixed(2).replace(".", ",")}
           </p>
-          <p className="text-[10px] text-gray-500">Pagamento único via PIX</p>
+          <p className="text-[10px] text-muted-foreground/60">Pagamento único via PIX</p>
         </div>
 
         <Button
@@ -331,7 +330,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
 
         <button
           onClick={handleSkip}
-          className="w-full text-center text-gray-600 hover:text-gray-400 text-xs py-1 transition-colors"
+          className="w-full text-center text-muted-foreground/50 hover:text-muted-foreground text-xs py-1 transition-colors"
         >
           {config.button_skip_text}
         </button>
@@ -375,7 +374,6 @@ export default function OrderDelivery() {
             if (expiresAt < new Date()) {
               setNotFound(true);
             } else {
-              // Parse order_data if it's a JSON string (server-side creates it as stringValue)
               let parsedOrderData = docData.order_data;
               if (typeof parsedOrderData === 'string') {
                 try { parsedOrderData = JSON.parse(parsedOrderData); } catch { parsedOrderData = { items: [], total_amount: 0 }; }
@@ -405,7 +403,6 @@ export default function OrderDelivery() {
     fetchOrder();
   }, [hash]);
 
-  // Listen to Firebase order_items in realtime for delivery code updates
   useEffect(() => {
     if (!order) return;
     const firebaseOrderId = orderIdParam || order.order_id;
@@ -447,14 +444,12 @@ export default function OrderDelivery() {
     toast({ title: "Copiado!", description: "Todos os códigos copiados!" });
   };
 
-  
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="flex flex-col items-center gap-3">
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
-          <p className="text-sm text-gray-400">Carregando seu pedido...</p>
+          <p className="text-sm text-muted-foreground">Carregando seu pedido...</p>
         </div>
       </div>
     );
@@ -462,13 +457,13 @@ export default function OrderDelivery() {
 
   if (notFound) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
         <div className="text-center space-y-4 max-w-md">
-          <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto">
-            <AlertTriangle className="w-8 h-8 text-red-500" />
+          <div className="w-16 h-16 bg-destructive/10 rounded-full flex items-center justify-center mx-auto">
+            <AlertTriangle className="w-8 h-8 text-destructive" />
           </div>
-          <h1 className="text-xl font-bold text-white">Pedido não encontrado</h1>
-          <p className="text-sm text-gray-400">
+          <h1 className="text-xl font-bold text-foreground">Pedido não encontrado</h1>
+          <p className="text-sm text-muted-foreground">
             Este link pode ter expirado ou ser inválido. Se você fez uma compra, verifique o e-mail usado no checkout.
           </p>
           <Link to="/">
@@ -482,15 +477,14 @@ export default function OrderDelivery() {
   if (!order) return null;
 
   const orderData = order.order_data;
-  // Use live Firebase data if available, fallback to static snapshot
   const items = liveItems || orderData.items || [];
   const hasAnyCodes = items.some(i => i.delivery_code);
   const effectiveOrderId = orderIdParam || order.order_id;
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a]">
+    <div className="min-h-screen bg-background">
       {/* Header */}
-      <div className="border-b border-[#1a1a1a] bg-[#0d0d0d]">
+      <div className="border-b border-border bg-card">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
           <Link to="/">
             <img src={vLogo} alt="Valnix" className="h-8" />
@@ -508,26 +502,26 @@ export default function OrderDelivery() {
           <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
             <CheckCircle2 className="w-10 h-10 text-green-500" />
           </div>
-          <h1 className="text-2xl md:text-3xl font-bold text-white">
+          <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Pedido Confirmado! 🎉
           </h1>
-          <p className="text-gray-400 text-sm">
-            Olá, <span className="text-white font-medium">{order.customer_name || "Cliente"}</span>! 
+          <p className="text-muted-foreground text-sm">
+            Olá, <span className="text-foreground font-medium">{order.customer_name || "Cliente"}</span>! 
             Seu pedido #{order.order_id.slice(0, 8)} foi confirmado.
           </p>
         </div>
 
         {/* Order email reference */}
-        <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-4 text-center">
-          <p className="text-xs text-gray-400">
-            E-mail do pedido: <span className="text-white font-medium">{order.email}</span>
+        <div className="bg-card border border-border rounded-xl p-4 text-center">
+          <p className="text-xs text-muted-foreground">
+            E-mail do pedido: <span className="text-foreground font-medium">{order.email}</span>
           </p>
         </div>
 
         {/* Products & Delivery Codes */}
-        <Card className="bg-[#111] border-[#1f1f1f]">
+        <Card className="bg-card border-border">
           <CardContent className="p-5 md:p-6">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-4">
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-4">
               {hasAnyCodes ? "Seus Códigos de Entrega" : "Itens do Pedido"}
             </h2>
 
@@ -536,18 +530,18 @@ export default function OrderDelivery() {
                 const codes = item.delivery_code ? item.delivery_code.split(",").map(c => c.trim()) : [];
 
                 return (
-                  <div key={itemIndex} className="rounded-xl border border-[#1f1f1f] overflow-hidden">
-                    <div className="flex items-center gap-4 p-4 bg-[#0d0d0d]">
+                  <div key={itemIndex} className="rounded-xl border border-border overflow-hidden">
+                    <div className="flex items-center gap-4 p-4 bg-secondary/30">
                       {item.product_image && (
                         <img
                           src={item.product_image}
                           alt={item.product_name}
-                          className="w-14 h-14 object-contain bg-[#1a1a1a] rounded-lg"
+                          className="w-14 h-14 object-contain bg-muted rounded-lg"
                         />
                       )}
                       <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-sm text-white truncate">{item.product_name}</h3>
-                        <p className="text-xs text-gray-500 mt-0.5">
+                        <h3 className="font-semibold text-sm text-foreground truncate">{item.product_name}</h3>
+                        <p className="text-xs text-muted-foreground/60 mt-0.5">
                           {item.quantity}x R$ {item.unit_price.toFixed(2).replace(".", ",")}
                         </p>
                       </div>
@@ -557,7 +551,7 @@ export default function OrderDelivery() {
                     </div>
 
                     {codes.length > 0 ? (
-                      <div className="border-t border-[#1f1f1f] bg-green-500/5 p-4">
+                      <div className="border-t border-border bg-green-500/5 p-4">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-xs font-medium text-green-500 flex items-center gap-1.5">
                             <CheckCircle2 className="w-3.5 h-3.5" />
@@ -578,10 +572,10 @@ export default function OrderDelivery() {
                           {codes.map((code, codeIndex) => (
                             <div
                               key={codeIndex}
-                              className="flex items-center justify-between gap-2 bg-[#0d0d0d] p-3 rounded-lg border border-[#1a1a1a]"
+                              className="flex items-center justify-between gap-2 bg-secondary/30 p-3 rounded-lg border border-border"
                             >
                               <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <span className="text-[10px] text-gray-600 font-mono shrink-0">#{codeIndex + 1}</span>
+                                <span className="text-[10px] text-muted-foreground/50 font-mono shrink-0">#{codeIndex + 1}</span>
                                 <code className="text-sm font-mono text-primary font-bold break-all select-all">
                                   {code}
                                 </code>
@@ -605,14 +599,14 @@ export default function OrderDelivery() {
                         </div>
                       </div>
                     ) : (
-                      <div className="border-t border-[#1f1f1f] bg-orange-500/5 p-4">
+                      <div className="border-t border-border bg-orange-500/5 p-4">
                         <div className="flex items-center gap-3">
                           <div className="bg-orange-500/15 p-2 rounded-full shrink-0">
                             <Package className="w-4 h-4 text-orange-500" />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-orange-500">Entrega Pendente</p>
-                            <p className="text-xs text-gray-500 mt-0.5">
+                            <p className="text-xs text-muted-foreground/60 mt-0.5">
                               Os códigos aparecerão aqui quando disponíveis. Recarregue a página.
                             </p>
                           </div>
@@ -626,31 +620,29 @@ export default function OrderDelivery() {
           </CardContent>
         </Card>
 
-        {/* Upsells now happen as full-screen pages before reaching this delivery page */}
-
         {/* Order Summary */}
-        <Card className="bg-[#111] border-[#1f1f1f]">
+        <Card className="bg-card border-border">
           <CardContent className="p-5">
-            <h2 className="text-sm font-semibold text-gray-400 uppercase tracking-wider mb-3">Resumo</h2>
+            <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wider mb-3">Resumo</h2>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
-                <span className="text-gray-500">Pedido</span>
-                <span className="text-white font-mono">#{order.order_id.slice(0, 8)}</span>
+                <span className="text-muted-foreground/60">Pedido</span>
+                <span className="text-foreground font-mono">#{order.order_id.slice(0, 8)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">Total</span>
+                <span className="text-muted-foreground/60">Total</span>
                 <span className="text-primary font-bold text-lg">
                   R$ {orderData.total_amount?.toFixed(2).replace(".", ",") || "0,00"}
                 </span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray-500">E-mail</span>
-                <span className="text-gray-300 truncate max-w-[200px]">{order.email}</span>
+                <span className="text-muted-foreground/60">E-mail</span>
+                <span className="text-muted-foreground truncate max-w-[200px]">{order.email}</span>
               </div>
               {orderData.created_at && (
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Data</span>
-                  <span className="text-gray-300">
+                  <span className="text-muted-foreground/60">Data</span>
+                  <span className="text-muted-foreground">
                     {new Date(orderData.created_at).toLocaleDateString("pt-BR", {
                       day: "2-digit",
                       month: "long",
@@ -668,8 +660,8 @@ export default function OrderDelivery() {
           <Card className="bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
             <CardContent className="p-5 text-center space-y-3">
               <ShoppingBag className="w-8 h-8 text-primary mx-auto" />
-              <h3 className="font-bold text-white">Quer acompanhar seus pedidos?</h3>
-              <p className="text-xs text-gray-400">
+              <h3 className="font-bold text-foreground">Quer acompanhar seus pedidos?</h3>
+              <p className="text-xs text-muted-foreground">
                 Crie uma conta grátis e vincule este pedido. Assim você pode acessar de qualquer lugar.
               </p>
               <Link to={`/auth?redirect=/order/${hash}`}>
@@ -685,7 +677,7 @@ export default function OrderDelivery() {
         {/* Back to store */}
         <div className="text-center pb-8">
           <Link to="/">
-            <Button variant="ghost" className="text-gray-500 hover:text-white">
+            <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
               ← Voltar à Loja
             </Button>
           </Link>
