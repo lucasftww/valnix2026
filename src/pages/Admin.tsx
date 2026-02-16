@@ -50,6 +50,7 @@ export default function Admin() {
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
+  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["dashboard"]));
   const [searchQuery, setSearchQuery] = useState("");
 
   // Strip UTM and other query params from admin URLs
@@ -87,10 +88,15 @@ export default function Admin() {
 
   const currentTab = tabTitles[activeTab] || tabTitles.dashboard;
 
+  const handleTabChange = (tab: string) => {
+    setActiveTab(tab);
+    setMountedTabs(prev => new Set(prev).add(tab));
+  };
+
   return (
     <SidebarProvider>
       <div className="min-h-screen flex w-full bg-gradient-to-br from-background via-background to-primary/5">
-        <AdminSidebar activeTab={activeTab} onTabChange={setActiveTab} />
+        <AdminSidebar activeTab={activeTab} onTabChange={handleTabChange} />
         
         <div className="flex-1 flex flex-col min-h-screen">
           {/* Header */}
@@ -188,14 +194,14 @@ export default function Admin() {
                   <Loader2 className="w-8 h-8 animate-spin text-primary" />
                 </div>
               }>
-                {activeTab === "dashboard" && <AdminDashboard />}
-                {activeTab === "analytics" && <AdminAnalytics />}
-                {activeTab === "products" && <AdminProducts />}
-                {activeTab === "categories" && <AdminCategories />}
-                {activeTab === "orders" && <AdminOrders />}
-                {activeTab === "users" && <AdminUsers />}
-                {activeTab === "coupons" && <AdminCoupons />}
-                {activeTab === "post-payment" && <AdminPostPaymentPages />}
+                {mountedTabs.has("dashboard") && <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}><AdminDashboard /></div>}
+                {mountedTabs.has("analytics") && <div style={{ display: activeTab === "analytics" ? "block" : "none" }}><AdminAnalytics /></div>}
+                {mountedTabs.has("products") && <div style={{ display: activeTab === "products" ? "block" : "none" }}><AdminProducts /></div>}
+                {mountedTabs.has("categories") && <div style={{ display: activeTab === "categories" ? "block" : "none" }}><AdminCategories /></div>}
+                {mountedTabs.has("orders") && <div style={{ display: activeTab === "orders" ? "block" : "none" }}><AdminOrders /></div>}
+                {mountedTabs.has("users") && <div style={{ display: activeTab === "users" ? "block" : "none" }}><AdminUsers /></div>}
+                {mountedTabs.has("coupons") && <div style={{ display: activeTab === "coupons" ? "block" : "none" }}><AdminCoupons /></div>}
+                {mountedTabs.has("post-payment") && <div style={{ display: activeTab === "post-payment" ? "block" : "none" }}><AdminPostPaymentPages /></div>}
               </Suspense>
             </div>
           </main>
