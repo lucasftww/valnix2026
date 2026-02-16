@@ -196,6 +196,7 @@ async function addFirestoreDocWithId(col: string, docId: string, data: Record<st
     body: JSON.stringify({ fields: firestoreFields }),
   });
   if (res.status === 409) return false;
+  if (!res.ok) console.warn(`⚠️ addFirestoreDocWithId ${col}/${docId} failed: ${res.status}`);
   return res.ok;
 }
 

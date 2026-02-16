@@ -83,12 +83,16 @@ function parsePublicIp(rawIp: string | undefined): string | undefined {
     /^192\.168\./,
     /^127\./,
     /^::1$/,
-    /^fd[0-9a-f]{2}:/i,
+    /^fd[0-9a-f]{2}:/i,    // IPv6 ULA (fc00::/7)
+    /^fc[0-9a-f]{2}:/i,    // IPv6 ULA (fc00::/7)
+    /^fe80:/i,              // IPv6 link-local
   ];
   for (const ip of ips) {
-    if (!privateRanges.some(r => r.test(ip))) return ip;
+    // Strip IPv4-mapped IPv6 prefix (::ffff:192.168.1.1 → 192.168.1.1)
+    const normalized = ip.replace(/^::ffff:/i, '');
+    if (!privateRanges.some(r => r.test(normalized))) return normalized;
   }
-  return ips[0]; // fallback to first IP if all are private
+  return ips[0]?.replace(/^::ffff:/i, ''); // fallback to first IP if all are private
 }
 
 // ── SHA-256 hash helper ────────────────────────────────────────────

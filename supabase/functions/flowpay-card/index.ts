@@ -206,7 +206,7 @@ async function addFirestoreDocWithId(col: string, docId: string, data: Record<st
   for (const [k, v] of Object.entries(data)) {
     if (v === null || v === undefined) fields[k] = { nullValue: null };
     else if (typeof v === 'string') fields[k] = { stringValue: v };
-    else if (typeof v === 'number') fields[k] = { doubleValue: v };
+    else if (typeof v === 'number') fields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
     else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
     else fields[k] = { stringValue: String(v) };
   }
@@ -216,6 +216,7 @@ async function addFirestoreDocWithId(col: string, docId: string, data: Record<st
     body: JSON.stringify({ fields }),
   });
   if (res.status === 409) return false;
+  if (!res.ok) console.warn(`⚠️ addFirestoreDocWithId ${col}/${docId} failed: ${res.status}`);
   return res.ok;
 }
 
