@@ -182,6 +182,25 @@ Deno.serve(async (req) => {
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // ── Global lock: prevent concurrent executions ──
+    const LOCK_DOC = 'restore_running';
+    const lockDoc = await getFirestoreDoc('restore_locks', LOCK_DOC);
+    if (lockDoc) {
+      const lockTime = lockDoc.fields?.locked_at?.stringValue;
+      const lockAge = lockTime ? Date.now() - new Date(lockTime).getTime() : Infinity;
+      // TTL: 5 minutes — if lock is older, consider it stale
+      if (lockAge < 5 * 60 * 1000) {
+        return new Response(JSON.stringify({ success: false, error: 'Restore already running. Try again in a few minutes.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+    }
+    // Acquire lock
+    await createFirestoreDoc('restore_locks', LOCK_DOC, {
+      locked_at: toFirestoreValue(new Date().toISOString()),
+      locked_by: toFirestoreValue(userData.email),
+    });
+
+    try {
     // Get all guest_orders from Firestore
     const guestOrderDocs = await queryAllFirestore('guest_orders');
 
@@ -287,9 +306,17 @@ Deno.serve(async (req) => {
       details.push(`✅ ${orderId} → ${customerName || email} (R$ ${orderData?.total_amount})`);
     }
 
+    // Release lock
+    await deleteFirestoreDoc('restore_locks', LOCK_DOC);
+
     return new Response(JSON.stringify({ success: true, restored, skipped, total: uniqueOrders.size, details }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+    } catch (innerErr: any) {
+      // Release lock on error
+      await deleteFirestoreDoc('restore_locks', LOCK_DOC);
+      throw innerErr;
+    }
   } catch (err: any) {
     console.error('❌ Restore error:', err);
     return new Response(JSON.stringify({ success: false, error: err.message }), {
