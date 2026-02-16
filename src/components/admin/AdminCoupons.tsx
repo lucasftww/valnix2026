@@ -132,7 +132,7 @@ export const AdminCoupons = () => {
         },
       });
       if (!res.ok) throw new Error("Failed to create coupon");
-      toast.success("Cupom criado com sucesso!");
+      
       resetForm();
       setIsDialogOpen(false);
       fetchCoupons();
@@ -165,7 +165,7 @@ export const AdminCoupons = () => {
         },
       });
       if (!res.ok) throw new Error("Failed to update coupon");
-      toast.success("Cupom atualizado com sucesso!");
+      
       resetForm();
       setIsDialogOpen(false);
       fetchCoupons();
@@ -186,7 +186,7 @@ export const AdminCoupons = () => {
         headers: { "x-firebase-token": token },
       });
       if (!res.ok) throw new Error("Failed to delete coupon");
-      toast.success("Cupom excluído com sucesso!");
+      
       fetchCoupons();
     } catch (error) {
       console.error("Error deleting coupon:", error);

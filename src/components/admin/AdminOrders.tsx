@@ -290,7 +290,7 @@ export const AdminOrders = () => {
       });
       const data = await response.json();
       if (data.success) {
-        toast({ title: `Restauração concluída!`, description: `${data.restored} pedido(s) restaurado(s), ${data.skipped} já existente(s).` });
+        if (data.restored > 0) fetchOrders();
         if (data.restored > 0) fetchOrders();
       } else {
         toast({ title: "Erro na restauração", description: data.error, variant: "destructive" });
@@ -306,7 +306,6 @@ export const AdminOrders = () => {
     setRefreshing(true);
     await fetchOrders();
     setRefreshing(false);
-    toast({ title: "Lista atualizada" });
   };
 
   const handleCleanByType = async () => {
@@ -336,7 +335,7 @@ export const AdminOrders = () => {
         });
       }
 
-      toast({ title: "Limpeza concluída!", description: `${toDelete.length} pedido(s) removido(s).` });
+      
       fetchOrders();
     } catch (error: any) {
       toast({ title: "Erro ao limpar pedidos", description: error.message, variant: "destructive" });
@@ -379,7 +378,7 @@ export const AdminOrders = () => {
           headers: { "x-firebase-token": token || "" },
           body: { id: order.id, payment_status: 'paid', status: 'processing' },
         });
-        toast({ title: "Pagamento confirmado! ✅", description: `Pedido #${order.id.substring(0, 8)} pago.` });
+        
         fetchOrders();
       } else {
         toast({ title: "Pagamento não confirmado", description: `Status: ${data.status || 'desconhecido'}` });
@@ -457,7 +456,7 @@ export const AdminOrders = () => {
           body: { id: targetOrder.id, status: "completed" },
         });
       }
-      toast({ title: "Código salvo!", description: "O cliente pode ver na página 'Meus Pedidos'." });
+      
       setDeliveryCode("");
       setSelectedItemId(null);
       if (detailOrder) handleViewDetail(detailOrder);
@@ -478,16 +477,15 @@ export const AdminOrders = () => {
         headers: { "x-firebase-token": token || "" },
         body: { id: orderId, status: newStatus },
       });
-      toast({ title: "Status atualizado!" });
+      
       fetchOrders();
     } catch (error: any) {
       toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
     }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = (text: string, _label: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: `${label} copiado!` });
   };
 
   const toggleSort = (field: "date" | "amount") => {
@@ -735,10 +733,9 @@ export const AdminOrders = () => {
                     });
                     const data = await res.json();
                     if (data.success) {
-                      toast({
-                        title: "Limpeza concluída",
-                        description: `${data.deletedOrders} pedido(s), ${data.deletedItems} item(ns), ${data.deletedGuest || 0} guest(s), ${data.deletedAddons || 0} addon(s) removidos.`,
-                      });
+                      setCleanupEmail("");
+                      setCleanupEmailDialogOpen(false);
+                      await fetchOrders();
                       setCleanupEmail("");
                       setCleanupEmailDialogOpen(false);
                       await fetchOrders();

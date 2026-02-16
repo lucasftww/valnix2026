@@ -79,7 +79,7 @@ export const AdminUsers = () => {
     setUpdatingBalance(true);
     try {
       await updateUserBalance(balanceDialogUser.id, balanceValue);
-      toast({ title: "Saldo atualizado!", description: `Saldo definido para R$ ${balanceValue.toFixed(2)}` });
+      
       queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
       setBalanceDialogUser(null);
       setNewBalance("");
@@ -99,7 +99,7 @@ export const AdminUsers = () => {
     setDeletingUser(true);
     try {
       await deleteFirebaseUser(deleteDialogUser.id);
-      toast({ title: "Usuário excluído!", description: `${deleteDialogUser.email} removido.` });
+      
       queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
       setDeleteDialogUser(null);
     } catch (error) {
@@ -108,9 +108,8 @@ export const AdminUsers = () => {
     } finally { setDeletingUser(false); }
   };
 
-  const copyToClipboard = (text: string, label: string) => {
+  const copyToClipboard = (text: string, _label: string) => {
     navigator.clipboard.writeText(text);
-    toast({ title: `${label} copiado!` });
   };
 
   const handleCleanup = useCallback(async () => {
@@ -128,10 +127,7 @@ export const AdminUsers = () => {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      toast({ 
-        title: "Limpeza concluída!", 
-        description: `${data.removedCount} usuários removidos de ${data.totalChecked} verificados.` 
-      });
+      console.log(`Cleanup: ${data.removedCount} removidos de ${data.totalChecked}`);
       queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
     } catch (err) {
       console.error("Cleanup error:", err);

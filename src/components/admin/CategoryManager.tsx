@@ -162,7 +162,7 @@ export const CategoryManager = () => {
           body: { id: editingCategory.id, ...catData, updated_at: new Date().toISOString() },
         });
         if (!res.ok) throw new Error("Failed to update category");
-        toast({ title: "Sucesso", description: "Categoria atualizada!" });
+        
       } else {
         const res = await invokeFunction("admin-data", {
           method: "POST",
@@ -178,7 +178,7 @@ export const CategoryManager = () => {
           },
         });
         if (!res.ok) throw new Error("Failed to create category");
-        toast({ title: "Sucesso", description: "Categoria criada!" });
+        
       }
 
       closeDialog();
@@ -201,7 +201,7 @@ export const CategoryManager = () => {
         headers: { "x-firebase-token": token },
       });
       if (!res.ok) throw new Error("Failed to delete category");
-      toast({ title: "Sucesso", description: "Categoria excluída!" });
+      
       invalidate();
     } catch (err) {
       toast({ title: "Erro", description: "Falha ao excluir categoria", variant: "destructive" });
@@ -226,7 +226,7 @@ export const CategoryManager = () => {
           body: { id: items[i].id, display_order: i },
         });
       }
-      toast({ title: "Sucesso", description: "Ordem atualizada!" });
+      
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
     } catch (err) {
       console.error("Error reordering:", err);
