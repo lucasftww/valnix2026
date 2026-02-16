@@ -64,8 +64,10 @@ async function getFirebaseAccessToken(): Promise<string> {
 
 async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
   try {
+    const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY');
+    if (!apiKey) throw new Error('FIREBASE_WEB_API_KEY not configured');
     const res = await fetch(
-      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw`,
+      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
       { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
     );
     if (!res.ok) return null;
@@ -414,7 +416,7 @@ Deno.serve(async (req) => {
         ];
 
         const accessToken = await getFirebaseAccessToken();
-        const FIREBASE_API_KEY = "AIzaSyBHpcqUztUdpvoCZpjuobkXuFXO9gEJogw";
+        const FIREBASE_API_KEY = Deno.env.get('FIREBASE_WEB_API_KEY') || '';
 
         // Get all profiles and users from Firestore
         const [profiles, users] = await Promise.all([
