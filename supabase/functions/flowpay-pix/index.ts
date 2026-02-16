@@ -664,6 +664,17 @@ Deno.serve(async (req) => {
           return new Response(JSON.stringify({ error: 'Order amount too low' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
+        // 🔒 Flood protection: check if user has too many pending orders (parity with card)
+        const orderUserId = orderFields.user_id?.stringValue;
+        if (orderUserId) {
+          const floodRl = await checkRateLimitFirestore(`flood_${orderUserId}`, 10, 3600_000, 3600_000);
+          if (!floodRl.allowed) {
+            console.warn(`🚨 ORDER FLOOD (PIX): user ${orderUserId} exceeded 10 pending orders/hour`);
+            return new Response(JSON.stringify({ error: 'Muitos pedidos pendentes. Aguarde ou finalize os pedidos anteriores.' }),
+              { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+
         const clientTotal = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
         if (Math.abs(clientTotal - recalculatedTotal) > 0.01) {
           console.warn(`🚨 PRICE MISMATCH! Client: R$${clientTotal}, Server: R$${recalculatedTotal}`);
