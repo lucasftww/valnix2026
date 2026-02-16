@@ -44,7 +44,7 @@ const MobileStickyCheckoutComponent = ({
                     {item.name}
                   </p>
                   <p className="text-muted-foreground text-[11px]">
-                    Quantity: {item.quantity}
+                    Qtd: {item.quantity}
                   </p>
                 </div>
                 <p className="text-foreground text-[13px] font-medium shrink-0">
