@@ -347,7 +347,7 @@ async function checkRateLimitFirestore(key: string, maxAttempts: number, windowM
               reset_at: { integerValue: String(now + windowMs) },
               blocked_until: { integerValue: '0' },
               updated_at: { timestampValue: new Date().toISOString() },
-              created_at: { stringValue: new Date().toISOString() },
+              created_at: { timestampValue: new Date().toISOString() },
             },
           },
         }],
