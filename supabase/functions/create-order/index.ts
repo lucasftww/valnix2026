@@ -413,6 +413,7 @@ Deno.serve(async (req) => {
     }
 
     // Create guest_order for /order/:hash access (server-side, bypasses Firestore rules)
+    // Uses hash as document ID: guest_orders/{hash} — enables secure read-by-path (no queries)
     let guestHash: string | null = null;
     try {
       const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
@@ -431,8 +432,8 @@ Deno.serve(async (req) => {
         }
       }
 
+      // Write guest_orders/{hash} doc (hash = docId, no auto-generated ID)
       const guestOrderData: Record<string, unknown> = {
-        hash,
         order_id: orderId,
         email: String(order.customer_email).trim().toLowerCase(),
         customer_name: order.customer_name || null,
@@ -440,32 +441,56 @@ Deno.serve(async (req) => {
         guest_session_id: userId.startsWith('guest_') ? userId : null,
         user_id: userId.startsWith('guest_') ? null : userId,
         linked: !userId.startsWith('guest_'),
-        order_data: JSON.stringify({
-          items: items.map((it: any) => {
-            const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
-            const qty = Number(it.quantity) || 1;
-            return {
-              product_name: it.product_name || '',
-              product_image: it.product_image || null,
-              quantity: qty,
-              unit_price: realPrice,
-              total_price: Math.round(realPrice * qty * 100) / 100,
-              delivery_code: null,
-            };
-          }),
-          total_amount: serverTotal,
-          payment_method: order.payment_method || 'pix',
-          created_at: now,
-        }),
+        total_amount: serverTotal,
+        payment_method: order.payment_method || 'pix',
         created_at: now,
         expires_at: expiresAt.toISOString(),
       };
 
-      // Use addFirestoreDoc but we need to handle the map/JSON for order_data
-      // Since our helper only does simple types, write order_data as stringValue (JSON)
-      await addFirestoreDoc('guest_orders', guestOrderData);
+      // Use PATCH to create doc with specific ID (hash)
+      const accessToken = await getFirebaseAccessToken();
+      const guestFields: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(guestOrderData)) {
+        if (v === null || v === undefined) guestFields[k] = { nullValue: null };
+        else if (typeof v === 'string') guestFields[k] = { stringValue: v };
+        else if (typeof v === 'number') guestFields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+        else if (typeof v === 'boolean') guestFields[k] = { booleanValue: v };
+        else guestFields[k] = { stringValue: String(v) };
+      }
+      const guestDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}`;
+      const guestRes = await fetch(guestDocUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+        body: JSON.stringify({ fields: guestFields }),
+      });
+      if (!guestRes.ok) throw new Error(`guest_orders write failed: ${guestRes.status}`);
+
+      // Write items to subcollection: guest_orders/{hash}/items/{itemIdx}
+      for (let idx = 0; idx < items.length; idx++) {
+        const it = items[idx] as any;
+        const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
+        const qty = Number(it.quantity) || 1;
+        const itemFields: Record<string, unknown> = {
+          product_name: { stringValue: String(it.product_name || '') },
+          product_image: it.product_image ? { stringValue: String(it.product_image) } : { nullValue: null },
+          product_id: { stringValue: String(it.product_id || '') },
+          quantity: { integerValue: String(qty) },
+          unit_price: { doubleValue: realPrice },
+          total_price: { doubleValue: Math.round(realPrice * qty * 100) / 100 },
+          delivery_code: { nullValue: null },
+          order_id: { stringValue: orderId },
+        };
+        const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}/items/${idx}`;
+        const itemRes = await fetch(itemUrl, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({ fields: itemFields }),
+        });
+        if (!itemRes.ok) console.warn(`⚠️ guest_orders/${hash}/items/${idx} write failed: ${itemRes.status}`);
+      }
+
       guestHash = hash;
-      console.log(`✅ Guest order saved with hash: ${hash}`);
+      console.log(`✅ Guest order saved with hash as docId: ${hash} (${items.length} items in subcollection)`);
     } catch (err) {
       console.warn('⚠️ Failed to save guest order:', err);
     }

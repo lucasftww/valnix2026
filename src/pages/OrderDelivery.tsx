@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { db } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
-import { collection, query, where, onSnapshot, getDocs, addDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, query, where, onSnapshot, getDocs, doc, getDoc, addDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
 import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -362,34 +362,35 @@ export default function OrderDelivery() {
 
     const fetchOrder = async () => {
       try {
-        const guestOrdersRef = collection(db, "guest_orders");
-        const q = query(guestOrdersRef, where("hash", "==", hash));
-        const snapshot = await getDocs(q);
+        // Read guest_orders/{hash} by document path (no query needed)
+        const guestDocRef = doc(db, "guest_orders", hash);
+        const guestSnap = await getDoc(guestDocRef);
 
-        if (snapshot.empty) {
+        if (!guestSnap.exists()) {
           setNotFound(true);
         } else {
-        const docData = snapshot.docs[0].data();
-            const expiresAt = docData.expires_at?.toDate ? docData.expires_at.toDate() : new Date(docData.expires_at);
-            if (expiresAt < new Date()) {
-              setNotFound(true);
-            } else {
-              let parsedOrderData = docData.order_data;
-              if (typeof parsedOrderData === 'string') {
-                try { parsedOrderData = JSON.parse(parsedOrderData); } catch { parsedOrderData = { items: [], total_amount: 0 }; }
-              }
-              setOrder({
-                id: snapshot.docs[0].id,
-                hash: docData.hash,
-                order_id: docData.order_id,
-                email: docData.email,
-                customer_name: docData.customer_name,
-                customer_phone: docData.customer_phone,
-                order_data: parsedOrderData || { items: [], total_amount: 0 },
-                linked: docData.linked,
-                created_at: docData.created_at?.toDate ? docData.created_at.toDate().toISOString() : new Date().toISOString(),
-                expires_at: expiresAt.toISOString(),
-              } as GuestOrderData);
+          const docData = guestSnap.data();
+          const expiresAt = docData.expires_at?.toDate ? docData.expires_at.toDate() : new Date(docData.expires_at);
+          if (expiresAt < new Date()) {
+            setNotFound(true);
+          } else {
+            setOrder({
+              id: guestSnap.id,
+              hash: hash,
+              order_id: docData.order_id,
+              email: docData.email,
+              customer_name: docData.customer_name,
+              customer_phone: docData.customer_phone,
+              order_data: {
+                items: [],
+                total_amount: docData.total_amount || 0,
+                payment_method: docData.payment_method || 'pix',
+                created_at: docData.created_at,
+              },
+              linked: docData.linked,
+              created_at: docData.created_at?.toDate ? docData.created_at.toDate().toISOString() : (docData.created_at || new Date().toISOString()),
+              expires_at: expiresAt.toISOString(),
+            } as GuestOrderData);
           }
         }
       } catch (err) {
@@ -404,14 +405,12 @@ export default function OrderDelivery() {
   }, [hash]);
 
   useEffect(() => {
-    if (!order) return;
-    const firebaseOrderId = orderIdParam || order.order_id;
-    if (!firebaseOrderId) return;
+    if (!order || !hash) return;
 
-    const itemsRef = collection(db, 'order_items');
-    const q = query(itemsRef, where('order_id', '==', firebaseOrderId));
+    // Read items from subcollection: guest_orders/{hash}/items (no query, direct path)
+    const itemsRef = collection(db, 'guest_orders', hash, 'items');
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
       if (snapshot.empty) return;
       const firebaseItems: OrderItemData[] = snapshot.docs.map(d => {
         const data = d.data();
@@ -426,11 +425,11 @@ export default function OrderDelivery() {
       });
       setLiveItems(firebaseItems);
     }, (err) => {
-      console.warn('⚠️ Firebase order_items listener error:', err);
+      console.warn('⚠️ Guest items listener error:', err);
     });
 
     return () => unsubscribe();
-  }, [order, orderIdParam]);
+  }, [order, hash]);
 
   const copyCode = (code: string, index: number) => {
     navigator.clipboard.writeText(code.trim());
