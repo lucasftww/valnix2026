@@ -302,7 +302,6 @@ export const AdminOrders = () => {
       const data = await response.json();
       if (data.success) {
         if (data.restored > 0) fetchOrders();
-        if (data.restored > 0) fetchOrders();
       } else {
         toast({ title: "Erro na restauração", description: data.error, variant: "destructive" });
       }
@@ -334,7 +333,7 @@ export const AdminOrders = () => {
 
       const skipped = orders.length - toDelete.length;
       if (skipped > 0 && cleanType !== "cancelled") {
-        console.log(`⚠️ ${skipped} pedido(s) recente(s) preservado(s) (< 5min)`);
+        // Safety: recent orders (< 5min) preserved
       }
 
       const token = await getFirebaseToken();

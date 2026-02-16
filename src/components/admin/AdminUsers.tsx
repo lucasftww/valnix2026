@@ -129,7 +129,7 @@ export const AdminUsers = () => {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      console.log(`Cleanup: ${data.removedCount} removidos de ${data.totalChecked}`);
+      // Cleanup completed: data.removedCount removed
       queryClient.invalidateQueries({ queryKey: ["firebase-admin-users"] });
     } catch (err) {
       console.error("Cleanup error:", err);
