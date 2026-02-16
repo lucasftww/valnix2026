@@ -1,4 +1,4 @@
-import { lazy, Suspense, memo, useEffect } from "react";
+import { lazy, Suspense, memo } from "react";
 
 import { Helmet } from "react-helmet-async";
 import { Header } from "@/components/Header";
@@ -7,8 +7,7 @@ import { SearchBar } from "@/components/SearchBar";
 import { HeroBanner } from "@/components/HeroBanner";
 import { ProductGrid } from "@/components/ProductGrid";
 import { useCategoryPrefetch } from "@/hooks/useCategoryPrefetch";
-import { trackPageView } from "@/lib/analytics";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
+
 
 // Lazy load componentes não críticos
 const CategoryCards = lazy(() => import("@/components/CategoryCards").then(m => ({ default: m.CategoryCards })));
@@ -17,15 +16,9 @@ const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.
 const FloatingContactButtons = lazy(() => import("@/components/FloatingContactButtons").then(m => ({ default: m.FloatingContactButtons })));
 
 const IndexComponent = () => {
-  const { user } = useAuth();
   // Prefetch categorias principais em background
   useCategoryPrefetch();
   
-  // Track PageView for analytics funnel
-  useEffect(() => {
-    trackPageView(user?.uid);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
   
   return (
     <div className="min-h-screen bg-background flex flex-col relative">

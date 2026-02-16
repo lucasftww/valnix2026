@@ -17,7 +17,7 @@ function getCorsHeaders(req: Request) {
   };
 }
 
-const VALID_EVENTS = ['PageView', 'ViewContent', 'AddToCart', 'InitiateCheckout', 'Purchase', 'Lead'];
+const VALID_EVENTS = ['InitiateCheckout', 'Purchase'];
 const FIREBASE_PROJECT_ID = 'valnix';
 
 // ── Firebase Auth ──────────────────────────────────────────────────

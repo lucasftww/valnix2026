@@ -38,9 +38,6 @@ const DEVICE_COLORS: Record<string, string> = {
 };
 
 const FUNNEL_EVENTS = [
-  { key: 'PageView', label: 'Visualizações', icon: Eye, color: '#3b82f6' },
-  { key: 'ViewContent', label: 'Viram Produto', icon: Eye, color: '#8b5cf6' },
-  { key: 'AddToCart', label: 'Add ao Carrinho', icon: ShoppingCart, color: '#f97316' },
   { key: 'InitiateCheckout', label: 'Iniciaram Checkout', icon: CreditCard, color: '#eab308' },
   { key: 'Purchase', label: 'Compraram', icon: CreditCard, color: '#22c55e' },
 ];
@@ -174,17 +171,14 @@ export function AdminAnalytics() {
   }, [events]);
 
   const metrics = useMemo(() => {
-    const pageViews = events.filter(e => e.event_name === 'PageView').length;
+    const initiateCheckouts = events.filter(e => e.event_name === 'InitiateCheckout').length;
     const purchases = events.filter(e => e.event_name === 'Purchase').length;
-    const addToCarts = events.filter(e => e.event_name === 'AddToCart').length;
     const revenue = events.filter(e => e.event_name === 'Purchase' && e.value).reduce((sum, e) => sum + (e.value || 0), 0);
-    const overallConversion = pageViews > 0 ? ((purchases / pageViews) * 100) : 0;
-    const cartToCheckout = addToCarts > 0 ? ((events.filter(e => e.event_name === 'InitiateCheckout').length / addToCarts) * 100) : 0;
+    const overallConversion = initiateCheckouts > 0 ? ((purchases / initiateCheckouts) * 100) : 0;
     
     return {
-      pageViews, purchases, addToCarts, revenue,
+      initiateCheckouts, purchases, revenue,
       overallConversion: overallConversion.toFixed(2),
-      cartToCheckout: cartToCheckout.toFixed(1),
       uniqueUsers: new Set(events.filter(e => e.user_id).map(e => e.user_id)).size,
     };
   }, [events]);
@@ -196,7 +190,7 @@ export function AdminAnalytics() {
     
     for (let i = daysCount - 1; i >= 0; i--) {
       const date = format(subDays(today, i), 'dd/MM');
-      days[date] = { date, PageView: 0, ViewContent: 0, AddToCart: 0, InitiateCheckout: 0, Purchase: 0 };
+      days[date] = { date, InitiateCheckout: 0, Purchase: 0 };
     }
     
     events.forEach(event => {
@@ -333,10 +327,9 @@ export function AdminAnalytics() {
         </div>
 
         {/* Key Metrics */}
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           {[
-            { label: 'Visualizações', value: metrics.pageViews.toLocaleString(), icon: Eye, bgColor: 'bg-blue-500/10', textColor: 'text-blue-500' },
-            { label: 'Carrinhos', value: metrics.addToCarts.toLocaleString(), icon: ShoppingCart, bgColor: 'bg-orange-500/10', textColor: 'text-orange-500' },
+            { label: 'Checkouts', value: metrics.initiateCheckouts.toLocaleString(), icon: ShoppingCart, bgColor: 'bg-yellow-500/10', textColor: 'text-yellow-500' },
             { label: 'Compras', value: metrics.purchases.toString(), icon: CreditCard, bgColor: 'bg-green-500/10', textColor: 'text-green-500' },
             { label: 'Receita', value: metrics.revenue > 0 ? `R$ ${metrics.revenue.toLocaleString('pt-BR')}` : '—', icon: DollarSign, bgColor: 'bg-emerald-500/10', textColor: 'text-emerald-500' },
             { label: 'Conversão', value: `${metrics.overallConversion}%`, icon: Target, bgColor: 'bg-purple-500/10', textColor: 'text-purple-500' },
