@@ -460,7 +460,7 @@ export default function Checkout() {
           <CheckoutHeader currentStep={2} />
         </div>
         <main className="max-w-xl mx-auto px-4 py-8">
-          <div className="bg-secondary/50 backdrop-blur-xl rounded-2xl border border-border/10 p-6">
+          <div className="bg-secondary/50 rounded-2xl border border-border/10 p-6">
             <PixPayment
               qrCodeText={paymentData.qrCodeText}
               transactionId={paymentData.transactionId}
@@ -495,6 +495,7 @@ export default function Checkout() {
           loading={loading}
           paymentMethod={paymentMethod}
           onSubmit={handleSubmit}
+          onRemoveItem={removeItem}
         />
 
         <div className="flex flex-col lg:flex-row gap-6">

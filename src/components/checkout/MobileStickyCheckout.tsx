@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronUp } from "lucide-react";
+import { Loader2, ChevronUp, Trash2 } from "lucide-react";
 import { CartItem } from "@/contexts/CartContext";
 
 interface MobileStickyCheckoutProps {
@@ -9,6 +9,7 @@ interface MobileStickyCheckoutProps {
   loading: boolean;
   paymentMethod: "pix" | "balance" | "card";
   onSubmit: () => void;
+  onRemoveItem?: (id: string) => void;
 }
 
 const MobileStickyCheckoutComponent = ({
@@ -17,6 +18,7 @@ const MobileStickyCheckoutComponent = ({
   loading,
   paymentMethod,
   onSubmit,
+  onRemoveItem,
 }: MobileStickyCheckoutProps) => {
   const [showSummary, setShowSummary] = useState(false);
 
@@ -25,7 +27,7 @@ const MobileStickyCheckoutComponent = ({
       {/* Dropdown summary - slides up */}
       {showSummary && (
         <div
-          className="bg-secondary/80 backdrop-blur-xl border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in max-w-lg mx-auto"
+          className="bg-secondary/95 border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in max-w-lg mx-auto"
           style={{ animationDuration: "150ms" }}
         >
           <div className="space-y-3 max-h-[40vh] overflow-y-auto">
@@ -51,14 +53,23 @@ const MobileStickyCheckoutComponent = ({
                   R${" "}
                   {(item.price * item.quantity).toFixed(2).replace(".", ",")}
                 </p>
+                {onRemoveItem && items.length > 1 && (
+                  <button
+                    onClick={() => onRemoveItem(item.id)}
+                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                    aria-label={`Remover ${item.name}`}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
               </div>
             ))}
           </div>
         </div>
       )}
 
-      {/* Sticky bar */}
-      <div className="bg-background/90 backdrop-blur-xl border-t border-border/10 px-4 pt-3 pb-8 safe-area-inset-bottom max-w-lg mx-auto w-full">
+      {/* Sticky bar — raised 2cm (~20px) via extra bottom padding */}
+      <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-10 safe-area-inset-bottom max-w-lg mx-auto w-full">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button

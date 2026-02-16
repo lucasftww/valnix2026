@@ -21,7 +21,6 @@ interface CartSidebarProps {
 
 const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
   const { items, totalItems, finalPrice, discount, updateQuantity, removeItem } = useCart();
-  const { user } = useAuth();
   const navigate = useNavigate();
 
   const handleCheckout = useCallback(() => {
@@ -53,10 +52,10 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
       
       <SheetContent 
         side="right" 
-        className="w-full sm:w-[400px] p-0 flex flex-col bg-[#0a0a0a] border-l border-[#1f1f1f]"
+        className="w-full sm:w-[400px] p-0 flex flex-col bg-background border-l border-border/20"
       >
-        <SheetHeader className="px-5 py-4 border-b border-[#1f1f1f] bg-[#0d0d0d]">
-          <SheetTitle className="flex items-center gap-3 text-white">
+        <SheetHeader className="px-5 py-4 border-b border-border/20 bg-secondary/30">
+          <SheetTitle className="flex items-center gap-3 text-foreground">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4 text-primary" />
             </div>
@@ -73,10 +72,10 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
 
         {items.length === 0 ? (
           <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-20 h-20 rounded-full bg-[#111] flex items-center justify-center mb-4">
+            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
               <ShoppingCart className="w-8 h-8 text-muted-foreground" />
             </div>
-            <h3 className="text-lg font-semibold text-white mb-2">Carrinho vazio</h3>
+            <h3 className="text-lg font-semibold text-foreground mb-2">Carrinho vazio</h3>
             <p className="text-sm text-muted-foreground mb-6 max-w-[200px]">
               Explore nossos produtos e adicione itens ao seu carrinho
             </p>
@@ -91,9 +90,9 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                 {items.map((item) => (
                   <div 
                     key={item.id} 
-                    className="flex gap-3 p-3 rounded-xl bg-[#111] border border-[#1a1a1a] hover:border-[#252525] transition-colors"
+                    className="flex gap-3 p-3 rounded-xl bg-secondary/50 border border-border/10 hover:border-border/20 transition-colors"
                   >
-                    <div className="w-16 h-16 rounded-lg bg-[#1a1a1a] overflow-hidden flex-shrink-0">
+                    <div className="w-16 h-16 rounded-lg bg-muted overflow-hidden flex-shrink-0">
                       <img 
                         src={item.image} 
                         alt={item.name} 
@@ -103,7 +102,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                     </div>
                     
                     <div className="flex-1 min-w-0">
-                      <h4 className="text-sm font-medium text-white line-clamp-2 leading-tight mb-1">
+                      <h4 className="text-sm font-medium text-foreground line-clamp-2 leading-tight mb-1">
                         {item.name}
                       </h4>
                       <p className="text-primary font-bold text-sm">
@@ -111,21 +110,21 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                       </p>
                       
                       <div className="flex items-center justify-between mt-2">
-                        <div className="flex items-center gap-1 bg-[#1a1a1a] rounded-lg p-0.5">
+                        <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                           <button
                             onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#252525] text-muted-foreground hover:text-white transition-colors"
+                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                             disabled={item.quantity <= 1}
                             aria-label="Diminuir quantidade"
                           >
                             <Minus className="w-3 h-3" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium text-white">
+                          <span className="w-8 text-center text-sm font-medium text-foreground">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-[#252525] text-muted-foreground hover:text-white transition-colors"
+                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                             aria-label="Aumentar quantidade"
                           >
                             <Plus className="w-3 h-3" />
@@ -134,7 +133,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                         
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-red-500/10 text-muted-foreground hover:text-red-500 transition-colors"
+                          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
                           aria-label="Remover item"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -146,7 +145,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
               </div>
             </ScrollArea>
 
-            <div className="border-t border-[#1f1f1f] bg-[#0d0d0d] p-4 space-y-4">
+            <div className="border-t border-border/20 bg-secondary/30 p-4 space-y-4">
               <div className="space-y-2">
                 {discount > 0 && (
                   <div className="flex justify-between text-sm">
@@ -162,11 +161,11 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                 </div>
               </div>
 
-              <Separator className="bg-[#1f1f1f]" />
+              <Separator className="bg-border/20" />
 
               <Button 
                 onClick={handleCheckout}
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-white font-semibold rounded-xl gap-2 shadow-lg shadow-primary/20"
+                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl gap-2 shadow-lg shadow-primary/20"
               >
                 Finalizar Compra
                 <ArrowRight className="w-4 h-4" />
