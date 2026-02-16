@@ -31,19 +31,7 @@ const getFirebaseToken = async () => {
 
 type Period = 'today' | '7d' | '30d';
 
-function filterByPeriod<T extends { created_at?: string | null }>(items: T[], period: Period): T[] {
-  const now = new Date();
-  const cutoff = new Date();
-  if (period === 'today') { cutoff.setHours(0, 0, 0, 0); }
-  else if (period === '7d') { cutoff.setDate(now.getDate() - 7); }
-  else { cutoff.setDate(now.getDate() - 30); }
-  return items.filter(item => {
-    if (!item.created_at) return false;
-    const d = new Date(item.created_at);
-    if (isNaN(d.getTime())) return false;
-    return d >= cutoff;
-  });
-}
+// Stats are now aggregated server-side
 
 export const AdminDashboard = () => {
   const queryClient = useQueryClient();
@@ -67,122 +55,23 @@ export const AdminDashboard = () => {
   const stats = useMemo(() => {
     if (!rawData) return null;
 
-    const allOrders = (rawData.orders || []) as any[];
-    const allProducts = (rawData.products || []) as any[];
-    const allProfiles = (rawData.profiles || []) as any[];
-    const allOrderItems = (rawData.orderItems || []) as any[];
-
-    const totalUsers = allProfiles.length;
-    const totalProducts = allProducts.filter((p: any) => p.is_active !== false).length;
-
-    const orders = allOrders.map((o: any) => ({
-      id: o.id,
-      customer_name: o.customer_name || '',
-      total_amount: Number(o.total_amount) || 0,
-      payment_status: o.payment_status || 'pending',
-      status: o.status || 'pending',
-      created_at: o.created_at ?? o.updated_at ?? null,
-      updated_at: o.updated_at ?? o.created_at ?? null,
-      payment_method: o.payment_method || null,
-    }));
-
-    // Period-filtered orders
-    const periodOrders = filterByPeriod(orders, period);
-    const periodPaid = periodOrders.filter((o: any) => o.payment_status === 'paid');
-    const periodRevenue = periodPaid.reduce((sum: number, o: any) => sum + o.total_amount, 0);
-    const periodAvgTicket = periodPaid.length > 0 ? periodRevenue / periodPaid.length : 0;
-    const periodFailed = periodOrders.filter((o: any) => o.payment_status === 'failed').length;
-
-    // All-time stats for context
-    const allPaid = orders.filter((o: any) => o.payment_status === 'paid');
-    const paidOrderIds = allPaid.map((o: any) => o.id);
-
-    const orderItems = allOrderItems
-      .map((item: any) => ({
-        id: item.id, order_id: item.order_id || '',
-        product_name: item.product_name || '', quantity: Number(item.quantity) || 0,
-        total_price: Number(item.total_price) || 0,
-      }))
-      .filter((item: any) => paidOrderIds.includes(item.order_id));
-
-    const productSales = orderItems.reduce((acc: any, item: any) => {
-      if (!acc[item.product_name]) acc[item.product_name] = { quantity: 0, revenue: 0 };
-      acc[item.product_name].quantity += item.quantity;
-      acc[item.product_name].revenue += Number(item.total_price);
-      return acc;
-    }, {} as Record<string, { quantity: number; revenue: number }>);
-
-    const topProducts = Object.entries(productSales)
-      .sort((a: any, b: any) => b[1].quantity - a[1].quantity)
-      .slice(0, 5);
-
-    const pendingDelivery = orders.filter((o: any) => o.payment_status === 'paid' && o.status !== 'completed' && o.status !== 'cancelled');
-
-    // Charts: last 7 days
-    const last7Days = Array.from({ length: 7 }, (_, i) => {
-      const date = new Date();
-      date.setDate(date.getDate() - (6 - i));
-      return date.toISOString().split('T')[0];
-    });
-
-    const revenueByDay = last7Days.map(date => {
-      const dayOrders = orders.filter((o: any) => o.created_at?.startsWith(date) && o.payment_status === 'paid');
-      const revenue = dayOrders.reduce((sum: number, o: any) => sum + o.total_amount, 0);
-      const dayName = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
-      return { name: dayName.charAt(0).toUpperCase() + dayName.slice(1, 3), receita: revenue, pedidos: dayOrders.length };
-    });
-
-    const paymentDistribution = [
-      { name: 'Pago', value: allPaid.length, color: '#10b981' },
-      { name: 'Pendente', value: orders.filter((o: any) => o.payment_status === 'pending').length, color: '#f59e0b' },
-      { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' }
-    ].filter(item => item.value > 0);
-
-    // Alerts
-    const alerts: { type: 'error' | 'warning'; title: string; description: string }[] = [];
-    
-    const processingBalance = orders.filter((o: any) => o.payment_status === 'processing_balance');
-    const stuckProcessing = processingBalance.filter((o: any) => {
-      const ref = o.updated_at || o.created_at;
-      if (!ref) return true; // no date = assume stuck
-      const elapsed = Date.now() - new Date(ref).getTime();
-      return elapsed > 5 * 60 * 1000; // > 5 min
-    });
-    if (stuckProcessing.length > 0) {
-      alerts.push({ type: 'error', title: `${stuckProcessing.length} pedido(s) travado(s) em processing_balance`, description: 'Possível falha no checkout-balance. Verificar manualmente.' });
-    }
-
-    const needsRefund = orders.filter((o: any) => o.payment_status === 'error_needs_refund');
-    if (needsRefund.length > 0) {
-      alerts.push({ type: 'error', title: `${needsRefund.length} pedido(s) com erro de reembolso`, description: 'Reembolso automático falhou. Ação manual necessária.' });
-    }
-
-    const lowStockProducts = allProducts.filter((p: any) => 
-      p.delivery_type === 'auto_real' && 
-      p.is_active !== false && 
-      (p.auto_delivery_codes?.length || 0) < 3
-    );
-    if (lowStockProducts.length > 0) {
-      alerts.push({ type: 'warning', title: `${lowStockProducts.length} produto(s) com estoque baixo`, description: `Produtos auto_real com < 3 códigos: ${lowStockProducts.map((p: any) => p.name).join(', ')}` });
-    }
-
-    if (periodFailed > 0) {
-      alerts.push({ type: 'warning', title: `${periodFailed} pagamento(s) falharam no período`, description: 'Verifique os logs de pagamento.' });
-    }
-
-    const recentOrders = [...orders]
-      .filter((o: any) => o.payment_status === 'paid')
-      .sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
-      .slice(0, 8);
+    const p = rawData.periods?.[period];
+    if (!p) return null;
 
     return {
-      periodRevenue, periodOrders: periodOrders.length,
-      periodPaidCount: periodPaid.length, periodAvgTicket, periodFailed,
-      totalProducts, totalUsers,
-      topProducts, recentOrders,
-      pendingDelivery: pendingDelivery.length,
-      revenueByDay, paymentDistribution,
-      alerts,
+      periodRevenue: p.revenue,
+      periodOrders: p.orders,
+      periodPaidCount: p.paidCount,
+      periodAvgTicket: p.avgTicket,
+      periodFailed: p.failed,
+      totalProducts: rawData.totalProducts || 0,
+      totalUsers: rawData.totalUsers || 0,
+      topProducts: rawData.topProducts || [],
+      recentOrders: rawData.recentOrders || [],
+      pendingDelivery: rawData.pendingDelivery || 0,
+      revenueByDay: rawData.revenueByDay || [],
+      paymentDistribution: rawData.paymentDistribution || [],
+      alerts: rawData.alerts || [],
     };
   }, [rawData, period]);
 
