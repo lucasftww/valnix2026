@@ -379,6 +379,46 @@ Deno.serve(async (req) => {
         );
       }
 
+      // 🔒 P1 FIX: Require Firebase token or delivery token for status check (prevent privacy leak)
+      const statusAuth = req.headers.get('authorization')?.replace(/^Bearer\s+/i, '');
+      const deliveryTokenHeader = req.headers.get('x-delivery-token');
+      let statusCallerUid: string | null = null;
+
+      if (statusAuth) {
+        const fbUser = await verifyFirebaseIdToken(statusAuth);
+        if (!fbUser) {
+          return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }),
+            { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        }
+        statusCallerUid = fbUser.uid;
+      }
+
+      if (!statusCallerUid && !deliveryTokenHeader) {
+        return new Response(JSON.stringify({ success: false, error: 'Authentication required' }),
+          { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
+      // Ownership validation
+      const ownerResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', paymentId);
+      if (ownerResults?.[0]?.document) {
+        const ownerFields = ownerResults[0].document.fields;
+        const ownerUid = ownerFields?.user_id?.stringValue;
+        const ownerDeliveryToken = ownerFields?.delivery_token?.stringValue;
+
+        if (statusCallerUid) {
+          if (ownerUid && ownerUid !== statusCallerUid) {
+            console.warn(`🚨 Card status ownership mismatch: caller=${statusCallerUid}, owner=${ownerUid}, paymentId=${paymentId}`);
+            return new Response(JSON.stringify({ success: false, error: 'Forbidden' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        } else if (deliveryTokenHeader) {
+          if (ownerDeliveryToken !== deliveryTokenHeader) {
+            return new Response(JSON.stringify({ success: false, error: 'Invalid delivery token' }),
+              { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          }
+        }
+      }
+
       const statusResponse = await fetch(`${FLOWPAY_CARD_URL}/status?id=${paymentId}`, {
         headers: { 'x-api-key': apiKey },
       });

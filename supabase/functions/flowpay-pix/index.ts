@@ -601,14 +601,23 @@ Deno.serve(async (req) => {
 
     // ==================== CHECK STATUS ====================
     if (req.method === 'GET' && action === 'status') {
+      // 🔒 P0 FIX: Public reads allowed; side-effects (mark paid, deliver) gated behind auth
       const statusAuthHeader = req.headers.get('authorization');
       const statusIdToken = statusAuthHeader?.replace(/^Bearer\s+/i, '');
+      const internalKey = req.headers.get('x-internal-key');
+      const webhookSecretForStatus = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+      const isInternalCall = internalKey && internalKey === webhookSecretForStatus;
+
+      let authenticatedUid: string | null = null;
       if (statusIdToken) {
         const statusFirebaseUser = await verifyFirebaseIdToken(statusIdToken);
-        if (!statusFirebaseUser) {
-          return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+        if (statusFirebaseUser) {
+          authenticatedUid = statusFirebaseUser.uid;
         }
+        // Don't reject invalid tokens — just treat as unauthenticated
       }
+
+      const canTriggerSideEffects = !!authenticatedUid || isInternalCall;
 
       if (!apiKey) {
         return new Response(JSON.stringify({ error: 'Payment gateway not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -625,11 +634,22 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: data.error || 'Failed to check status' }), { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // FALLBACK: If COMPLETED, ensure Purchase events were sent
-      if (data.charge?.status === 'COMPLETED') {
-        try {
-          const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+      // 🔒 FALLBACK side-effects: Only if caller is authenticated or internal
+      // Public/guest callers get read-only status — webhook handles the actual processing
+      if (data.charge?.status === 'COMPLETED' && canTriggerSideEffects) {
+        // 🔒 Ownership check for authenticated users before triggering side-effects
+        let ownershipValid = true;
+        const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+        if (authenticatedUid && !isInternalCall && queryResults?.[0]?.document) {
+          const ownerUid = queryResults[0].document.fields?.user_id?.stringValue;
+          if (ownerUid && ownerUid !== authenticatedUid) {
+            console.warn(`🚨 PIX status ownership mismatch: caller=${authenticatedUid}, owner=${ownerUid}, chargeId=${chargeId}`);
+            ownershipValid = false;
+          }
+        }
 
+        if (ownershipValid) {
+        try {
           if (queryResults?.[0]?.document) {
             const orderDoc = queryResults[0].document;
             const fbOrderId = orderDoc.name.split('/').pop()!;
@@ -645,13 +665,10 @@ Deno.serve(async (req) => {
               const fbPhone = orderFields?.customer_phone?.stringValue || '';
 
               await updateFirestoreDoc('orders', fbOrderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
-              // 🔒 Call process-delivery (single-writer) via internal key
               try {
-                const webhookSecret2 = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
-                await invokeEdgeFunction('process-delivery', { orderId: fbOrderId }, { 'x-internal-key': webhookSecret2 });
+                await invokeEdgeFunction('process-delivery', { orderId: fbOrderId }, { 'x-internal-key': webhookSecretForStatus });
               } catch {}
 
-              // 🔒 Idempotent coupon increment (prevents double-increment from webhook + polling)
               const couponId = orderFields?.coupon_id?.stringValue;
               if (couponId) { try { await idempotentCouponIncrement(fbOrderId, couponId); } catch {} }
 
@@ -695,6 +712,7 @@ Deno.serve(async (req) => {
         } catch (fallbackError) {
           console.warn('⚠️ Purchase fallback error (non-blocking):', fallbackError);
         }
+        } // end ownershipValid
       }
 
       return new Response(JSON.stringify({ success: true, status: data.charge.status, paidAt: data.charge.paidAt || null }), {
