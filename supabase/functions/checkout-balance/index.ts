@@ -40,6 +40,7 @@ const FIREBASE_PROJECT_ID = 'valnix';
 const SUPABASE_FUNCTIONS_URL = Deno.env.get('SUPABASE_URL') + '/functions/v1';
 const LOCK_TTL_MS = 30_000;
 const DELIVERY_TIMEOUT_MS = 5_000;
+const MAX_ALLOWED_BALANCE = 200; // 🔒 Defense-in-depth: reject suspiciously high balances
 
 /** Round to 2 decimal places to avoid floating point drift */
 function roundCents(v: number): number {
@@ -456,6 +457,14 @@ Deno.serve(async (req) => {
       }
 
       const currentBalance = roundCents(Number(profileDoc.fields.balance?.doubleValue || profileDoc.fields.balance?.integerValue || 0));
+      
+      // 🔒 Defense-in-depth: reject suspiciously high balances (likely manipulated)
+      if (currentBalance > MAX_ALLOWED_BALANCE) {
+        console.warn(`🚨 SUSPICIOUS BALANCE: user ${firebaseUser.uid} has R$${currentBalance} (max allowed: R$${MAX_ALLOWED_BALANCE})`);
+        return new Response(JSON.stringify({ error: 'Saldo inválido. Entre em contato com o suporte.' }),
+          { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+      
       if (currentBalance < recalculatedTotal) {
         return new Response(JSON.stringify({ error: 'Saldo insuficiente', balance: currentBalance, required: recalculatedTotal }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
