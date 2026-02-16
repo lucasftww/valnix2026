@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.restore-products]
 verify_jwt = false
+
+[functions.process-delivery]
+verify_jwt = false

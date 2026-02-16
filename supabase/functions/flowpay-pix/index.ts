@@ -219,11 +219,11 @@ async function registerAnalyticsEvent(orderId: string, value: number, userId?: s
 }
 
 // ── Call edge function via direct fetch (replaces supabase.functions.invoke) ──
-async function invokeEdgeFunction(functionName: string, body: Record<string, unknown>) {
+async function invokeEdgeFunction(functionName: string, body: Record<string, unknown>, extraHeaders?: Record<string, string>) {
   try {
     const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${functionName}`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...extraHeaders },
       body: JSON.stringify(body),
     });
     if (!res.ok) console.warn(`⚠️ ${functionName} returned ${res.status}`);
@@ -419,7 +419,12 @@ Deno.serve(async (req) => {
       await updateFirestoreDoc('orders', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
       console.log(`✅ Order ${orderId} marked as paid via webhook`);
 
-      try { await processAutoDelivery(orderId); } catch (e) { console.error(`⚠️ Auto-delivery failed:`, e); }
+      // 🔒 Call process-delivery (single-writer) via internal key
+      try {
+        const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+        await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret });
+        console.log(`📦 process-delivery called for order ${orderId}`);
+      } catch (e) { console.error(`⚠️ process-delivery call failed:`, e); }
 
       const couponId = orderFields?.coupon_id?.stringValue;
       if (couponId) { try { await incrementCouponUsage(couponId); } catch {} }
@@ -648,7 +653,11 @@ Deno.serve(async (req) => {
               const fbPhone = orderFields?.customer_phone?.stringValue || '';
 
               await updateFirestoreDoc('orders', fbOrderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
-              try { await processAutoDelivery(fbOrderId); } catch {}
+              // 🔒 Call process-delivery (single-writer) via internal key
+              try {
+                const webhookSecret2 = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+                await invokeEdgeFunction('process-delivery', { orderId: fbOrderId }, { 'x-internal-key': webhookSecret2 });
+              } catch {}
               await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
 
               const nameParts = fbName.split(' ');

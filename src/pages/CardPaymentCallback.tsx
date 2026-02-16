@@ -6,7 +6,7 @@ import { updateOrderStatus } from "@/hooks/firebase";
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { saveGuestOrder } from "@/lib/guestOrders";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+import { db, auth } from "@/integrations/firebase/config";
 import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
@@ -18,7 +18,6 @@ export default function CardPaymentCallback() {
   const [pollCount, setPollCount] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Get payment info from URL params or sessionStorage
   const urlOrderId = searchParams.get("order_id");
   const urlPaymentId = searchParams.get("payment_id");
   
@@ -59,63 +58,20 @@ export default function CardPaymentCallback() {
             }
           } catch (err) { console.warn('⚠️ Order status update error (card):', err); }
 
-          // Auto-delivery for card payments (no webhook exists for card, so we handle it client-side)
-          // Idempotent: skips items that already have delivery_code
+          // 🔒 AUTO-DELIVERY: Call server-side process-delivery (single-writer)
+          // NO client-side code consumption — server handles atomicity & idempotency
           try {
-            const itemsSnap = await getDocs(query(collection(db, "order_items"), where("order_id", "==", orderId)));
-            let allDelivered = true;
-
-            for (const itemDoc of itemsSnap.docs) {
-              const itemData = itemDoc.data();
-              if (itemData.delivery_code) continue; // Already delivered
-
-              const productId = itemData.product_id;
-              if (!productId) { allDelivered = false; continue; }
-
-              const productSnap = await getDoc(doc(db, "products", productId));
-              if (!productSnap.exists()) { allDelivered = false; continue; }
-
-              const product = productSnap.data();
-              const deliveryType = product.delivery_type || 'manual';
-              const qty = itemData.quantity || 1;
-
-              if (deliveryType === 'auto_fake') {
-                const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-                const codes: string[] = [];
-                for (let q = 0; q < qty; q++) {
-                  let code = '';
-                  for (let i = 0; i < 16; i++) {
-                    code += chars.charAt(Math.floor(Math.random() * chars.length));
-                    if ((i + 1) % 4 === 0 && i < 15) code += '-';
-                  }
-                  codes.push(code);
-                }
-                await updateDoc(itemDoc.ref, { delivery_code: codes.join(',') });
-                console.log(`✅ Auto-generated ${codes.length} fake code(s) for card item ${itemDoc.id}`);
-              } else if (deliveryType === 'auto_real') {
-                const autoCodes = product.auto_delivery_codes || [];
-                if (autoCodes.length > 0) {
-                  const needed = Math.min(qty, autoCodes.length);
-                  const usedCodes = autoCodes.slice(0, needed);
-                  const remaining = autoCodes.slice(needed);
-                  await updateDoc(itemDoc.ref, { delivery_code: usedCodes.join(',') });
-                  await updateDoc(doc(db, "products", productId), { auto_delivery_codes: remaining });
-                  console.log(`✅ Assigned ${usedCodes.length} real code(s) for card item ${itemDoc.id}`);
-                } else {
-                  allDelivered = false;
-                  console.warn(`⚠️ No auto_delivery_codes for product ${productId}`);
-                }
-              } else {
-                allDelivered = false; // manual delivery
-              }
-            }
-
-            if (allDelivered && itemsSnap.size > 0) {
-              await updateDoc(doc(db, "orders", orderId), { status: 'completed', updated_at: new Date().toISOString() });
-              console.log(`✅ Card order ${orderId} auto-completed`);
-            }
+            const currentUser = auth.currentUser;
+            const idToken = currentUser ? await currentUser.getIdToken() : null;
+            const deliveryRes = await invokeFunction('process-delivery', {
+              method: 'POST',
+              headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : { 'x-internal-key': 'card-callback' },
+              body: { orderId },
+            });
+            const deliveryResult = await deliveryRes.json();
+            console.log(`📦 process-delivery result for ${orderId}:`, deliveryResult);
           } catch (deliveryErr) {
-            console.warn('⚠️ Card auto-delivery error:', deliveryErr);
+            console.warn('⚠️ process-delivery call failed (admin auto-verify will retry):', deliveryErr);
           }
 
           // Track purchase
@@ -222,10 +178,8 @@ export default function CardPaymentCallback() {
       }
     };
 
-    // Check immediately
     checkStatus();
 
-    // Poll every 5s for up to 2 min
     intervalRef.current = setInterval(() => {
       setPollCount(prev => {
         if (prev >= 24) {

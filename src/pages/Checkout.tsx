@@ -308,60 +308,34 @@ export default function Checkout() {
           utm_term: utmParams.utm_term || null,
         });
 
-        // For auto_real products, we still need to fetch codes from Firestore
-        // For auto_fake, we use the delivery_type from cart items directly
-        const productsDeliveryInfo: Record<string, { delivery_type: string; auto_delivery_codes: string[] | null }> = {};
-        
-        for (const item of items) {
-          const deliveryType = item.delivery_type || 'manual';
-          if (deliveryType === 'auto_real') {
-            // Only fetch from Firestore for auto_real (need actual codes)
-            try {
-              const productRef = doc(db, "products", item.id);
-              const productSnap = await getDoc(productRef);
-              if (productSnap.exists()) {
-                const data = productSnap.data();
-                productsDeliveryInfo[item.id] = {
-                  delivery_type: 'auto_real',
-                  auto_delivery_codes: data.auto_delivery_codes || null,
-                };
-              }
-            } catch (err) {
-              console.error(`Error fetching product ${item.id} codes:`, err);
-              productsDeliveryInfo[item.id] = { delivery_type: 'auto_real', auto_delivery_codes: null };
-            }
-          } else {
-            productsDeliveryInfo[item.id] = { delivery_type: deliveryType, auto_delivery_codes: null };
-          }
-        }
+        // Balance: delivery is handled server-side via process-delivery (single-writer)
+        // No client-side code consumption — just create items without delivery codes
+        const orderItemsData = items.map(item => ({
+          order_id: orderId,
+          product_id: item.id,
+          product_name: item.name,
+          product_image: item.image,
+          quantity: item.quantity,
+          unit_price: item.price,
+          total_price: item.price * item.quantity,
+          delivery_type: item.delivery_type || 'manual',
+          auto_delivery_codes: null as string[] | null,
+        }));
 
-        const orderItemsData = items.map(item => {
-          const deliveryInfo = productsDeliveryInfo[item.id] || { delivery_type: item.delivery_type || 'manual', auto_delivery_codes: null };
-          return {
-            order_id: orderId,
-            product_id: item.id,
-            product_name: item.name,
-            product_image: item.image,
-            quantity: item.quantity,
-            unit_price: item.price,
-            total_price: item.price * item.quantity,
-            delivery_type: deliveryInfo.delivery_type,
-            auto_delivery_codes: deliveryInfo.auto_delivery_codes,
-          };
-        });
+        await createOrderItems(orderItemsData, false); // Never process delivery client-side
 
-        await createOrderItems(orderItemsData, true);
-
-        // Check if all items got auto-delivered, if so mark order as completed
+        // 🔒 Call server-side process-delivery for auto-delivery (single-writer)
         try {
-          const orderItemsSnap = await getDocs(query(collection(db, "order_items"), where('order_id', '==', orderId)));
-          const allDelivered = orderItemsSnap.size > 0 && orderItemsSnap.docs.every(d => d.data().delivery_code);
-          if (allDelivered) {
-            await updateOrderStatus(orderId, 'completed', 'paid');
-            console.log(`✅ Balance order ${orderId} auto-completed`);
-          }
-        } catch (err) {
-          console.warn('⚠️ Failed to auto-complete balance order:', err);
+          const idToken = user ? await user.getIdToken() : null;
+          const deliveryRes = await invokeFunction('process-delivery', {
+            method: 'POST',
+            headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
+            body: { orderId },
+          });
+          const deliveryResult = await deliveryRes.json();
+          console.log(`📦 Balance process-delivery for ${orderId}:`, deliveryResult);
+        } catch (deliveryErr) {
+          console.warn('⚠️ Balance process-delivery failed (will retry via admin):', deliveryErr);
         }
 
         if (user) {
