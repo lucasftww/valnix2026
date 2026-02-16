@@ -616,8 +616,8 @@ export const AdminProducts = () => {
                       <Suspense fallback={<div className="min-h-[250px] bg-neutral-800 animate-pulse rounded" />}>
                         <ReactQuill
                           theme="snow"
-                          value={formData.rich_description}
-                          onChange={(value) => setFormData({ ...formData, rich_description: value })}
+                          value={formData.rich_description || ""}
+                          onChange={(value: string) => { setFormData(prev => ({ ...prev, rich_description: value })); }}
                           modules={{
                             toolbar: [
                               [{ 'header': [1, 2, 3, false] }],
@@ -651,8 +651,8 @@ export const AdminProducts = () => {
                       <Suspense fallback={<div className="min-h-[180px] bg-neutral-800 animate-pulse rounded" />}>
                         <ReactQuill
                           theme="snow"
-                          value={formData.instructions}
-                          onChange={(value) => setFormData({ ...formData, instructions: value })}
+                          value={formData.instructions || ""}
+                          onChange={(value: string) => { setFormData(prev => ({ ...prev, instructions: value })); }}
                           modules={{
                             toolbar: [
                               [{ 'header': [1, 2, 3, false] }],
@@ -678,8 +678,8 @@ export const AdminProducts = () => {
                       <Suspense fallback={<div className="min-h-[180px] bg-neutral-800 animate-pulse rounded" />}>
                         <ReactQuill
                           theme="snow"
-                          value={formData.terms_conditions}
-                          onChange={(value) => setFormData({ ...formData, terms_conditions: value })}
+                          value={formData.terms_conditions || ""}
+                          onChange={(value: string) => { setFormData(prev => ({ ...prev, terms_conditions: value })); }}
                           modules={{
                             toolbar: [
                               [{ 'header': [1, 2, 3, false] }],
