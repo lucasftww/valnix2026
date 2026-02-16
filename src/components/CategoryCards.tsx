@@ -37,7 +37,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
     >
       <div 
         ref={cardRef}
-        className="rounded-2xl overflow-hidden"
+        className="rounded-2xl overflow-hidden contain-layout"
       >
         <div className="aspect-[16/9]">
           {isVisible && category.image_url ? (

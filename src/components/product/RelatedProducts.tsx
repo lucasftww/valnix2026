@@ -71,7 +71,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                     to={ROUTES.PRODUCT(product.id)}
                     className="group block h-full"
                   >
-                    <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col">
+                    <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col contain-layout">
                       {/* Imagem */}
                       <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden" style={{ contain: 'layout paint' }}>
                         <img

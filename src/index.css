@@ -128,6 +128,17 @@ All colors MUST be HSL.
     transform: translateZ(0);
   }
   
+  /* Content visibility for below-fold sections */
+  .content-lazy {
+    content-visibility: auto;
+    contain-intrinsic-size: auto 500px;
+  }
+  
+  /* Layout containment for repeated items */
+  .contain-layout {
+    contain: layout style paint;
+  }
+  
   /* Better mobile scrolling */
   .smooth-scroll {
     -webkit-overflow-scrolling: touch;

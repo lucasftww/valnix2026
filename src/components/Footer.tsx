@@ -44,7 +44,7 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
   ];
 
   return (
-    <footer className="w-full bg-muted/20 border-t border-border/10 mt-16">
+    <footer className="w-full bg-muted/20 border-t border-border/10 mt-16 content-lazy">
       {/* Main Footer Content */}
       {showFullVersion && (
         <>
@@ -198,9 +198,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             <div className="flex flex-col items-center gap-3 w-full">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
               <div className="flex items-center justify-center gap-1.5">
-                <img src={pixLogo} alt="PIX" className="h-7 w-auto object-contain" />
-                <img src={visaLogo} alt="Visa" className="h-7 w-auto object-contain" />
-                <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" />
+                <img src={pixLogo} alt="PIX" className="h-7 w-auto object-contain" loading="lazy" />
+                <img src={visaLogo} alt="Visa" className="h-7 w-auto object-contain" loading="lazy" />
+                <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" loading="lazy" />
               </div>
             </div>
           </div>
@@ -209,9 +209,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           <div className="px-6 py-6 border-t border-border/30">
             <p className="text-[10px] text-muted-foreground text-center uppercase tracking-wider mb-4">Segurança verificada</p>
             <div className="flex items-center justify-center gap-5">
-              <img src={nortonSecured} alt="Norton Secured" className="h-8 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
-              <img src={reclameAqui} alt="Reclame Aqui" className="h-6 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
-              <img src={googleSafe} alt="Google Safe Browsing" className="h-8 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
+              <img src={nortonSecured} alt="Norton Secured" className="h-8 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
+              <img src={reclameAqui} alt="Reclame Aqui" className="h-6 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
+              <img src={googleSafe} alt="Google Safe Browsing" className="h-8 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
             </div>
           </div>
 
@@ -306,9 +306,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
             <div className="flex flex-col items-center gap-3 flex-shrink-0 px-6 py-5 rounded-lg">
               <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
               <div className="flex items-center justify-center gap-2">
-                <img src={pixLogo} alt="PIX" className="h-9 w-auto object-contain" />
-                <img src={visaLogo} alt="Visa" className="h-9 w-auto object-contain" />
-                <img src={mastercardLogo} alt="Mastercard" className="h-9 w-auto object-contain" />
+                <img src={pixLogo} alt="PIX" className="h-9 w-auto object-contain" loading="lazy" />
+                <img src={visaLogo} alt="Visa" className="h-9 w-auto object-contain" loading="lazy" />
+                <img src={mastercardLogo} alt="Mastercard" className="h-9 w-auto object-contain" loading="lazy" />
               </div>
             </div>
           </div>
@@ -317,9 +317,9 @@ export const Footer = ({ showFullVersion = true }: FooterProps) => {
           <div className="mb-8 pb-8 border-b border-border/30">
             <p className="text-[10px] text-muted-foreground text-center uppercase tracking-wider mb-4">Segurança verificada</p>
             <div className="flex items-center justify-center gap-8">
-              <img src={nortonSecured} alt="Norton Secured" className="h-14 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
-              <img src={reclameAqui} alt="Reclame Aqui" className="h-8 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
-              <img src={googleSafe} alt="Google Safe Browsing" className="h-14 object-contain opacity-70" style={{ mixBlendMode: 'lighten' }} />
+              <img src={nortonSecured} alt="Norton Secured" className="h-14 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
+              <img src={reclameAqui} alt="Reclame Aqui" className="h-8 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
+              <img src={googleSafe} alt="Google Safe Browsing" className="h-14 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
             </div>
           </div>
 
