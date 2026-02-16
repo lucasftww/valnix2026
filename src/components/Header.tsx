@@ -40,7 +40,7 @@ const HeaderComponent = () => {
   
   const { data: categories = [] } = useCategories();
 
-  // Buscar perfil do usuário
+  // Buscar perfil do usuário (deferred — not critical for initial render)
   useEffect(() => {
     if (!user?.uid) {
       setProfile(null);
@@ -49,7 +49,8 @@ const HeaderComponent = () => {
 
     let mounted = true;
 
-    const fetchProfile = async () => {
+    // Defer profile fetch to avoid competing with critical data
+    const timeoutId = setTimeout(async () => {
       try {
         const profileDoc = await getDoc(doc(db, "profiles", user.uid));
         
@@ -64,11 +65,9 @@ const HeaderComponent = () => {
       } catch (error) {
         console.error("Error fetching profile:", error);
       }
-    };
+    }, 100);
 
-    fetchProfile();
-
-    return () => { mounted = false; };
+    return () => { mounted = false; clearTimeout(timeoutId); };
   }, [user?.uid]);
 
   const getInitials = useCallback(() => {
