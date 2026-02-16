@@ -39,6 +39,12 @@ function getCorsHeaders(req: Request) {
 const FIREBASE_PROJECT_ID = 'valnix';
 const SUPABASE_FUNCTIONS_URL = Deno.env.get('SUPABASE_URL') + '/functions/v1';
 const LOCK_TTL_MS = 30_000;
+const DELIVERY_TIMEOUT_MS = 5_000;
+
+/** Round to 2 decimal places to avoid floating point drift */
+function roundCents(v: number): number {
+  return Math.round(v * 100) / 100;
+}
 
 // ── Firebase Service Account Auth ──
 let cachedAccessToken: string | null = null;
@@ -170,7 +176,7 @@ async function queryFirestore(collectionId: string, fieldPath: string, op: strin
 }
 
 // ── Distributed lock via Firestore (balance_locks/{uid}) ──
-async function acquireLock(userId: string): Promise<boolean> {
+async function acquireLock(userId: string, meta: { orderId: string; ip: string }): Promise<boolean> {
   // Check existing lock
   const existing = await getFirestoreDoc('balance_locks', userId);
   if (existing?.fields) {
@@ -185,17 +191,16 @@ async function acquireLock(userId: string): Promise<boolean> {
     }
   }
 
-  // Try to create lock (use create to fail if concurrent write already created it)
+  // Try to create lock (POST with documentId= → 409 if already exists)
   const res = await createFirestoreDoc('balance_locks', userId, {
     locked_at: new Date().toISOString(),
+    locked_by: userId,
+    order_id: meta.orderId,
+    ip: meta.ip,
     ttl_ms: LOCK_TTL_MS,
   });
 
-  if (res.status === 409) {
-    // Another request already created the lock
-    return false;
-  }
-
+  if (res.status === 409) return false;
   return res.ok;
 }
 
@@ -336,13 +341,15 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    const clientIpForLock = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+
     // ══════════════════════════════════════════════
     // STEP 1: Acquire distributed lock
     // ══════════════════════════════════════════════
-    const lockAcquired = await acquireLock(firebaseUser.uid);
+    const lockAcquired = await acquireLock(firebaseUser.uid, { orderId, ip: clientIpForLock });
     if (!lockAcquired) {
-      return new Response(JSON.stringify({ error: 'Pagamento em processamento. Aguarde.' }),
-        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      return new Response(JSON.stringify({ error: 'Pagamento em processamento. Aguarde.', retry_after_seconds: 5 }),
+        { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Retry-After': '5' } });
     }
 
     try {
@@ -367,7 +374,10 @@ Deno.serve(async (req) => {
       // Idempotency: already paid
       const currentPaymentStatus = orderFields.payment_status?.stringValue;
       if (currentPaymentStatus === 'paid') {
-        return new Response(JSON.stringify({ success: true, message: 'Already paid', orderId }),
+        // Return fresh balance for UI
+        const freshProfile = await getFirestoreDoc('profiles', firebaseUser.uid);
+        const freshBalance = roundCents(Number(freshProfile?.fields?.balance?.doubleValue || freshProfile?.fields?.balance?.integerValue || 0));
+        return new Response(JSON.stringify({ success: true, message: 'Already paid', orderId, remainingBalance: freshBalance }),
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -386,7 +396,7 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      let recalculatedTotal = 0;
+      let subtotalAmount = 0;
       for (const result of orderItemsResults) {
         if (!result.document) continue;
         const itemFields = result.document.fields;
@@ -401,10 +411,13 @@ Deno.serve(async (req) => {
         }
 
         const realPrice = Number(productDoc.fields.price?.doubleValue || productDoc.fields.price?.integerValue || 0);
-        recalculatedTotal += realPrice * quantity;
+        subtotalAmount += realPrice * quantity;
       }
 
+      subtotalAmount = roundCents(subtotalAmount);
+
       // Apply coupon
+      let discountAmount = 0;
       const couponId = orderFields.coupon_id?.stringValue;
       if (couponId) {
         const couponDoc = await getFirestoreDoc('coupons', couponId);
@@ -418,14 +431,15 @@ Deno.serve(async (req) => {
           const expiresAt = cf.expires_at?.stringValue;
 
           if (isActive && (!maxUses || currentUses < maxUses) && (!expiresAt || new Date(expiresAt) > new Date())) {
-            let discountAmount = 0;
-            if (discountType === 'percentage') discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal);
-            else discountAmount = Math.min(discountValue, recalculatedTotal);
-            recalculatedTotal -= discountAmount;
+            if (discountType === 'percentage') discountAmount = Math.min(subtotalAmount * (discountValue / 100), subtotalAmount);
+            else discountAmount = Math.min(discountValue, subtotalAmount);
+            discountAmount = roundCents(discountAmount);
             console.log(`🏷️ Coupon ${couponId}: -R$${discountAmount.toFixed(2)}`);
           }
         }
       }
+
+      const recalculatedTotal = roundCents(subtotalAmount - discountAmount);
 
       if (recalculatedTotal < 1) {
         return new Response(JSON.stringify({ error: 'Order total too low' }),
@@ -441,7 +455,7 @@ Deno.serve(async (req) => {
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      const currentBalance = Number(profileDoc.fields.balance?.doubleValue || profileDoc.fields.balance?.integerValue || 0);
+      const currentBalance = roundCents(Number(profileDoc.fields.balance?.doubleValue || profileDoc.fields.balance?.integerValue || 0));
       if (currentBalance < recalculatedTotal) {
         return new Response(JSON.stringify({ error: 'Saldo insuficiente', balance: currentBalance, required: recalculatedTotal }),
           { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -474,10 +488,13 @@ Deno.serve(async (req) => {
           payment_status: 'paid',
           status: 'processing',
           payment_method: 'balance',
-          total_amount: recalculatedTotal, // overwrite with server-recalculated value
+          subtotal_amount: subtotalAmount,
+          discount_amount: discountAmount,
+          total_amount: recalculatedTotal,
+          currency: 'BRL',
           updated_at: new Date().toISOString(),
         });
-        console.log(`✅ Order ${orderId} paid via balance. Deducted R$${recalculatedTotal.toFixed(2)}`);
+        console.log(`✅ Order ${orderId} paid via balance. Sub:R$${subtotalAmount} Disc:R$${discountAmount} Total:R$${recalculatedTotal}`);
       } catch (markPaidError) {
         // COMPENSATE: refund balance
         console.error(`❌ Failed to mark paid, refunding R$${recalculatedTotal}:`, markPaidError);
@@ -510,13 +527,16 @@ Deno.serve(async (req) => {
       // ══════════════════════════════════════════════
       try {
         const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
         await fetch(`${SUPABASE_FUNCTIONS_URL}/process-delivery`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'x-internal-key': webhookSecret },
           body: JSON.stringify({ orderId }),
-        });
+          signal: controller.signal,
+        }).finally(() => clearTimeout(timeout));
       } catch (e) {
-        console.warn('⚠️ process-delivery call failed (will retry):', e);
+        console.warn('⚠️ process-delivery call failed/timeout (will retry):', e);
       }
 
       return new Response(JSON.stringify({
