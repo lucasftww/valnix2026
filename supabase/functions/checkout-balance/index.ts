@@ -176,6 +176,31 @@ async function queryFirestore(collectionId: string, fieldPath: string, op: strin
   return await res.json();
 }
 
+async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
+  const accessToken = await getFirebaseAccessToken();
+  const firestoreFields = toFirestoreFields(data);
+  await fetch(`${firestoreBase}/${col}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ fields: firestoreFields }),
+  });
+}
+
+async function invokeEdgeFunction(functionName: string, body: Record<string, unknown>) {
+  try {
+    const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${functionName}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(body),
+    });
+    if (!res.ok) console.warn(`⚠️ ${functionName} returned ${res.status}`);
+    return res;
+  } catch (e) {
+    console.warn(`⚠️ ${functionName} invoke error:`, e);
+    return null;
+  }
+}
+
 // ── Distributed lock via Firestore (balance_locks/{uid}) ──
 async function acquireLock(userId: string, meta: { orderId: string; ip: string }): Promise<boolean> {
   // Check existing lock
@@ -611,6 +636,80 @@ Deno.serve(async (req) => {
       } catch (e) {
         console.warn('⚠️ process-delivery call failed/timeout (will retry):', e);
       }
+
+      // ══════════════════════════════════════════════
+      // STEP 10: Server-side tracking (Analytics + Meta CAPI + UTMify)
+      // ══════════════════════════════════════════════
+      // Fetch real product names from order_items for analytics accuracy
+      let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+      try {
+        const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+        if (Array.isArray(itemsResults)) {
+          const names = itemsResults
+            .filter((r: any) => r.document?.fields?.product_name?.stringValue)
+            .map((r: any) => r.document.fields.product_name.stringValue);
+          if (names.length > 0) productNamesList = names.join(', ');
+        }
+      } catch {}
+
+      const customerName = orderFields.customer_name?.stringValue || '';
+      const customerEmail = orderFields.customer_email?.stringValue || '';
+      const customerPhone = orderFields.customer_phone?.stringValue || '';
+
+      // Analytics event
+      try {
+        await addFirestoreDoc('analytics_events', {
+          event_name: 'Purchase',
+          event_time: new Date().toISOString(),
+          user_id: firebaseUser.uid,
+          value: recalculatedTotal,
+          currency: 'BRL',
+          order_id: orderId,
+          page_url: 'https://www.valnix.com.br/checkout',
+          content_name: productNamesList,
+        });
+        console.log(`📊 Analytics Purchase event registered for balance order ${orderId}`);
+      } catch {}
+
+      // Meta CAPI
+      const nameParts = customerName.split(' ');
+      try {
+        await invokeEdgeFunction('meta-capi', {
+          event_name: 'Purchase',
+          event_id: `purchase_${orderId}_${Date.now()}`,
+          order_id: orderId,
+          value: recalculatedTotal,
+          currency: 'BRL',
+          content_name: productNamesList,
+          email: customerEmail,
+          phone: customerPhone || undefined,
+          first_name: nameParts[0] || undefined,
+          last_name: nameParts.slice(1).join(' ') || undefined,
+          external_id: firebaseUser.uid,
+          fbc: orderFields.fbc?.stringValue,
+          fbp: orderFields.fbp?.stringValue,
+        });
+        console.log(`📡 Meta CAPI Purchase sent for balance order ${orderId}`);
+      } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
+
+      // UTMify
+      try {
+        await invokeEdgeFunction('utmify-event', {
+          order_id: orderId,
+          event_type: 'Purchase',
+          value: recalculatedTotal,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone || undefined,
+          product_name: productNamesList,
+          utm_source: orderFields.utm_source?.stringValue,
+          utm_medium: orderFields.utm_medium?.stringValue,
+          utm_campaign: orderFields.utm_campaign?.stringValue,
+          utm_content: orderFields.utm_content?.stringValue,
+          utm_term: orderFields.utm_term?.stringValue,
+        });
+        console.log(`📡 UTMify Purchase sent for balance order ${orderId}`);
+      } catch (e) { console.warn('⚠️ UTMify balance error:', e); }
 
       return new Response(JSON.stringify({
         success: true,
