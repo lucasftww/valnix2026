@@ -9,7 +9,7 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
-import { createOrder, createOrderItems, updateOrderStatus } from "@/hooks/firebase";
+import { createOrder, createOrderItems } from "@/hooks/firebase";
 import { Loader2, Zap, Lock, Check, AlertCircle, Wallet, CreditCard, ChevronUp } from "lucide-react";
 import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";

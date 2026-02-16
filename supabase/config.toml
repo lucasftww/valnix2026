@@ -21,22 +21,13 @@ verify_jwt = false
 [functions.admin-post-payment]
 verify_jwt = false
 
-[functions.restore-orders-json]
-verify_jwt = false
-
 [functions.admin-data]
-verify_jwt = false
-
-[functions.firestore-diagnostic]
 verify_jwt = false
 
 [functions.upload-r2]
 verify_jwt = false
 
 [functions.restore-orders]
-verify_jwt = false
-
-[functions.restore-products]
 verify_jwt = false
 
 [functions.process-delivery]
