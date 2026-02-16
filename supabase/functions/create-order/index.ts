@@ -131,29 +131,51 @@ async function logRateLimitBlock(source: string, ip: string, attempts: number) {
   }
 }
 
-// ── Rate limiting (in-memory, best-effort) ──
-const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
-function checkRateLimit(ip: string): boolean {
+// ── Rate limiting (Firestore-backed, centralized) ──
+async function checkRateLimitFirestore(key: string, maxAttempts: number, windowMs: number, blockMs: number): Promise<{ allowed: boolean; attempts: number }> {
+  const docId = key.replace(/[\/\.]/g, '_');
   const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (entry && entry.blockedUntil > now) return false;
-  if (!entry || entry.resetAt <= now) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
-    return true;
+  try {
+    const fields = await getFirestoreDoc('rate_limits', docId);
+    if (fields) {
+      const blockedUntil = Number(fields.blocked_until?.integerValue || '0');
+      if (blockedUntil > now) return { allowed: false, attempts: Number(fields.count?.integerValue || '0') };
+      const resetAt = Number(fields.reset_at?.integerValue || '0');
+      const count = Number(fields.count?.integerValue || '0');
+      if (resetAt > now) {
+        const newCount = count + 1;
+        if (newCount > maxAttempts) {
+          await updateRateLimitDoc(docId, newCount, resetAt, now + blockMs);
+          return { allowed: false, attempts: newCount };
+        }
+        await updateRateLimitDoc(docId, newCount, resetAt, 0);
+        return { allowed: true, attempts: newCount };
+      }
+    }
+    await updateRateLimitDoc(docId, 1, now + windowMs, 0);
+    return { allowed: true, attempts: 1 };
+  } catch (e) {
+    console.warn('⚠️ Rate limit check failed, allowing request:', e);
+    return { allowed: true, attempts: 0 };
   }
-  entry.count++;
-  if (entry.count > 8) {
-    entry.blockedUntil = now + 300_000;
-    return false;
-  }
-  return true;
 }
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of rateLimitMap) {
-    if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
-  }
-}, 300_000);
+
+async function updateRateLimitDoc(docId: string, count: number, resetAt: number, blockedUntil: number) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits/${docId}?updateMask.fieldPaths=count&updateMask.fieldPaths=reset_at&updateMask.fieldPaths=blocked_until&updateMask.fieldPaths=updated_at`;
+  await fetch(url, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        count: { integerValue: String(count) },
+        reset_at: { integerValue: String(resetAt) },
+        blocked_until: { integerValue: String(blockedUntil) },
+        updated_at: { stringValue: new Date().toISOString() },
+      },
+    }),
+  });
+}
 
 // ── Blocked emails ──
 const BLOCKED_EMAILS = new Set([
@@ -174,10 +196,11 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Rate limit
+    // Rate limit (Firestore-backed, centralized)
     const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    if (!checkRateLimit(clientIp)) {
-      logRateLimitBlock('create-order', clientIp, rateLimitMap.get(clientIp)?.count || 0);
+    const rlResult = await checkRateLimitFirestore(`order_${clientIp}`, 8, 60_000, 300_000);
+    if (!rlResult.allowed) {
+      logRateLimitBlock('create-order', clientIp, rlResult.attempts);
       return new Response(JSON.stringify({ error: 'Too many requests' }),
         { status: 429, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
