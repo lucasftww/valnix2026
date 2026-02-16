@@ -83,7 +83,7 @@ const ProductCardComponent = ({
     <Link 
       ref={cardRef}
       to={ROUTES.PRODUCT(productId)} 
-      className="group block touch-manipulation" 
+      className={`group block touch-manipulation transition-all duration-500 ease-out ${isVisible ? 'opacity-100 translate-y-0' : 'opacity-0 translate-y-4'}`}
       onMouseEnter={triggerPrefetch}
       onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
