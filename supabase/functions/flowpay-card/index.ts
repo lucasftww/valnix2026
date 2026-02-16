@@ -198,6 +198,27 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
   });
 }
 
+/** Create doc with specific ID — returns true if created, false if already exists (409) */
+async function addFirestoreDocWithId(col: string, docId: string, data: Record<string, unknown>): Promise<boolean> {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}?documentId=${encodeURIComponent(docId)}`;
+  const fields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (v === null || v === undefined) fields[k] = { nullValue: null };
+    else if (typeof v === 'string') fields[k] = { stringValue: v };
+    else if (typeof v === 'number') fields[k] = { doubleValue: v };
+    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
+    else fields[k] = { stringValue: String(v) };
+  }
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ fields }),
+  });
+  if (res.status === 409) return false;
+  return res.ok;
+}
+
 async function invokeEdgeFunction(functionName: string, body: Record<string, unknown>, extraHeaders?: Record<string, string>) {
   try {
     const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${functionName}`, {
@@ -754,25 +775,30 @@ Deno.serve(async (req) => {
         });
       } catch {}
 
-      // 9. Meta CAPI
+      // 9. Meta CAPI (idempotent via meta_purchase_events/{orderId})
       const nameParts = customerName.split(' ');
       try {
-        await invokeEdgeFunction('meta-capi', {
-          event_name: 'Purchase',
-          event_id: `purchase_${orderId}_${Date.now()}`,
-          order_id: orderId,
-          value: orderValue,
-          currency: 'BRL',
-          content_name: productNamesList,
-          email: customerEmail,
-          phone: customerPhone || undefined,
-          first_name: nameParts[0] || undefined,
-          last_name: nameParts.slice(1).join(' ') || undefined,
-          external_id: userId,
-          fbc: orderFields.fbc?.stringValue,
-          fbp: orderFields.fbp?.stringValue,
-        });
-        console.log(`📡 Meta CAPI Purchase sent for card order ${orderId}`);
+        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_confirm' });
+        if (capiGuardRes) {
+          await invokeEdgeFunction('meta-capi', {
+            event_name: 'Purchase',
+            event_id: `purchase_${orderId}`,
+            order_id: orderId,
+            value: orderValue,
+            currency: 'BRL',
+            content_name: productNamesList,
+            email: customerEmail,
+            phone: customerPhone || undefined,
+            first_name: nameParts[0] || undefined,
+            last_name: nameParts.slice(1).join(' ') || undefined,
+            external_id: userId,
+            fbc: orderFields.fbc?.stringValue,
+            fbp: orderFields.fbp?.stringValue,
+          });
+          console.log(`📡 Meta CAPI Purchase sent for card order ${orderId}`);
+        } else {
+          console.log(`ℹ️ Meta CAPI Purchase already sent for card order ${orderId}, skipping`);
+        }
       } catch (e) { console.warn('⚠️ Meta CAPI card error:', e); }
 
       // 10. UTMify

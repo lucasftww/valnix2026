@@ -186,6 +186,19 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
   });
 }
 
+/** Create doc with specific ID — returns true if created, false if already exists (409) */
+async function addFirestoreDocWithId(col: string, docId: string, data: Record<string, unknown>): Promise<boolean> {
+  const accessToken = await getFirebaseAccessToken();
+  const firestoreFields = toFirestoreFields(data);
+  const res = await fetch(`${firestoreBase}/${col}?documentId=${encodeURIComponent(docId)}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({ fields: firestoreFields }),
+  });
+  if (res.status === 409) return false;
+  return res.ok;
+}
+
 async function invokeEdgeFunction(functionName: string, body: Record<string, unknown>) {
   try {
     const res = await fetch(`${SUPABASE_FUNCTIONS_URL}/${functionName}`, {
@@ -671,25 +684,30 @@ Deno.serve(async (req) => {
         console.log(`📊 Analytics Purchase event registered for balance order ${orderId}`);
       } catch {}
 
-      // Meta CAPI
+      // Meta CAPI (idempotent via meta_purchase_events/{orderId})
       const nameParts = customerName.split(' ');
       try {
-        await invokeEdgeFunction('meta-capi', {
-          event_name: 'Purchase',
-          event_id: `purchase_${orderId}_${Date.now()}`,
-          order_id: orderId,
-          value: recalculatedTotal,
-          currency: 'BRL',
-          content_name: productNamesList,
-          email: customerEmail,
-          phone: customerPhone || undefined,
-          first_name: nameParts[0] || undefined,
-          last_name: nameParts.slice(1).join(' ') || undefined,
-          external_id: firebaseUser.uid,
-          fbc: orderFields.fbc?.stringValue,
-          fbp: orderFields.fbp?.stringValue,
-        });
-        console.log(`📡 Meta CAPI Purchase sent for balance order ${orderId}`);
+        const capiGuardRes = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'balance' });
+        if (capiGuardRes) {
+          await invokeEdgeFunction('meta-capi', {
+            event_name: 'Purchase',
+            event_id: `purchase_${orderId}`,
+            order_id: orderId,
+            value: recalculatedTotal,
+            currency: 'BRL',
+            content_name: productNamesList,
+            email: customerEmail,
+            phone: customerPhone || undefined,
+            first_name: nameParts[0] || undefined,
+            last_name: nameParts.slice(1).join(' ') || undefined,
+            external_id: firebaseUser.uid,
+            fbc: orderFields.fbc?.stringValue,
+            fbp: orderFields.fbp?.stringValue,
+          });
+          console.log(`📡 Meta CAPI Purchase sent for balance order ${orderId}`);
+        } else {
+          console.log(`ℹ️ Meta CAPI Purchase already sent for balance order ${orderId}, skipping`);
+        }
       } catch (e) { console.warn('⚠️ Meta CAPI balance error:', e); }
 
       // UTMify

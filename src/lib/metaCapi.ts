@@ -39,8 +39,14 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
     const fbc = getCookie('_fbc');
     const fbp = getCookie('_fbp');
 
+    // Deterministic event_id: no timestamp to ensure dedupe across retries
+    const eventId = data.order_id 
+      ? `${data.event_name.toLowerCase()}_${data.order_id}`
+      : `${data.event_name.toLowerCase()}_${Date.now()}`;
+
     const payload = {
       ...data,
+      event_id: eventId,
       currency: 'BRL',
       event_source_url: window.location.href,
       user_agent: navigator.userAgent,
