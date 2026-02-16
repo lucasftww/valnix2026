@@ -296,24 +296,18 @@ export async function createOrderItems(items: CreateOrderItemData[], _processAut
   }
 }
 
-// Função para atualizar status do pedido
+// Função para atualizar status do pedido (somente status, nunca payment_status)
+// payment_status é controlado exclusivamente server-side via Edge Functions
 export async function updateOrderStatus(
   orderId: string, 
   status: string, 
-  paymentStatus?: string
 ): Promise<void> {
   const orderRef = doc(db, 'orders', orderId);
   
-  const updates: any = {
+  await updateDoc(orderRef, {
     status,
     updated_at: serverTimestamp(),
-  };
-  
-  if (paymentStatus) {
-    updates.payment_status = paymentStatus;
-  }
-  
-  await updateDoc(orderRef, updates);
+  });
 }
 
 // Hook para buscar todos os pedidos (admin)

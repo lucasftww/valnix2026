@@ -94,7 +94,8 @@ Deno.serve(async (req) => {
     const accessToken = await getFirebaseAccessToken();
     const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
 
-    const res = await fetch(queryUrl, {
+    // Try composite query first, fallback to simple query if index missing
+    let res = await fetch(queryUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({
@@ -109,10 +110,30 @@ Deno.serve(async (req) => {
       }),
     });
 
+    // Fallback: if composite index is missing (400 FAILED_PRECONDITION), query without orderBy
     if (!res.ok) {
-      console.error('Firestore query failed:', await res.text());
-      return new Response(JSON.stringify({ banners: [] }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const errorText = await res.text();
+      if (errorText.includes('FAILED_PRECONDITION') || errorText.includes('requires an index')) {
+        console.warn('⚠️ Composite index missing for site_banners, falling back to unordered query');
+        res = await fetch(queryUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({
+            structuredQuery: {
+              from: [{ collectionId: 'site_banners' }],
+              where: {
+                fieldFilter: { field: { fieldPath: 'is_active' }, op: 'EQUAL', value: { booleanValue: true } },
+              },
+              limit: 20,
+            },
+          }),
+        });
+      }
+      if (!res.ok) {
+        console.error('Firestore query failed:', errorText);
+        return new Response(JSON.stringify({ banners: [] }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     const results = await res.json();
@@ -123,7 +144,8 @@ Deno.serve(async (req) => {
         const obj: any = { id: r.document.name.split('/').pop() };
         for (const [k, v] of Object.entries(fields)) obj[k] = extractFirestoreValue(v);
         return obj;
-      });
+      })
+      .sort((a: any, b: any) => (a.display_order ?? 999) - (b.display_order ?? 999));
 
     return new Response(JSON.stringify({ banners }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } });

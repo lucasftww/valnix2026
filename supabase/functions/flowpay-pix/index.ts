@@ -637,13 +637,19 @@ Deno.serve(async (req) => {
       // 🔒 FALLBACK side-effects: Only if caller is authenticated or internal
       // Public/guest callers get read-only status — webhook handles the actual processing
       if (data.charge?.status === 'COMPLETED' && canTriggerSideEffects) {
-        // 🔒 Ownership check for authenticated users before triggering side-effects
+        // 🔒 Ownership check: ALWAYS validate before triggering side-effects
         let ownershipValid = true;
         const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
-        if (authenticatedUid && !isInternalCall && queryResults?.[0]?.document) {
+        if (!isInternalCall && queryResults?.[0]?.document) {
           const ownerUid = queryResults[0].document.fields?.user_id?.stringValue;
-          if (ownerUid && ownerUid !== authenticatedUid) {
+          // For authenticated users: must match UID
+          if (authenticatedUid && ownerUid && !ownerUid.startsWith('guest_') && ownerUid !== authenticatedUid) {
             console.warn(`🚨 PIX status ownership mismatch: caller=${authenticatedUid}, owner=${ownerUid}, chargeId=${chargeId}`);
+            ownershipValid = false;
+          }
+          // For guest orders: authenticated users cannot trigger side-effects on guest orders they don't own
+          if (authenticatedUid && ownerUid && ownerUid.startsWith('guest_')) {
+            console.warn(`🚨 PIX status: authenticated user ${authenticatedUid} tried to process guest order, chargeId=${chargeId}`);
             ownershipValid = false;
           }
         }
