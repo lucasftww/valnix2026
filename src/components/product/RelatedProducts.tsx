@@ -73,7 +73,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                   >
                     <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col contain-layout">
                       {/* Imagem */}
-                      <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden" style={{ contain: 'layout paint' }}>
+                      <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden contain-layout">
                         <img
                           src={product.image_url || ""}
                           alt={product.name}
