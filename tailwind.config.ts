@@ -55,7 +55,7 @@ export default {
           foreground: "hsl(var(--discount-foreground))",
         },
         discord: "hsl(var(--discord))",
-        glow: "hsl(var(--glow))",
+        
         sidebar: {
           DEFAULT: "hsl(var(--sidebar-background))",
           foreground: "hsl(var(--sidebar-foreground))",
@@ -89,14 +89,6 @@ export default {
             height: "0",
           },
         },
-        "glow-pulse": {
-          "0%, 100%": {
-            boxShadow: "0 0 15px hsl(var(--card-glow))",
-          },
-          "50%": {
-            boxShadow: "0 0 25px hsl(var(--card-glow))",
-          },
-        },
         "fade-in": {
           "0%": {
             opacity: "0",
@@ -121,7 +113,7 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "glow-pulse": "glow-pulse 2s ease-in-out infinite",
+        "fade-in": "fade-in 0.3s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
       },
