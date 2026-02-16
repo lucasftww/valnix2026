@@ -1,46 +1,21 @@
-import { memo, useRef, useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
+import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
 import { useHomeCategories } from "@/hooks/firebase";
 import type { Category } from "@/types";
 
-
 const CategoryCardItem = memo(({ category }: { category: Category }) => {
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
   const imageUrl = category.image_url || '';
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '100px', threshold: 0.01 }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
-  }, []);
-  
   return (
     <Link 
       to={`/${category.slug}`} 
       aria-label={`Ver produtos de ${category.name}`}
       className="block group"
     >
-      <div 
-        ref={cardRef}
-        className="rounded-2xl overflow-hidden contain-layout"
-      >
+      <div className="rounded-2xl overflow-hidden contain-layout">
         <div className="aspect-[16/9]">
-          {isVisible && category.image_url ? (
+          {category.image_url ? (
             <img
               src={imageUrl}
               alt={category.name}

@@ -53,14 +53,9 @@ const ProductCardComponent = ({
     });
   }, [queryClient, productId]);
 
-  // Use native lazy loading via CSS content-visibility instead of per-card IntersectionObserver
-  // This dramatically reduces observer overhead when many cards are rendered
+  // Priority cards are visible immediately; non-priority show after first paint
   useEffect(() => {
-    if (priority) return;
-    // Simple timeout fallback — cards below fold become visible after brief delay
-    // Combined with CSS contain-layout this is lighter than individual observers
-    const id = requestAnimationFrame(() => setIsVisible(true));
-    return () => cancelAnimationFrame(id);
+    if (!priority) setIsVisible(true);
   }, [priority]);
 
   // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
