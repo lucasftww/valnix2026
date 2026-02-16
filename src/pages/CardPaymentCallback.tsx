@@ -2,9 +2,7 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { trackPurchaseEvent } from "@/lib/analytics";
-import { doc, getDoc, collection, getDocs } from "firebase/firestore";
-import { db, auth } from "@/integrations/firebase/config";
+import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
@@ -88,17 +86,8 @@ export default function CardPaymentCallback() {
 
           sessionStorage.removeItem('valnix_card_payment');
 
-          // Track purchase (client-side analytics only — no Firestore writes)
-          try {
-            const orderDoc = await getDoc(doc(db, "orders", orderId));
-            if (orderDoc.exists()) {
-              const od = orderDoc.data();
-              const { query: fsQuery, where: fsWhere } = await import("firebase/firestore");
-              const itemsSnap = await getDocs(fsQuery(collection(db, "order_items"), fsWhere("order_id", "==", orderId)));
-              const productNamesList = itemsSnap.docs.map(d => d.data().product_name).filter(Boolean).join(', ');
-              trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, productNamesList || "card");
-            }
-          } catch {}
+          // 🔒 Purchase tracking is handled server-side in flowpay-card confirm handler.
+          // Do NOT track here to avoid duplicate Purchase events in analytics.
 
           // 🔒 FIX: Guest order is already created server-side by create-order edge function.
           // Do NOT call saveGuestOrder() here — it creates duplicates.
