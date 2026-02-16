@@ -58,7 +58,7 @@ export const ROUTES = {
   ADMIN: '/admin',
   ABOUT: '/about',
   TERMS: '/terms',
-  SEIZED: '/seized',
+  
   PRODUCT: (id: string) => `/product/${id}`,
   CATEGORY: (slug: string) => `/${slug}`,
 } as const;
