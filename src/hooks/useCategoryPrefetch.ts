@@ -81,22 +81,26 @@ export const useCategoryPrefetch = () => {
       );
     };
 
-    // Start prefetch sooner (500ms instead of 2s)
+    // Defer prefetch to avoid competing with critical initial data loads
     const timeoutId = setTimeout(async () => {
       try {
         const categories = await prefetchCategories();
-        // Get all category slugs to prefetch products for ALL categories
+        // Prefetch products for categories but with a small delay to not block
         const slugs = (categories || [])
           .filter((c: any) => c?.slug)
           .map((c: any) => c.slug);
         
         if (slugs.length > 0) {
-          await prefetchProducts(slugs);
+          // Stagger product prefetch — 2 categories at a time to avoid bandwidth contention
+          for (let i = 0; i < slugs.length; i += 2) {
+            const batch = slugs.slice(i, i + 2);
+            await prefetchProducts(batch);
+          }
         }
       } catch (err) {
         // Silent fail
       }
-    }, 500);
+    }, 2000);
 
     return () => clearTimeout(timeoutId);
   }, [queryClient]);

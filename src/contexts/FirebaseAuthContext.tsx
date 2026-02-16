@@ -49,59 +49,64 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
+        // ── PERF: Check admin role FIRST (fast, single read) ──
+        // Profile/users doc creation can happen async without blocking UI
         try {
-          // ── SECURITY: Check admin ONLY from user_roles collection ──
-          // user_roles is write-protected by Firestore Rules (only admin can write)
-          // The "users" collection is NOT trusted for role checks
-          const [roleDoc, userDoc, profileDoc] = await Promise.all([
-            getDoc(doc(db, "user_roles", firebaseUser.uid)),
-            getDoc(doc(db, "users", firebaseUser.uid)),
-            getDoc(doc(db, "profiles", firebaseUser.uid)),
-          ]);
-
+          const roleDoc = await getDoc(doc(db, "user_roles", firebaseUser.uid));
           const hasAdminRole = roleDoc.exists() && roleDoc.data()?.role === "admin";
           setIsAdmin(hasAdminRole);
 
-          // ── AUTO-REVERT: If users doc claims admin but user_roles says no ──
-          // This catches privilege escalation attempts
-          if (userDoc.exists()) {
-            const userData = userDoc.data();
-            if ((userData?.role === "admin" || userData?.isAdmin === true) && !hasAdminRole) {
-              if (!revertedRef.current.has(firebaseUser.uid)) {
-                revertedRef.current.add(firebaseUser.uid);
-                console.warn("🚨 Unauthorized admin detected, reverting:", firebaseUser.uid);
-                try {
-                  await setDoc(doc(db, "users", firebaseUser.uid), {
-                    email: firebaseUser.email,
-                    role: "user",
-                    isAdmin: false,
-                    created_at: userData.created_at || new Date().toISOString(),
-                    flagged_at: new Date().toISOString(),
-                    flagged_reason: "unauthorized_admin_revert",
-                  });
-                } catch (revertErr) {
-                  console.error("Failed to revert rogue admin doc:", revertErr);
-                }
-              }
-            }
-          } else {
-            // New user — create users doc (non-admin)
-            await setDoc(doc(db, "users", firebaseUser.uid), {
-              email: firebaseUser.email,
-              role: "user",
-              isAdmin: false,
-              created_at: new Date().toISOString(),
-            });
-          }
+          // Non-blocking: handle users/profile docs in background
+          (async () => {
+            try {
+              const [userDoc, profileDoc] = await Promise.all([
+                getDoc(doc(db, "users", firebaseUser.uid)),
+                getDoc(doc(db, "profiles", firebaseUser.uid)),
+              ]);
 
-          if (!profileDoc.exists()) {
-            await setDoc(doc(db, "profiles", firebaseUser.uid), {
-              email: firebaseUser.email,
-              full_name: firebaseUser.displayName || null,
-              balance: 0,
-              created_at: new Date().toISOString(),
-            });
-          }
+              // ── AUTO-REVERT: If users doc claims admin but user_roles says no ──
+              if (userDoc.exists()) {
+                const userData = userDoc.data();
+                if ((userData?.role === "admin" || userData?.isAdmin === true) && !hasAdminRole) {
+                  if (!revertedRef.current.has(firebaseUser.uid)) {
+                    revertedRef.current.add(firebaseUser.uid);
+                    console.warn("🚨 Unauthorized admin detected, reverting:", firebaseUser.uid);
+                    try {
+                      await setDoc(doc(db, "users", firebaseUser.uid), {
+                        email: firebaseUser.email,
+                        role: "user",
+                        isAdmin: false,
+                        created_at: userData.created_at || new Date().toISOString(),
+                        flagged_at: new Date().toISOString(),
+                        flagged_reason: "unauthorized_admin_revert",
+                      });
+                    } catch (revertErr) {
+                      console.error("Failed to revert rogue admin doc:", revertErr);
+                    }
+                  }
+                }
+              } else {
+                // New user — create users doc (non-admin)
+                await setDoc(doc(db, "users", firebaseUser.uid), {
+                  email: firebaseUser.email,
+                  role: "user",
+                  isAdmin: false,
+                  created_at: new Date().toISOString(),
+                });
+              }
+
+              if (!profileDoc.exists()) {
+                await setDoc(doc(db, "profiles", firebaseUser.uid), {
+                  email: firebaseUser.email,
+                  full_name: firebaseUser.displayName || null,
+                  balance: 0,
+                  created_at: new Date().toISOString(),
+                });
+              }
+            } catch (bgError) {
+              console.error("Background profile sync error:", bgError);
+            }
+          })();
         } catch (error) {
           console.error("Error checking admin status:", error);
           setIsAdmin(false);
