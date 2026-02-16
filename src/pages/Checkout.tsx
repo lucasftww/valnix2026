@@ -493,7 +493,7 @@ export default function Checkout() {
             auto_delivery_codes: deliveryInfo.auto_delivery_codes,
           };
         });
-        createOrderItems(orderItemsData, false).catch(err => console.warn('⚠️ Order items failed:', err));
+        await createOrderItems(orderItemsData, false);
 
         // Create card charge via edge function
         const cardResponse = await invokeFunction('flowpay-card', {

@@ -153,6 +153,32 @@ async function incrementCouponUsage(couponId: string) {
   else console.log(`✅ Coupon ${couponId} incremented (card server-side)`);
 }
 
+// 🔒 Idempotent coupon increment — prevents double-increment from concurrent confirm/webhook
+async function idempotentCouponIncrement(orderId: string, couponId: string) {
+  const accessToken = await getFirebaseAccessToken();
+  // Try to atomically create coupon_use_events/{orderId} — 409 if already exists
+  const createUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/coupon_use_events?documentId=${encodeURIComponent(orderId)}`;
+  const res = await fetch(createUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        coupon_id: { stringValue: couponId },
+        used_at: { stringValue: new Date().toISOString() },
+      },
+    }),
+  });
+  if (res.status === 409) {
+    console.log(`ℹ️ Coupon already incremented for order ${orderId}`);
+    return;
+  }
+  if (!res.ok) {
+    console.warn(`⚠️ Coupon event creation failed for order ${orderId}: ${res.status}`);
+    return;
+  }
+  await incrementCouponUsage(couponId);
+}
+
 // ── Analytics ──
 async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
   const accessToken = await getFirebaseAccessToken();
@@ -489,10 +515,10 @@ Deno.serve(async (req) => {
         console.log(`📦 process-delivery called for card order ${orderId}`);
       } catch (e) { console.warn('⚠️ process-delivery call failed:', e); }
 
-      // 6. Increment coupon usage (server-side only)
+      // 6. Increment coupon usage (idempotent — prevents double-increment)
       const couponId = orderFields.coupon_id?.stringValue;
       if (couponId) {
-        try { await incrementCouponUsage(couponId); } catch {}
+        try { await idempotentCouponIncrement(orderId, couponId); } catch {}
       }
 
       // 7. Analytics

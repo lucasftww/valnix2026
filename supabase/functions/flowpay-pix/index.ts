@@ -222,6 +222,31 @@ async function incrementCouponUsage(couponId: string) {
   else console.log(`✅ Coupon ${couponId} incremented`);
 }
 
+// 🔒 Idempotent coupon increment — prevents double-increment from concurrent webhook/polling
+async function idempotentCouponIncrement(orderId: string, couponId: string) {
+  const accessToken = await getFirebaseAccessToken();
+  const createUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/coupon_use_events?documentId=${encodeURIComponent(orderId)}`;
+  const res = await fetch(createUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        coupon_id: { stringValue: couponId },
+        used_at: { stringValue: new Date().toISOString() },
+      },
+    }),
+  });
+  if (res.status === 409) {
+    console.log(`ℹ️ Coupon already incremented for order ${orderId}`);
+    return;
+  }
+  if (!res.ok) {
+    console.warn(`⚠️ Coupon event creation failed for order ${orderId}: ${res.status}`);
+    return;
+  }
+  await incrementCouponUsage(couponId);
+}
+
 // ── Process upsell addon payment (webhook or fallback) ─────────────
 async function processAddonPayment(addonDoc: any, addonId: string): Promise<boolean> {
   const f = addonDoc.fields || addonDoc;
@@ -394,7 +419,7 @@ Deno.serve(async (req) => {
       } catch (e) { console.error(`⚠️ process-delivery call failed:`, e); }
 
       const couponId = orderFields?.coupon_id?.stringValue;
-      if (couponId) { try { await incrementCouponUsage(couponId); } catch {} }
+      if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
 
       await registerAnalyticsEvent(orderId, orderValue, userId, customerEmail);
 
@@ -626,9 +651,9 @@ Deno.serve(async (req) => {
                 await invokeEdgeFunction('process-delivery', { orderId: fbOrderId }, { 'x-internal-key': webhookSecret2 });
               } catch {}
 
-              // 🔒 P0 FIX: Increment coupon usage in fallback (was missing)
+              // 🔒 Idempotent coupon increment (prevents double-increment from webhook + polling)
               const couponId = orderFields?.coupon_id?.stringValue;
-              if (couponId) { try { await incrementCouponUsage(couponId); } catch {} }
+              if (couponId) { try { await idempotentCouponIncrement(fbOrderId, couponId); } catch {} }
 
               await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
 
