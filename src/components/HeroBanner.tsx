@@ -58,7 +58,7 @@ const HeroBannerComponent = () => {
   }
 
   return (
-    <section className="container px-0 md:px-8 py-0 md:py-8">
+    <section className="container px-3 md:px-8 py-3 md:py-8">
       <Carousel
         opts={{
           loop: true,
@@ -72,7 +72,7 @@ const HeroBannerComponent = () => {
         <CarouselContent className="ml-0">
           {banners.map((banner, index) => (
             <CarouselItem key={banner.id} className="pl-0">
-              <div className="relative w-full overflow-hidden md:rounded-2xl border-0 md:border border-border/10 shadow-none md:shadow-2xl md:shadow-black/20 bg-muted">
+              <div className="relative w-full overflow-hidden rounded-2xl border border-border/20 shadow-lg shadow-black/30 bg-muted">
                 {banner.link_url ? (
                   <a href={banner.link_url}>
                     <img
