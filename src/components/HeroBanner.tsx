@@ -53,7 +53,16 @@ const HeroBannerComponent = () => {
     return () => clearTimeout(timeout);
   }, [banners]);
 
-  if (isLoading || banners.length === 0) {
+  // Show skeleton placeholder during loading to prevent CLS
+  if (isLoading) {
+    return (
+      <section className="container px-3 md:px-8 py-3 md:py-8">
+        <div className="w-full rounded-2xl bg-muted animate-pulse aspect-[16/7] md:aspect-[21/6]" />
+      </section>
+    );
+  }
+
+  if (banners.length === 0) {
     return null;
   }
 
