@@ -54,7 +54,7 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
-// ── Cleanup logic with PAGINATION ──
+// ── Cleanup logic with PAGINATION + orderBy + dual-type filter ──
 async function cleanupCollection(collection: string, retentionDays: number, accessToken: string): Promise<number> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
@@ -62,19 +62,36 @@ async function cleanupCollection(collection: string, retentionDays: number, acce
 
   let totalDeleted = 0;
 
-  // Loop until no more docs match
   while (true) {
     const queryUrl = `${FIRESTORE_BASE}:runQuery`;
+
+    // Query using compositeFilter (OR) to match BOTH stringValue and timestampValue created_at
+    // This ensures cleanup works regardless of how the doc was written
     const queryBody = {
       structuredQuery: {
         from: [{ collectionId: collection }],
         where: {
-          fieldFilter: {
-            field: { fieldPath: 'created_at' },
-            op: 'LESS_THAN',
-            value: { stringValue: cutoffIso },
+          compositeFilter: {
+            op: 'OR',
+            filters: [
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'created_at' },
+                  op: 'LESS_THAN',
+                  value: { stringValue: cutoffIso },
+                },
+              },
+              {
+                fieldFilter: {
+                  field: { fieldPath: 'created_at' },
+                  op: 'LESS_THAN',
+                  value: { timestampValue: cutoffIso },
+                },
+              },
+            ],
           },
         },
+        orderBy: [{ field: { fieldPath: 'created_at' }, direction: 'ASCENDING' }],
         limit: BATCH_SIZE,
       },
     };
@@ -86,7 +103,10 @@ async function cleanupCollection(collection: string, retentionDays: number, acce
     });
 
     if (!res.ok) {
-      console.warn(`⚠️ Query failed for ${collection}: ${res.status}`);
+      // Fallback: if compositeFilter/orderBy fails (missing index), try simple stringValue filter
+      console.warn(`⚠️ OR query failed for ${collection} (${res.status}), falling back to simple filter`);
+      const fallbackDeleted = await cleanupCollectionFallback(collection, cutoffIso, accessToken);
+      totalDeleted += fallbackDeleted;
       break;
     }
 
@@ -113,7 +133,62 @@ async function cleanupCollection(collection: string, retentionDays: number, acce
     totalDeleted += docs.length;
     console.log(`🧹 ${collection}: deleted batch of ${docs.length} docs (total: ${totalDeleted})`);
 
-    // If less than BATCH_SIZE, we're done
+    if (docs.length < BATCH_SIZE) break;
+  }
+
+  return totalDeleted;
+}
+
+// Fallback: simple stringValue filter without orderBy (no index needed)
+async function cleanupCollectionFallback(collection: string, cutoffIso: string, accessToken: string): Promise<number> {
+  let totalDeleted = 0;
+
+  while (true) {
+    const queryUrl = `${FIRESTORE_BASE}:runQuery`;
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: collection }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'created_at' },
+            op: 'LESS_THAN',
+            value: { stringValue: cutoffIso },
+          },
+        },
+        limit: BATCH_SIZE,
+      },
+    };
+
+    const res = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify(queryBody),
+    });
+
+    if (!res.ok) {
+      console.warn(`⚠️ Fallback query failed for ${collection}: ${res.status}`);
+      break;
+    }
+
+    const results = await res.json();
+    const docs = results.filter((r: any) => r.document?.name);
+    if (docs.length === 0) break;
+
+    const commitUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+    const writes = docs.map((r: any) => ({ delete: r.document.name }));
+    const commitRes = await fetch(commitUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ writes }),
+    });
+
+    if (!commitRes.ok) {
+      console.warn(`⚠️ Fallback batch delete failed for ${collection}: ${commitRes.status}`);
+      break;
+    }
+
+    totalDeleted += docs.length;
+    console.log(`🧹 ${collection} (fallback): deleted batch of ${docs.length} (total: ${totalDeleted})`);
     if (docs.length < BATCH_SIZE) break;
   }
 
@@ -121,16 +196,20 @@ async function cleanupCollection(collection: string, retentionDays: number, acce
 }
 
 // ── Write audit doc ──
-async function writeAuditDoc(accessToken: string, results: Record<string, number>, totalDeleted: number, durationMs: number) {
-  const runId = crypto.randomUUID();
+async function writeAuditDoc(accessToken: string, runId: string, results: Record<string, number>, totalDeleted: number, durationMs: number, success: boolean) {
   const url = `${FIRESTORE_BASE}/cron_audit_logs?documentId=${encodeURIComponent(runId)}`;
+  const nowIso = new Date().toISOString();
   const fields: Record<string, unknown> = {
     type: { stringValue: 'cleanup-ttl' },
     run_id: { stringValue: runId },
     total_deleted: { integerValue: String(totalDeleted) },
     duration_ms: { integerValue: String(durationMs) },
-    created_at: { stringValue: new Date().toISOString() },
-    server_time_utc: { stringValue: new Date().toISOString() },
+    success: { booleanValue: success },
+    // Use timestampValue for created_at so TTL filter works consistently
+    created_at: { timestampValue: nowIso },
+    started_at: { stringValue: nowIso },
+    finished_at: { stringValue: new Date().toISOString() },
+    server_time_utc: { stringValue: nowIso },
   };
   for (const [col, count] of Object.entries(results)) {
     fields[`deleted_${col}`] = { integerValue: String(count) };
@@ -159,13 +238,16 @@ Deno.serve(async (req) => {
     });
   }
 
+  const runId = crypto.randomUUID();
   const startMs = Date.now();
   const serverNow = new Date();
-  console.log(`🕐 cleanup-ttl started at ${serverNow.toISOString()} (UTC) | Timezone offset: ${serverNow.getTimezoneOffset()}min`);
+  console.log(`🕐 cleanup-ttl [${runId}] started at ${serverNow.toISOString()} (UTC) | Timezone offset: ${serverNow.getTimezoneOffset()}min`);
+
+  let success = false;
+  const results: Record<string, number> = {};
 
   try {
     const accessToken = await getFirebaseAccessToken();
-    const results: Record<string, number> = {};
 
     for (const config of CLEANUP_CONFIG) {
       const deleted = await cleanupCollection(config.collection, config.retentionDays, accessToken);
@@ -175,14 +257,16 @@ Deno.serve(async (req) => {
 
     const durationMs = Date.now() - startMs;
     const totalDeleted = Object.values(results).reduce((a, b) => a + b, 0);
+    success = true;
 
-    console.log(`✅ TTL cleanup complete: ${totalDeleted} docs deleted in ${durationMs}ms`);
+    console.log(`✅ TTL cleanup [${runId}] complete: ${totalDeleted} docs deleted in ${durationMs}ms`);
 
     // Write audit doc for observability
-    await writeAuditDoc(accessToken, results, totalDeleted, durationMs);
+    await writeAuditDoc(accessToken, runId, results, totalDeleted, durationMs, true);
 
     return new Response(JSON.stringify({
       success: true,
+      run_id: runId,
       deleted: results,
       total_deleted: totalDeleted,
       duration_ms: durationMs,
@@ -192,8 +276,16 @@ Deno.serve(async (req) => {
       headers: { 'Content-Type': 'application/json' },
     });
   } catch (err) {
-    console.error('❌ cleanup-ttl error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
+    const durationMs = Date.now() - startMs;
+    console.error(`❌ cleanup-ttl [${runId}] error:`, err);
+
+    // Best-effort: write failed audit doc
+    try {
+      const accessToken = await getFirebaseAccessToken();
+      await writeAuditDoc(accessToken, runId, results, 0, durationMs, false);
+    } catch {}
+
+    return new Response(JSON.stringify({ error: 'Internal server error', run_id: runId }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
     });

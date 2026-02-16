@@ -531,9 +531,10 @@ Deno.serve(async (req) => {
     }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
   } catch (error: any) {
-    console.error('❌ process-delivery error:', error);
-    // 🔒 Never leak internal error details to client
-    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }),
+    const requestId = crypto.randomUUID();
+    console.error(`❌ process-delivery error [${requestId}]:`, error);
+    // 🔒 Never leak internal error details to client — return error_code + request_id for correlation
+    return new Response(JSON.stringify({ success: false, error_code: 'INTERNAL_ERROR', request_id: requestId }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });
