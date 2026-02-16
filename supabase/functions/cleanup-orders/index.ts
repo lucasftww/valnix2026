@@ -90,6 +90,21 @@ async function patchDoc(token: string, docPath: string, fields: Record<string, u
   });
 }
 
+async function addAuditLog(token: string, data: Record<string, unknown>): Promise<void> {
+  const fields: Record<string, unknown> = {};
+  for (const [k, v] of Object.entries(data)) {
+    if (typeof v === 'string') fields[k] = { stringValue: v };
+    else if (typeof v === 'number') fields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+    else if (typeof v === 'boolean') fields[k] = { booleanValue: v };
+    else fields[k] = { nullValue: null };
+  }
+  await fetch(`${BASE}/cron_audit_logs`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ fields }),
+  });
+}
+
 // ── Constant-time comparison ──
 function timingSafeEqual(a: string, b: string): boolean {
   if (a.length !== b.length) return false;
@@ -121,12 +136,15 @@ Deno.serve(async (req: Request) => {
       { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
+  const startMs = Date.now();
+  let cancelled = 0;
+  let auditError: string | null = null;
+
   try {
     const token = await getFirebaseAccessToken();
     const cutoff = new Date(Date.now() - STALE_MINUTES * 60 * 1000);
 
-    // Query orders: status=pending AND payment_status=pending AND created_at < cutoff
-    // Note: composite query requires index; fallback to client-side filtering if needed
+    // Query orders: status=pending AND payment_status=pending
     let results: any[] = [];
     try {
       results = await runQuery(token, {
@@ -143,7 +161,6 @@ Deno.serve(async (req: Request) => {
         limit: 200,
       });
     } catch {
-      // Fallback: query only by status, filter client-side
       results = await runQuery(token, {
         from: [{ collectionId: 'orders' }],
         where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
@@ -151,15 +168,11 @@ Deno.serve(async (req: Request) => {
       });
     }
 
-    let cancelled = 0;
     const now = new Date().toISOString();
 
     for (const r of results) {
       const fields = r.document.fields;
-      // Client-side filter: ensure payment_status is pending
       if (fields?.payment_status?.stringValue !== 'pending') continue;
-
-      // Client-side filter: check created_at < cutoff
       const createdAt = fields?.created_at?.stringValue || fields?.created_at?.timestampValue;
       if (!createdAt) continue;
       const createdDate = new Date(createdAt);
@@ -175,13 +188,44 @@ Deno.serve(async (req: Request) => {
       cancelled++;
     }
 
-    console.log(`[cleanup-orders] Cancelled ${cancelled} stale orders`);
+    const durationMs = Date.now() - startMs;
+    console.log(`[cleanup-orders] Cancelled ${cancelled} stale orders in ${durationMs}ms`);
 
-    return new Response(JSON.stringify({ success: true, cancelled }), {
+    // Write audit log to Firestore (fire-and-forget)
+    try {
+      await addAuditLog(token, {
+        job_name: 'cleanup-orders',
+        ran_at: new Date().toISOString(),
+        ok: true,
+        cancelled_count: cancelled,
+        duration_ms: durationMs,
+        orders_scanned: results.length,
+      });
+    } catch (e) {
+      console.warn('[cleanup-orders] Audit log write failed:', e);
+    }
+
+    return new Response(JSON.stringify({ success: true, cancelled, duration_ms: durationMs }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (err) {
+    auditError = err instanceof Error ? err.message : String(err);
+    const durationMs = Date.now() - startMs;
     console.error('[cleanup-orders] Error:', err);
+
+    // Attempt audit log even on failure
+    try {
+      const token = await getFirebaseAccessToken();
+      await addAuditLog(token, {
+        job_name: 'cleanup-orders',
+        ran_at: new Date().toISOString(),
+        ok: false,
+        cancelled_count: cancelled,
+        duration_ms: durationMs,
+        error: auditError,
+      });
+    } catch { /* best effort */ }
+
     return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
