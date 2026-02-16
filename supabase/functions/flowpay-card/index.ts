@@ -575,7 +575,19 @@ Deno.serve(async (req) => {
         try { await idempotentCouponIncrement(orderId, couponId); } catch {}
       }
 
-      // 7. Analytics
+      // 7. Fetch real product names from order_items for analytics accuracy
+      let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+      try {
+        const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
+        if (Array.isArray(itemsResults)) {
+          const names = itemsResults
+            .filter((r: any) => r.document?.fields?.product_name?.stringValue)
+            .map((r: any) => r.document.fields.product_name.stringValue);
+          if (names.length > 0) productNamesList = names.join(', ');
+        }
+      } catch {}
+
+      // 8. Analytics
       const orderValue = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0);
       const userId = orderFields.user_id?.stringValue;
       const customerEmail = orderFields.customer_email?.stringValue;
@@ -591,11 +603,11 @@ Deno.serve(async (req) => {
           currency: 'BRL',
           order_id: orderId,
           page_url: 'https://www.valnix.com.br/card-callback',
-          content_name: `Pedido #${orderId.substring(0, 8)}`,
+          content_name: productNamesList,
         });
       } catch {}
 
-      // 8. Meta CAPI
+      // 9. Meta CAPI
       const nameParts = customerName.split(' ');
       try {
         await invokeEdgeFunction('meta-capi', {
@@ -604,7 +616,7 @@ Deno.serve(async (req) => {
           order_id: orderId,
           value: orderValue,
           currency: 'BRL',
-          content_name: `Pedido #${orderId.substring(0, 8)}`,
+          content_name: productNamesList,
           email: customerEmail,
           phone: customerPhone || undefined,
           first_name: nameParts[0] || undefined,
@@ -616,7 +628,7 @@ Deno.serve(async (req) => {
         console.log(`📡 Meta CAPI Purchase sent for card order ${orderId}`);
       } catch (e) { console.warn('⚠️ Meta CAPI card error:', e); }
 
-      // 9. UTMify
+      // 10. UTMify
       try {
         await invokeEdgeFunction('utmify-event', {
           order_id: orderId,
@@ -625,7 +637,7 @@ Deno.serve(async (req) => {
           customer_name: customerName,
           customer_email: customerEmail,
           customer_phone: customerPhone || undefined,
-          product_name: `Pedido #${orderId.substring(0, 8)}`,
+          product_name: productNamesList,
           utm_source: orderFields.utm_source?.stringValue,
           utm_medium: orderFields.utm_medium?.stringValue,
           utm_campaign: orderFields.utm_campaign?.stringValue,
