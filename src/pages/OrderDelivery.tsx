@@ -371,23 +371,28 @@ export default function OrderDelivery() {
         if (snapshot.empty) {
           setNotFound(true);
         } else {
-          const docData = snapshot.docs[0].data();
-          const expiresAt = docData.expires_at?.toDate ? docData.expires_at.toDate() : new Date(docData.expires_at);
-          if (expiresAt < new Date()) {
-            setNotFound(true);
-          } else {
-            setOrder({
-              id: snapshot.docs[0].id,
-              hash: docData.hash,
-              order_id: docData.order_id,
-              email: docData.email,
-              customer_name: docData.customer_name,
-              customer_phone: docData.customer_phone,
-              order_data: docData.order_data,
-              linked: docData.linked,
-              created_at: docData.created_at?.toDate ? docData.created_at.toDate().toISOString() : new Date().toISOString(),
-              expires_at: expiresAt.toISOString(),
-            } as GuestOrderData);
+        const docData = snapshot.docs[0].data();
+            const expiresAt = docData.expires_at?.toDate ? docData.expires_at.toDate() : new Date(docData.expires_at);
+            if (expiresAt < new Date()) {
+              setNotFound(true);
+            } else {
+              // Parse order_data if it's a JSON string (server-side creates it as stringValue)
+              let parsedOrderData = docData.order_data;
+              if (typeof parsedOrderData === 'string') {
+                try { parsedOrderData = JSON.parse(parsedOrderData); } catch { parsedOrderData = { items: [], total_amount: 0 }; }
+              }
+              setOrder({
+                id: snapshot.docs[0].id,
+                hash: docData.hash,
+                order_id: docData.order_id,
+                email: docData.email,
+                customer_name: docData.customer_name,
+                customer_phone: docData.customer_phone,
+                order_data: parsedOrderData || { items: [], total_amount: 0 },
+                linked: docData.linked,
+                created_at: docData.created_at?.toDate ? docData.created_at.toDate().toISOString() : new Date().toISOString(),
+                expires_at: expiresAt.toISOString(),
+              } as GuestOrderData);
           }
         }
       } catch (err) {
@@ -519,39 +524,11 @@ export default function OrderDelivery() {
           </p>
         </div>
 
-        {/* Warning Banner */}
-        <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-4 flex items-start gap-3">
-          <AlertTriangle className="w-5 h-5 text-yellow-500 shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-medium text-yellow-500">Salve este link!</p>
-            <p className="text-xs text-gray-400 mt-1">
-              Se perder acesso, use o e-mail <span className="text-white">{order.email}</span> para recuperar.
-              {!user && " Ou cadastre-se para vincular este pedido à sua conta."}
-            </p>
-          </div>
-        </div>
-
-        {/* Save Link Buttons */}
-        <div className="flex gap-3">
-          <Button
-            variant="outline"
-            className="flex-1 h-11 border-[#2a2a2a] text-gray-300 hover:text-white"
-            onClick={handleBookmark}
-          >
-            <Bookmark className={`w-4 h-4 mr-2 ${bookmarked ? "fill-primary text-primary" : ""}`} />
-            {bookmarked ? "Salvo!" : "Salvar nos Favoritos"}
-          </Button>
-          <Button
-            variant="outline"
-            className="flex-1 h-11 border-[#2a2a2a] text-gray-300 hover:text-white"
-            onClick={() => {
-              navigator.clipboard.writeText(window.location.href.split("?")[0]);
-              toast({ title: "Link copiado!", description: "Cole em algum lugar seguro." });
-            }}
-          >
-            <Copy className="w-4 h-4 mr-2" />
-            Copiar Link
-          </Button>
+        {/* Order email reference */}
+        <div className="bg-[#111] border border-[#1f1f1f] rounded-xl p-4 text-center">
+          <p className="text-xs text-gray-400">
+            E-mail do pedido: <span className="text-white font-medium">{order.email}</span>
+          </p>
         </div>
 
         {/* Products & Delivery Codes */}

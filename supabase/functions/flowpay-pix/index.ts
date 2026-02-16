@@ -601,23 +601,7 @@ Deno.serve(async (req) => {
 
     // ==================== CHECK STATUS ====================
     if (req.method === 'GET' && action === 'status') {
-      // 🔒 P0 FIX: Public reads allowed; side-effects (mark paid, deliver) gated behind auth
-      const statusAuthHeader = req.headers.get('authorization');
-      const statusIdToken = statusAuthHeader?.replace(/^Bearer\s+/i, '');
-      const internalKey = req.headers.get('x-internal-key');
       const webhookSecretForStatus = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
-      const isInternalCall = internalKey && internalKey === webhookSecretForStatus;
-
-      let authenticatedUid: string | null = null;
-      if (statusIdToken) {
-        const statusFirebaseUser = await verifyFirebaseIdToken(statusIdToken);
-        if (statusFirebaseUser) {
-          authenticatedUid = statusFirebaseUser.uid;
-        }
-        // Don't reject invalid tokens — just treat as unauthenticated
-      }
-
-      const canAttemptSideEffects = !!authenticatedUid || isInternalCall;
 
       if (!apiKey) {
         return new Response(JSON.stringify({ error: 'Payment gateway not configured' }), { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -634,97 +618,72 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ error: data.error || 'Failed to check status' }), { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
-      // 🔒 FALLBACK side-effects: Only if caller is authenticated or internal
-      // Public/guest callers get read-only status — webhook handles the actual processing
-      if (data.charge?.status === 'COMPLETED' && canAttemptSideEffects) {
-        // 🔒 Ownership check: ALWAYS validate before triggering side-effects
-        const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
-        const orderDoc = queryResults?.[0]?.document;
-        const orderId = orderDoc?.name?.split('/').pop() || 'unknown';
-        const ownerUid = orderDoc?.fields?.user_id?.stringValue;
+      // Side-effects: FlowPay API is source of truth — if COMPLETED, process payment
+      if (data.charge?.status === 'COMPLETED') {
+        try {
+          const queryResults = await queryFirestore('orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+          const orderDoc = queryResults?.[0]?.document;
 
-        let ownershipValid = true;
+          if (orderDoc) {
+            const orderId = orderDoc.name.split('/').pop()!;
+            const orderFields = orderDoc.fields;
+            const currentPaymentStatus = orderFields?.payment_status?.stringValue;
 
-        if (!isInternalCall && orderDoc) {
-          // INVARIANT 1: Guest orders (user_id absent or guest_*) — side-effects ONLY via webhook/internal key
-          const isGuestOrder = !ownerUid || ownerUid.startsWith('guest_');
-          if (isGuestOrder) {
-            console.warn(`🚨 PIX side-effects BLOCKED: guest order | orderId=${orderId}, chargeId=${chargeId}, ownerUid=${ownerUid || 'none'}, callerUid=${authenticatedUid}, isInternal=${!!isInternalCall}`);
-            ownershipValid = false;
-          }
-          // INVARIANT 2: Authenticated orders — caller UID must match order owner
-          else if (authenticatedUid && ownerUid !== authenticatedUid) {
-            console.warn(`🚨 PIX side-effects BLOCKED: ownership mismatch | orderId=${orderId}, chargeId=${chargeId}, ownerUid=${ownerUid}, callerUid=${authenticatedUid}, isInternal=${!!isInternalCall}`);
-            ownershipValid = false;
-          }
-        }
+            if (currentPaymentStatus !== 'paid') {
+              console.log(`🔄 Processing order ${orderId} via polling (FlowPay confirmed COMPLETED)`);
+              const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0;
+              const fbUserId = orderFields?.user_id?.stringValue;
+              const fbEmail = orderFields?.customer_email?.stringValue;
+              const fbName = orderFields?.customer_name?.stringValue || '';
+              const fbPhone = orderFields?.customer_phone?.stringValue || '';
 
-        // 🔒 Early exit: blocked callers get read-only status — webhook handles actual processing
-        if (!ownershipValid) {
-          console.log(`ℹ️ PIX status read-only response for chargeId=${chargeId} (side-effects blocked)`);
-        } else {
-          try {
-            if (orderDoc) {
-              const fbOrderId = orderId;
-              const orderFields = orderDoc.fields;
-              const currentPaymentStatus = orderFields?.payment_status?.stringValue;
+              await updateFirestoreDoc('orders', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+              try {
+                await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecretForStatus });
+              } catch {}
 
-              if (currentPaymentStatus !== 'paid') {
-                console.log(`🔄 FALLBACK: Processing order ${fbOrderId} via polling | callerUid=${authenticatedUid}, isInternal=${!!isInternalCall}`);
-                const orderValue = orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0;
-                const fbUserId = orderFields?.user_id?.stringValue;
-                const fbEmail = orderFields?.customer_email?.stringValue;
-                const fbName = orderFields?.customer_name?.stringValue || '';
-                const fbPhone = orderFields?.customer_phone?.stringValue || '';
+              const couponId = orderFields?.coupon_id?.stringValue;
+              if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
 
-                await updateFirestoreDoc('orders', fbOrderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
-                try {
-                  await invokeEdgeFunction('process-delivery', { orderId: fbOrderId }, { 'x-internal-key': webhookSecretForStatus });
-                } catch {}
+              await registerAnalyticsEvent(orderId, Number(orderValue), fbUserId, fbEmail);
 
-                const couponId = orderFields?.coupon_id?.stringValue;
-                if (couponId) { try { await idempotentCouponIncrement(fbOrderId, couponId); } catch {} }
+              const nameParts = fbName.split(' ');
+              try {
+                await invokeEdgeFunction('meta-capi', {
+                  event_name: 'Purchase', event_id: `purchase_${orderId}_${Date.now()}`, order_id: orderId,
+                  value: Number(orderValue), currency: 'BRL', content_name: `Pedido #${orderId.substring(0, 8)}`,
+                  email: fbEmail, phone: fbPhone || undefined,
+                  first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+                  external_id: fbUserId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+                });
+              } catch {}
 
-                await registerAnalyticsEvent(fbOrderId, Number(orderValue), fbUserId, fbEmail);
-
-                const nameParts = fbName.split(' ');
-                try {
-                  await invokeEdgeFunction('meta-capi', {
-                    event_name: 'Purchase', event_id: `purchase_${fbOrderId}_${Date.now()}`, order_id: fbOrderId,
-                    value: Number(orderValue), currency: 'BRL', content_name: `Pedido #${fbOrderId.substring(0, 8)}`,
-                    email: fbEmail, phone: fbPhone || undefined,
-                    first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
-                    external_id: fbUserId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
-                  });
-                } catch {}
-
-                try {
-                  await invokeEdgeFunction('utmify-event', {
-                    order_id: fbOrderId, event_type: 'Purchase', value: Number(orderValue),
-                    customer_name: fbName, customer_email: fbEmail, customer_phone: fbPhone || undefined,
-                    product_name: `Pedido #${fbOrderId.substring(0, 8)}`,
-                    utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue,
-                    utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue,
-                    utm_term: orderFields?.utm_term?.stringValue,
-                  });
-                } catch {}
-              }
-            } else {
-              // Check upsell addon in Firestore
-              const addonResults = await queryFirestore('sale_addons', 'flowpay_charge_id', 'EQUAL', chargeId);
-              if (addonResults?.[0]?.document) {
-                const addonDoc2 = addonResults[0].document;
-                const addonId = addonDoc2.name.split('/').pop()!;
-                const addonStatus = addonDoc2.fields?.status?.stringValue;
-                if (addonStatus !== 'paid') {
-                  console.log(`🔄 FALLBACK: Processing upsell addon ${addonId} via polling`);
-                  await processAddonPayment(addonDoc2, addonId);
-                }
+              try {
+                await invokeEdgeFunction('utmify-event', {
+                  order_id: orderId, event_type: 'Purchase', value: Number(orderValue),
+                  customer_name: fbName, customer_email: fbEmail, customer_phone: fbPhone || undefined,
+                  product_name: `Pedido #${orderId.substring(0, 8)}`,
+                  utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue,
+                  utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue,
+                  utm_term: orderFields?.utm_term?.stringValue,
+                });
+              } catch {}
+            }
+          } else {
+            // Check upsell addon
+            const addonResults = await queryFirestore('sale_addons', 'flowpay_charge_id', 'EQUAL', chargeId);
+            if (addonResults?.[0]?.document) {
+              const addonDoc2 = addonResults[0].document;
+              const addonId = addonDoc2.name.split('/').pop()!;
+              const addonStatus = addonDoc2.fields?.status?.stringValue;
+              if (addonStatus !== 'paid') {
+                console.log(`🔄 Processing upsell addon ${addonId} via polling`);
+                await processAddonPayment(addonDoc2, addonId);
               }
             }
-          } catch (fallbackError) {
-            console.warn('⚠️ Purchase fallback error (non-blocking):', fallbackError);
           }
+        } catch (fallbackError) {
+          console.warn('⚠️ Purchase fallback error (non-blocking):', fallbackError);
         }
       }
 
