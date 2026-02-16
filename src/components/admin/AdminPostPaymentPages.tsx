@@ -68,6 +68,7 @@ export function AdminPostPaymentPages() {
   const [pages, setPages] = useState<PageConfig[]>([]);
   const [stats, setStats] = useState<Record<string, AddonStats>>({});
   const [loading, setLoading] = useState(true);
+  const [seeding, setSeeding] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [utmParams, setUtmParams] = useState<Record<string, { source: string; medium: string; campaign: string }>>({});
   const { toast } = useToast();
@@ -118,6 +119,22 @@ export function AdminPostPaymentPages() {
     setLoading(false);
   };
 
+  const handleSeed = async () => {
+    setSeeding(true);
+    try {
+      const result = await callAdminPostPayment("POST", { action: "seed" });
+      if (result.success || result.message) {
+        toast({ title: "Páginas criadas!", description: "As páginas padrão de pós-venda foram configuradas." });
+        await fetchData();
+      } else {
+        toast({ title: "Erro", description: result.error || "Falha ao criar páginas", variant: "destructive" });
+      }
+    } catch {
+      toast({ title: "Erro", description: "Falha na conexão", variant: "destructive" });
+    }
+    setSeeding(false);
+  };
+
   const handleSave = async (page: PageConfig) => {
     setSaving(page.id);
     try {
@@ -157,6 +174,22 @@ export function AdminPostPaymentPages() {
   const totalRevenue = Object.values(stats).reduce((sum, s) => sum + s.revenue, 0);
   const totalPaid = Object.values(stats).reduce((sum, s) => sum + s.paid, 0);
   const totalViews = Object.values(stats).reduce((sum, s) => sum + s.total, 0);
+
+  if (pages.length === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-16 space-y-4">
+        <Zap className="w-12 h-12 text-muted-foreground" />
+        <h3 className="text-xl font-bold text-foreground">Nenhuma página configurada</h3>
+        <p className="text-sm text-muted-foreground text-center max-w-md">
+          As páginas de pós-venda (Entrega Prioritária e Proteção Total) ainda não foram criadas. Clique abaixo para configurar as páginas padrão.
+        </p>
+        <Button onClick={handleSeed} disabled={seeding} size="lg" className="gap-2">
+          {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4" />}
+          {seeding ? "Criando..." : "Criar Páginas Padrão"}
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
