@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
-import { collection, addDoc, query, where, getDocs, serverTimestamp } from "firebase/firestore";
+import { collection, addDoc, serverTimestamp } from "firebase/firestore";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { z } from "zod";
 
@@ -53,26 +53,18 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
     try {
       const subscribersRef = collection(db, "newsletter_subscribers");
       
-      // Check if email already exists
-      const existingQuery = query(subscribersRef, where("email", "==", validation.data.email.toLowerCase()));
-      const existingSnapshot = await getDocs(existingQuery);
-      
-      if (!existingSnapshot.empty) {
-        toast({
-          title: "Email já cadastrado",
-          description: "Este email já está inscrito na nossa newsletter!",
-        });
-      } else {
-        await addDoc(subscribersRef, {
-          email: validation.data.email.toLowerCase(),
-          created_at: serverTimestamp(),
-        });
-        toast({
-          title: "Obrigado pela assinatura!",
-          description: "Você receberá nossas novidades em breve 🎉",
-        });
-        setEmail("");
-      }
+      // Write-only: no duplicate check (read is blocked by Firestore rules)
+      // Server-side deduplication can be added later if needed
+      await addDoc(subscribersRef, {
+        email: validation.data.email.toLowerCase(),
+        user_id: user.uid,
+        created_at: serverTimestamp(),
+      });
+      toast({
+        title: "Obrigado pela assinatura!",
+        description: "Você receberá nossas novidades em breve 🎉",
+      });
+      setEmail("");
     } catch (error) {
       console.error("Erro ao inscrever na newsletter:", error);
       toast({
