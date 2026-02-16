@@ -128,7 +128,7 @@ export default function Checkout() {
         prices: items.map(i => i.price),
       });
     }
-  }, [items.length, finalPrice, effectiveUserId]); // deps ensure items are loaded
+  }, [items.length, finalPrice, effectiveUserId, user?.email]); // deps: wait for items + auth hydration
 
   // Load user profile
   useEffect(() => {

@@ -85,25 +85,27 @@ function buildContents(
   productIds?: string[],
   quantities?: number[],
   prices?: number[],
-  totalValue?: number,
-): { contents: ContentItem[]; numItems: number } {
+): { contents: ContentItem[] | undefined; numItems: number | undefined } {
   const ids = productIds || [];
-  if (ids.length === 0) return { contents: [], numItems: 1 };
+  if (ids.length === 0) return { contents: undefined, numItems: undefined };
 
   const contents: ContentItem[] = ids.map((id, i) => {
     const qty = quantities?.[i] ?? 1;
-    // If price is missing/0, try proportional fallback from totalValue
-    let price = prices?.[i];
-    if ((price === undefined || price === 0) && totalValue && ids.length > 0) {
-      price = totalValue / ids.length;
-    }
-    return { id, quantity: qty, item_price: price ?? 0 };
+    const price = prices?.[i];
+    // Only include item_price if we have a real value — never guess/fabricate
+    return price !== undefined && price > 0
+      ? { id, quantity: qty, item_price: price }
+      : { id, quantity: qty, item_price: 0 }; // Meta requires the field but 0 signals "unknown"
   });
 
-  const sumQty = contents.reduce((sum, c) => sum + c.quantity, 0);
-  const numItems = sumQty > 0 ? sumQty : ids.length || 1;
+  // If ALL prices are 0 (no real data), strip item_price entirely
+  const hasAnyPrice = contents.some(c => c.item_price > 0);
+  const cleanContents = hasAnyPrice
+    ? contents
+    : contents.map(({ id, quantity }) => ({ id, quantity, item_price: 0 }));
 
-  return { contents, numItems };
+  const sumQty = cleanContents.reduce((sum, c) => sum + c.quantity, 0);
+  return { contents: cleanContents, numItems: sumQty > 0 ? sumQty : undefined };
 }
 
 // ── InitiateCheckout ───────────────────────────────────────────────
@@ -121,7 +123,7 @@ export function sendInitiateCheckout(params: {
 }) {
   const checkoutSessionId = getCheckoutSessionId();
   const { contents, numItems } = buildContents(
-    params.productIds, params.quantities, params.prices, params.value,
+    params.productIds, params.quantities, params.prices,
   );
 
   sendMetaCapiEvent({
@@ -154,7 +156,7 @@ export function sendPurchaseFromClient(params: {
 }) {
   const nameParts = (params.name || '').split(' ');
   const { contents, numItems } = buildContents(
-    params.productIds, params.quantities, params.prices, params.value,
+    params.productIds, params.quantities, params.prices,
   );
 
   clearCheckoutSessionId();
