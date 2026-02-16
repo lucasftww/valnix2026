@@ -45,7 +45,7 @@ const MyOrders = lazy(() => import("./pages/MyOrders"));
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Category = lazy(() => import("./pages/Category"));
-const Seized = lazy(() => import("./pages/Seized"));
+
 const NotFound = lazy(() => import("./pages/NotFound"));
 const PainelPagar = lazy(() => import("./pages/PainelPagar"));
 const PainelPagarEntrega = lazy(() => import("./pages/PainelPagarEntrega"));
@@ -99,7 +99,7 @@ const App = () => {
 
                         <Route path="/about" element={<About />} />
                         <Route path="/terms" element={<Terms />} />
-                        <Route path="/seized" element={<Seized />} />
+                        
                         
                         <Route path="/painel-pagar" element={<PainelPagar />} />
                         <Route path="/entrega-prioritaria" element={<PainelPagarEntrega />} />
