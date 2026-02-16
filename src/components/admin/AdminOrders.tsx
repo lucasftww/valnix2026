@@ -283,9 +283,10 @@ export const AdminOrders = () => {
   const handleRestoreOrders = async () => {
     setRestoringOrders(true);
     try {
+      const token = await user?.getIdToken();
       const response = await invokeFunction('restore-orders', {
         method: 'GET',
-        headers: { 'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY}` },
+        headers: { 'x-firebase-token': token || '' },
       });
       const data = await response.json();
       if (data.success) {

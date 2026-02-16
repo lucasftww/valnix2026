@@ -1,10 +1,6 @@
 /**
- * API Helper - abstracts backend function calls.
- * Currently uses Supabase Edge Functions URLs.
- * When migrating to Firebase Cloud Functions, just change API_BASE_URL.
- * 
- * Set VITE_API_BASE_URL in .env to point to your Firebase Cloud Functions:
- * e.g. https://us-central1-valnix.cloudfunctions.net
+ * API Helper — abstracts all backend function calls.
+ * Edge functions are hosted via Lovable Cloud runtime.
  */
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
