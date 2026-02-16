@@ -345,7 +345,20 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "products") {
-        const products = await queryCollection("products");
+        const [products, allCodes] = await Promise.all([
+          queryCollection("products"),
+          queryCollection("product_codes"),
+        ]);
+
+        // 🔒 Merge codes from secure collection for admin view only
+        const codesMap = new Map<string, string[]>();
+        for (const c of allCodes) {
+          codesMap.set(c.id, c.codes || []);
+        }
+        for (const p of products) {
+          p.auto_delivery_codes = codesMap.get(p.id) || p.auto_delivery_codes || [];
+        }
+
         products.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
 
         return new Response(JSON.stringify({ products }),
@@ -401,11 +414,12 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "dashboard-stats") {
-        const [orders, products, profiles, orderItems] = await Promise.all([
+        const [orders, products, profiles, orderItems, productCodes] = await Promise.all([
           queryCollection("orders"),
           queryCollection("products"),
           queryCollection("profiles"),
           queryCollection("order_items"),
+          queryCollection("product_codes"),
         ]);
 
         // Convert timestamps
@@ -491,7 +505,10 @@ Deno.serve(async (req) => {
         if (stuckProcessing.length > 0) alerts.push({ type: 'error', title: `${stuckProcessing.length} pedido(s) travado(s) em processing_balance`, description: 'Possível falha no checkout-balance. Verificar manualmente.' });
         const needsRefund = orders.filter((o: any) => o.payment_status === 'error_needs_refund');
         if (needsRefund.length > 0) alerts.push({ type: 'error', title: `${needsRefund.length} pedido(s) com erro de reembolso`, description: 'Reembolso automático falhou. Ação manual necessária.' });
-        const lowStock = products.filter((p: any) => p.delivery_type === 'auto_real' && p.is_active !== false && (p.auto_delivery_codes?.length || 0) < 3);
+        // Build product_codes map for stock check
+        const codesMap = new Map<string, number>();
+        for (const c of productCodes) codesMap.set(c.id, (c.codes || []).length);
+        const lowStock = products.filter((p: any) => p.delivery_type === 'auto_real' && p.is_active !== false && (codesMap.get(p.id) || 0) < 3);
         if (lowStock.length > 0) alerts.push({ type: 'warning', title: `${lowStock.length} produto(s) com estoque baixo`, description: `Produtos auto_real com < 3 códigos: ${lowStock.map((p: any) => p.name).join(', ')}` });
 
         // Recent orders (last 8 paid)
@@ -529,15 +546,25 @@ Deno.serve(async (req) => {
       };
 
       if (resource === "products") {
-        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'auto_delivery_codes', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
+        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
         const safeBody: Record<string, unknown> = {};
-        for (const key of Object.keys(sanitize(body))) {
-          if (PRODUCT_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
+        const sanitized = sanitize(body);
+        for (const key of Object.keys(sanitized)) {
+          if (PRODUCT_ALLOWED_FIELDS.includes(key)) safeBody[key] = sanitized[key];
         }
         safeBody['updated_at'] = new Date().toISOString();
         const success = await createFirestoreDoc("products", docId, safeBody);
+
+        // 🔒 SECURITY: Store auto_delivery_codes in separate admin-only collection
+        if (body.auto_delivery_codes && Array.isArray(body.auto_delivery_codes)) {
+          await createFirestoreDoc("product_codes", docId, {
+            codes: body.auto_delivery_codes,
+            updated_at: new Date().toISOString(),
+          });
+        }
+
         return new Response(JSON.stringify({ success, id: docId }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -737,13 +764,23 @@ Deno.serve(async (req) => {
       sanitizePut(body);
 
       if (resource === "products") {
-        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'auto_delivery_codes', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
+        const PRODUCT_ALLOWED_FIELDS = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
         const safeBody: Record<string, unknown> = {};
         for (const key of Object.keys(body)) {
           if (PRODUCT_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
         }
         safeBody['updated_at'] = new Date().toISOString();
         const success = await updateFirestoreDoc("products", docId, safeBody);
+
+        // 🔒 SECURITY: Store auto_delivery_codes in separate admin-only collection
+        if (body.auto_delivery_codes !== undefined) {
+          const codes = Array.isArray(body.auto_delivery_codes) ? body.auto_delivery_codes : [];
+          await createFirestoreDoc("product_codes", docId, {
+            codes,
+            updated_at: new Date().toISOString(),
+          });
+        }
+
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -964,8 +1001,12 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
       if (resource === "products") {
-        const success = await deleteFirestoreDoc("products", docId);
-        return new Response(JSON.stringify({ success }),
+        // Delete product and its secure codes
+        await Promise.all([
+          deleteFirestoreDoc("products", docId),
+          deleteFirestoreDoc("product_codes", docId).catch(() => {}),
+        ]);
+        return new Response(JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
