@@ -1,12 +1,14 @@
 import { useEffect, useRef } from 'react';
-import { db, auth } from '@/integrations/firebase/config';
-import { doc, getDoc, updateDoc, Timestamp } from 'firebase/firestore';
 import type { Order } from './useFirebaseOrders';
 
 /**
- * Auto-verifies pending PIX payments by checking FlowPay status API.
- * If payment is confirmed, marks order as paid and calls process-delivery server-side.
- * NO client-side delivery code consumption — single-writer pattern.
+ * Auto-verifies pending PIX payments by calling the FlowPay status endpoint.
+ * The server-side fallback in the status endpoint handles:
+ * - Marking order as paid
+ * - Calling process-delivery (single-writer, atomic)
+ * - Incrementing coupon usage (idempotent)
+ * - Firing analytics events
+ * NO client-side Firestore writes needed.
  */
 export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () => void) {
   const verifiedRef = useRef<Set<string>>(new Set());
@@ -36,35 +38,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           const data = await response.json();
 
           if (data.success && data.status === 'COMPLETED') {
-            console.log(`✅ Auto-verified PIX payment for order ${order.id}`);
-            
-            // Mark as paid (idempotent check)
-            const orderRef = doc(db, "orders", order.id);
-            const orderSnap = await getDoc(orderRef);
-            if (orderSnap.exists() && orderSnap.data()?.payment_status !== 'paid') {
-              await updateDoc(orderRef, {
-                payment_status: 'paid',
-                status: 'processing',
-                updated_at: Timestamp.now(),
-              });
-            }
-
-            // 🔒 Call server-side process-delivery (single-writer, atomic, idempotent)
-            try {
-              const currentUser = auth.currentUser;
-              const idToken = currentUser ? await currentUser.getIdToken() : null;
-              
-              const deliveryRes = await invokeFunction('process-delivery', {
-                method: 'POST',
-                headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
-                body: { orderId: order.id },
-              });
-              const deliveryResult = await deliveryRes.json();
-              console.log(`📦 Admin auto-verify PIX delivery for ${order.id}:`, deliveryResult);
-            } catch (deliveryErr) {
-              console.warn(`⚠️ process-delivery failed for ${order.id}:`, deliveryErr);
-            }
-
+            console.log(`✅ Auto-verified PIX payment for order ${order.id} (server-side)`);
             onOrderUpdated?.();
           }
         } catch (error) {

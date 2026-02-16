@@ -145,18 +145,43 @@ async function queryFirestore(collectionId: string, fieldPath: string, op: strin
 const LOCK_TTL_MS = 30_000; // 30 seconds
 
 async function acquireProductLock(productId: string): Promise<boolean> {
+  const accessToken = await getFirebaseAccessToken();
+
+  // Check if existing lock is still active
   const lockDoc = await getFirestoreDoc('delivery_locks', productId);
   if (lockDoc?.fields) {
     const lockTime = lockDoc.fields.locked_at?.stringValue;
     if (lockTime && (Date.now() - new Date(lockTime).getTime()) < LOCK_TTL_MS) {
-      return false; // Lock is held
+      return false; // Lock is active, held by someone else
     }
+    // Lock expired — delete it first (best-effort)
+    try {
+      const delUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/delivery_locks/${productId}`;
+      await fetch(delUrl, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } });
+    } catch { /* best effort */ }
   }
-  // Acquire lock
-  await updateFirestoreDoc('delivery_locks', productId, {
-    locked_at: new Date().toISOString(),
-    locked_by: 'process-delivery',
+
+  // 🔒 Atomic create: POST with documentId returns 409 if someone else created between check and now
+  const createUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/delivery_locks?documentId=${encodeURIComponent(productId)}`;
+  const res = await fetch(createUrl, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        locked_at: { stringValue: new Date().toISOString() },
+        locked_by: { stringValue: 'process-delivery' },
+      },
+    }),
   });
+
+  if (res.status === 409) {
+    console.log(`🔒 Lock contention for product ${productId} (409)`);
+    return false;
+  }
+  if (!res.ok) {
+    console.warn(`⚠️ Lock acquire failed for ${productId}: ${res.status}`);
+    return false;
+  }
   return true;
 }
 
