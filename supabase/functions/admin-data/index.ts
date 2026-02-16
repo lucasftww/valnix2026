@@ -107,6 +107,16 @@ function extractValue(val: any): any {
   return null;
 }
 
+function parseFirestoreResults(results: any[]): any[] {
+  if (!Array.isArray(results)) return [];
+  return results.filter((r: any) => r.document).map((r: any) => {
+    const fields = r.document.fields || {};
+    const obj: any = { id: r.document.name.split('/').pop() };
+    for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
+    return obj;
+  });
+}
+
 async function queryCollection(col: string) {
   const accessToken = await getFirebaseAccessToken();
   const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
@@ -116,14 +126,117 @@ async function queryCollection(col: string) {
     body: JSON.stringify({ structuredQuery: { from: [{ collectionId: col }], limit: 10000 } }),
   });
   if (!res.ok) { console.error(`❌ Query ${col} failed:`, await res.text()); return []; }
-  const results = await res.json();
-  if (!Array.isArray(results)) return [];
-  return results.filter((r: any) => r.document).map((r: any) => {
-    const fields = r.document.fields || {};
-    const obj: any = { id: r.document.name.split('/').pop() };
-    for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
-    return obj;
-  });
+  return parseFirestoreResults(await res.json());
+}
+
+// Paginated collection query — fetches all docs in batches to avoid timeouts
+async function queryCollectionPaginated(col: string, batchSize = 500): Promise<any[]> {
+  const accessToken = await getFirebaseAccessToken();
+  const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const allDocs: any[] = [];
+  let lastDocName: string | null = null;
+
+  for (let page = 0; page < 40; page++) { // Safety: max 40 pages = 20k docs
+    const structuredQuery: any = {
+      from: [{ collectionId: col }],
+      orderBy: [{ field: { fieldPath: '__name__' }, direction: 'ASCENDING' }],
+      limit: batchSize,
+    };
+    if (lastDocName) {
+      structuredQuery.startAt = {
+        values: [{ referenceValue: lastDocName }],
+        before: false, // exclusive (startAfter)
+      };
+    }
+
+    const res = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ structuredQuery }),
+    });
+    if (!res.ok) { console.error(`❌ Paginated query ${col} page ${page} failed`); break; }
+    const results = await res.json();
+    const docs = Array.isArray(results) ? results.filter((r: any) => r.document) : [];
+    if (docs.length === 0) break;
+
+    for (const r of docs) {
+      const fields = r.document.fields || {};
+      const obj: any = { id: r.document.name.split('/').pop() };
+      for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
+      allDocs.push(obj);
+    }
+
+    lastDocName = docs[docs.length - 1].document.name;
+    if (docs.length < batchSize) break; // Last page
+  }
+
+  return allDocs;
+}
+
+// Query orders filtered by created_at >= cutoffISO (uses Firestore WHERE)
+async function queryOrdersSince(cutoffISO: string): Promise<any[]> {
+  const accessToken = await getFirebaseAccessToken();
+  const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+  const allDocs: any[] = [];
+  let lastDocName: string | null = null;
+
+  for (let page = 0; page < 40; page++) {
+    const structuredQuery: any = {
+      from: [{ collectionId: 'orders' }],
+      where: {
+        fieldFilter: {
+          field: { fieldPath: 'created_at' },
+          op: 'GREATER_THAN_OR_EQUAL',
+          value: { stringValue: cutoffISO },
+        },
+      },
+      orderBy: [
+        { field: { fieldPath: 'created_at' }, direction: 'DESCENDING' },
+        { field: { fieldPath: '__name__' }, direction: 'DESCENDING' },
+      ],
+      limit: 500,
+    };
+    if (lastDocName) {
+      // For startAfter with composite orderBy, we need the last doc's created_at + name
+      const lastDoc = allDocs[allDocs.length - 1];
+      structuredQuery.startAt = {
+        values: [
+          { stringValue: lastDoc?.created_at || '' },
+          { referenceValue: lastDocName },
+        ],
+        before: false,
+      };
+    }
+
+    const res = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ structuredQuery }),
+    });
+    if (!res.ok) {
+      // Fallback: if index doesn't exist, use unpaginated query with simple filter
+      console.warn(`⚠️ Paginated order query failed (page ${page}), falling back to simple query`);
+      if (page === 0) {
+        return queryCollectionFiltered('orders', 'created_at', 'GREATER_THAN_OR_EQUAL', { stringValue: cutoffISO });
+      }
+      break;
+    }
+    const results = await res.json();
+    const docs = Array.isArray(results) ? results.filter((r: any) => r.document) : [];
+    if (docs.length === 0) break;
+
+    for (const r of docs) {
+      const fields = r.document.fields || {};
+      const obj: any = { id: r.document.name.split('/').pop() };
+      for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
+      allDocs.push(obj);
+    }
+
+    lastDocName = docs[docs.length - 1].document.name;
+    if (docs.length < 500) break;
+  }
+
+  return allDocs;
 }
 
 async function queryCollectionFiltered(col: string, field: string, op: string, value: any) {
@@ -414,13 +527,22 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "dashboard-stats") {
-        const [orders, products, profiles, orderItems, productCodes] = await Promise.all([
-          queryCollection("orders"),
+        // 🔒 OPTIMIZED: Only fetch orders from last 30 days + use paginated queries
+        const now = new Date();
+        const todayCutoff = new Date(now); todayCutoff.setHours(0, 0, 0, 0);
+        const d7Cutoff = new Date(now); d7Cutoff.setDate(now.getDate() - 7);
+        const d30Cutoff = new Date(now); d30Cutoff.setDate(now.getDate() - 30);
+
+        // Fetch only what we need: orders from last 30d, products, profiles (small), product_codes
+        // order_items are fetched only for paid orders
+        const [orders, products, profiles, productCodes] = await Promise.all([
+          queryOrdersSince(d30Cutoff.toISOString()),
           queryCollection("products"),
           queryCollection("profiles"),
-          queryCollection("order_items"),
           queryCollection("product_codes"),
         ]);
+
+        console.log(`📊 dashboard-stats: ${orders.length} orders (last 30d), ${products.length} products, ${profiles.length} profiles`);
 
         // Convert timestamps
         for (const o of orders) {
@@ -433,11 +555,6 @@ Deno.serve(async (req) => {
         }
 
         // ── Server-side aggregation ──
-        const now = new Date();
-        const todayCutoff = new Date(now); todayCutoff.setHours(0, 0, 0, 0);
-        const d7Cutoff = new Date(now); d7Cutoff.setDate(now.getDate() - 7);
-        const d30Cutoff = new Date(now); d30Cutoff.setDate(now.getDate() - 30);
-
         const filterByDate = (items: any[], cutoff: Date) =>
           items.filter((i: any) => { const d = new Date(i.created_at); return !isNaN(d.getTime()) && d >= cutoff; });
 
@@ -456,12 +573,15 @@ Deno.serve(async (req) => {
         const periods = {
           today: computePeriod(filterByDate(orders, todayCutoff)),
           '7d': computePeriod(filterByDate(orders, d7Cutoff)),
-          '30d': computePeriod(filterByDate(orders, d30Cutoff)),
+          '30d': computePeriod(orders), // All fetched orders are already within 30d
         };
 
-        // All-time paid orders for top products
+        // Top products: fetch order_items only for paid orders (in batches)
         const allPaid = orders.filter((o: any) => o.payment_status === 'paid');
         const paidIds = new Set(allPaid.map((o: any) => o.id));
+
+        // Fetch order_items paginated (these could be many)
+        const orderItems = await queryCollectionPaginated("order_items", 500);
 
         const productSales: Record<string, { quantity: number; revenue: number }> = {};
         for (const item of orderItems) {
@@ -487,14 +607,14 @@ Deno.serve(async (req) => {
           return { name: dn.charAt(0).toUpperCase() + dn.slice(1, 3), receita: rev, pedidos: dayPaid.length };
         });
 
-        // Payment distribution
+        // Payment distribution (within 30d window)
         const paymentDistribution = [
           { name: 'Pago', value: allPaid.length, color: '#10b981' },
           { name: 'Pendente', value: orders.filter((o: any) => o.payment_status === 'pending').length, color: '#f59e0b' },
           { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' },
         ].filter(i => i.value > 0);
 
-        // Alerts
+        // Alerts (only check recent orders for stuck/refund issues)
         const alerts: { type: string; title: string; description: string }[] = [];
         const stuckProcessing = orders.filter((o: any) => {
           if (o.payment_status !== 'processing_balance') return false;
