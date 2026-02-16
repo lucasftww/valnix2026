@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
 import { db } from "@/integrations/firebase/config";
@@ -6,10 +6,11 @@ import { collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp }
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Loader2, Check, Shield, Zap, Star, Clock } from "lucide-react";
+import { Loader2, Check, Zap, Star, Clock, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import { Progress } from "@/components/ui/progress";
+import { invokeFunction } from "@/lib/apiHelper";
 import vIcon from "@/assets/v-icon.png";
 
 interface DynamicPostPaymentPageProps {
@@ -29,24 +30,30 @@ const iconMap: Record<string, typeof Shield> = {
   data_swap_warranty: Shield,
 };
 
-/** Helper to insert a sale_addon doc into Firestore */
-async function insertSaleAddon(data: Record<string, any>) {
-  const saleAddonsRef = collection(db, "sale_addons");
-  await addDoc(saleAddonsRef, {
-    ...data,
-    created_at: serverTimestamp(),
-    updated_at: serverTimestamp(),
-  });
+/** Fire-and-forget Firestore write — never blocks UI */
+function insertSaleAddonAsync(data: Record<string, any>) {
+  try {
+    addDoc(collection(db, "sale_addons"), {
+      ...data,
+      created_at: serverTimestamp(),
+      updated_at: serverTimestamp(),
+    }).catch(() => {});
+  } catch { /* ignore */ }
 }
 
-/** Helper to update a sale_addon doc in Firestore by order_id + addon_type */
-async function updateSaleAddon(orderId: string, addonType: string, updates: Record<string, any>) {
-  const saleAddonsRef = collection(db, "sale_addons");
-  const q = query(saleAddonsRef, where("order_id", "==", orderId), where("addon_type", "==", addonType));
-  const snapshot = await getDocs(q);
-  for (const doc of snapshot.docs) {
-    await updateDoc(doc.ref, { ...updates, updated_at: serverTimestamp() });
-  }
+function updateSaleAddonAsync(orderId: string, addonType: string, updates: Record<string, any>) {
+  try {
+    const q = query(
+      collection(db, "sale_addons"),
+      where("order_id", "==", orderId),
+      where("addon_type", "==", addonType)
+    );
+    getDocs(q).then((snapshot) => {
+      for (const doc of snapshot.docs) {
+        updateDoc(doc.ref, { ...updates, updated_at: serverTimestamp() }).catch(() => {});
+      }
+    }).catch(() => {});
+  } catch { /* ignore */ }
 }
 
 export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProps) {
@@ -69,11 +76,19 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10 * 60);
 
+  // Build next-route URL helper
+  const buildNextUrl = useCallback((nextRoute: string) => {
+    if (nextRoute === "/order" && hashParam) return `/order/${hashParam}`;
+    if (nextRoute === "/order") return "/";
+    const params = new URLSearchParams();
+    params.set("order_id", orderId);
+    if (hashParam) params.set("hash", hashParam);
+    return `${nextRoute}?${params.toString()}`;
+  }, [orderId, hashParam]);
+
   // If no config after loading, redirect home
   useEffect(() => {
-    if (!configLoading && !config) {
-      navigate("/");
-    }
+    if (!configLoading && !config) navigate("/");
   }, [configLoading, config, navigate]);
 
   // Timer for PIX
@@ -81,10 +96,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     if (!pixData || paymentConfirmed) return;
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
-        if (prev <= 1) {
-          clearInterval(timer);
-          return 0;
-        }
+        if (prev <= 1) { clearInterval(timer); return 0; }
         return prev - 1;
       });
     }, 1000);
@@ -92,12 +104,14 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   }, [pixData, paymentConfirmed]);
 
   // Poll payment status
+  const pollingRef = useRef(false);
   useEffect(() => {
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
+      if (pollingRef.current) return; // skip if previous poll still running
+      pollingRef.current = true;
       try {
         const idToken = user ? await user.getIdToken() : null;
-        const { invokeFunction } = await import("@/lib/apiHelper");
         const response = await invokeFunction("flowpay-pix", {
           method: "GET",
           queryParams: { action: "status", chargeId: pixData.chargeId },
@@ -109,30 +123,23 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           setPaymentConfirmed(true);
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
           const nextRoute = config?.next_route || "/";
-          if (nextRoute === "/order" && hashParam) {
-            setTimeout(() => navigate(`/order/${hashParam}`, { replace: true }), 2500);
-          } else if (nextRoute === "/order") {
-            setTimeout(() => navigate("/", { replace: true }), 2500);
-          } else {
-            const params = new URLSearchParams();
-            params.set("order_id", orderId);
-            if (hashParam) params.set("hash", hashParam);
-            setTimeout(() => navigate(`${nextRoute}?${params.toString()}`, { replace: true }), 2500);
-          }
+          setTimeout(() => navigate(buildNextUrl(nextRoute), { replace: true }), 2500);
         }
       } catch (err) {
         console.warn("Poll error:", err);
+      } finally {
+        pollingRef.current = false;
       }
     }, 5000);
     return () => clearInterval(poll);
-  }, [pixData, paymentConfirmed, timeLeft, orderId, addonType, config, navigate, toast]);
+  }, [pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, user]);
 
   const handleAccept = async () => {
     if (!config || purchasing) return;
     setPurchasing(true);
     try {
-      // Record addon attempt in Firestore
-      await insertSaleAddon({
+      // Fire-and-forget: record addon attempt
+      insertSaleAddonAsync({
         order_id: orderId,
         user_id: user?.uid || null,
         addon_type: addonType,
@@ -145,10 +152,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         utm_campaign: utmCampaign,
       });
 
-      // Create PIX charge with Firebase auth
+      // Create PIX charge immediately (don't wait for Firestore)
       const amountInCents = Math.round(config.price * 100);
       const firebaseIdToken = await user?.getIdToken();
-      const { invokeFunction } = await import("@/lib/apiHelper");
       const pixResponse = await invokeFunction("flowpay-pix", {
         method: "POST",
         queryParams: { action: "create" },
@@ -163,8 +169,8 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       const data = await pixResponse.json();
       if (!pixResponse.ok || !data.success) throw new Error(data.error || "Erro ao gerar PIX");
 
-      // Update addon with charge info in Firestore
-      await updateSaleAddon(orderId, addonType, {
+      // Fire-and-forget: update addon with charge info
+      updateSaleAddonAsync(orderId, addonType, {
         pix_code: data.brCode,
         flowpay_charge_id: data.chargeId,
       });
@@ -178,39 +184,24 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }
   };
 
-  const [skipping, setSkipping] = useState(false);
-  const handleSkip = async () => {
-    if (skipping) return;
-    setSkipping(true);
-    // Record skip in Firestore
-    try {
-      await insertSaleAddon({
-        order_id: orderId,
-        addon_type: addonType,
-        status: "skipped",
-        amount: 0,
-        user_id: user?.uid || null,
-        utm_source: utmSource,
-        utm_medium: utmMedium,
-        utm_campaign: utmCampaign,
-      });
-    } catch (e) { /* ignore */ }
+  const handleSkip = () => {
+    // Fire-and-forget: record skip (never blocks navigation)
+    insertSaleAddonAsync({
+      order_id: orderId,
+      addon_type: addonType,
+      status: "skipped",
+      amount: 0,
+      user_id: user?.uid || null,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
+    });
 
     const nextRoute = config?.next_route || "/";
-    
     if (isStandalone) {
       navigate(nextRoute === "/" ? "/" : nextRoute, { replace: true });
     } else {
-      if (nextRoute === "/order" && hashParam) {
-        navigate(`/order/${hashParam}`, { replace: true });
-      } else if (nextRoute === "/order" && !hashParam) {
-        navigate("/", { replace: true });
-      } else {
-        const params = new URLSearchParams();
-        params.set("order_id", orderId);
-        if (hashParam) params.set("hash", hashParam);
-        navigate(`${nextRoute}?${params.toString()}`, { replace: true });
-      }
+      navigate(buildNextUrl(nextRoute), { replace: true });
     }
   };
 
@@ -222,13 +213,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     );
   }
 
-  if (!config) {
-    return null;
-  }
+  if (!config) return null;
 
   const Icon = iconMap[addonType] || Star;
   const badgeClass = badgeColorMap[config.badge_color] || badgeColorMap.yellow;
-  const formatTime = (s: number) => `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+  const formatTime = (s: number) =>
+    `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
   // PIX Payment view
   if (pixData) {
