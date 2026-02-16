@@ -225,7 +225,52 @@ Deno.serve(async (req) => {
       }
     }
 
-    return new Response(JSON.stringify({ success: true, orderId }), {
+    // Create guest_order for /order/:hash access (server-side, bypasses Firestore rules)
+    let guestHash: string | null = null;
+    try {
+      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+      let hash = '';
+      for (let i = 0; i < 12; i++) hash += chars.charAt(Math.floor(Math.random() * chars.length));
+
+      const expiresAt = new Date();
+      expiresAt.setDate(expiresAt.getDate() + 30);
+
+      const guestOrderData: Record<string, unknown> = {
+        hash,
+        order_id: orderId,
+        email: String(order.customer_email).trim().toLowerCase(),
+        customer_name: order.customer_name || null,
+        customer_phone: order.customer_phone || null,
+        guest_session_id: userId.startsWith('guest_') ? userId : null,
+        user_id: userId.startsWith('guest_') ? null : userId,
+        linked: !userId.startsWith('guest_'),
+        order_data: JSON.stringify({
+          items: items.map((it: any) => ({
+            product_name: it.product_name || '',
+            product_image: it.product_image || null,
+            quantity: it.quantity || 1,
+            unit_price: it.unit_price || 0,
+            total_price: it.total_price || 0,
+            delivery_code: null,
+          })),
+          total_amount: Number(order.total_amount),
+          payment_method: order.payment_method || 'pix',
+          created_at: now,
+        }),
+        created_at: now,
+        expires_at: expiresAt.toISOString(),
+      };
+
+      // Use addFirestoreDoc but we need to handle the map/JSON for order_data
+      // Since our helper only does simple types, write order_data as stringValue (JSON)
+      await addFirestoreDoc('guest_orders', guestOrderData);
+      guestHash = hash;
+      console.log(`✅ Guest order saved with hash: ${hash}`);
+    } catch (err) {
+      console.warn('⚠️ Failed to save guest order:', err);
+    }
+
+    return new Response(JSON.stringify({ success: true, orderId, guestHash }), {
       status: 200,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
