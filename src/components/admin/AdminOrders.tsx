@@ -986,43 +986,58 @@ export const AdminOrders = () => {
                         Verificar
                       </Button>
                      )}
-                    {detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        disabled={reprocessingDelivery || detailItems.every(i => !!i.delivery_code)}
-                        onClick={async () => {
-                          setReprocessingDelivery(true);
-                          try {
-                            const token = await user?.getIdToken();
-                            const res = await invokeFunction("process-delivery", {
-                              method: "POST",
-                              headers: { "x-firebase-token": token || "" },
-                              body: { orderId: detailOrder.id },
-                            });
-                            const data = await res.json();
-                            if (data.failedCount > 0) {
-                              toast({ title: `Entrega parcial`, description: `${data.deliveredCount || 0} entregue(s), ${data.failedCount} falha(s). Verifique os logs.`, variant: "destructive" });
-                            } else if (data.deliveredCount > 0) {
-                              toast({ title: `Entrega reprocessada!`, description: `${data.deliveredCount} código(s) entregue(s).` });
-                            } else if (data.skippedCount > 0) {
-                              toast({ title: "Já entregue", description: "Todos os itens já possuem código." });
-                            } else {
-                              toast({ title: "Sem códigos disponíveis", description: "Verifique o estoque dos produtos.", variant: "destructive" });
+                    {(() => {
+                      const allDelivered = detailItems.length > 0 && detailItems.every((it: any) => !!it.delivery_code);
+                      const canReprocess = detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && detailOrder.status !== 'cancelled' && !allDelivered;
+                      return (detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed') ? (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          disabled={!canReprocess || reprocessingDelivery}
+                          onClick={async () => {
+                            setReprocessingDelivery(true);
+                            try {
+                              const token = await user?.getIdToken();
+                              if (!token) {
+                                toast({ title: "Sem autenticação", description: "Faça login como admin novamente.", variant: "destructive" });
+                                return;
+                              }
+                              const res = await invokeFunction("process-delivery", {
+                                method: "POST",
+                                headers: { Authorization: `Bearer ${token}` },
+                                body: { orderId: detailOrder.id },
+                              });
+                              const data = await res.json();
+                              if (!res.ok || data?.success === false) {
+                                toast({ title: "Erro ao reprocessar", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+                                return;
+                              }
+                              const delivered = Number(data?.deliveredCount || 0);
+                              const failed = Number(data?.failedCount || 0);
+                              const skipped = Number(data?.skippedCount || 0);
+                              if (failed > 0) {
+                                toast({ title: "Entrega parcial", description: `${delivered} entregue(s), ${failed} falha(s). Verifique logs/estoque.`, variant: "destructive" });
+                              } else if (delivered > 0) {
+                                toast({ title: "Entrega reprocessada!", description: `${delivered} código(s) entregue(s).` });
+                              } else if (skipped > 0) {
+                                toast({ title: "Já entregue", description: "Os itens já possuíam código de entrega." });
+                              } else {
+                                toast({ title: "Sem códigos disponíveis", description: "Verifique o estoque (auto_real) ou tipo de entrega do produto.", variant: "destructive" });
+                              }
+                              await handleViewDetail(detailOrder);
+                              await fetchOrders();
+                            } catch (err: any) {
+                              toast({ title: "Erro ao reprocessar", description: err?.message || "Falha inesperada", variant: "destructive" });
+                            } finally {
+                              setReprocessingDelivery(false);
                             }
-                            handleViewDetail(detailOrder);
-                            fetchOrders();
-                          } catch (err: any) {
-                            toast({ title: "Erro ao reprocessar", description: err.message, variant: "destructive" });
-                          } finally {
-                            setReprocessingDelivery(false);
-                          }
-                        }}
-                      >
-                        {reprocessingDelivery ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-                        {detailItems.every(i => !!i.delivery_code) ? "Já entregue" : "Reprocessar entrega"}
-                      </Button>
-                    )}
+                          }}
+                        >
+                          {reprocessingDelivery ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                          {allDelivered ? "Já entregue" : "Reprocessar entrega"}
+                        </Button>
+                      ) : null;
+                    })()}
                   </div>
                   <div className="space-y-3">
                     <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
