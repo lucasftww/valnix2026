@@ -93,7 +93,8 @@ export default function CardPaymentCallback() {
             const orderDoc = await getDoc(doc(db, "orders", orderId));
             if (orderDoc.exists()) {
               const od = orderDoc.data();
-              const itemsSnap = await getDocs(collection(db, "orders", orderId, "items"));
+              const { query: fsQuery, where: fsWhere } = await import("firebase/firestore");
+              const itemsSnap = await getDocs(fsQuery(collection(db, "order_items"), fsWhere("order_id", "==", orderId)));
               const productNamesList = itemsSnap.docs.map(d => d.data().product_name).filter(Boolean).join(', ');
               trackPurchaseEvent(od.user_id || "guest", od.total_amount, orderId, productNamesList || "card");
             }
