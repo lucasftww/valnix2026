@@ -316,6 +316,31 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
   return true;
 }
 
+// ── Rate limiting for PIX charge creation (per-IP) ──
+const pixRateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+function checkPixCreateRateLimit(ip: string): boolean {
+  const now = Date.now();
+  const entry = pixRateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) return false;
+  if (!entry || entry.resetAt <= now) {
+    pixRateLimitMap.set(ip, { count: 1, resetAt: now + 60_000, blockedUntil: 0 });
+    return true;
+  }
+  entry.count++;
+  if (entry.count > 6) { // Max 6 PIX charges per minute per IP
+    entry.blockedUntil = now + 600_000; // Block for 10 minutes
+    console.warn(`🚨 PIX RATE LIMIT: IP ${ip} blocked after ${entry.count} attempts`);
+    return false;
+  }
+  return true;
+}
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of pixRateLimitMap) {
+    if (v.resetAt <= now && v.blockedUntil <= now) pixRateLimitMap.delete(k);
+  }
+}, 300_000);
+
 // ════════════════════════════════════════════════════════════════════
 // MAIN HANDLER
 // ════════════════════════════════════════════════════════════════════
@@ -457,6 +482,13 @@ Deno.serve(async (req) => {
 
     // ==================== CREATE PIX CHARGE ====================
     if (req.method === 'POST' && action === 'create') {
+      // 🔒 Rate limit PIX creation per IP
+      const createIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+      if (!checkPixCreateRateLimit(createIp)) {
+        return new Response(JSON.stringify({ error: 'Muitas tentativas. Aguarde alguns minutos.' }),
+          { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
+
       const authHeader = req.headers.get('authorization');
       const idToken = authHeader?.replace(/^Bearer\s+/i, '');
       let firebaseUser: { uid: string; email?: string } | null = null;
@@ -477,7 +509,7 @@ Deno.serve(async (req) => {
       const { orderId, customer, utmParameters } = body;
       let { amount } = body;
 
-      if (!orderId) {
+      if (!orderId || typeof orderId !== 'string' || orderId.length > 100) {
         return new Response(JSON.stringify({ error: 'orderId is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
 
@@ -568,8 +600,9 @@ Deno.serve(async (req) => {
         }
       }
 
-      const rawDesc = body.description || `Pedido ${orderId || 'Valnix'}`;
-      const description = rawDesc.replace(/[\u{1F600}-\u{1F6FF}\u{1F900}-\u{1F9FF}\u{2600}-\u{26FF}\u{2700}-\u{27BF}\u{FE00}-\u{FE0F}\u{1F000}-\u{1FFFF}\u{E0020}-\u{E007F}#:]/gu, '').trim() || `Pedido ${orderId}`;
+      // 🔒 SECURITY: Description is ALWAYS generated server-side (never trust client input)
+      const isUpsellCharge = orderId.startsWith('upsell-');
+      const description = isUpsellCharge ? `Upsell ${orderId.substring(7, 30)}` : `Pedido ${orderId.substring(0, 8).toUpperCase()}`;
 
       console.log('🔵 Creating FlowPay PIX charge:', { amount, orderId });
       const response = await fetch(`${FLOWPAY_BASE_URL}/create`, {
