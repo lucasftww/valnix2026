@@ -28,16 +28,15 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
   if (relatedProducts.length === 0) return null;
 
   return (
-    <section className="mt-8 lg:mt-12">
+    <section className="mt-10 lg:mt-14">
       {/* Header */}
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-base md:text-lg font-bold flex items-center gap-2 text-foreground">
-          <Star className="w-4 h-4 md:w-5 md:h-5 text-primary fill-primary" />
+      <div className="flex items-center justify-between mb-5">
+        <h2 className="text-base md:text-lg font-bold tracking-tight text-foreground">
           Produtos Relacionados
         </h2>
         <Link
           to={`/${category}`}
-          className="text-xs md:text-sm text-primary hover:text-primary/80 transition-colors flex items-center gap-0.5 font-medium"
+          className="text-xs text-muted-foreground hover:text-foreground transition-colors flex items-center gap-0.5 font-medium"
         >
           Ver todos
           <ChevronRight className="w-3.5 h-3.5" />
@@ -72,7 +71,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                     to={ROUTES.PRODUCT(product.id)}
                     className="group block h-full"
                   >
-                    <div className="rounded-lg overflow-hidden border border-border/20 hover:border-primary/40 transition-colors duration-200 bg-card h-full flex flex-col">
+                    <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col">
                       {/* Imagem */}
                       <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden">
                         <img
@@ -85,7 +84,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                       </div>
 
                       {/* Info */}
-                      <div className="p-2.5 md:p-3 bg-background flex-1 flex flex-col gap-1">
+                      <div className="p-2.5 md:p-3 flex-1 flex flex-col gap-1">
                         <h3 className="text-xs md:text-sm font-semibold text-foreground line-clamp-2 leading-snug">
                           {product.name}
                         </h3>
@@ -104,7 +103,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                               {formatPrice(product.old_price!)}
                             </span>
                           )}
-                          <span className="text-sm md:text-base font-extrabold text-primary leading-tight">
+                          <span className="text-sm md:text-base font-extrabold tracking-tight leading-tight">
                             {formatPrice(product.price)}
                           </span>
                         </div>
@@ -118,8 +117,8 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
           {relatedProducts.length > 4 && (
             <>
-              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/95 hover:bg-background border border-border/50 text-foreground shadow-lg" />
-              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/95 hover:bg-background border border-border/50 text-foreground shadow-lg" />
+              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/90 backdrop-blur-sm hover:bg-background border border-border/10 text-foreground" />
+              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/90 backdrop-blur-sm hover:bg-background border border-border/10 text-foreground" />
             </>
           )}
         </Carousel>
