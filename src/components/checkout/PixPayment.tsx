@@ -8,6 +8,7 @@ import vIcon from "@/assets/v-icon.png";
 import { invokeFunction } from "@/lib/apiHelper";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { auth } from "@/integrations/firebase/config";
+import { trackPurchaseEvent } from "@/lib/analytics";
 
 
 interface PixPaymentProps {
@@ -50,6 +51,9 @@ export function PixPayment({
   const handlePaymentSuccess = async () => {
     if (paymentConfirmed) return;
     setPaymentConfirmed(true);
+    
+    // Track Purchase event for PIX payments
+    trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
     
     onPaymentConfirmed?.();
     
