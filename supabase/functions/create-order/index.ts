@@ -359,6 +359,7 @@ Deno.serve(async (req) => {
       payment_method: order.payment_method ? String(order.payment_method).slice(0, 20) : null,
       fbc: order.fbc || null,
       fbp: order.fbp || null,
+      event_source_url: order.event_source_url || null,
       utm_source: order.utm_source || null,
       utm_medium: order.utm_medium || null,
       utm_campaign: order.utm_campaign || null,

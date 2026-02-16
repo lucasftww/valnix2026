@@ -497,6 +497,7 @@ Deno.serve(async (req) => {
               email: customerEmail, phone: customerPhone || undefined,
               first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
               external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+              event_source_url: orderFields?.event_source_url?.stringValue || undefined,
             });
             console.log(`📡 Meta CAPI Purchase sent for card order ${orderId} (webhook)`);
           }
@@ -932,6 +933,7 @@ Deno.serve(async (req) => {
               email: customerEmail, phone: customerPhone || undefined,
               first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
               external_id: userId, fbc: orderFields.fbc?.stringValue, fbp: orderFields.fbp?.stringValue,
+              event_source_url: orderFields.event_source_url?.stringValue || undefined,
             });
           }
         })(),
