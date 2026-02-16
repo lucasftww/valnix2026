@@ -237,15 +237,6 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Rate limit (Firestore-backed, centralized)
-    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
-    const rlResult = await checkRateLimitFirestore(`order_${clientIp}`, 15, 60_000, 300_000);
-    if (!rlResult.allowed) {
-      logRateLimitBlock('create-order', clientIp, rlResult.attempts);
-      return new Response(JSON.stringify({ error: 'Too many requests' }),
-        { status: 429, headers: { ...cors, 'Content-Type': 'application/json' } });
-    }
-
     const body = await req.json();
     const { order, items } = body;
 
@@ -253,13 +244,35 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: 'Missing order or items data' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    // Validate user if authenticated
-    let callerUid: string | null = null;
+    // ── PARALLEL: Rate limit + Auth verification + Product reads + Coupon read ──
+    const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
     const authHeader = req.headers.get('Authorization');
-    if (authHeader?.startsWith('Bearer ')) {
-      const token = authHeader.slice(7);
-      const verified = await verifyFirebaseIdToken(token);
-      callerUid = verified?.uid || null;
+
+    const [rlResult, callerUid, productResults, couponFields] = await Promise.all([
+      // 1. Rate limit check
+      checkRateLimitFirestore(`order_${clientIp}`, 15, 60_000, 300_000),
+      // 2. Auth verification (parallel)
+      (async (): Promise<string | null> => {
+        if (authHeader?.startsWith('Bearer ')) {
+          const verified = await verifyFirebaseIdToken(authHeader.slice(7));
+          return verified?.uid || null;
+        }
+        return null;
+      })(),
+      // 3. ALL product reads in parallel (was sequential before!)
+      Promise.all(items.map((item: any) => {
+        const productId = String(item.product_id || '');
+        return productId ? getFirestoreDoc('products', productId).then(fields => ({ productId, fields })) : Promise.resolve({ productId, fields: null });
+      })),
+      // 4. Coupon read in parallel
+      order.coupon_id ? getFirestoreDoc('coupons', String(order.coupon_id)) : Promise.resolve(null),
+    ]);
+
+    // Rate limit gate
+    if (!rlResult.allowed) {
+      logRateLimitBlock('create-order', clientIp, rlResult.attempts);
+      return new Response(JSON.stringify({ error: 'Too many requests' }),
+        { status: 429, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     // Ensure user_id matches caller (if authenticated) or is a guest id
@@ -284,44 +297,38 @@ Deno.serve(async (req) => {
     }
 
     // 🔒 Server-side price recalculation — NEVER trust client total_amount
-    // Cache product data to avoid N+1 reads (reused for order_items + guest_orders below)
     const productCache = new Map<string, Record<string, unknown>>();
     let recalculatedTotal = 0;
-    for (const item of items) {
-      const productId = item.product_id;
-      const quantity = Number(item.quantity) || 1;
-      if (!productId || typeof productId !== 'string') {
+    for (const { productId, fields } of productResults) {
+      if (!productId) {
         return new Response(JSON.stringify({ error: 'Invalid product_id in items' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
-      // 🔒 Validate quantity bounds (prevent absurd values)
+      if (!fields) {
+        return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
+      }
+      productCache.set(productId, fields);
+      const item = items.find((i: any) => String(i.product_id) === productId);
+      const quantity = Number(item?.quantity) || 1;
       if (!Number.isInteger(quantity) || quantity < 1 || quantity > 100) {
         return new Response(JSON.stringify({ error: 'Invalid quantity (must be 1-100)' }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
       }
-      const productFields = await getFirestoreDoc('products', productId);
-      if (!productFields) {
-        return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...cors, 'Content-Type': 'application/json' } });
-      }
-      productCache.set(productId, productFields);
-      const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
+      const realPrice = Number(fields.price?.doubleValue || fields.price?.integerValue || 0);
       recalculatedTotal += realPrice * quantity;
     }
 
-    // Apply coupon discount server-side
+    // Apply coupon discount server-side (already fetched in parallel)
     let discountAmount = 0;
-    if (order.coupon_id) {
-      const couponFields = await getFirestoreDoc('coupons', String(order.coupon_id));
-      if (couponFields) {
-        const discountType = couponFields.discount_type?.stringValue;
-        const discountValue = Number(couponFields.discount_value?.doubleValue || couponFields.discount_value?.integerValue || 0);
-        const isActive = couponFields.is_active?.booleanValue !== false;
-        const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null;
-        const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0;
-        const expiresAt = couponFields.expires_at?.stringValue;
-        if (isActive && (!maxUses || currentUses < maxUses) && (!expiresAt || new Date(expiresAt) > new Date())) {
-          if (discountType === 'percentage') discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal);
-          else discountAmount = Math.min(discountValue, recalculatedTotal);
-          console.log(`🏷️ Coupon ${order.coupon_id}: -R$${discountAmount.toFixed(2)}`);
-        }
+    if (order.coupon_id && couponFields) {
+      const discountType = couponFields.discount_type?.stringValue;
+      const discountValue = Number(couponFields.discount_value?.doubleValue || couponFields.discount_value?.integerValue || 0);
+      const isActive = couponFields.is_active?.booleanValue !== false;
+      const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null;
+      const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0;
+      const expiresAt = couponFields.expires_at?.stringValue;
+      if (isActive && (!maxUses || currentUses < maxUses) && (!expiresAt || new Date(expiresAt) > new Date())) {
+        if (discountType === 'percentage') discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal);
+        else discountAmount = Math.min(discountValue, recalculatedTotal);
+        console.log(`🏷️ Coupon ${order.coupon_id}: -R$${discountAmount.toFixed(2)}`);
       }
     }
 
@@ -393,13 +400,17 @@ Deno.serve(async (req) => {
 
     console.log(`✅ ${items.length} order items created for order ${orderId}`);
 
-    // Save coupon info if present
-    if (order.coupon_id && order.coupon_code) {
-      try {
+    // ── PARALLEL: Coupon save + Guest order creation ──────────────────
+    let guestHash: string | null = null;
+
+    const [, guestResult] = await Promise.allSettled([
+      // 1. Save coupon info (fire-and-forget style)
+      (async () => {
+        if (!order.coupon_id || !order.coupon_code) return;
         const accessToken = await getFirebaseAccessToken();
         const fieldPaths = 'updateMask.fieldPaths=coupon_id&updateMask.fieldPaths=coupon_code';
         const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/orders/${orderId}?${fieldPaths}`;
-        await fetch(url, {
+        const res = await fetch(url, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
           body: JSON.stringify({
@@ -409,91 +420,90 @@ Deno.serve(async (req) => {
             },
           }),
         });
-      } catch (err) {
-        console.warn('⚠️ Failed to save coupon info:', err);
-      }
-    }
+        if (!res.ok) console.warn('⚠️ Failed to save coupon info:', res.status);
+      })(),
 
-    // Create guest_order for /order/:hash access (server-side, bypasses Firestore rules)
-    // Uses hash as document ID: guest_orders/{hash} — enables secure read-by-path (no queries)
-    let guestHash: string | null = null;
-    try {
-      const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-      let hash = '';
-      for (let i = 0; i < 12; i++) hash += chars.charAt(Math.floor(Math.random() * chars.length));
+      // 2. Create guest_order for /order/:hash access
+      (async () => {
+        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+        let hash = '';
+        for (let i = 0; i < 12; i++) hash += chars.charAt(Math.floor(Math.random() * chars.length));
 
-      const expiresAt = new Date();
-      expiresAt.setDate(expiresAt.getDate() + 30);
+        const expiresAt = new Date();
+        expiresAt.setDate(expiresAt.getDate() + 30);
 
-      // 🔒 SECURITY: Use cached server-recalculated prices for guest_orders display (no extra reads)
-      const serverItemPrices = new Map<string, number>();
-      for (const item of items) {
-        const cached = productCache.get(String(item.product_id));
-        if (cached) {
-          serverItemPrices.set(String(item.product_id), Number(cached.price?.doubleValue || cached.price?.integerValue || 0));
+        const serverItemPrices = new Map<string, number>();
+        for (const item of items) {
+          const cached = productCache.get(String(item.product_id));
+          if (cached) {
+            serverItemPrices.set(String(item.product_id), Number(cached.price?.doubleValue || cached.price?.integerValue || 0));
+          }
         }
-      }
 
-      // Write guest_orders/{hash} doc (hash = docId, no auto-generated ID)
-      const guestOrderData: Record<string, unknown> = {
-        order_id: orderId,
-        email: String(order.customer_email).trim().toLowerCase(),
-        customer_name: order.customer_name || null,
-        customer_phone: order.customer_phone || null,
-        guest_session_id: userId.startsWith('guest_') ? userId : null,
-        user_id: userId.startsWith('guest_') ? null : userId,
-        linked: !userId.startsWith('guest_'),
-        total_amount: serverTotal,
-        payment_method: order.payment_method || 'pix',
-        created_at: now,
-        expires_at: expiresAt.toISOString(),
-      };
-
-      // Use PATCH to create doc with specific ID (hash)
-      const accessToken = await getFirebaseAccessToken();
-      const guestFields: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(guestOrderData)) {
-        if (v === null || v === undefined) guestFields[k] = { nullValue: null };
-        else if (typeof v === 'string') guestFields[k] = { stringValue: v };
-        else if (typeof v === 'number') guestFields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-        else if (typeof v === 'boolean') guestFields[k] = { booleanValue: v };
-        else guestFields[k] = { stringValue: String(v) };
-      }
-      const guestDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}`;
-      const guestRes = await fetch(guestDocUrl, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-        body: JSON.stringify({ fields: guestFields }),
-      });
-      if (!guestRes.ok) throw new Error(`guest_orders write failed: ${guestRes.status}`);
-
-      // Write items to subcollection IN PARALLEL: guest_orders/{hash}/items/{itemIdx}
-      await Promise.all(items.map(async (it: any, idx: number) => {
-        const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
-        const qty = Number(it.quantity) || 1;
-        const itemFields: Record<string, unknown> = {
-          product_name: { stringValue: String(it.product_name || '') },
-          product_image: it.product_image ? { stringValue: String(it.product_image) } : { nullValue: null },
-          product_id: { stringValue: String(it.product_id || '') },
-          quantity: { integerValue: String(qty) },
-          unit_price: { doubleValue: realPrice },
-          total_price: { doubleValue: Math.round(realPrice * qty * 100) / 100 },
-          delivery_code: { nullValue: null },
-          order_id: { stringValue: orderId },
+        const guestOrderData: Record<string, unknown> = {
+          order_id: orderId,
+          email: String(order.customer_email).trim().toLowerCase(),
+          customer_name: order.customer_name || null,
+          customer_phone: order.customer_phone || null,
+          guest_session_id: userId.startsWith('guest_') ? userId : null,
+          user_id: userId.startsWith('guest_') ? null : userId,
+          linked: !userId.startsWith('guest_'),
+          total_amount: serverTotal,
+          payment_method: order.payment_method || 'pix',
+          created_at: now,
+          expires_at: expiresAt.toISOString(),
         };
-        const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}/items/${idx}`;
-        const itemRes = await fetch(itemUrl, {
+
+        const accessToken = await getFirebaseAccessToken();
+        const guestFields: Record<string, unknown> = {};
+        for (const [k, v] of Object.entries(guestOrderData)) {
+          if (v === null || v === undefined) guestFields[k] = { nullValue: null };
+          else if (typeof v === 'string') guestFields[k] = { stringValue: v };
+          else if (typeof v === 'number') guestFields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+          else if (typeof v === 'boolean') guestFields[k] = { booleanValue: v };
+          else guestFields[k] = { stringValue: String(v) };
+        }
+        const guestDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}`;
+        const guestRes = await fetch(guestDocUrl, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-          body: JSON.stringify({ fields: itemFields }),
+          body: JSON.stringify({ fields: guestFields }),
         });
-        if (!itemRes.ok) console.warn(`⚠️ guest_orders/${hash}/items/${idx} write failed: ${itemRes.status}`);
-      }));
+        if (!guestRes.ok) throw new Error(`guest_orders write failed: ${guestRes.status}`);
 
-      guestHash = hash;
-      console.log(`✅ Guest order saved with hash as docId: ${hash} (${items.length} items in subcollection)`);
-    } catch (err) {
-      console.warn('⚠️ Failed to save guest order:', err);
+        // Write items to subcollection IN PARALLEL
+        await Promise.all(items.map(async (it: any, idx: number) => {
+          const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
+          const qty = Number(it.quantity) || 1;
+          const itemFields: Record<string, unknown> = {
+            product_name: { stringValue: String(it.product_name || '') },
+            product_image: it.product_image ? { stringValue: String(it.product_image) } : { nullValue: null },
+            product_id: { stringValue: String(it.product_id || '') },
+            quantity: { integerValue: String(qty) },
+            unit_price: { doubleValue: realPrice },
+            total_price: { doubleValue: Math.round(realPrice * qty * 100) / 100 },
+            delivery_code: { nullValue: null },
+            order_id: { stringValue: orderId },
+          };
+          const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}/items/${idx}`;
+          const itemRes = await fetch(itemUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({ fields: itemFields }),
+          });
+          if (!itemRes.ok) console.warn(`⚠️ guest_orders/${hash}/items/${idx} write failed: ${itemRes.status}`);
+        }));
+
+        console.log(`✅ Guest order saved with hash as docId: ${hash} (${items.length} items in subcollection)`);
+        return hash;
+      })(),
+    ]);
+
+    // Extract guestHash from settled result
+    if (guestResult.status === 'fulfilled' && guestResult.value) {
+      guestHash = guestResult.value as string;
+    } else if (guestResult.status === 'rejected') {
+      console.warn('⚠️ Failed to save guest order:', guestResult.reason);
     }
 
     return new Response(JSON.stringify({ success: true, orderId, guestHash }), {

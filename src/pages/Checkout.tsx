@@ -225,7 +225,7 @@ export default function Checkout() {
     
     setLoading(true);
 
-    // Send InitiateCheckout to Meta CAPI
+    // Send InitiateCheckout to Meta CAPI (fire-and-forget, don't block checkout)
     sendInitiateCheckout({
       userId: effectiveUserId,
       email: formData.email || user?.email || undefined,
