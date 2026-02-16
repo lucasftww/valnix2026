@@ -413,10 +413,102 @@ Deno.serve(async (req) => {
           if (o.created_at && typeof o.created_at === 'object' && o.created_at.seconds) {
             o.created_at = new Date(o.created_at.seconds * 1000).toISOString();
           }
+          if (o.updated_at && typeof o.updated_at === 'object' && o.updated_at.seconds) {
+            o.updated_at = new Date(o.updated_at.seconds * 1000).toISOString();
+          }
         }
 
-        return new Response(JSON.stringify({ orders, products, profiles, orderItems }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        // ── Server-side aggregation ──
+        const now = new Date();
+        const todayCutoff = new Date(now); todayCutoff.setHours(0, 0, 0, 0);
+        const d7Cutoff = new Date(now); d7Cutoff.setDate(now.getDate() - 7);
+        const d30Cutoff = new Date(now); d30Cutoff.setDate(now.getDate() - 30);
+
+        const filterByDate = (items: any[], cutoff: Date) =>
+          items.filter((i: any) => { const d = new Date(i.created_at); return !isNaN(d.getTime()) && d >= cutoff; });
+
+        const computePeriod = (periodOrders: any[]) => {
+          const paid = periodOrders.filter((o: any) => o.payment_status === 'paid');
+          const revenue = paid.reduce((s: number, o: any) => s + (Number(o.total_amount) || 0), 0);
+          return {
+            orders: periodOrders.length,
+            paidCount: paid.length,
+            revenue,
+            avgTicket: paid.length > 0 ? revenue / paid.length : 0,
+            failed: periodOrders.filter((o: any) => o.payment_status === 'failed').length,
+          };
+        };
+
+        const periods = {
+          today: computePeriod(filterByDate(orders, todayCutoff)),
+          '7d': computePeriod(filterByDate(orders, d7Cutoff)),
+          '30d': computePeriod(filterByDate(orders, d30Cutoff)),
+        };
+
+        // All-time paid orders for top products
+        const allPaid = orders.filter((o: any) => o.payment_status === 'paid');
+        const paidIds = new Set(allPaid.map((o: any) => o.id));
+
+        const productSales: Record<string, { quantity: number; revenue: number }> = {};
+        for (const item of orderItems) {
+          if (!paidIds.has(item.order_id)) continue;
+          const name = item.product_name || 'Desconhecido';
+          if (!productSales[name]) productSales[name] = { quantity: 0, revenue: 0 };
+          productSales[name].quantity += Number(item.quantity) || 0;
+          productSales[name].revenue += Number(item.total_price) || 0;
+        }
+        const topProducts = Object.entries(productSales)
+          .sort((a, b) => b[1].quantity - a[1].quantity)
+          .slice(0, 5);
+
+        // Revenue by day (last 7)
+        const last7Days = Array.from({ length: 7 }, (_, i) => {
+          const d = new Date(); d.setDate(d.getDate() - (6 - i));
+          return d.toISOString().split('T')[0];
+        });
+        const revenueByDay = last7Days.map(date => {
+          const dayPaid = orders.filter((o: any) => o.created_at?.startsWith(date) && o.payment_status === 'paid');
+          const rev = dayPaid.reduce((s: number, o: any) => s + (Number(o.total_amount) || 0), 0);
+          const dn = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
+          return { name: dn.charAt(0).toUpperCase() + dn.slice(1, 3), receita: rev, pedidos: dayPaid.length };
+        });
+
+        // Payment distribution
+        const paymentDistribution = [
+          { name: 'Pago', value: allPaid.length, color: '#10b981' },
+          { name: 'Pendente', value: orders.filter((o: any) => o.payment_status === 'pending').length, color: '#f59e0b' },
+          { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' },
+        ].filter(i => i.value > 0);
+
+        // Alerts
+        const alerts: { type: string; title: string; description: string }[] = [];
+        const stuckProcessing = orders.filter((o: any) => {
+          if (o.payment_status !== 'processing_balance') return false;
+          const ref = o.updated_at || o.created_at;
+          if (!ref) return true;
+          return Date.now() - new Date(ref).getTime() > 5 * 60 * 1000;
+        });
+        if (stuckProcessing.length > 0) alerts.push({ type: 'error', title: `${stuckProcessing.length} pedido(s) travado(s) em processing_balance`, description: 'Possível falha no checkout-balance. Verificar manualmente.' });
+        const needsRefund = orders.filter((o: any) => o.payment_status === 'error_needs_refund');
+        if (needsRefund.length > 0) alerts.push({ type: 'error', title: `${needsRefund.length} pedido(s) com erro de reembolso`, description: 'Reembolso automático falhou. Ação manual necessária.' });
+        const lowStock = products.filter((p: any) => p.delivery_type === 'auto_real' && p.is_active !== false && (p.auto_delivery_codes?.length || 0) < 3);
+        if (lowStock.length > 0) alerts.push({ type: 'warning', title: `${lowStock.length} produto(s) com estoque baixo`, description: `Produtos auto_real com < 3 códigos: ${lowStock.map((p: any) => p.name).join(', ')}` });
+
+        // Recent orders (last 8 paid)
+        const recentOrders = [...allPaid]
+          .sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''))
+          .slice(0, 8)
+          .map((o: any) => ({ id: o.id, customer_name: o.customer_name || '', total_amount: Number(o.total_amount) || 0, created_at: o.created_at }));
+
+        // Pending delivery count
+        const pendingDelivery = orders.filter((o: any) => o.payment_status === 'paid' && o.status !== 'completed' && o.status !== 'cancelled').length;
+
+        return new Response(JSON.stringify({
+          periods, topProducts, revenueByDay, paymentDistribution,
+          alerts, recentOrders, pendingDelivery,
+          totalProducts: products.filter((p: any) => p.is_active !== false).length,
+          totalUsers: profiles.length,
+        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       return new Response(JSON.stringify({ error: "Invalid resource" }),
