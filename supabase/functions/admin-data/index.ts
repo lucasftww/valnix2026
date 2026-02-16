@@ -849,6 +849,66 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
+
+      // ── Admin verify-payment: force payment_status with audit log ──
+      if (resource === "verify-payment") {
+        const newPaymentStatus = body.payment_status;
+        const newStatus = body.status;
+        if (!newPaymentStatus) {
+          return new Response(JSON.stringify({ error: "payment_status required" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        const ALLOWED_PAYMENT_STATUSES = ['paid', 'pending', 'failed', 'refunded'];
+        if (!ALLOWED_PAYMENT_STATUSES.includes(newPaymentStatus)) {
+          return new Response(JSON.stringify({ error: `Invalid payment_status. Allowed: ${ALLOWED_PAYMENT_STATUSES.join(', ')}` }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Read current order for audit
+        try {
+          const accessToken = await getFirebaseAccessToken();
+          const orderUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/orders/${docId}`;
+          const orderRes = await fetch(orderUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+          const orderData = orderRes.ok ? await orderRes.json() : null;
+          const prevPaymentStatus = orderData?.fields?.payment_status?.stringValue ?? 'unknown';
+          const prevStatus = orderData?.fields?.status?.stringValue ?? 'unknown';
+
+          // Write audit log
+          const auditId = crypto.randomUUID();
+          const auditUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/admin_audit_logs/${auditId}`;
+          await fetch(auditUrl, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              fields: {
+                action: { stringValue: 'verify_payment' },
+                order_id: { stringValue: docId },
+                admin_uid: { stringValue: userData.uid },
+                admin_email: { stringValue: userData.email },
+                previous_payment_status: { stringValue: prevPaymentStatus },
+                new_payment_status: { stringValue: newPaymentStatus },
+                previous_status: { stringValue: prevStatus },
+                new_status: { stringValue: newStatus || prevStatus },
+                ip: { stringValue: clientIp },
+                created_at: { stringValue: new Date().toISOString() },
+              },
+            }),
+          });
+          console.log(`📝 AUDIT: Verify payment by ${userData.email} for order ${docId}: ${prevPaymentStatus} → ${newPaymentStatus}`);
+        } catch (auditErr) {
+          console.error('⚠️ Audit log failed (non-blocking):', auditErr);
+        }
+
+        const updateData: Record<string, unknown> = {
+          payment_status: newPaymentStatus,
+          updated_at: new Date().toISOString(),
+        };
+        if (newStatus) updateData.status = newStatus;
+
+        const success = await updateFirestoreDoc("orders", docId, updateData);
+        return new Response(JSON.stringify({ success }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
     }
 
     // ── DELETE ────────────────────────────────────────────────────

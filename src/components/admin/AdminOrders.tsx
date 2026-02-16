@@ -384,7 +384,7 @@ export const AdminOrders = () => {
         const token = await getFirebaseToken();
         await invokeFunction("admin-data", {
           method: "PUT",
-          queryParams: { resource: "orders" },
+          queryParams: { resource: "verify-payment" },
           headers: { "x-firebase-token": token || "" },
           body: { id: order.id, payment_status: 'paid', status: 'processing' },
         });
@@ -743,9 +743,6 @@ export const AdminOrders = () => {
                     });
                     const data = await res.json();
                     if (data.success) {
-                      setCleanupEmail("");
-                      setCleanupEmailDialogOpen(false);
-                      await fetchOrders();
                       setCleanupEmail("");
                       setCleanupEmailDialogOpen(false);
                       await fetchOrders();
