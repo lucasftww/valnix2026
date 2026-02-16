@@ -92,9 +92,12 @@ export default function CardPaymentCallback() {
             orderId,
             value: stored?.amount,
             userId: currentUser?.uid,
-            email: stored?.email,
-            name: stored?.name,
+            email: stored?.customerEmail,
+            name: stored?.customerName,
             productNames: stored?.productNames,
+            productIds: stored?.productIds,
+            quantities: stored?.quantities,
+            prices: stored?.prices,
           });
 
           // 🔒 FIX: Guest order is already created server-side by create-order edge function.

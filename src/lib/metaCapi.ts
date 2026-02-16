@@ -10,22 +10,36 @@ function getCookie(name: string): string | undefined {
   return match ? decodeURIComponent(match[2]) : undefined;
 }
 
-// Get UTM params from sessionStorage
-function getUtmParams(): Record<string, string> {
-  try {
-    const raw = sessionStorage.getItem('valnix_utm_params');
-    return raw ? JSON.parse(raw) : {};
-  } catch {
-    return {};
-  }
+// Generate or retrieve a stable checkout session ID (anti-inflate on refresh)
+function getCheckoutSessionId(): string {
+  const key = 'valnix_checkout_session_id';
+  const existing = sessionStorage.getItem(key);
+  if (existing) return existing;
+  const id = `cs_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+  sessionStorage.setItem(key, id);
+  return id;
+}
+
+// Clear checkout session ID (call after purchase or cart clear)
+export function clearCheckoutSessionId() {
+  sessionStorage.removeItem('valnix_checkout_session_id');
+}
+
+interface ContentItem {
+  id: string;
+  quantity: number;
+  item_price: number;
 }
 
 interface MetaCapiEventData {
   event_name: string;
+  event_id?: string;
   order_id?: string;
   value?: number;
   content_name?: string;
   content_ids?: string[];
+  contents?: ContentItem[];
+  num_items?: number;
   email?: string;
   phone?: string;
   first_name?: string;
@@ -39,10 +53,12 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
     const fbc = getCookie('_fbc');
     const fbp = getCookie('_fbp');
 
-    // Deterministic event_id: no timestamp to ensure dedupe across retries
-    const eventId = data.order_id 
-      ? `${data.event_name.trim().toLowerCase()}_${data.order_id}`
-      : `${data.event_name.trim().toLowerCase()}_${Date.now()}`;
+    // Use provided event_id or generate deterministic one
+    const eventId = data.event_id
+      ? data.event_id
+      : data.order_id 
+        ? `${data.event_name.trim().toLowerCase()}_${data.order_id}`
+        : `${data.event_name.trim().toLowerCase()}_${Date.now()}`;
 
     const payload = {
       ...data,
@@ -70,13 +86,30 @@ export function sendInitiateCheckout(params: {
   name?: string;
   value?: number;
   productNames?: string[];
+  productIds?: string[];
+  quantities?: number[];
+  prices?: number[];
 }) {
   const nameParts = (params.name || '').split(' ');
+  const checkoutSessionId = getCheckoutSessionId();
+  
+  // Build contents array for better catalog matching
+  const contents: ContentItem[] = (params.productIds || []).map((id, i) => ({
+    id,
+    quantity: params.quantities?.[i] || 1,
+    item_price: params.prices?.[i] || 0,
+  }));
+
+  const numItems = (params.quantities || []).reduce((sum, q) => sum + q, 0) || contents.length;
+
   sendMetaCapiEvent({
     event_name: 'InitiateCheckout',
+    event_id: `initiatecheckout_${checkoutSessionId}`,
     value: params.value,
     content_name: params.productNames?.join(', '),
-    content_ids: params.productNames,
+    content_ids: params.productIds || params.productNames,
+    contents,
+    num_items: numItems,
     email: params.email,
     phone: params.phone,
     first_name: nameParts[0],
@@ -92,14 +125,32 @@ export function sendPurchaseFromClient(params: {
   email?: string;
   name?: string;
   productNames?: string[];
+  productIds?: string[];
+  quantities?: number[];
+  prices?: number[];
 }) {
   const nameParts = (params.name || '').split(' ');
+
+  // Build contents array
+  const contents: ContentItem[] = (params.productIds || []).map((id, i) => ({
+    id,
+    quantity: params.quantities?.[i] || 1,
+    item_price: params.prices?.[i] || 0,
+  }));
+
+  const numItems = (params.quantities || []).reduce((sum, q) => sum + q, 0) || contents.length;
+
+  // Clear checkout session on purchase
+  clearCheckoutSessionId();
+
   sendMetaCapiEvent({
     event_name: 'Purchase',
     order_id: params.orderId,
     value: params.value,
     content_name: params.productNames?.join(', '),
-    content_ids: params.productNames,
+    content_ids: params.productIds || params.productNames,
+    contents,
+    num_items: numItems,
     email: params.email,
     first_name: nameParts[0],
     last_name: nameParts.slice(1).join(' ') || undefined,
