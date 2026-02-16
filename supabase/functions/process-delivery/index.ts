@@ -532,7 +532,8 @@ Deno.serve(async (req) => {
 
   } catch (error: any) {
     console.error('❌ process-delivery error:', error);
-    return new Response(JSON.stringify({ success: false, error: error.message || 'Internal server error' }),
+    // 🔒 Never leak internal error details to client
+    return new Response(JSON.stringify({ success: false, error: 'Internal server error' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 });

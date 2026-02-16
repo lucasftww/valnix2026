@@ -10,6 +10,8 @@ const CLEANUP_CONFIG = [
   { collection: 'rate_limit_logs', retentionDays: 30 },
 ];
 
+const BATCH_SIZE = 500;
+
 // ── Firebase Service Account Auth ──
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -52,62 +54,98 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
-// ── Cleanup logic ──
+// ── Cleanup logic with PAGINATION ──
 async function cleanupCollection(collection: string, retentionDays: number, accessToken: string): Promise<number> {
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - retentionDays);
   const cutoffIso = cutoff.toISOString();
 
-  // Query docs with created_at < cutoff using structured query
-  const queryUrl = `${FIRESTORE_BASE}:runQuery`;
-  const queryBody = {
-    structuredQuery: {
-      from: [{ collectionId: collection }],
-      where: {
-        fieldFilter: {
-          field: { fieldPath: 'created_at' },
-          op: 'LESS_THAN',
-          value: { stringValue: cutoffIso },
+  let totalDeleted = 0;
+
+  // Loop until no more docs match
+  while (true) {
+    const queryUrl = `${FIRESTORE_BASE}:runQuery`;
+    const queryBody = {
+      structuredQuery: {
+        from: [{ collectionId: collection }],
+        where: {
+          fieldFilter: {
+            field: { fieldPath: 'created_at' },
+            op: 'LESS_THAN',
+            value: { stringValue: cutoffIso },
+          },
         },
+        limit: BATCH_SIZE,
       },
-      limit: 500,
-    },
+    };
+
+    const res = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify(queryBody),
+    });
+
+    if (!res.ok) {
+      console.warn(`⚠️ Query failed for ${collection}: ${res.status}`);
+      break;
+    }
+
+    const results = await res.json();
+    const docs = results.filter((r: any) => r.document?.name);
+
+    if (docs.length === 0) break;
+
+    // Batch delete via :commit
+    const commitUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
+    const writes = docs.map((r: any) => ({ delete: r.document.name }));
+
+    const commitRes = await fetch(commitUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ writes }),
+    });
+
+    if (!commitRes.ok) {
+      console.warn(`⚠️ Batch delete failed for ${collection}: ${commitRes.status}`);
+      break;
+    }
+
+    totalDeleted += docs.length;
+    console.log(`🧹 ${collection}: deleted batch of ${docs.length} docs (total: ${totalDeleted})`);
+
+    // If less than BATCH_SIZE, we're done
+    if (docs.length < BATCH_SIZE) break;
+  }
+
+  return totalDeleted;
+}
+
+// ── Write audit doc ──
+async function writeAuditDoc(accessToken: string, results: Record<string, number>, totalDeleted: number, durationMs: number) {
+  const runId = crypto.randomUUID();
+  const url = `${FIRESTORE_BASE}/cron_audit_logs?documentId=${encodeURIComponent(runId)}`;
+  const fields: Record<string, unknown> = {
+    type: { stringValue: 'cleanup-ttl' },
+    run_id: { stringValue: runId },
+    total_deleted: { integerValue: String(totalDeleted) },
+    duration_ms: { integerValue: String(durationMs) },
+    created_at: { stringValue: new Date().toISOString() },
+    server_time_utc: { stringValue: new Date().toISOString() },
   };
-
-  const res = await fetch(queryUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-    body: JSON.stringify(queryBody),
-  });
-
-  if (!res.ok) {
-    console.warn(`⚠️ Query failed for ${collection}: ${res.status}`);
-    return 0;
+  for (const [col, count] of Object.entries(results)) {
+    fields[`deleted_${col}`] = { integerValue: String(count) };
   }
-
-  const results = await res.json();
-  const docs = results.filter((r: any) => r.document?.name);
-
-  if (docs.length === 0) return 0;
-
-  // Batch delete using :commit (max 500 per commit)
-  const commitUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
-  const writes = docs.map((r: any) => ({
-    delete: r.document.name,
-  }));
-
-  const commitRes = await fetch(commitUrl, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-    body: JSON.stringify({ writes }),
-  });
-
-  if (!commitRes.ok) {
-    console.warn(`⚠️ Batch delete failed for ${collection}: ${commitRes.status}`);
-    return 0;
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ fields }),
+    });
+    if (res.ok) console.log(`📝 Audit doc written: ${runId}`);
+    else console.warn(`⚠️ Audit doc write failed: ${res.status}`);
+  } catch (e) {
+    console.warn('⚠️ Audit doc write error:', e);
   }
-
-  return docs.length;
 }
 
 Deno.serve(async (req) => {
@@ -122,6 +160,8 @@ Deno.serve(async (req) => {
   }
 
   const startMs = Date.now();
+  const serverNow = new Date();
+  console.log(`🕐 cleanup-ttl started at ${serverNow.toISOString()} (UTC) | Timezone offset: ${serverNow.getTimezoneOffset()}min`);
 
   try {
     const accessToken = await getFirebaseAccessToken();
@@ -130,7 +170,7 @@ Deno.serve(async (req) => {
     for (const config of CLEANUP_CONFIG) {
       const deleted = await cleanupCollection(config.collection, config.retentionDays, accessToken);
       results[config.collection] = deleted;
-      console.log(`🧹 ${config.collection}: deleted ${deleted} docs (retention: ${config.retentionDays}d)`);
+      console.log(`🧹 ${config.collection}: total deleted ${deleted} docs (retention: ${config.retentionDays}d)`);
     }
 
     const durationMs = Date.now() - startMs;
@@ -138,11 +178,15 @@ Deno.serve(async (req) => {
 
     console.log(`✅ TTL cleanup complete: ${totalDeleted} docs deleted in ${durationMs}ms`);
 
+    // Write audit doc for observability
+    await writeAuditDoc(accessToken, results, totalDeleted, durationMs);
+
     return new Response(JSON.stringify({
       success: true,
       deleted: results,
       total_deleted: totalDeleted,
       duration_ms: durationMs,
+      server_time_utc: serverNow.toISOString(),
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
