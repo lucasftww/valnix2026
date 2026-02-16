@@ -400,7 +400,7 @@ Deno.serve(async (req) => {
 
       const event = body.event || body.type || body.status;
       const chargeData = body.data || body.charge || body;
-      const paidEvents = ['card.paid', 'charge.paid', 'COMPLETED', 'paid', 'approved'];
+      const paidEvents = ['charge.completed', 'card.paid', 'charge.paid', 'COMPLETED', 'paid', 'approved'];
       const isPaidEvent = paidEvents.includes(event) || chargeData?.status === 'COMPLETED' || chargeData?.status === 'paid';
 
       if (!isPaidEvent) {
