@@ -677,6 +677,95 @@ Deno.serve(async (req) => {
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      // ── Cleanup analytics events ──────────────────────────────────
+      if (resource === "cleanup-analytics") {
+        const { before_date, after_date, event_names, dry_run } = body;
+
+        if (!before_date && !after_date) {
+          return new Response(JSON.stringify({ error: "before_date or after_date required (ISO format)" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Query analytics_events
+        const accessToken = await getFirebaseAccessToken();
+        const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
+        
+        // Build filters
+        const filters: any[] = [];
+        if (after_date) {
+          filters.push({ fieldFilter: { field: { fieldPath: 'event_time' }, op: 'GREATER_THAN_OR_EQUAL', value: { stringValue: after_date } } });
+        }
+        if (before_date) {
+          filters.push({ fieldFilter: { field: { fieldPath: 'event_time' }, op: 'LESS_THAN', value: { stringValue: before_date } } });
+        }
+
+        const where = filters.length === 1 ? filters[0] : { compositeFilter: { op: 'AND', filters } };
+
+        const res = await fetch(queryUrl, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+          body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'analytics_events' }], where, limit: 10000 } }),
+        });
+
+        if (!res.ok) {
+          return new Response(JSON.stringify({ error: "Failed to query analytics events" }),
+            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        const results = await res.json();
+        const docs = Array.isArray(results) ? results.filter((r: any) => r.document) : [];
+
+        // Optionally filter by event names
+        const validNames = event_names && Array.isArray(event_names) && event_names.length > 0 ? new Set(event_names) : null;
+        const toDelete = docs.filter((r: any) => {
+          if (!validNames) return true;
+          const name = r.document.fields?.event_name?.stringValue;
+          return validNames.has(name);
+        });
+
+        if (dry_run) {
+          // Count by event_name
+          const counts: Record<string, number> = {};
+          for (const r of toDelete) {
+            const name = r.document.fields?.event_name?.stringValue || 'unknown';
+            counts[name] = (counts[name] || 0) + 1;
+          }
+          return new Response(JSON.stringify({ dry_run: true, total: toDelete.length, by_event: counts }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+
+        // Delete in batches
+        let deleted = 0;
+        const errors: string[] = [];
+        for (const r of toDelete) {
+          const docPath = r.document.name;
+          try {
+            const delRes = await fetch(`https://firestore.googleapis.com/v1/${docPath}`, {
+              method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` },
+            });
+            if (delRes.ok || delRes.status === 404) deleted++;
+            else errors.push(`Failed: ${docPath}`);
+          } catch (err: any) {
+            errors.push(`Error: ${docPath}: ${err.message}`);
+          }
+        }
+
+        console.log(`🧹 Analytics cleanup by ${userData.email}: deleted ${deleted}/${toDelete.length} events (range: ${after_date || '*'} to ${before_date || '*'})`);
+
+        // Audit log
+        await createFirestoreDoc("admin_audit_logs", crypto.randomUUID(), {
+          admin_uid: userData.uid,
+          admin_email: userData.email,
+          action: "cleanup_analytics",
+          details: `Deleted ${deleted} analytics events (${after_date || '*'} to ${before_date || '*'})`,
+          ip: clientIp,
+          created_at: new Date().toISOString(),
+        });
+
+        return new Response(JSON.stringify({ success: true, deleted, total: toDelete.length, errors: errors.length > 0 ? errors.slice(0, 10) : undefined }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       // ── Cleanup orders by email ──────────────────────────────────
       if (resource === "cleanup-orders") {
         const email = (body.email || '').trim().toLowerCase();

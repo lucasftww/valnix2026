@@ -8,7 +8,7 @@ import {
   BarChart3, TrendingDown, Eye, ShoppingCart, 
   CreditCard, RefreshCw, ArrowDown, AlertTriangle,
   Smartphone, Monitor, Globe, DollarSign,
-  Activity, Target, Zap, Tablet
+  Activity, Target, Zap, Tablet, Trash2
 } from "lucide-react";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -23,6 +23,13 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { toast } from "sonner";
 
 const DEVICE_COLORS: Record<string, string> = {
   mobile: '#f97316',
@@ -64,6 +71,10 @@ function getPathname(url: string | null): string {
 
 export function AdminAnalytics() {
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('today');
+  const [cleanupFrom, setCleanupFrom] = useState('');
+  const [cleanupTo, setCleanupTo] = useState('');
+  const [cleanupLoading, setCleanupLoading] = useState(false);
+  const [previewData, setPreviewData] = useState<{ total: number; by_event: Record<string, number> } | null>(null);
   
   const { data: events = [], isLoading, refetch, isFetching } = useQuery({
     queryKey: ['analytics-events', dateRange],
@@ -90,6 +101,60 @@ export function AdminAnalytics() {
     },
     refetchInterval: 30000,
   });
+
+  const handleCleanupPreview = async () => {
+    if (!cleanupFrom && !cleanupTo) { toast.error("Selecione pelo menos uma data"); return; }
+    setCleanupLoading(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('Not authenticated');
+      const token = await currentUser.getIdToken();
+      const { invokeFunction } = await import("@/lib/apiHelper");
+      const res = await invokeFunction("admin-data", {
+        method: "POST",
+        queryParams: { resource: "cleanup-analytics" },
+        headers: { "x-firebase-token": token },
+        body: {
+          after_date: cleanupFrom ? new Date(cleanupFrom).toISOString() : undefined,
+          before_date: cleanupTo ? new Date(cleanupTo + 'T23:59:59').toISOString() : undefined,
+          dry_run: true,
+        },
+      });
+      const data = await res.json();
+      if (data.dry_run) setPreviewData(data);
+      else toast.error(data.error || "Erro ao previsar");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setCleanupLoading(false); }
+  };
+
+  const handleCleanupConfirm = async () => {
+    setCleanupLoading(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser) throw new Error('Not authenticated');
+      const token = await currentUser.getIdToken();
+      const { invokeFunction } = await import("@/lib/apiHelper");
+      const res = await invokeFunction("admin-data", {
+        method: "POST",
+        queryParams: { resource: "cleanup-analytics" },
+        headers: { "x-firebase-token": token },
+        body: {
+          after_date: cleanupFrom ? new Date(cleanupFrom).toISOString() : undefined,
+          before_date: cleanupTo ? new Date(cleanupTo + 'T23:59:59').toISOString() : undefined,
+          dry_run: false,
+        },
+      });
+      const data = await res.json();
+      if (data.success) {
+        toast.success(`${data.deleted} eventos removidos com sucesso`);
+        setPreviewData(null);
+        setCleanupFrom('');
+        setCleanupTo('');
+        refetch();
+      } else toast.error(data.error || "Erro");
+    } catch (e: any) { toast.error(e.message); }
+    finally { setCleanupLoading(false); }
+  };
 
   const funnelData = useMemo(() => {
     const counts: Record<string, number> = {};
@@ -209,6 +274,58 @@ export function AdminAnalytics() {
                 <TabsTrigger value="all" className="text-xs">Todos</TabsTrigger>
               </TabsList>
             </Tabs>
+
+            {/* Cleanup Dialog */}
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="outline" size="icon" className="h-9 w-9 text-destructive hover:text-destructive" title="Limpar eventos spam">
+                  <Trash2 className="h-4 w-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Limpar Eventos de Analytics</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    Remova eventos de spam/invasor por período. Esta ação é irreversível.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <div className="space-y-3 py-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label className="text-xs">De (início)</Label>
+                      <Input type="date" value={cleanupFrom} onChange={e => setCleanupFrom(e.target.value)} />
+                    </div>
+                    <div>
+                      <Label className="text-xs">Até (fim)</Label>
+                      <Input type="date" value={cleanupTo} onChange={e => setCleanupTo(e.target.value)} />
+                    </div>
+                  </div>
+                  {previewData && (
+                    <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20 text-sm space-y-1">
+                      <p className="font-semibold text-destructive">{previewData.total} eventos serão deletados:</p>
+                      {Object.entries(previewData.by_event).map(([name, count]) => (
+                        <p key={name} className="text-muted-foreground text-xs">• {name}: {count}</p>
+                      ))}
+                    </div>
+                  )}
+                </div>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setPreviewData(null)}>Cancelar</AlertDialogCancel>
+                  {!previewData ? (
+                    <Button onClick={handleCleanupPreview} disabled={cleanupLoading}>
+                      {cleanupLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Prévia
+                    </Button>
+                  ) : (
+                    <Button variant="destructive" onClick={handleCleanupConfirm} disabled={cleanupLoading}>
+                      {cleanupLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : null}
+                      Confirmar Exclusão ({previewData.total})
+                    </Button>
+                  )}
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
+
             <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => refetch()} disabled={isFetching}>
               <RefreshCw className={`h-4 w-4 ${isFetching ? 'animate-spin' : ''}`} />
             </Button>
