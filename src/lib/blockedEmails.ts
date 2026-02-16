@@ -3,6 +3,7 @@ const BLOCKED_EMAILS = new Set([
   "rodrigofaro@gmail.com",
   "test_redteam@gmail.com",
   "silvacarolinem7@gmail.com",
+  "lucky_pentester@example.com",
 ]);
 
 // Also block by UID for accounts where email may change

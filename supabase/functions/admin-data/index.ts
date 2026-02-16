@@ -599,6 +599,7 @@ Deno.serve(async (req) => {
           "rodrigofaro@gmail.com",
           "test_redteam@gmail.com",
           "silvacarolinem7@gmail.com",
+          "lucky_pentester@example.com",
         ];
 
         const accessToken = await getFirebaseAccessToken();
