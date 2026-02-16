@@ -127,7 +127,7 @@ async function uploadToR2(fileName: string, body: Uint8Array, contentType: strin
   const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
 
   const uploadUrl = `https://${host}${objectPath}`;
-  console.log(`Uploading to R2: ${uploadUrl}`);
+  console.log(`[R2 DEBUG] host=${host}, objectPath=${objectPath}, accessKeyId=${accessKeyId?.slice(0,8)}..., endpoint=${endpoint}, uploadUrl=${uploadUrl}`);
 
   const res = await fetch(uploadUrl, {
     method: 'PUT',
