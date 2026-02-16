@@ -152,19 +152,8 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>) {
   return res.ok;
 }
 
-// ── Delivery helpers ───────────────────────────────────────────────
 // NOTE: Auto-delivery is handled exclusively by process-delivery edge function.
-// processAutoDelivery was removed to prevent bypass of atomic locks.
-
-function generateFakeDeliveryCode(): string {
-  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  let result = '';
-  for (let i = 0; i < 16; i++) {
-    result += chars.charAt(Math.floor(Math.random() * chars.length));
-    if ((i + 1) % 4 === 0 && i < 15) result += '-';
-  }
-  return result;
-}
+// generateFakeDeliveryCode and processAutoDelivery were removed to prevent bypass of atomic locks.
 
 // ── Analytics → Firestore ──────────────────────────────────────────
 async function registerAnalyticsEvent(orderId: string, value: number, userId?: string, customerEmail?: string) {

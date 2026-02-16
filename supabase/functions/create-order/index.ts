@@ -137,7 +137,8 @@ Deno.serve(async (req) => {
     // Ensure user_id matches caller (if authenticated) or is a guest id
     const userId = order.user_id || '';
     if (callerUid && userId !== callerUid) {
-      console.warn(`⚠️ create-order: user_id mismatch. caller=${callerUid}, order.user_id=${userId}`);
+      console.warn(`🚨 create-order: REJECTED user_id mismatch. caller=${callerUid}, order.user_id=${userId}`);
+      return new Response(JSON.stringify({ error: 'User ID mismatch' }), { status: 403, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
     // Basic input validation
