@@ -31,9 +31,10 @@
     <link rel="dns-prefetch" href="https://media.discordapp.net" />
     <link rel="dns-prefetch" href="https://www.googleapis.com" />
     <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
     
-    <!-- Prefetch páginas principais -->
-    <link rel="prefetch" href="/valorant" as="document" />
+    
+    <title>VALNIX</title>
     <title>VALNIX</title>
     <meta name="description" content="Na VALNIX, nosso objetivo é que você compre seus giftcards de forma fácil e segura, com as principais formas de pagamento! O que está esperando? Compre agora!">
     <meta name="author" content="VALNIX" />
@@ -178,20 +179,21 @@
       })();
     </script>
 
-    <!-- Facebook Pixel Base (generates _fbp cookie for CAPI match quality) -->
+    <!-- Facebook Pixel Base — DEFERRED to avoid blocking render -->
     <script>
-      !function(f,b,e,v,n,t,s)
-      {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-      n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-      if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-      n.queue=[];t=b.createElement(e);t.async=!0;
-      t.src=v;s=b.getElementsByTagName(e)[0];
-      s.parentNode.insertBefore(t,s)}(window, document,'script',
-      'https://connect.facebook.net/en_US/fbevents.js');
-      fbq('set', 'autoConfig', false, '1939179866693535');
-      fbq('init', '1939179866693535');
-      // No PageView, no automatic events — pixel exists only for _fbc/_fbp cookie generation
-      // All conversion events are sent server-side via CAPI
+      // Defer FB pixel init to after page load for better LCP
+      window.addEventListener('load', function() {
+        !function(f,b,e,v,n,t,s)
+        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
+        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
+        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
+        n.queue=[];t=b.createElement(e);t.async=!0;
+        t.src=v;s=b.getElementsByTagName(e)[0];
+        s.parentNode.insertBefore(t,s)}(window, document,'script',
+        'https://connect.facebook.net/en_US/fbevents.js');
+        fbq('set', 'autoConfig', false, '1939179866693535');
+        fbq('init', '1939179866693535');
+      }, {once: true});
     </script>
     
 
