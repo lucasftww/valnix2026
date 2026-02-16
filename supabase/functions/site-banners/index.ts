@@ -20,12 +20,19 @@ function getCorsHeaders(req: Request) {
 
 const FIREBASE_PROJECT_ID = "valnix";
 
-// ── In-memory banner cache (survives across requests within same instance) ──
+// ── In-memory banner cache with jitter + single-flight lock ──
 let cachedBanners: any[] | null = null;
 let bannersCacheExpiry = 0;
-const BANNER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes (banners rarely change)
+const BANNER_CACHE_TTL = 15 * 60 * 1000; // 15 minutes base
+const BANNER_JITTER = 2 * 60 * 1000; // ±2 min jitter to prevent thundering herd
 // Stale cache: kept even after expiry as fallback when Firestore is unavailable
 let staleBanners: any[] | null = null;
+// Single-flight: only one Firestore fetch at a time; concurrent requests share the same promise
+let inflight: Promise<any[]> | null = null;
+
+function getTTLWithJitter(): number {
+  return BANNER_CACHE_TTL + Math.floor((Math.random() - 0.5) * BANNER_JITTER * 2);
+}
 
 let cachedAccessToken: string | null = null;
 let tokenExpiresAt = 0;
@@ -94,117 +101,125 @@ Deno.serve(async (req) => {
       { status: 405, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   }
 
+  const cacheHeaders = { "Cache-Control": "public, max-age=600, s-maxage=900, stale-while-revalidate=1800" };
+  const staleCacheHeaders = { "Cache-Control": "public, max-age=60, stale-while-revalidate=300" };
+
   try {
-    // Return cached banners if available (avoids Firestore REST roundtrip)
+    // 1. Serve from fresh cache
     if (cachedBanners && Date.now() < bannersCacheExpiry) {
       return new Response(JSON.stringify({ banners: cachedBanners }), {
-        headers: {
-          ...corsHeaders,
-          "Content-Type": "application/json",
-          "Cache-Control": "public, max-age=600, s-maxage=900, stale-while-revalidate=1800",
-        },
+        headers: { ...corsHeaders, "Content-Type": "application/json", ...cacheHeaders, "X-Banners-Source": "cache" },
       });
     }
 
-    const accessToken = await getFirebaseAccessToken();
-    const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
-
-    // Try composite query first, fallback to simple query if index missing
-    let res = await fetch(queryUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-      body: JSON.stringify({
-        structuredQuery: {
-          from: [{ collectionId: 'site_banners' }],
-          where: {
-            fieldFilter: { field: { fieldPath: 'is_active' }, op: 'EQUAL', value: { booleanValue: true } },
-          },
-          orderBy: [{ field: { fieldPath: 'display_order' }, direction: 'ASCENDING' }],
-          limit: 20,
-        },
-      }),
-    });
-
-    // Fallback ONLY for missing composite index (FAILED_PRECONDITION + "requires an index")
-    if (!res.ok) {
-      const errorText = await res.text();
-      const isIndexMissing = res.status === 400 &&
-        errorText.includes('FAILED_PRECONDITION') &&
-        errorText.includes('requires an index');
-
-      if (isIndexMissing) {
-        const indexLinkMatch = errorText.match(/https:\/\/console\.firebase\.google\.com[^\s"')]+/);
-        console.warn(`⚠️ Composite index missing for site_banners. Falling back to unordered query.${indexLinkMatch ? ` Create index: ${indexLinkMatch[0]}` : ''}`);
-        res = await fetch(queryUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-          body: JSON.stringify({
-            structuredQuery: {
-              from: [{ collectionId: 'site_banners' }],
-              where: {
-                fieldFilter: { field: { fieldPath: 'is_active' }, op: 'EQUAL', value: { booleanValue: true } },
-              },
-              limit: 20,
-            },
-          }),
+    // 2. Single-flight: if another request is already fetching, wait for it
+    if (inflight) {
+      try {
+        const banners = await inflight;
+        return new Response(JSON.stringify({ banners }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", ...cacheHeaders, "X-Banners-Source": "coalesced" },
         });
-        if (!res.ok) {
-          const fallbackError = await res.text();
-          console.error(`❌ Firestore fallback query also failed (${res.status}):`, fallbackError);
-          if (staleBanners) {
-            console.warn('⚠️ Serving stale banners cache due to Firestore error');
-            return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
-              headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
-            });
-          }
-          return new Response(JSON.stringify({ banners: [], error: 'Firestore unavailable' }),
-            { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-        }
-      } else {
-        console.error(`❌ Firestore query failed (${res.status}):`, errorText);
+      } catch {
+        // inflight failed — fall through to stale/empty
         if (staleBanners) {
-          console.warn('⚠️ Serving stale banners cache due to Firestore error');
           return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+            headers: { ...corsHeaders, "Content-Type": "application/json", ...staleCacheHeaders, "X-Banners-Source": "stale" },
           });
         }
-        return new Response(JSON.stringify({ banners: [], error: 'Firestore unavailable' }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        return new Response(JSON.stringify({ banners: [] }), {
+          status: 200, headers: { ...corsHeaders, "Content-Type": "application/json", "X-Banners-Source": "empty" },
+        });
       }
     }
 
-    const results = await res.json();
-    const banners = (Array.isArray(results) ? results : [])
-      .filter((r: any) => r.document)
-      .map((r: any) => {
-        const fields = r.document.fields || {};
-        const obj: any = { id: r.document.name.split('/').pop() };
-        for (const [k, v] of Object.entries(fields)) obj[k] = extractFirestoreValue(v);
-        return obj;
-      })
-      .sort((a: any, b: any) => (a.display_order ?? 999) - (b.display_order ?? 999));
+    // 3. This request becomes the fetcher (single-flight leader)
+    inflight = (async (): Promise<any[]> => {
+      const accessToken = await getFirebaseAccessToken();
+      const queryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
 
-    // Cache banners in-memory for 5 minutes (+ keep stale copy for fallback)
-    cachedBanners = banners;
-    staleBanners = banners;
-    bannersCacheExpiry = Date.now() + BANNER_CACHE_TTL;
+      let res = await fetch(queryUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          structuredQuery: {
+            from: [{ collectionId: 'site_banners' }],
+            where: { fieldFilter: { field: { fieldPath: 'is_active' }, op: 'EQUAL', value: { booleanValue: true } } },
+            orderBy: [{ field: { fieldPath: 'display_order' }, direction: 'ASCENDING' }],
+            limit: 20,
+          },
+        }),
+      });
 
-    return new Response(JSON.stringify({ banners }), {
-      headers: {
-        ...corsHeaders,
-        "Content-Type": "application/json",
-        "Cache-Control": "public, max-age=600, s-maxage=900, stale-while-revalidate=1800",
-      },
-    });
+      // Fallback for missing composite index
+      if (!res.ok) {
+        const errorText = await res.text();
+        const isIndexMissing = res.status === 400 && errorText.includes('FAILED_PRECONDITION') && errorText.includes('requires an index');
+        if (isIndexMissing) {
+          const indexLink = errorText.match(/https:\/\/console\.firebase\.google\.com[^\s"')]+/);
+          console.warn(`⚠️ Composite index missing. Falling back.${indexLink ? ` Create: ${indexLink[0]}` : ''}`);
+          res = await fetch(queryUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+            body: JSON.stringify({
+              structuredQuery: {
+                from: [{ collectionId: 'site_banners' }],
+                where: { fieldFilter: { field: { fieldPath: 'is_active' }, op: 'EQUAL', value: { booleanValue: true } } },
+                limit: 20,
+              },
+            }),
+          });
+        }
+        if (!res.ok) {
+          console.error(`❌ Firestore query failed (${res.status})`);
+          throw new Error('Firestore unavailable');
+        }
+      }
+
+      const results = await res.json();
+      return (Array.isArray(results) ? results : [])
+        .filter((r: any) => r.document)
+        .map((r: any) => {
+          const fields = r.document.fields || {};
+          const obj: any = { id: r.document.name.split('/').pop() };
+          for (const [k, v] of Object.entries(fields)) obj[k] = extractFirestoreValue(v);
+          return obj;
+        })
+        .sort((a: any, b: any) => (a.display_order ?? 999) - (b.display_order ?? 999));
+    })();
+
+    try {
+      const banners = await inflight;
+      // Update caches
+      cachedBanners = banners;
+      staleBanners = banners;
+      bannersCacheExpiry = Date.now() + getTTLWithJitter();
+
+      return new Response(JSON.stringify({ banners }), {
+        headers: { ...corsHeaders, "Content-Type": "application/json", ...cacheHeaders, "X-Banners-Source": "firestore" },
+      });
+    } catch {
+      // Firestore failed — serve stale or empty
+      console.warn('⚠️ Firestore fetch failed, serving fallback');
+      if (staleBanners) {
+        return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", ...staleCacheHeaders, "X-Banners-Source": "stale" },
+        });
+      }
+      return new Response(JSON.stringify({ banners: [] }), {
+        status: 200, headers: { ...corsHeaders, "Content-Type": "application/json", "X-Banners-Source": "empty" },
+      });
+    } finally {
+      inflight = null;
+    }
   } catch (error) {
     console.error("❌ site-banners unhandled error:", error);
     if (staleBanners) {
-      console.warn('⚠️ Serving stale banners cache due to unhandled error');
       return new Response(JSON.stringify({ banners: staleBanners, stale: true }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, stale-while-revalidate=300" },
+        headers: { ...corsHeaders, "Content-Type": "application/json", ...staleCacheHeaders, "X-Banners-Source": "stale" },
       });
     }
-    return new Response(JSON.stringify({ banners: [], error: "Service temporarily unavailable" }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    return new Response(JSON.stringify({ banners: [] }), {
+      status: 200, headers: { ...corsHeaders, "Content-Type": "application/json", "X-Banners-Source": "empty" },
+    });
   }
 });
