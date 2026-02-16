@@ -99,7 +99,7 @@ const ProductCardComponent = ({
         )}
         
         {/* Imagem com lazy loading otimizado */}
-        <div className="relative w-full aspect-[4/5] bg-muted overflow-hidden">
+        <div className="relative w-full aspect-[4/5] bg-background overflow-hidden">
           {isVisible ? (
             <img
               src={image}
