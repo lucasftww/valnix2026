@@ -505,11 +505,15 @@ export default function Checkout() {
           throw new Error(cardData.error || 'Erro ao criar cobrança de cartão');
         }
 
+        // Generate order-scoped delivery token for guest card callback
+        const deliveryToken = crypto.randomUUID();
+
         // Store card payment info for callback
         sessionStorage.setItem('valnix_card_payment', JSON.stringify({
           orderId,
           paymentId: cardData.paymentId,
-          couponId: appliedCoupon?.id || null, // Will be used to ensure coupon is saved to order on callback if not already
+          deliveryToken,
+          couponId: appliedCoupon?.id || null,
           couponCode: appliedCoupon?.code || null,
           discountAmount: discount || 0,
           customerName: formData.name,
@@ -519,13 +523,14 @@ export default function Checkout() {
           productNames: items.map(i => i.name),
         }));
 
-        // Save flowpay_charge_id and coupon info on the order for admin verification & webhook processing
+        // Save flowpay_charge_id, coupon info, and delivery_token on the order
         try {
           const orderRef = doc(db, "orders", orderId);
           await updateDoc(orderRef, { 
             flowpay_charge_id: cardData.paymentId,
             coupon_id: appliedCoupon?.id || null,
             coupon_code: appliedCoupon?.code || null,
+            delivery_token: deliveryToken,
           });
         } catch (err) {
           console.warn('⚠️ Failed to save flowpay_charge_id/coupon:', err);
