@@ -296,12 +296,14 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
   let parentFbc: string | undefined;
   let parentFbp: string | undefined;
   let parentPhone: string | undefined;
+  let parentEventSourceUrl: string | undefined;
   try {
     const parentOrder = await getFirestoreDoc('orders', orderId);
     if (parentOrder) {
       parentFbc = parentOrder.fbc?.stringValue || undefined;
       parentFbp = parentOrder.fbp?.stringValue || undefined;
       parentPhone = parentOrder.customer_phone?.stringValue || undefined;
+      parentEventSourceUrl = parentOrder.event_source_url?.stringValue || undefined;
     }
   } catch {}
 
@@ -320,6 +322,7 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
       first_name: nameParts[0] || undefined,
       last_name: nameParts.slice(1).join(' ') || undefined,
       external_id: userId, fbc: parentFbc, fbp: parentFbp,
+      event_source_url: parentEventSourceUrl,
     });
     console.log(`📡 Meta CAPI upsell Purchase sent for addon ${addonId}`);
   } catch (e) { console.warn('⚠️ Meta CAPI upsell failed:', e); }
@@ -581,6 +584,7 @@ Deno.serve(async (req) => {
               email: customerEmail, phone: customerPhone || undefined,
               first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
               external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+              event_source_url: orderFields?.event_source_url?.stringValue || undefined,
             });
             console.log(`📡 Meta CAPI Purchase sent for order ${orderId}`);
           }
@@ -884,6 +888,7 @@ Deno.serve(async (req) => {
                     email: fbEmail, phone: fbPhone || undefined,
                     first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
                     external_id: fbUserId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+                    event_source_url: orderFields?.event_source_url?.stringValue || undefined,
                   });
                 } else {
                   console.log(`ℹ️ Meta CAPI Purchase already sent for order ${orderId} (polling), skipping`);
