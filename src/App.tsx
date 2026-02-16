@@ -14,19 +14,17 @@ import { lazy, Suspense, useEffect } from "react";
 const AppContent = () => {
   useBackRedirect("/");
   
-  // Prefetch rotas comuns após idle
+  // Prefetch only the most critical route chunks after idle
   useEffect(() => {
     const prefetch = () => {
-      import("./pages/Auth");
-      import("./pages/Cart");
       import("./pages/ProductDetail");
-      import("./pages/Checkout");
-      import("./pages/Category"); // Prefetch category chunk for instant navigation
+      import("./pages/Category");
     };
+    // Delay prefetch to avoid competing with initial render
     if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(prefetch, { timeout: 2000 });
+      (window as any).requestIdleCallback(prefetch, { timeout: 4000 });
     } else {
-      setTimeout(prefetch, 1500);
+      setTimeout(prefetch, 3000);
     }
   }, []);
   

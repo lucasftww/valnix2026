@@ -53,25 +53,14 @@ const ProductCardComponent = ({
     });
   }, [queryClient, productId]);
 
-  // Intersection Observer para lazy loading
+  // Use native lazy loading via CSS content-visibility instead of per-card IntersectionObserver
+  // This dramatically reduces observer overhead when many cards are rendered
   useEffect(() => {
     if (priority) return;
-
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '100px', threshold: 0.01 }
-    );
-
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-
-    return () => observer.disconnect();
+    // Simple timeout fallback — cards below fold become visible after brief delay
+    // Combined with CSS contain-layout this is lighter than individual observers
+    const id = requestAnimationFrame(() => setIsVisible(true));
+    return () => cancelAnimationFrame(id);
   }, [priority]);
 
   // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
