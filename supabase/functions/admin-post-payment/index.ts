@@ -200,7 +200,7 @@ async function updateFirestoreDoc(col: string, docId: string, data: Record<strin
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
-  if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+  if (req.method === "OPTIONS") return new Response("ok", { status: 200, headers: corsHeaders });
 
   try {
     const firebaseToken = req.headers.get("x-firebase-token");

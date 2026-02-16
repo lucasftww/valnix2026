@@ -337,24 +337,30 @@ export const AdminProducts = () => {
   };
 
   const handleToggleFeatured = async (product: Product) => {
+    const newFeatured = !product.featured;
+    
+    // Optimistic update - update only this product locally
+    setProducts(prev => prev.map(p => p.id === product.id ? { ...p, featured: newFeatured } : p));
+    
     try {
       const token = await getFirebaseToken();
       const res = await invokeFunction('admin-data', {
         method: 'PUT',
         queryParams: { resource: 'products' },
         headers: { 'x-firebase-token': token },
-        body: { id: product.id, featured: !product.featured, updated_at: new Date().toISOString() },
+        body: { id: product.id, featured: newFeatured, updated_at: new Date().toISOString() },
       });
       if (!res.ok) throw new Error('Failed to toggle featured');
       
       toast({
-        title: product.featured ? "Removido dos Mais Vendidos" : "Adicionado aos Mais Vendidos",
-        description: `${product.name} foi ${product.featured ? "removido de" : "adicionado aos"} Mais Vendidos.`,
+        title: newFeatured ? "Adicionado aos Mais Vendidos" : "Removido dos Mais Vendidos",
+        description: `${product.name} foi ${newFeatured ? "adicionado aos" : "removido de"} Mais Vendidos.`,
       });
       
-      fetchProducts();
       invalidateQueries();
     } catch (error: any) {
+      // Revert on error
+      setProducts(prev => prev.map(p => p.id === product.id ? { ...p, featured: product.featured } : p));
       toast({
         title: "Erro ao atualizar",
         description: error.message,
