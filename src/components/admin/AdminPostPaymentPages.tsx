@@ -149,6 +149,7 @@ export function AdminPostPaymentPages() {
         original_price: page.original_price,
         button_accept_text: page.button_accept_text,
         button_skip_text: page.button_skip_text,
+        next_route: page.next_route,
         is_active: page.is_active,
       });
 
@@ -313,7 +314,7 @@ export function AdminPostPaymentPages() {
                   />
                 </div>
 
-                {/* Buttons text */}
+                {/* Buttons text + next_route */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
                     <Label className="text-xs text-gray-400">Texto botão aceitar</Label>
@@ -322,6 +323,10 @@ export function AdminPostPaymentPages() {
                   <div>
                     <Label className="text-xs text-gray-400">Texto botão pular</Label>
                     <Input value={page.button_skip_text} onChange={(e) => updatePage(page.id, { button_skip_text: e.target.value })} className="bg-[#0a0a0a] border-[#222]" />
+                  </div>
+                  <div className="md:col-span-2">
+                    <Label className="text-xs text-gray-400">Próxima rota (next_route)</Label>
+                    <Input value={page.next_route || ""} onChange={(e) => updatePage(page.id, { next_route: e.target.value })} placeholder="/protecao-total" className="bg-[#0a0a0a] border-[#222]" />
                   </div>
                 </div>
 
