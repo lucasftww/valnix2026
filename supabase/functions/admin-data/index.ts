@@ -1012,12 +1012,54 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "users") {
-        await Promise.all([
+        // 1. Delete Firestore docs (profiles, users, user_roles)
+        const firestoreResults = await Promise.allSettled([
           deleteFirestoreDoc("profiles", docId),
           deleteFirestoreDoc("users", docId),
           deleteFirestoreDoc("user_roles", docId),
         ]);
-        return new Response(JSON.stringify({ success: true }),
+        const firestoreErrors = firestoreResults.filter(r => r.status === 'rejected');
+        if (firestoreErrors.length > 0) {
+          console.warn(`⚠️ Some Firestore docs failed to delete for ${docId}:`, firestoreErrors);
+        }
+
+        // 2. Delete Firebase Auth account (prevents user from logging in again and re-creating docs)
+        let authDeleted = false;
+        try {
+          const accessToken = await getFirebaseAccessToken();
+          const deleteAuthRes = await fetch(
+            `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${Deno.env.get('FIREBASE_WEB_API_KEY')}`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+              body: JSON.stringify({ localId: docId }),
+            }
+          );
+          authDeleted = deleteAuthRes.ok;
+          if (!authDeleted) {
+            const errBody = await deleteAuthRes.text();
+            console.warn(`⚠️ Firebase Auth delete failed for ${docId}: ${deleteAuthRes.status} ${errBody}`);
+          } else {
+            console.log(`✅ Firebase Auth user deleted: ${docId}`);
+          }
+        } catch (authErr) {
+          console.error(`❌ Firebase Auth delete error for ${docId}:`, authErr);
+        }
+
+        // 3. Also delete user's orders and order_items
+        try {
+          const userOrders = await queryCollectionFiltered("orders", "user_id", "EQUAL", { stringValue: docId });
+          for (const order of userOrders) {
+            const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: order.id });
+            await Promise.allSettled(items.map(item => deleteFirestoreDoc("order_items", item.id)));
+            await deleteFirestoreDoc("orders", order.id);
+          }
+          console.log(`🗑️ Deleted ${userOrders.length} orders for user ${docId}`);
+        } catch (orderErr) {
+          console.warn(`⚠️ Failed to delete user orders for ${docId}:`, orderErr);
+        }
+
+        return new Response(JSON.stringify({ success: true, authDeleted }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
