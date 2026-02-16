@@ -111,7 +111,8 @@ export default function Checkout() {
     }
   }, [items.length, paymentData, navigate]);
 
-  // Track InitiateCheckout once on mount (aligned: both analytics + Meta CAPI fire here)
+  // Track InitiateCheckout once when items are ready (not blind mount)
+  // NO form PII here — user hasn't typed yet. Only auth-known data.
   const initiateCheckoutFiredRef = useRef(false);
   useEffect(() => {
     if (items.length > 0 && !initiateCheckoutFiredRef.current) {
@@ -119,9 +120,7 @@ export default function Checkout() {
       trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
       sendInitiateCheckout({
         userId: effectiveUserId,
-        email: formData.email || user?.email || undefined,
-        phone: formData.phone || undefined,
-        name: formData.name,
+        userEmail: user?.email || undefined,
         value: finalPrice,
         productNames: items.map(i => i.name),
         productIds: items.map(i => i.id),
@@ -129,7 +128,7 @@ export default function Checkout() {
         prices: items.map(i => i.price),
       });
     }
-  }, []); // fire once on mount
+  }, [items.length, finalPrice, effectiveUserId]); // deps ensure items are loaded
 
   // Load user profile
   useEffect(() => {

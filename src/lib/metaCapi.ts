@@ -10,21 +10,24 @@ function getCookie(name: string): string | undefined {
   return match ? decodeURIComponent(match[2]) : undefined;
 }
 
-// Generate or retrieve a stable checkout session ID (anti-inflate on refresh)
+// ── Checkout Session ID (localStorage for cross-tab stability) ─────
+const CHECKOUT_SESSION_KEY = 'valnix_checkout_session_id';
+
 function getCheckoutSessionId(): string {
-  const key = 'valnix_checkout_session_id';
-  const existing = sessionStorage.getItem(key);
-  if (existing) return existing;
+  try {
+    const existing = localStorage.getItem(CHECKOUT_SESSION_KEY);
+    if (existing) return existing;
+  } catch { /* localStorage unavailable */ }
   const id = `cs_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
-  sessionStorage.setItem(key, id);
+  try { localStorage.setItem(CHECKOUT_SESSION_KEY, id); } catch {}
   return id;
 }
 
-// Clear checkout session ID (call after purchase or cart clear)
 export function clearCheckoutSessionId() {
-  sessionStorage.removeItem('valnix_checkout_session_id');
+  try { localStorage.removeItem(CHECKOUT_SESSION_KEY); } catch {}
 }
 
+// ── Types ──────────────────────────────────────────────────────────
 interface ContentItem {
   id: string;
   quantity: number;
@@ -47,13 +50,12 @@ interface MetaCapiEventData {
   external_id?: string;
 }
 
+// ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {
   try {
-    // Capture client-side data
     const fbc = getCookie('_fbc');
     const fbp = getCookie('_fbp');
 
-    // Use provided event_id or generate deterministic one
     const eventId = data.event_id
       ? data.event_id
       : data.order_id 
@@ -70,7 +72,6 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       fbp: fbp || undefined,
     };
 
-    // Fire and forget - non-blocking
     invokeFunctionFireAndForget('meta-capi', payload).then(() => {
       console.log(`📡 Meta CAPI ${data.event_name} sent`);
     });
@@ -79,28 +80,49 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
   }
 }
 
+// ── Helper: build contents with safe fallbacks ─────────────────────
+function buildContents(
+  productIds?: string[],
+  quantities?: number[],
+  prices?: number[],
+  totalValue?: number,
+): { contents: ContentItem[]; numItems: number } {
+  const ids = productIds || [];
+  if (ids.length === 0) return { contents: [], numItems: 1 };
+
+  const contents: ContentItem[] = ids.map((id, i) => {
+    const qty = quantities?.[i] ?? 1;
+    // If price is missing/0, try proportional fallback from totalValue
+    let price = prices?.[i];
+    if ((price === undefined || price === 0) && totalValue && ids.length > 0) {
+      price = totalValue / ids.length;
+    }
+    return { id, quantity: qty, item_price: price ?? 0 };
+  });
+
+  const sumQty = contents.reduce((sum, c) => sum + c.quantity, 0);
+  const numItems = sumQty > 0 ? sumQty : ids.length || 1;
+
+  return { contents, numItems };
+}
+
+// ── InitiateCheckout ───────────────────────────────────────────────
+// Called on checkout mount — NO form PII (user hasn't typed yet).
+// Only sends data already available: userId, user email (if logged in),
+// cart items, fbp/fbc (captured automatically in sendMetaCapiEvent).
 export function sendInitiateCheckout(params: {
   userId?: string;
-  email?: string;
-  phone?: string;
-  name?: string;
+  userEmail?: string;       // from auth, NOT from form
   value?: number;
   productNames?: string[];
   productIds?: string[];
   quantities?: number[];
   prices?: number[];
 }) {
-  const nameParts = (params.name || '').split(' ');
   const checkoutSessionId = getCheckoutSessionId();
-  
-  // Build contents array for better catalog matching
-  const contents: ContentItem[] = (params.productIds || []).map((id, i) => ({
-    id,
-    quantity: params.quantities?.[i] || 1,
-    item_price: params.prices?.[i] || 0,
-  }));
-
-  const numItems = (params.quantities || []).reduce((sum, q) => sum + q, 0) || contents.length;
+  const { contents, numItems } = buildContents(
+    params.productIds, params.quantities, params.prices, params.value,
+  );
 
   sendMetaCapiEvent({
     event_name: 'InitiateCheckout',
@@ -110,14 +132,15 @@ export function sendInitiateCheckout(params: {
     content_ids: params.productIds || params.productNames,
     contents,
     num_items: numItems,
-    email: params.email,
-    phone: params.phone,
-    first_name: nameParts[0],
-    last_name: nameParts.slice(1).join(' ') || undefined,
+    // Only auth-known PII — no form data at mount
+    email: params.userEmail,
     external_id: params.userId,
   });
 }
 
+// ── Purchase (client-side) ─────────────────────────────────────────
+// Called after payment confirmed — full PII available.
+// event_id = purchase_{orderId} — MUST match server-side for dedup.
 export function sendPurchaseFromClient(params: {
   orderId: string;
   value: number;
@@ -130,17 +153,10 @@ export function sendPurchaseFromClient(params: {
   prices?: number[];
 }) {
   const nameParts = (params.name || '').split(' ');
+  const { contents, numItems } = buildContents(
+    params.productIds, params.quantities, params.prices, params.value,
+  );
 
-  // Build contents array
-  const contents: ContentItem[] = (params.productIds || []).map((id, i) => ({
-    id,
-    quantity: params.quantities?.[i] || 1,
-    item_price: params.prices?.[i] || 0,
-  }));
-
-  const numItems = (params.quantities || []).reduce((sum, q) => sum + q, 0) || contents.length;
-
-  // Clear checkout session on purchase
   clearCheckoutSessionId();
 
   sendMetaCapiEvent({
