@@ -1,6 +1,5 @@
 // Blocked emails - these accounts are permanently banned
 const BLOCKED_EMAILS = new Set([
-  "lucaseucontato@gmail.com",
   "rodrigofaro@gmail.com",
   "test_redteam@gmail.com",
   "silvacarolinem7@gmail.com",
