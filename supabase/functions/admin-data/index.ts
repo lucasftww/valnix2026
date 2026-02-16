@@ -292,6 +292,14 @@ async function deleteFirestoreDoc(col: string, docId: string) {
   return res.ok;
 }
 
+async function getFirestoreDoc(col: string, docId: string) {
+  const accessToken = await getFirebaseAccessToken();
+  const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
+  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+  if (!res.ok) return null;
+  return await res.json();
+}
+
 async function createFirestoreDoc(col: string, docId: string, data: Record<string, unknown>) {
   const accessToken = await getFirebaseAccessToken();
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
