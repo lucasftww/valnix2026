@@ -888,14 +888,26 @@ Deno.serve(async (req) => {
 
       // ── Cleanup orders by email ──────────────────────────────────
       if (resource === "cleanup-orders") {
-        const email = (body.email || '').trim().toLowerCase();
+        const rawEmail = (body.email || '').trim();
+        const email = rawEmail.toLowerCase();
         if (!email) {
           return new Response(JSON.stringify({ error: "email required" }),
             { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
         }
 
-        // Find all orders matching the email
-        const orders = await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: email });
+        // Firestore is case-sensitive — query both lowercase and original casing
+        const ordersLower = await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: email });
+        const ordersOriginal = rawEmail !== email
+          ? await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: rawEmail })
+          : [];
+        // Also try uppercase variant
+        const ordersUpper = await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: email.toUpperCase() });
+        // Deduplicate by id
+        const seenIds = new Set<string>();
+        const orders: typeof ordersLower = [];
+        for (const o of [...ordersLower, ...ordersOriginal, ...ordersUpper]) {
+          if (!seenIds.has(o.id)) { seenIds.add(o.id); orders.push(o); }
+        }
         if (orders.length === 0) {
           return new Response(JSON.stringify({ success: true, deletedOrders: 0, deletedItems: 0, message: "Nenhum pedido encontrado para este email." }),
             { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -922,7 +934,11 @@ Deno.serve(async (req) => {
         // Also clean guest_orders matching this email (including subcollection items)
         let deletedGuest = 0;
         try {
-          const guestOrders = await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: email });
+          const guestLower = await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: email });
+          const guestUpper = email !== email.toUpperCase() ? await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: email.toUpperCase() }) : [];
+          const guestOriginal = rawEmail !== email ? await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: rawEmail }) : [];
+          const guestSeen = new Set<string>();
+          const guestOrders = [...guestLower, ...guestUpper, ...guestOriginal].filter(g => { if (guestSeen.has(g.id)) return false; guestSeen.add(g.id); return true; });
           for (const g of guestOrders) {
             // Delete subcollection items first
             try {
@@ -945,7 +961,11 @@ Deno.serve(async (req) => {
         // Also clean sale_addons
         let deletedAddons = 0;
         try {
-          const addons = await queryCollectionFiltered("sale_addons", "customer_email", "EQUAL", { stringValue: email });
+          const addonsLower = await queryCollectionFiltered("sale_addons", "customer_email", "EQUAL", { stringValue: email });
+          const addonsUpper = email !== email.toUpperCase() ? await queryCollectionFiltered("sale_addons", "customer_email", "EQUAL", { stringValue: email.toUpperCase() }) : [];
+          const addonsOriginal = rawEmail !== email ? await queryCollectionFiltered("sale_addons", "customer_email", "EQUAL", { stringValue: rawEmail }) : [];
+          const addonsSeen = new Set<string>();
+          const addons = [...addonsLower, ...addonsUpper, ...addonsOriginal].filter(a => { if (addonsSeen.has(a.id)) return false; addonsSeen.add(a.id); return true; });
           for (const a of addons) {
             await deleteFirestoreDoc("sale_addons", a.id);
             deletedAddons++;
