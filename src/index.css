@@ -207,3 +207,23 @@ All colors MUST be HSL.
   scrollbar-color: hsl(var(--primary)) hsl(var(--background));
 }
 
+/* Performance: respect reduced-motion AND help non-GPU machines */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+/* Lighter skeleton pulse for low-end devices */
+@keyframes skeleton-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+.animate-pulse {
+  animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+

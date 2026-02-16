@@ -3,7 +3,7 @@ import { Card } from "./ui/card";
 
 export const ProductSkeleton = () => {
   return (
-    <Card className="overflow-hidden group hover:shadow-xl transition-all duration-300 border-border/50 rounded-md md:rounded-2xl">
+    <Card className="overflow-hidden border-border/50 rounded-md md:rounded-2xl">
       <div className="relative aspect-[4/5] overflow-hidden bg-secondary/30">
         <Skeleton className="w-full h-full" />
       </div>
