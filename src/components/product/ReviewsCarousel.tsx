@@ -28,7 +28,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
           key={star}
           className={`w-3.5 h-3.5 ${
             star <= review.rating
-              ? "fill-yellow-400 text-yellow-400"
+              ? "fill-amber-400 text-amber-400"
               : "fill-muted text-muted-foreground/20"
           }`}
         />

@@ -211,9 +211,9 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
           <div className="px-6 py-6 border-t border-border/30">
             <p className="text-[10px] text-muted-foreground text-center uppercase tracking-wider mb-4">Segurança verificada</p>
             <div className="flex items-center justify-center gap-5">
-              <img src={nortonSecured} alt="Norton Secured" className="h-8 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
-              <img src={reclameAqui} alt="Reclame Aqui" className="h-6 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
-              <img src={googleSafe} alt="Google Safe Browsing" className="h-8 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
+              <img src={nortonSecured} alt="Norton Secured" className="h-8 object-contain opacity-70" loading="lazy" />
+              <img src={reclameAqui} alt="Reclame Aqui" className="h-6 object-contain opacity-70" loading="lazy" />
+              <img src={googleSafe} alt="Google Safe Browsing" className="h-8 object-contain opacity-70" loading="lazy" />
             </div>
           </div>
 
@@ -319,9 +319,9 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
           <div className="mb-8 pb-8 border-b border-border/30">
             <p className="text-[10px] text-muted-foreground text-center uppercase tracking-wider mb-4">Segurança verificada</p>
             <div className="flex items-center justify-center gap-8">
-              <img src={nortonSecured} alt="Norton Secured" className="h-14 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
-              <img src={reclameAqui} alt="Reclame Aqui" className="h-8 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
-              <img src={googleSafe} alt="Google Safe Browsing" className="h-14 object-contain opacity-70" loading="lazy" style={{ mixBlendMode: 'lighten' }} />
+              <img src={nortonSecured} alt="Norton Secured" className="h-14 object-contain opacity-70" loading="lazy" />
+              <img src={reclameAqui} alt="Reclame Aqui" className="h-8 object-contain opacity-70" loading="lazy" />
+              <img src={googleSafe} alt="Google Safe Browsing" className="h-14 object-contain opacity-70" loading="lazy" />
             </div>
           </div>
 

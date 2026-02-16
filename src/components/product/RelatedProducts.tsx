@@ -90,7 +90,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                         </h3>
 
                         <div className="flex items-center gap-1 mt-auto">
-                          <Star className="w-3 h-3 fill-yellow-400 text-yellow-400 shrink-0" />
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
                           <span className="text-[10px] md:text-[11px] text-muted-foreground">
                             {stats.reviewCount.toLocaleString("pt-BR")}{" "}
                             avaliações
@@ -117,8 +117,8 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
           {relatedProducts.length > 4 && (
             <>
-              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/90 backdrop-blur-sm hover:bg-background border border-border/10 text-foreground" />
-              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/90 backdrop-blur-sm hover:bg-background border border-border/10 text-foreground" />
+              <CarouselPrevious className="hidden md:flex absolute left-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/90 hover:bg-background border border-border/10 text-foreground" />
+              <CarouselNext className="hidden md:flex absolute right-2 top-1/2 -translate-y-1/2 z-20 h-9 w-9 bg-background/90 hover:bg-background border border-border/10 text-foreground" />
             </>
           )}
         </Carousel>
