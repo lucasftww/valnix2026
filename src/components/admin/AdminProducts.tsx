@@ -194,11 +194,6 @@ export const AdminProducts = () => {
           body: { id: editingProduct.id, ...productData },
         });
         if (!res.ok) throw new Error('Failed to update product');
-        
-        toast({
-          title: "Produto atualizado!",
-          description: "O produto foi atualizado com sucesso.",
-        });
       } else {
         const newId = crypto.randomUUID();
         const res = await invokeFunction('admin-data', {
@@ -208,11 +203,6 @@ export const AdminProducts = () => {
           body: { id: newId, ...productData, created_at: now },
         });
         if (!res.ok) throw new Error('Failed to create product');
-        
-        toast({
-          title: "Produto criado!",
-          description: "O produto foi adicionado com sucesso.",
-        });
       }
 
       setDialogOpen(false);
@@ -290,10 +280,7 @@ export const AdminProducts = () => {
       });
       if (!res.ok) throw new Error('Failed to duplicate product');
 
-      toast({
-        title: "Produto duplicado!",
-        description: "O produto foi duplicado com sucesso.",
-      });
+      if (!res.ok) throw new Error('Failed to duplicate product');
 
       const newProduct = { id: newId, ...duplicatedProduct } as Product;
       handleEdit(newProduct);
@@ -321,10 +308,7 @@ export const AdminProducts = () => {
       });
       if (!res.ok) throw new Error('Failed to delete product');
 
-      toast({
-        title: "Produto excluído!",
-        description: "O produto foi removido com sucesso.",
-      });
+      if (!res.ok) throw new Error('Failed to delete product');
 
       fetchProducts();
       invalidateQueries();
@@ -351,9 +335,6 @@ export const AdminProducts = () => {
         body: { id: productId, is_active: newActive, updated_at: new Date().toISOString() },
       });
       if (!res.ok) throw new Error('Failed to toggle active');
-      toast({
-        title: newActive ? "Produto ativado" : "Produto desativado",
-      });
       invalidateQueries();
     } catch (error: any) {
       setProducts(prev => prev.map(p => p.id === productId ? { ...p, is_active: currentActive } : p));
@@ -384,10 +365,7 @@ export const AdminProducts = () => {
       });
       if (!res.ok) throw new Error('Failed to toggle featured');
       
-      toast({
-        title: newFeatured ? "Adicionado aos Mais Vendidos" : "Removido dos Mais Vendidos",
-        description: newFeatured ? "Produto adicionado aos Mais Vendidos." : "Produto removido dos Mais Vendidos.",
-      });
+      if (!res.ok) throw new Error('Failed to toggle featured');
       
       invalidateQueries();
     } catch (error: any) {
