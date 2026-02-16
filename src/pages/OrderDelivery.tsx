@@ -357,79 +357,76 @@ export default function OrderDelivery() {
 
   // No longer need single upsell config — UpsellSequence handles it
 
+  // Fetch guest order + items via Edge Function (Firestore is deny-all for guest_orders)
   useEffect(() => {
     if (!hash) { setNotFound(true); setLoading(false); return; }
 
-    const fetchOrder = async () => {
-      try {
-        // Read guest_orders/{hash} by document path (no query needed)
-        const guestDocRef = doc(db, "guest_orders", hash);
-        const guestSnap = await getDoc(guestDocRef);
+    let cancelled = false;
+    let pollInterval: ReturnType<typeof setInterval> | null = null;
 
-        if (!guestSnap.exists()) {
-          setNotFound(true);
-        } else {
-          const docData = guestSnap.data();
-          const expiresAt = docData.expires_at?.toDate ? docData.expires_at.toDate() : new Date(docData.expires_at);
-          if (expiresAt < new Date()) {
-            setNotFound(true);
-          } else {
-            setOrder({
-              id: guestSnap.id,
-              hash: hash,
-              order_id: docData.order_id,
-              email: docData.email,
-              customer_name: docData.customer_name,
-              customer_phone: docData.customer_phone,
-              order_data: {
-                items: [],
-                total_amount: docData.total_amount || 0,
-                payment_method: docData.payment_method || 'pix',
-                created_at: docData.created_at,
-              },
-              linked: docData.linked,
-              created_at: docData.created_at?.toDate ? docData.created_at.toDate().toISOString() : (docData.created_at || new Date().toISOString()),
-              expires_at: expiresAt.toISOString(),
-            } as GuestOrderData);
+    const fetchGuestOrder = async () => {
+      try {
+        const res = await invokeFunction('guest-order', {
+          method: 'GET',
+          queryParams: { hash },
+        });
+
+        if (!res.ok) {
+          if (!cancelled) setNotFound(true);
+          return false;
+        }
+
+        const data = await res.json();
+
+        if (!cancelled) {
+          setOrder({
+            id: hash,
+            hash: hash,
+            order_id: data.order_id,
+            email: data.email,
+            customer_name: data.customer_name,
+            customer_phone: data.customer_phone,
+            order_data: {
+              items: data.items || [],
+              total_amount: data.total_amount || 0,
+              payment_method: data.payment_method || 'pix',
+              created_at: data.created_at,
+            },
+            linked: data.linked,
+            created_at: data.created_at || new Date().toISOString(),
+            expires_at: data.expires_at || new Date().toISOString(),
+          } as GuestOrderData);
+
+          // Update live items from server response
+          if (data.items && data.items.length > 0) {
+            setLiveItems(data.items);
           }
         }
+        return true;
       } catch (err) {
         console.error("Error fetching guest order:", err);
-        setNotFound(true);
+        if (!cancelled) setNotFound(true);
+        return false;
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     };
 
-    fetchOrder();
-  }, [hash]);
-
-  useEffect(() => {
-    if (!order || !hash) return;
-
-    // Read items from subcollection: guest_orders/{hash}/items (no query, direct path)
-    const itemsRef = collection(db, 'guest_orders', hash, 'items');
-
-    const unsubscribe = onSnapshot(itemsRef, (snapshot) => {
-      if (snapshot.empty) return;
-      const firebaseItems: OrderItemData[] = snapshot.docs.map(d => {
-        const data = d.data();
-        return {
-          product_name: data.product_name || '',
-          product_image: data.product_image || null,
-          quantity: data.quantity || 1,
-          unit_price: data.unit_price || 0,
-          total_price: data.total_price || 0,
-          delivery_code: data.delivery_code || null,
-        };
-      });
-      setLiveItems(firebaseItems);
-    }, (err) => {
-      console.warn('⚠️ Guest items listener error:', err);
+    // Initial fetch
+    fetchGuestOrder().then((ok) => {
+      if (ok && !cancelled) {
+        // Poll every 5s for delivery code updates (replaces onSnapshot)
+        pollInterval = setInterval(() => {
+          fetchGuestOrder();
+        }, 5000);
+      }
     });
 
-    return () => unsubscribe();
-  }, [order, hash]);
+    return () => {
+      cancelled = true;
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [hash]);
 
   const copyCode = (code: string, index: number) => {
     navigator.clipboard.writeText(code.trim());
