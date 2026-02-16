@@ -4,6 +4,7 @@ import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
+import { sendPurchaseFromClient } from "@/lib/metaCapi";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
 
@@ -86,8 +87,15 @@ export default function CardPaymentCallback() {
 
           sessionStorage.removeItem('valnix_card_payment');
 
-          // 🔒 Purchase tracking is handled server-side in flowpay-card confirm handler.
-          // Do NOT track here to avoid duplicate Purchase events in analytics.
+          // Send Purchase to Meta CAPI (card payments)
+          sendPurchaseFromClient({
+            orderId,
+            value: stored?.amount,
+            userId: currentUser?.uid,
+            email: stored?.email,
+            name: stored?.name,
+            productNames: stored?.productNames,
+          });
 
           // 🔒 FIX: Guest order is already created server-side by create-order edge function.
           // Do NOT call saveGuestOrder() here — it creates duplicates.

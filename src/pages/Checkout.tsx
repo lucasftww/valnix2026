@@ -16,7 +16,7 @@ import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail } from "@/compone
 import { MobileCoupon } from "@/components/checkout/MobileCoupon";
 import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
-import { sendInitiateCheckout } from "@/lib/metaCapi";
+import { sendInitiateCheckout, sendPurchaseFromClient } from "@/lib/metaCapi";
 
 // Read Facebook cookies for CAPI match quality
 function getCookie(name: string): string | null {
@@ -300,8 +300,16 @@ export default function Checkout() {
         }
 
         setUserBalance(balanceResult.remainingBalance ?? 0);
-        // 🔒 Purchase tracking is now handled server-side in checkout-balance edge function.
-        // Do NOT track here to avoid duplicate Purchase events.
+
+        // Send Purchase to Meta CAPI (balance payments)
+        sendPurchaseFromClient({
+          orderId,
+          value: orderAmount,
+          userId: effectiveUserId,
+          email: formData.email || user?.email || undefined,
+          name: formData.name,
+          productNames: items.map(i => i.name),
+        });
 
         saveCheckoutDataToProfile();
         clearCart();

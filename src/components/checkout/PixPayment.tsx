@@ -9,7 +9,7 @@ import { invokeFunction } from "@/lib/apiHelper";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { auth } from "@/integrations/firebase/config";
 import { trackPurchaseEvent } from "@/lib/analytics";
-
+import { sendPurchaseFromClient } from "@/lib/metaCapi";
 
 interface PixPaymentProps {
   qrCodeText: string;
@@ -54,6 +54,16 @@ export function PixPayment({
     
     // Track Purchase event for PIX payments
     trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
+    
+    // Send Purchase to Meta CAPI
+    sendPurchaseFromClient({
+      orderId,
+      value: amount,
+      userId: customerId,
+      email: customerEmail,
+      name: customerName,
+      productNames,
+    });
     
     onPaymentConfirmed?.();
     
