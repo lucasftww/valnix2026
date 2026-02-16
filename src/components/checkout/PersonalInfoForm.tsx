@@ -43,7 +43,41 @@ const isValidCPF = (cpf: string): boolean => {
   return true;
 };
 
-const isValidEmail = (email: string): boolean => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+// Valid TLDs — common typos and gibberish are rejected
+const VALID_TLDS = new Set([
+  "com","net","org","edu","gov","mil","int",
+  "co","io","dev","app","me","info","biz","name","pro","museum","aero","coop",
+  "br","us","uk","ca","au","de","fr","es","it","pt","nl","be","ch","at","se","no","dk","fi","pl","cz","ru","jp","cn","kr","in","mx","ar","cl","co","pe","uy","py","ec","ve","bo",
+  "com.br","net.br","org.br","edu.br","gov.br",
+  "co.uk","org.uk","ac.uk","co.in","co.jp","co.kr","com.au","com.ar","com.mx","com.co","com.pe","com.uy","com.py",
+  "online","store","shop","site","tech","xyz","club","live","email","gg","tv","cc","ai","cloud","digital","world","global","space","fun","one","top","link","click","work","zone","games","social","team","chat","group",
+]);
+
+const isValidEmail = (email: string): boolean => {
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return false;
+  return true;
+};
+
+const getEmailTLDError = (email: string): string | undefined => {
+  const trimmed = email.trim();
+  if (!trimmed || !trimmed.includes("@")) return undefined;
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) return "E-mail inválido";
+  
+  const domain = trimmed.split("@")[1]?.toLowerCase();
+  if (!domain) return "E-mail inválido";
+  
+  // Extract TLD (supports compound like .com.br)
+  const parts = domain.split(".");
+  if (parts.length < 2) return "E-mail inválido";
+  
+  const tld = parts.slice(-1)[0];
+  const compoundTld = parts.slice(-2).join(".");
+  
+  if (!VALID_TLDS.has(tld) && !VALID_TLDS.has(compoundTld)) {
+    return `Domínio ".${tld}" não é válido. Verifique seu e-mail.`;
+  }
+  return undefined;
+};
 
 function ValidationIcon({ isValid, show }: { isValid: boolean; show: boolean }) {
   if (!show) return null;
@@ -53,8 +87,7 @@ function ValidationIcon({ isValid, show }: { isValid: boolean; show: boolean }) 
     <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
   );
 }
-
-export { formatCPF, isValidCPF, isValidEmail };
+export { formatCPF, isValidCPF, isValidEmail, getEmailTLDError };
 
 export const PersonalInfoForm = memo(function PersonalInfoForm({
   formData,
@@ -78,13 +111,14 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
           : formData.document.replace(/\D/g, "").length < 11
           ? "CPF incompleto"
           : undefined,
-      email: isValidEmail(formData.email),
-      emailError:
-        formData.email.trim().length > 0 && !isValidEmail(formData.email)
-          ? "E-mail inválido"
-          : formData.email.trim().length === 0
-          ? "E-mail é obrigatório"
-          : undefined,
+      email: isValidEmail(formData.email) && !getEmailTLDError(formData.email),
+      emailError: (() => {
+        if (formData.email.trim().length === 0) return "E-mail é obrigatório";
+        if (!isValidEmail(formData.email)) return "E-mail inválido";
+        const tldErr = getEmailTLDError(formData.email);
+        if (tldErr) return tldErr;
+        return undefined;
+      })(),
     }),
     [formData]
   );
