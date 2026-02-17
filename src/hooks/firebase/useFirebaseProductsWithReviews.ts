@@ -108,26 +108,33 @@ export const useProductById = (productId: string | undefined) => {
       
       const ref = doc(db, "products", productId);
 
-      // getDoc with persistent cache already checks local cache first, then network
-      // Single call with a reasonable timeout instead of 3 sequential attempts
+      // Single getDoc (persistent cache checks local first, then network)
+      // On timeout, throw error so React Query shows isError + allows retry
+      const TIMEOUT_MS = 8000;
       const result = await Promise.race([
-        getDoc(ref),
-        new Promise<null>((r) => setTimeout(() => r(null), 8000)),
+        getDoc(ref).catch((e) => { throw e; }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('PRODUCT_FETCH_TIMEOUT')), TIMEOUT_MS)
+        ),
       ]);
 
-      if (result && result.exists()) {
-        const data = result.data();
-        if (!data.is_active) return null;
-        return { id: result.id, ...data } as Product;
-      }
-
-      return null;
+      if (!result.exists()) return null; // genuinely not found
+      const data = result.data();
+      if (!data.is_active) return null; // inactive product
+      return { id: result.id, ...data } as Product;
     },
     enabled: !!productId,
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    retry: (failureCount, error) => {
+      // Retry timeouts and network errors, not "not found"
+      if (failureCount >= 2) return false;
+      const msg = (error as Error)?.message || '';
+      return msg.includes('TIMEOUT') || msg.includes('unavailable') || msg.includes('network');
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 };
 

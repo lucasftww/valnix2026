@@ -39,6 +39,9 @@ const ProductCardComponent = ({
   const prefetchTriggered = useRef(false);
   const triggerPrefetch = useCallback(() => {
     if (prefetchTriggered.current) return;
+    // Respect saveData and slow connections
+    const conn = (navigator as any).connection;
+    if (conn?.saveData || conn?.effectiveType === '2g') return;
     prefetchTriggered.current = true;
     // Prefetch JS chunk + data in parallel
     import("@/pages/ProductDetail");

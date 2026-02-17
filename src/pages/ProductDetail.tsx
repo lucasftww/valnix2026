@@ -41,7 +41,7 @@ const ProductDetail = () => {
   
 
   // Buscar produto com Firebase
-  const { data: product, isLoading } = useProductById(id);
+  const { data: product, isLoading, isError, refetch } = useProductById(id);
 
   // Track ViewContent when product loads
   useEffect(() => {
@@ -109,6 +109,26 @@ const ProductDetail = () => {
 
   if (isLoading) {
     return <ProductDetailSkeleton />;
+  }
+
+  // Error state (timeout/network) — allow retry
+  if (isError) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col">
+        <Header />
+        <Navigation />
+        <main className="flex-1 container px-4 md:px-8 py-12">
+          <div className="text-center space-y-4">
+            <h1 className="text-2xl font-bold">Erro ao carregar produto</h1>
+            <p className="text-muted-foreground">Não foi possível carregar o produto. Verifique sua conexão.</p>
+            <Button onClick={() => refetch()}>Tentar novamente</Button>
+          </div>
+        </main>
+        <Suspense fallback={null}>
+          <Footer />
+        </Suspense>
+      </div>
+    );
   }
   
   if (!product) {
