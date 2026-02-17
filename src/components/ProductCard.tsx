@@ -40,6 +40,8 @@ const ProductCardComponent = ({
   const triggerPrefetch = useCallback(() => {
     if (prefetchTriggered.current) return;
     prefetchTriggered.current = true;
+    // Prefetch JS chunk + data in parallel
+    import("@/pages/ProductDetail");
     queryClient.prefetchQuery({
       queryKey: [QUERY_KEYS.PRODUCT, productId],
       queryFn: async () => {
