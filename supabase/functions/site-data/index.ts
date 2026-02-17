@@ -133,7 +133,9 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const type = url.searchParams.get("type") || "featured";
 
-    const cacheKey = `products_${type}`;
+    const slug = url.searchParams.get("slug") || "";
+    const id = url.searchParams.get("id") || "";
+    const cacheKey = `${type}_${slug || id || "all"}`;
     const cached = cache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
       return new Response(JSON.stringify(cached.data), {
@@ -157,7 +159,6 @@ Deno.serve(async (req) => {
       data = { categories: categories.sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)) };
 
     } else if (type === "category") {
-      const slug = url.searchParams.get("slug");
       if (!slug) return new Response(JSON.stringify({ error: "slug required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const products = await queryCollection("products", [
         { field: { fieldPath: "category" }, op: "EQUAL", value: { stringValue: slug } },
@@ -166,7 +167,6 @@ Deno.serve(async (req) => {
       data = { products: products.sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)) };
 
     } else if (type === "product") {
-      const id = url.searchParams.get("id");
       if (!id) return new Response(JSON.stringify({ error: "id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
       const accessToken = await getFirebaseAccessToken();
       const docUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/products/${id}`;
