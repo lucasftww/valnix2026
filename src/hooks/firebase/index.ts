@@ -20,5 +20,3 @@ export {
   generateFakeDeliveryCode
 } from "./useFirebaseOrders";
 export type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from "./useFirebaseOrders";
-export { useAdminUsers, useUserOrders as useAdminUserOrders, useIsUserAdmin, updateUserBalance } from "./useFirebaseUsers";
-export type { FirebaseUser, FirebaseOrder } from "./useFirebaseUsers";

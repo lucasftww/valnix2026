@@ -23,13 +23,11 @@ import Index from "./pages/Index";
 const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 
 const Cart = lazy(() => import("./pages/Cart"));
-const Auth = lazy(() => import("./pages/Auth"));
 const Admin = lazy(() => import("./pages/Admin"));
 const checkoutImport = () => import("./pages/Checkout");
 const Checkout = lazy(checkoutImport);
 // Export for prefetch when user adds to cart
 export const prefetchCheckout = () => { checkoutImport(); };
-const MyOrders = lazy(() => import("./pages/MyOrders"));
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Category = lazy(() => import("./pages/Category"));
@@ -79,10 +77,8 @@ const App = () => {
                   }>
                     <Routes>
                         <Route path="/" element={<Index />} />
-                        <Route path="/auth/*" element={<Auth />} />
                         <Route path="/cart" element={<Cart />} />
                         <Route path="/checkout" element={<Checkout />} />
-                        <Route path="/my-orders" element={<MyOrders />} />
                         <Route path="/admin/*" element={<Admin />} />
 
                         <Route path="/about" element={<About />} />

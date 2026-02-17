@@ -1,22 +1,12 @@
-import { memo, useEffect, useState, useCallback } from "react";
-import { User, LogOut, Shield, Menu, Package } from "lucide-react";
+import { memo, useState, useCallback } from "react";
+import { Shield, Menu } from "lucide-react";
 import { Button } from "./ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "./ui/avatar";
 import logo from "@/assets/valnix-logo.png";
 import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { SearchBar } from "./SearchBar";
 import { CartSidebar } from "./CartSidebar";
 import { useCategories } from "@/hooks/firebase/useFirebaseCategories";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   Sheet,
   SheetContent,
@@ -25,73 +15,17 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
-interface UserProfile {
-  nickname: string | null;
-  avatar_url: string | null;
-  full_name: string | null;
-}
-
 const HeaderComponent = () => {
-  const { user, isAdmin, signOut } = useAuth();
+  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   
   const { data: categories = [] } = useCategories();
-
-  // Buscar perfil do usuário (deferred — not critical for initial render)
-  useEffect(() => {
-    if (!user?.uid) {
-      setProfile(null);
-      return;
-    }
-
-    let mounted = true;
-
-    // Defer profile fetch to avoid competing with critical product data
-    const timeoutId = setTimeout(async () => {
-      try {
-        const profileDoc = await getDoc(doc(db, "profiles", user.uid));
-        
-        if (mounted && profileDoc.exists()) {
-          const data = profileDoc.data();
-          setProfile({
-            nickname: data.nickname || null,
-            avatar_url: data.avatar_url || null,
-            full_name: data.full_name || null
-          });
-        }
-      } catch {
-        // Non-critical — silently ignore
-      }
-    }, 2000); // 2s delay — let products load first
-
-    return () => { mounted = false; clearTimeout(timeoutId); };
-  }, [user?.uid]);
-
-  const getInitials = useCallback(() => {
-    if (profile?.nickname) return profile.nickname.slice(0, 2).toUpperCase();
-    if (profile?.full_name) return profile.full_name.split(" ").map(n => n[0]).join("").slice(0, 2).toUpperCase();
-    if (user?.email) return user.email.slice(0, 2).toUpperCase();
-    return "US";
-  }, [profile, user?.email]);
-
-  const getDisplayName = useCallback(() => {
-    if (profile?.nickname) return profile.nickname;
-    if (profile?.full_name) return profile.full_name.split(" ")[0];
-    return user?.email?.split("@")[0] || "Conta";
-  }, [profile, user?.email]);
 
   const handleCloseMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
   }, []);
-
-  const handleSignOut = useCallback(async (e: Event) => {
-    e.preventDefault();
-    await signOut();
-    navigate("/");
-  }, [signOut, navigate]);
   
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/10 bg-background">
@@ -160,75 +94,16 @@ const HeaderComponent = () => {
         
         {/* Right Section - Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* User Menu */}
-          {user ? (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="gap-2 h-10 px-2 sm:px-3 rounded-full hover:bg-secondary"
-                  aria-label={`Menu da conta de ${getDisplayName()}`}
-                >
-                  <Avatar className="h-7 w-7 border border-primary/30">
-                    <AvatarImage src={profile?.avatar_url || ""} alt="Avatar" />
-                    <AvatarFallback className="text-xs font-bold bg-primary/10 text-primary">
-                      {getInitials()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <span className="hidden sm:inline text-sm font-medium max-w-[80px] truncate">
-                    {getDisplayName()}
-                  </span>
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <div className="px-2 py-2 flex items-center gap-3">
-                  <Avatar className="h-10 w-10 border border-primary/30">
-                    <AvatarImage src={profile?.avatar_url || ""} alt="Avatar" />
-                    <AvatarFallback className="text-sm font-bold bg-primary/10 text-primary">
-                      {getInitials()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium truncate">{getDisplayName()}</p>
-                    <p className="text-xs text-muted-foreground break-all">{user.email}</p>
-                  </div>
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link to="/my-orders" className="cursor-pointer flex items-center">
-                    <Package className="w-4 h-4 mr-2" />
-                    Meus Pedidos
-                  </Link>
-                </DropdownMenuItem>
-                {isAdmin && (
-                  <DropdownMenuItem asChild>
-                    <Link to="/admin" className="cursor-pointer flex items-center">
-                      <Shield className="w-4 h-4 mr-2" />
-                      Painel Admin
-                    </Link>
-                  </DropdownMenuItem>
-                )}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onSelect={handleSignOut} 
-                  className="cursor-pointer text-destructive focus:text-destructive flex items-center"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Sair
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          ) : (
-            <Link to="/auth" aria-label="Entrar na conta">
+          {/* Admin Link (only visible for admins) */}
+          {isAdmin && (
+            <Link to="/admin" aria-label="Painel Admin">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="gap-2 h-10 px-3 rounded-full hover:bg-secondary"
-                aria-label="Entrar na conta"
               >
-                <User className="h-4 w-4" aria-hidden="true" />
-                <span className="hidden sm:inline text-sm font-medium">Entrar</span>
+                <Shield className="h-4 w-4" />
+                <span className="hidden sm:inline text-sm font-medium">Admin</span>
               </Button>
             </Link>
           )}

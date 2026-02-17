@@ -1,6 +1,6 @@
 import { 
   Package, ShoppingCart, FolderTree, Home, 
-  BarChart3, Tag, Users, ChevronLeft, ChevronRight, LogOut,
+  BarChart3, Tag, ChevronLeft, ChevronRight, LogOut,
   Zap, TrendingUp
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +37,6 @@ const mainMenuItems = [
 ];
 
 const systemMenuItems = [
-  { id: "users", title: "Usuários", icon: Users, badge: null },
   { id: "coupons", title: "Cupons", icon: Tag, badge: null },
   { id: "post-payment", title: "Pós-Venda", icon: Zap, badge: null },
 ];
@@ -129,7 +128,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           
           <SidebarGroupContent>
             <SidebarMenu className="space-y-1">
-              {/* Voltar ao Site */}
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => navigate("/")}
@@ -146,7 +144,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             </SidebarMenu>
           </SidebarGroupContent>
         </SidebarGroup>
-
 
         {/* System Section */}
         <SidebarGroup className="py-2 px-2">
@@ -192,7 +189,6 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             )}
           </div>
 
-          {/* Collapse Toggle */}
           <Button
             variant="ghost"
             size="sm"
