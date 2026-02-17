@@ -26,13 +26,20 @@ const ProductGridComponent = () => {
   }
   
   if (error) {
+    const isBlocked = error.message?.toLowerCase().includes("network") || 
+                      error.message?.includes("FIRESTORE_QUERY_TIMEOUT") ||
+                      (error as any)?.code === "unavailable";
     return (
       <section className="container px-4 md:px-8 py-12">
         <div className="text-center py-12">
-          <div className="text-5xl mb-4">⚠️</div>
-          <h3 className="text-xl font-bold mb-2">Erro ao carregar produtos</h3>
-          <p className="text-muted-foreground mb-4">
-            {error.message || "Tente recarregar a página"}
+          <div className="text-5xl mb-4">{isBlocked ? "🛡️" : "⚠️"}</div>
+          <h3 className="text-xl font-bold mb-2">
+            {isBlocked ? "Conexão bloqueada" : "Erro ao carregar produtos"}
+          </h3>
+          <p className="text-muted-foreground mb-4 max-w-md mx-auto">
+            {isBlocked 
+              ? "Parece que um bloqueador de anúncios está impedindo o carregamento. Desative-o para este site ou adicione valnix.com.br à lista de permissões."
+              : (error.message || "Tente recarregar a página")}
           </p>
           <Button onClick={() => refetch()} variant="outline">
             Tentar novamente
