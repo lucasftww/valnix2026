@@ -20,18 +20,19 @@ const AdBlockDetectorComponent = () => {
 
     // Passive detection: poll the global flag set by Firestore hooks
     // Uses short interval (500ms) for responsive detection, stops after 15s
-    let timer: ReturnType<typeof setTimeout>;
+    let timer: ReturnType<typeof setTimeout> | undefined;
 
     const check = () => {
       if ((window as any).__valnix_firestore_blocked) {
         setIsBlocked(true);
+        if (timer) clearTimeout(timer);
         return;
       }
       timer = setTimeout(check, 500);
     };
 
     check(); // immediate first check
-    const stop = setTimeout(() => clearTimeout(timer), 15000);
+    const stop = setTimeout(() => { if (timer) clearTimeout(timer); }, 15000);
 
     return () => {
       clearTimeout(timer);
