@@ -46,18 +46,18 @@ const ProductCardComponent = ({
     prefetchTriggered.current = true;
     // Prefetch JS chunk + data in parallel (uses shared fetchProduct with timeout)
     import("@/pages/ProductDetail");
-    queryClient.prefetchQuery({
-      queryKey: [QUERY_KEYS.PRODUCT, productId],
-      queryFn: async () => {
-        try {
+    queryClient
+      .prefetchQuery({
+        queryKey: [QUERY_KEYS.PRODUCT, productId],
+        queryFn: async () => {
           const { fetchProduct } = await import("@/lib/fetchProduct");
-          return await fetchProduct(productId);
-        } catch {
-          return null; // prefetch is best-effort — don't pollute cache with errors
-        }
-      },
-      ...CACHE_TIMES.MODERATE,
-    });
+          return fetchProduct(productId);
+        },
+        ...CACHE_TIMES.MODERATE,
+      })
+      .catch(() => {
+        // Prefetch é best-effort — não poluir cache com erro
+      });
   }, [queryClient, productId]);
 
   // Priority cards are visible immediately; non-priority show after first paint
