@@ -117,28 +117,28 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                         <div className="flex items-center gap-1 bg-muted rounded-lg p-0.5">
                           <button
                             onClick={() => updateQuantity(item.id, Math.max(1, item.quantity - 1))}
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
                             disabled={item.quantity <= 1}
-                            aria-label="Diminuir quantidade"
+                            aria-label={`Diminuir quantidade de ${item.name}`}
                           >
-                            <Minus className="w-3 h-3" />
+                            <Minus className="w-3.5 h-3.5" />
                           </button>
-                          <span className="w-8 text-center text-sm font-medium text-foreground">
+                          <span className="w-8 text-center text-sm font-medium text-foreground" aria-live="polite">
                             {item.quantity}
                           </span>
                           <button
                             onClick={() => updateQuantity(item.id, item.quantity + 1)}
-                            className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
-                            aria-label="Aumentar quantidade"
+                            className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-secondary text-muted-foreground hover:text-foreground transition-colors"
+                            aria-label={`Aumentar quantidade de ${item.name}`}
                           >
-                            <Plus className="w-3 h-3" />
+                            <Plus className="w-3.5 h-3.5" />
                           </button>
                         </div>
                         
                         <button
                           onClick={() => removeItem(item.id)}
-                          className="w-7 h-7 flex items-center justify-center rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
-                          aria-label="Remover item"
+                          className="w-8 h-8 flex items-center justify-center rounded-md hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                          aria-label={`Remover ${item.name} do carrinho`}
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>

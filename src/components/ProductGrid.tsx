@@ -108,11 +108,11 @@ const ProductGridComponent = () => {
           ))}
         </CarouselContent>
         <CarouselPrevious 
-          className="left-0 md:left-2 h-8 w-8" 
+          className="left-0 md:left-2 h-10 w-10" 
           aria-label="Ver produto anterior" 
         />
         <CarouselNext 
-          className="right-0 md:right-2 h-8 w-8" 
+          className="right-0 md:right-2 h-10 w-10" 
           aria-label="Ver próximo produto" 
         />
       </Carousel>
