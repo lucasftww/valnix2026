@@ -65,6 +65,9 @@
     s.parentNode!.insertBefore(t, s);
     f.fbq('set', 'autoConfig', false, '1939179866693535');
     f.fbq('init', '1939179866693535');
+    // PageView with deterministic event_id for CAPI dedup
+    const pvId = `pageview_${window.location.pathname}_${new Date().toISOString().slice(0, 13)}`;
+    f.fbq('track', 'PageView', {}, { eventID: pvId });
   }, { once: true });
 })();
 
