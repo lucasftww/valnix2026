@@ -1,35 +1,29 @@
 import { memo, useCallback, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Button } from "./ui/button";
 import { Link } from "react-router-dom";
-import { useCategoriesTree } from "@/hooks/firebase/useFirebaseCategories";
+import { useCategoriesTreeApi } from "@/hooks/useApiData";
 import { useQueryClient } from "@tanstack/react-query";
-import { collection, query, where } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
-import { resilientGetDocs } from "@/lib/firebaseHelpers";
+
+// ═══════════════════════════════════════════════════════════════════
+// PERFORMANCE: No static Firebase imports!
+// Categories fetched via API; prefetch uses dynamic import.
+// ═══════════════════════════════════════════════════════════════════
 
 const NavigationComponent = () => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
-  const { data: categories = [] } = useCategoriesTree();
+  const { data: categories = [] } = useCategoriesTreeApi();
   const queryClient = useQueryClient();
 
   const prefetchCategoryProducts = useCallback((categorySlug: string) => {
     queryClient.prefetchQuery({
       queryKey: ["category-products", categorySlug],
       queryFn: async () => {
-        const q = query(
-          collection(db, "products"),
-          where("category", "==", categorySlug)
-        );
-        const snapshot = await resilientGetDocs(q);
-
-        type ProductDoc = { id: string; is_active?: boolean; display_order?: number; [key: string]: unknown };
-        
-        return snapshot.docs
-          .map((docSnap) => ({ id: docSnap.id, ...docSnap.data() } as ProductDoc))
-          .filter((p) => p?.is_active !== false)
-          .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
-          .map((p) => ({ ...p, reviewCount: 0 }));
+        const { fetchCategoryProductsFallback } = await import("@/lib/firestoreFallback");
+        const products = await fetchCategoryProductsFallback(categorySlug);
+        return products
+          .filter((p: any) => p?.is_active !== false)
+          .sort((a: any, b: any) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
+          .map((p: any) => ({ ...p, reviewCount: 0 }));
       },
       staleTime: 10 * 60 * 1000,
     });

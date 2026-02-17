@@ -3,9 +3,11 @@ import { Search, X } from "lucide-react";
 import { Input } from "./ui/input";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
-import { collection, limit, query as fsQuery } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
-import { resilientGetDocs } from "@/lib/firebaseHelpers";
+
+// ═══════════════════════════════════════════════════════════════════
+// PERFORMANCE: No static Firebase imports!
+// Firebase is loaded dynamically only when the user starts typing.
+// ═══════════════════════════════════════════════════════════════════
 
 interface Product {
   id: string;
@@ -36,8 +38,23 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
   const loadCatalog = useCallback(async (): Promise<Product[]> => {
     if (catalogCache) return catalogCache;
 
-    const q = fsQuery(collection(db, "products"), limit(500));
-    const snapshot = await resilientGetDocs(q);
+    // Lazy-load Firebase only on first search interaction
+    const [config, fs] = await Promise.all([
+      import("@/integrations/firebase/config"),
+      import("firebase/firestore"),
+    ]);
+
+    await config.appCheckReady;
+    const q = fs.query(fs.collection(config.db, "products"), fs.limit(500));
+
+    const firestorePromise = fs.getDocsFromServer(q);
+    const timeout = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("TIMEOUT")), 4000)
+    );
+    firestorePromise.catch(() => {});
+    timeout.catch(() => {});
+
+    const snapshot = await Promise.race([firestorePromise, timeout]);
     const items = snapshot.docs.map((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
       return {

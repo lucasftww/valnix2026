@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
-import { db } from "@/integrations/firebase/config";
-import { collection, query, where } from "firebase/firestore";
-import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { toast } from "sonner";
+
+// ═══════════════════════════════════════════════════════════════════
+// PERFORMANCE: No static Firebase imports!
+// Firestore is only needed for coupon validation (applyCoupon),
+// which is loaded dynamically when the user applies a coupon.
+// ═══════════════════════════════════════════════════════════════════
 
 export interface CartItem {
   id: string;
@@ -71,7 +74,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalPrice = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
 
-  // Recalculate discount when cart total changes (e.g. quantity updated after coupon applied)
   const discount = useMemo(() => {
     if (!appliedCoupon) return 0;
     if (appliedCoupon.discount_type === "percentage") {
@@ -116,9 +118,25 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const applyCoupon = useCallback(async (code: string) => {
     try {
-      const couponsRef = collection(db, "coupons");
-      const q = query(couponsRef, where("code", "==", code.toUpperCase()));
-      const snapshot = await resilientGetDocs(q);
+      // Lazy-load Firebase only when user applies a coupon
+      const [config, fs] = await Promise.all([
+        import("@/integrations/firebase/config"),
+        import("firebase/firestore"),
+      ]);
+
+      const couponsRef = fs.collection(config.db, "coupons");
+      const q = fs.query(couponsRef, fs.where("code", "==", code.toUpperCase()));
+
+      // Inline resilient fetch with timeout
+      await config.appCheckReady;
+      const firestorePromise = fs.getDocsFromServer(q);
+      const timeout = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("TIMEOUT")), 5000)
+      );
+      firestorePromise.catch(() => {});
+      timeout.catch(() => {});
+
+      const snapshot = await Promise.race([firestorePromise, timeout]);
 
       if (snapshot.empty) {
         toast.error("Cupom não encontrado");
@@ -128,13 +146,11 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const couponDoc = snapshot.docs[0];
       const coupon = couponDoc.data();
 
-      // Validate active
       if (!coupon.is_active) {
         toast.error("Este cupom está inativo");
         return;
       }
 
-      // Validate expiration
       if (coupon.expires_at) {
         const expiresDate = new Date(coupon.expires_at);
         if (expiresDate < new Date()) {
@@ -143,27 +159,23 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
       }
 
-      // Validate max uses
       if (coupon.max_uses && (coupon.current_uses || 0) >= coupon.max_uses) {
         toast.error("Este cupom atingiu o limite de usos");
         return;
       }
 
-      // Validate min purchase
       const currentTotal = items.reduce((sum, item) => sum + item.price * item.quantity, 0);
       if (coupon.min_purchase_amount && currentTotal < coupon.min_purchase_amount) {
         toast.error(`Compra mínima de R$ ${Number(coupon.min_purchase_amount).toFixed(2)} para este cupom`);
         return;
       }
 
-      // Calculate discount
       let discountAmount: number;
       if (coupon.discount_type === "percentage") {
         discountAmount = currentTotal * (coupon.discount_value / 100);
       } else {
         discountAmount = Number(coupon.discount_value);
       }
-
       discountAmount = Math.min(discountAmount, currentTotal);
 
       setAppliedCoupon({
