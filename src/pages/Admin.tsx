@@ -54,6 +54,9 @@ export default function Admin() {
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["dashboard"]));
   const [searchQuery, setSearchQuery] = useState("");
 
+  // Prefetch all admin data in parallel on mount (must be before conditional returns)
+  useAdminPrefetch();
+
   // Strip UTM and other query params from admin URLs
   useEffect(() => {
     if (window.location.search) {
@@ -87,9 +90,6 @@ export default function Admin() {
       </div>
     );
   }
-
-  // Prefetch all admin data in parallel on mount
-  useAdminPrefetch();
 
   const currentTab = tabTitles[activeTab] || tabTitles.dashboard;
 
