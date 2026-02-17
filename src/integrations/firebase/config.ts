@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -17,22 +16,14 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// App Check with reCAPTCHA v3 — all domains are registered in reCAPTCHA console
-// (valnix.com.br, lovableproject.com, lovable.app, localhost)
-try {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
-    isTokenAutoRefreshEnabled: true,
-  });
-} catch (e) {
-  console.warn("App Check init failed:", e);
-}
+// App Check DISABLED — enforcement must also be disabled in Firebase Console
+// The reCAPTCHA v3 key was causing 401/403 errors blocking all Firestore queries.
+// Re-enable after fixing reCAPTCHA configuration.
+export const appCheckReady = Promise.resolve();
 
-// Initialize services with persistent local cache (IndexedDB)
+// Initialize services
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
+  localCache: memoryLocalCache()
 });
 export default app;
