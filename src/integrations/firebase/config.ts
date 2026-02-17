@@ -17,16 +17,21 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// App Check with reCAPTCHA v3 — NON-BLOCKING
-const RECAPTCHA_SITE_KEY = "6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J";
+// App Check with reCAPTCHA v3 — only on production domains
+// Preview/dev domains are not registered in reCAPTCHA console, so skip there.
+const PRODUCTION_HOSTS = ["www.valnix.com.br", "valnix.com.br", "valnix2026.lovable.app"];
+const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
-try {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-    isTokenAutoRefreshEnabled: true,
-  });
-} catch (err) {
-  console.warn("[AppCheck] Init failed:", (err as Error).message);
+if (isProduction) {
+  try {
+    const RECAPTCHA_SITE_KEY = "6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J";
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (err) {
+    console.warn("[AppCheck] Init failed:", (err as Error).message);
+  }
 }
 
 export const appCheckReady = Promise.resolve();
