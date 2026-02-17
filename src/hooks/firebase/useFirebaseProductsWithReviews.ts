@@ -133,26 +133,45 @@ export const useCategoryBySlug = (slug: string | undefined) => {
 export const useProductById = (productId: string | undefined) => {
   return useQuery({
     queryKey: ['product', productId],
-    queryFn: async () => {
+    queryFn: async (): Promise<Product | null> => {
       if (!productId) return null;
 
-      let firestoreResult: any = undefined;
-      let apiResult: any = undefined;
+      let firestoreResult: Product | null | undefined = undefined;
+      let apiResult: Product | null | undefined = undefined;
+      let firestoreError: unknown = null;
+      let apiError: unknown = null;
 
       const firestoreFetch = (async () => {
         return await fetchProduct(productId);
-      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => {
+        firestoreError = err;
+        markFirestorePossiblyBlocked(err);
+        return null;
+      });
 
       const apiFetch = (async () => {
         return await fetchProductFallback(productId);
-      })().then(r => { apiResult = r; return r; }).catch(() => null);
+      })().then(r => { apiResult = r; return r; }).catch((err) => {
+        apiError = err;
+        return null;
+      });
 
+      // Wait for first non-null result
       const first = await Promise.race([firestoreFetch, apiFetch]);
       if (first) return first;
 
+      // Wait for both to settle
       await Promise.allSettled([firestoreFetch, apiFetch]);
       if (firestoreResult) return firestoreResult;
       if (apiResult) return apiResult;
+
+      // If BOTH errored (network issue, App Check rejection, etc.),
+      // THROW so React Query can retry instead of showing "not found"
+      if (firestoreError && apiError) {
+        throw new Error("PRODUCT_FETCH_BOTH_FAILED");
+      }
+
+      // If at least one succeeded but returned null → product genuinely doesn't exist
       return null;
     },
     enabled: typeof productId === "string",
@@ -161,8 +180,13 @@ export const useProductById = (productId: string | undefined) => {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: true,
-    retry: 1,
-    retryDelay: 2000,
+    retry: (failureCount, error) => {
+      // Retry up to 3 times for network/App Check failures
+      if (failureCount >= 3) return false;
+      const msg = (error as Error)?.message || "";
+      return msg.includes("BOTH_FAILED") || msg.includes("TIMEOUT") || msg.includes("network");
+    },
+    retryDelay: (attempt) => Math.min(1000 * (attempt + 1), 4000),
     meta: { productId },
   });
 };
