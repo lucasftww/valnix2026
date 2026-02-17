@@ -130,11 +130,14 @@ export const useProduct = (productId: string | undefined) => {
       
       const { doc: docRef, getDoc, getDocFromServer } = await import("firebase/firestore");
       
-      let productDoc;
-      try {
-        productDoc = await getDocFromServer(docRef(db, "products", productId));
-      } catch {
-        productDoc = await getDoc(docRef(db, "products", productId));
+      // Try cache first, fall back to server if empty
+      let productDoc = await getDoc(docRef(db, "products", productId));
+      if (!productDoc.exists()) {
+        try {
+          productDoc = await getDocFromServer(docRef(db, "products", productId));
+        } catch {
+          // Server also failed, keep the empty result
+        }
       }
       
       if (!productDoc.exists()) return null;
