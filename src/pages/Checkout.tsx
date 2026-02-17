@@ -1,10 +1,10 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart, CartItem } from "@/contexts/CartContext";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
-import { doc, getDoc, updateDoc, increment, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { auth } from "@/integrations/firebase/config";
 
 import { Loader2 } from "lucide-react";
 import { PixPayment } from "@/components/checkout/PixPayment";
@@ -63,15 +63,14 @@ interface PaymentData {
 
 export default function Checkout() {
   const { items, totalPrice, finalPrice, discount, appliedCoupon, clearCart, applyCoupon, removeCoupon, removeItem, updateQuantity } = useCart();
-  const { user, loading: authLoading } = useAuth();
+  const user = auth.currentUser;
   const navigate = useNavigate();
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
   const isSubmittingRef = useRef(false);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
-  const [userBalance, setUserBalance] = useState<number>(0);
-  const [paymentMethod, setPaymentMethod] = useState<"pix" | "balance" | "card">("pix");
+  const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
   const [formData, setFormData] = useState<FormData>(() => {
     try {
       const saved = sessionStorage.getItem('valnix_checkout_form');
@@ -149,54 +148,20 @@ export default function Checkout() {
     }
   }, [items.length]);
 
-  // Load user profile
+  // Pre-fill form with auth data if available (admin testing)
   useEffect(() => {
     if (!user) return;
-    let mounted = true;
-    
-    const loadProfile = async () => {
-      try {
-        const profileRef = doc(db, "profiles", user.uid);
-        const profileSnap = await getDoc(profileRef);
-        const profileData = profileSnap.exists() ? profileSnap.data() : null;
-
-        if (mounted) {
-          setFormData(prev => {
-            const updated = {
-              ...prev,
-              name: prev.name || user.displayName || profileData?.full_name || "",
-              email: prev.email || user.email || profileData?.email || "",
-              phone: prev.phone || profileData?.phone || "",
-            };
-            try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
-            return updated;
-          });
-          setUserBalance(profileData?.balance || 0);
-        }
-      } catch (err) {
-        console.error("Error loading profile:", err);
-      }
-    };
-    
-    loadProfile();
-    return () => { mounted = false; };
+    setFormData(prev => {
+      if (prev.email) return prev;
+      const updated = {
+        ...prev,
+        name: prev.name || user.displayName || "",
+        email: prev.email || user.email || "",
+      };
+      try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
+      return updated;
+    });
   }, [user]);
-
-  // Save checkout data to user profile
-  const saveCheckoutDataToProfile = useCallback(async () => {
-    if (!user?.uid) return;
-    try {
-      const profileRef = doc(db, "profiles", user.uid);
-      const updates: Record<string, string | null> = {};
-      if (formData.name.trim()) updates.full_name = formData.name.trim();
-      if (formData.phone.trim()) updates.phone = formData.phone.trim();
-      if (Object.keys(updates).length > 0) {
-        await updateDoc(profileRef, updates);
-      }
-    } catch (err) {
-      console.warn('⚠️ Failed to save profile data:', err);
-    }
-  }, [user?.uid, formData.name, formData.phone]);
 
   const validation = useMemo(() => ({
     name: formData.name.trim().length >= 3 && formData.name.trim().split(' ').length >= 2,
@@ -274,88 +239,6 @@ export default function Checkout() {
         return;
       }
 
-      // ─── BALANCE PAYMENT ─────────────────────────────────────────────
-      if (paymentMethod === "balance") {
-        if (userBalance < orderAmount) {
-          toast({ title: "Saldo insuficiente", description: `Seu saldo (R$ ${userBalance.toFixed(2)}) é menor que o valor do pedido.`, variant: "destructive" });
-          setLoading(false);
-          isSubmittingRef.current = false;
-          return;
-        }
-
-        const balanceToken = user ? await user.getIdToken() : null;
-        const orderItemsData = items.map(item => ({
-          product_id: item.id, product_name: item.name, product_image: item.image,
-          quantity: item.quantity, unit_price: item.price, total_price: item.price * item.quantity,
-          delivery_type: item.delivery_type || 'manual',
-        }));
-
-        const { orderId, guestHash } = await createOrderServerSide({
-          user_id: effectiveUserId,
-          customer_name: formData.name,
-          customer_email: formData.email || user?.email || "",
-          customer_phone: formData.phone || "",
-          total_amount: orderAmount,
-          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Saldo` : "Saldo",
-          payment_method: "balance",
-          coupon_id: appliedCoupon?.id || null,
-          coupon_code: appliedCoupon?.code || null,
-          fbc: getCookie('_fbc'), fbp: getCookie('_fbp'),
-          event_source_url: window.location.href,
-          utm_source: utmParams.utm_source || null, utm_medium: utmParams.utm_medium || null,
-          utm_campaign: utmParams.utm_campaign || null, utm_content: utmParams.utm_content || null,
-          utm_term: utmParams.utm_term || null,
-        }, orderItemsData, balanceToken);
-
-        const idToken = user ? await user.getIdToken() : null;
-        if (!idToken) {
-          toast({ title: "Erro de autenticação", description: "Faça login novamente para pagar com saldo.", variant: "destructive" });
-          setLoading(false);
-          isSubmittingRef.current = false;
-          return;
-        }
-
-        const balanceRes = await invokeFunction('checkout-balance', {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${idToken}` },
-          body: { orderId },
-        });
-        const balanceResult = await balanceRes.json();
-
-        if (!balanceRes.ok || !balanceResult.success) {
-          toast({ title: "Erro no pagamento", description: balanceResult.error || "Falha ao processar pagamento com saldo.", variant: "destructive" });
-          setLoading(false);
-          isSubmittingRef.current = false;
-          return;
-        }
-
-        setUserBalance(balanceResult.remainingBalance ?? 0);
-
-        // Send Purchase to Meta CAPI (balance payments)
-        sendPurchaseFromClient({
-          orderId,
-          value: orderAmount,
-          userId: effectiveUserId,
-          email: formData.email || user?.email || undefined,
-          name: formData.name,
-          productNames: items.map(i => i.name),
-          productIds: items.map(i => i.id),
-          quantities: items.map(i => i.quantity),
-          prices: items.map(i => i.price),
-        });
-
-        saveCheckoutDataToProfile();
-        try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
-        clearCart();
-
-        if (guestHash) {
-          navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`);
-        } else {
-          navigate(`/entrega-prioritaria?order_id=${orderId}`);
-        }
-        return;
-      }
-
       // ─── CARD PAYMENT ────────────────────────────────────────────────
       if (paymentMethod === "card") {
         const cpfDigits = formData.document.replace(/\D/g, '');
@@ -413,7 +296,7 @@ export default function Checkout() {
           eventSourceUrl: window.location.href,
         }));
 
-        saveCheckoutDataToProfile();
+        // Profile save removed (guest-only checkout)
         try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
         clearCart();
         window.open(cardData.paymentUrl, '_blank');
@@ -478,7 +361,7 @@ export default function Checkout() {
         throw new Error(pixData.error || 'Erro ao gerar cobrança PIX');
       }
 
-      saveCheckoutDataToProfile();
+      // Profile save removed (guest-only checkout)
       // IC flag cleared on actual payment confirmation (in PixPayment), not on QR generation
       setPaymentData({
         qrCodeText: pixData.brCode, transactionId: pixData.chargeId,
@@ -493,7 +376,7 @@ export default function Checkout() {
       setLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, userBalance, clearCart, navigate, user, effectiveUserId]);
+  }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, clearCart, navigate, user, effectiveUserId]);
 
   // ─── PIX PAYMENT SCREEN ────────────────────────────────────────────────
   if (paymentData) {
@@ -549,7 +432,6 @@ export default function Checkout() {
             <PaymentMethodSelector
               paymentMethod={paymentMethod}
               onMethodChange={setPaymentMethod}
-              userBalance={userBalance}
               finalPrice={finalPrice}
             />
 

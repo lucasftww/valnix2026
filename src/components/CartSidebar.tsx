@@ -3,7 +3,6 @@ import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from "lucide-react";
 import { Button } from "./ui/button";
 import { useCart } from "@/contexts/CartContext";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import {
   Sheet,
   SheetContent,

@@ -1,20 +1,18 @@
 import { memo } from "react";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
-import { CreditCard, Wallet } from "lucide-react";
+import { CreditCard } from "lucide-react";
 import pixLogo from "@/assets/pix-logo.png";
 
 interface PaymentMethodSelectorProps {
-  paymentMethod: "pix" | "balance" | "card";
-  onMethodChange: (method: "pix" | "balance" | "card") => void;
-  userBalance: number;
+  paymentMethod: "pix" | "card";
+  onMethodChange: (method: "pix" | "card") => void;
   finalPrice: number;
 }
 
 export const PaymentMethodSelector = memo(function PaymentMethodSelector({
   paymentMethod,
   onMethodChange,
-  userBalance,
   finalPrice,
 }: PaymentMethodSelectorProps) {
   return (
@@ -23,7 +21,7 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
 
       <RadioGroup
         value={paymentMethod}
-        onValueChange={(value) => onMethodChange(value as "pix" | "balance" | "card")}
+        onValueChange={(value) => onMethodChange(value as "pix" | "card")}
         className="space-y-2"
       >
         {/* PIX Option */}
@@ -81,41 +79,6 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
             </div>
           </Label>
         </div>
-
-        {/* Balance Option */}
-        {userBalance > 0 && (
-          <div
-            className={`relative flex items-center gap-4 p-4 rounded-xl border cursor-pointer transition-all ${
-              paymentMethod === "balance"
-                ? "border-primary/40 bg-primary/5"
-                : "border-border/10 bg-background hover:border-border/20"
-            } ${userBalance < finalPrice ? "opacity-60" : ""}`}
-            onClick={() => userBalance >= finalPrice && onMethodChange("balance")}
-          >
-            <RadioGroupItem
-              value="balance"
-              id="balance"
-              className="shrink-0"
-              disabled={userBalance < finalPrice}
-            />
-            <Label htmlFor="balance" className="flex items-center gap-3 cursor-pointer flex-1">
-              <div className="w-8 h-8 rounded-full bg-green-500/20 flex items-center justify-center">
-                <Wallet className="w-4 h-4 text-green-500" />
-              </div>
-              <div className="flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="text-[14px] font-medium text-foreground">Saldo da conta</p>
-                  <span className="text-[12px] font-semibold text-green-500">
-                    R$ {userBalance.toFixed(2)}
-                  </span>
-                </div>
-                <p className="text-[11px] text-muted-foreground mt-1.5">
-                  {userBalance >= finalPrice ? "Pagamento imediato" : "Saldo insuficiente"}
-                </p>
-              </div>
-            </Label>
-          </div>
-        )}
       </RadioGroup>
 
       {/* Payment info - hidden on mobile for cleaner look */}
@@ -128,22 +91,12 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
               aplicativo do seu banco para escanear o QR Code ou copie o código.
             </p>
           </>
-        ) : paymentMethod === "card" ? (
+        ) : (
           <>
             <h3 className="text-[14px] font-semibold text-foreground mb-2">Pagamento com Cartão</h3>
             <p className="text-[13px] text-muted-foreground leading-relaxed">
               Ao finalizar a compra, você será redirecionado para um site seguro para inserir os
               dados do seu cartão e completar o pagamento.
-            </p>
-          </>
-        ) : (
-          <>
-            <h3 className="text-[14px] font-semibold text-foreground mb-2">Pagamento com Saldo</h3>
-            <p className="text-[13px] text-muted-foreground leading-relaxed">
-              O valor será debitado imediatamente do seu saldo. Saldo após compra:{" "}
-              <span className="text-green-500 font-medium">
-                R$ {(userBalance - finalPrice).toFixed(2)}
-              </span>
             </p>
           </>
         )}

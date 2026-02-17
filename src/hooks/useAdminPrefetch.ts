@@ -23,7 +23,6 @@ export const useAdminPrefetch = () => {
         { key: "admin-orders", resource: "orders" },
         { key: "admin-products", resource: "products" },
         { key: "admin-categories", resource: "categories" },
-        { key: "firebase-admin-users", resource: "users" },
         { key: "admin-coupons", resource: "coupons" },
       ];
 
