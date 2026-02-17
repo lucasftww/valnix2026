@@ -37,9 +37,11 @@ All colors MUST be HSL.
     user-select: auto;
   }
   
-  /* Prevenir zoom em inputs */
-  input, textarea, select {
-    font-size: 16px !important;
+  /* Prevent zoom on mobile inputs — only scoped to form elements */
+  @media (max-width: 768px) {
+    input, textarea, select {
+      font-size: 16px !important;
+    }
   }
   
   :root {
@@ -94,7 +96,8 @@ All colors MUST be HSL.
 }
 
 @layer base {
-  *, *::before, *::after {
+  /* Scoped border reset — avoid universal selector recalc */
+  div, section, main, header, nav, footer, aside, article, form, fieldset, details, summary {
     border-color: hsl(var(--border));
     border-width: 0;
     border-style: solid;
@@ -136,11 +139,6 @@ All colors MUST be HSL.
 
 /* Mobile-specific fixes */
 @media (max-width: 768px) {
-  /* Prevent zoom on input focus */
-  input, select, textarea {
-    font-size: 16px !important;
-  }
-  
   /* Optimize container padding */
   .container {
     padding-left: 1rem;

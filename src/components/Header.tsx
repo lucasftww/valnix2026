@@ -49,7 +49,7 @@ const HeaderComponent = () => {
 
     let mounted = true;
 
-    // Defer profile fetch to avoid competing with critical data
+    // Defer profile fetch to avoid competing with critical product data
     const timeoutId = setTimeout(async () => {
       try {
         const profileDoc = await getDoc(doc(db, "profiles", user.uid));
@@ -62,10 +62,10 @@ const HeaderComponent = () => {
             full_name: data.full_name || null
           });
         }
-      } catch (error) {
-        console.error("Error fetching profile:", error);
+      } catch {
+        // Non-critical — silently ignore
       }
-    }, 100);
+    }, 2000); // 2s delay — let products load first
 
     return () => { mounted = false; clearTimeout(timeoutId); };
   }, [user?.uid]);
@@ -94,7 +94,7 @@ const HeaderComponent = () => {
   }, [signOut, navigate]);
   
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/10 bg-background/95 backdrop-saturate-150">
+    <header className="sticky top-0 z-50 w-full border-b border-border/10 bg-background">
       <div className="container h-14 md:h-16 flex items-center px-4 md:px-6">
         {/* Left Section - Menu (Mobile) + Logo */}
         <div className="flex items-center gap-3 flex-shrink-0">
