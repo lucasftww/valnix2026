@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useRef } from "react";
+import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import {
   User,
   signInWithEmailAndPassword,
@@ -33,9 +33,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
 
-  // Track if we've already reverted a rogue admin doc to avoid loops
-  const revertedRef = useRef(new Set<string>());
-
   // ── Cached role check with TTL (avoids Firestore read every page load) ──
   const ROLE_CACHE_KEY = 'valnix_role_cache_v1';
   const ROLE_CACHE_TTL = 10 * 60 * 1000; // 10 min
@@ -67,31 +64,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (firebaseUser) {
         // Block banned UIDs immediately
         if (isBlockedUid(firebaseUser.uid)) {
-          console.warn("🚫 Blocked UID detected, signing out:", firebaseUser.uid);
           await firebaseSignOut(auth);
           setUser(null);
           setIsAdmin(false);
           return;
         }
 
-        // Block spam email patterns — auto sign out and skip ALL Firestore writes
+        // Block spam email patterns — auto sign out
         if (firebaseUser.email && (isBlockedEmail(firebaseUser.email) || isSpamEmailPattern(firebaseUser.email))) {
-          console.warn("🚫 Spam/blocked email detected, signing out:", firebaseUser.email);
           await firebaseSignOut(auth);
           setUser(null);
           setIsAdmin(false);
           return;
         }
 
-        // Skip Firestore doc creation for unverified emails to prevent quota drain attacks
-        // The attacker creates accounts via direct API calls — those accounts won't have verified emails
-        // BUT still check admin role so admin can access the panel
         const isUnverifiedPassword = !firebaseUser.emailVerified && firebaseUser.providerData?.[0]?.providerId === 'password';
 
-        // ── Check admin role — use local cache first, then validate in background ──
-        console.log("[Auth] Checking admin role for UID:", firebaseUser.uid, "Email:", firebaseUser.email);
+        // ── Check admin role via user_roles collection (source of truth) ──
+        // Race: Firestore SDK vs API fallback — first to respond wins
         const cachedAdmin = getCachedRole(firebaseUser.uid);
-        let hasAdminRole = cachedAdmin ?? false;
 
         // Fallback: check role via edge function when Firestore fails
         const checkRoleViaApi = async (uid: string): Promise<boolean> => {
@@ -100,133 +91,124 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role&uid=${uid}`, {
               headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
             });
-            if (!res.ok) {
-              console.warn("[Auth] API role check failed with status:", res.status);
-              return false;
-            }
+            if (!res.ok) return false;
             const data = await res.json();
-            console.log("[Auth] API role check result:", data);
             return data.isAdmin === true;
-          } catch (err) {
-            console.warn("[Auth] API role check error:", err);
+          } catch {
             return false;
           }
+        };
+
+        // Check role via Firestore with 3s timeout
+        const checkRoleViaFirestore = async (uid: string): Promise<boolean> => {
+          const roleResult = await Promise.race([
+            getDoc(doc(db, "user_roles", uid)),
+            new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+          ]);
+          if (!roleResult) return false; // timeout
+          return roleResult.exists?.() && roleResult.data()?.role === "admin";
         };
         
         if (cachedAdmin !== null) {
           // Use cached value immediately for fast render
           if (alive) setIsAdmin(cachedAdmin);
-          // Validate in background (non-blocking)
-          getDoc(doc(db, "user_roles", firebaseUser.uid)).then((roleDoc) => {
+          // Validate in background via race (non-blocking)
+          (async () => {
+            let firestoreResult: boolean | null = null;
+            let apiResult: boolean | null = null;
+
+            const fsFetch = checkRoleViaFirestore(firebaseUser.uid)
+              .then(r => { firestoreResult = r; return r; })
+              .catch(() => null);
+            const apiFetch = checkRoleViaApi(firebaseUser.uid)
+              .then(r => { apiResult = r; return r; })
+              .catch(() => null);
+
+            const first = await Promise.race([fsFetch, apiFetch]);
+            const serverAdmin = first ?? false;
+
             if (!alive) return;
-            const serverAdmin = roleDoc.exists() && roleDoc.data()?.role === "admin";
             if (serverAdmin !== cachedAdmin) {
               setIsAdmin(serverAdmin);
               setCachedRole(firebaseUser.uid, serverAdmin);
             }
-            hasAdminRole = serverAdmin;
-          }).catch(async () => {
-            // Firestore failed — try API fallback
-            console.warn("[Auth] Firestore role check failed, trying API fallback");
-            const apiAdmin = await checkRoleViaApi(firebaseUser.uid);
-            if (!alive) return;
-            if (apiAdmin !== cachedAdmin) {
-              setIsAdmin(apiAdmin);
-              setCachedRole(firebaseUser.uid, apiAdmin);
+
+            // If first was false, wait for the other in case it returns true
+            if (!serverAdmin) {
+              await Promise.allSettled([fsFetch, apiFetch]);
+              const finalAdmin = firestoreResult === true || apiResult === true;
+              if (finalAdmin !== cachedAdmin && alive) {
+                setIsAdmin(finalAdmin);
+                setCachedRole(firebaseUser.uid, finalAdmin);
+              }
             }
-            hasAdminRole = apiAdmin;
-          });
+          })();
         } else {
-          // No cache — fetch with timeout, fallback to API
-          try {
-            const roleResult = await Promise.race([
-              getDoc(doc(db, "user_roles", firebaseUser.uid)),
-              new Promise<null>((r) => setTimeout(() => r(null), 3000)),
-            ]);
-            if (roleResult) {
-              hasAdminRole = roleResult.exists?.() && roleResult.data()?.role === "admin";
-              console.log("[Auth] Firestore role result:", hasAdminRole, "exists:", roleResult.exists?.(), "data:", roleResult.data());
-            } else {
-              // Timeout — try API fallback
-              console.warn("[Auth] Firestore role check timed out, trying API fallback");
-              hasAdminRole = await checkRoleViaApi(firebaseUser.uid);
-              console.log("[Auth] API fallback admin result:", hasAdminRole);
-            }
-            if (alive) setIsAdmin(hasAdminRole);
-            setCachedRole(firebaseUser.uid, hasAdminRole);
-          } catch {
-            // Firestore error — try API fallback
-            console.warn("[Auth] Firestore role check error, trying API fallback");
-            try {
-              hasAdminRole = await checkRoleViaApi(firebaseUser.uid);
-              if (alive) setIsAdmin(hasAdminRole);
-              setCachedRole(firebaseUser.uid, hasAdminRole);
-            } catch {
-              setIsAdmin(false);
-            }
+          // No cache — race Firestore and API simultaneously
+          let firestoreResult: boolean | null = null;
+          let apiResult: boolean | null = null;
+
+          const fsFetch = checkRoleViaFirestore(firebaseUser.uid)
+            .then(r => { firestoreResult = r; return r; })
+            .catch(() => null);
+          const apiFetch = checkRoleViaApi(firebaseUser.uid)
+            .then(r => { apiResult = r; return r; })
+            .catch(() => null);
+
+          const first = await Promise.race([fsFetch, apiFetch]);
+          let hasAdminRole = first === true;
+
+          // If first was false/null, wait for the other
+          if (!hasAdminRole) {
+            await Promise.allSettled([fsFetch, apiFetch]);
+            hasAdminRole = firestoreResult === true || apiResult === true;
           }
+
+          if (alive) setIsAdmin(hasAdminRole);
+          setCachedRole(firebaseUser.uid, hasAdminRole);
         }
 
-          // Non-blocking: handle users/profile docs in background with heavy delay
-          // Skip for unverified password accounts to prevent quota drain attacks
-          if (!isUnverifiedPassword) {
-            // This prevents competing with product data for Firestore quota
-            setTimeout(() => {
-              if (!alive) return;
-              (async () => {
-                try {
-                  const [userDoc, profileDoc] = await Promise.all([
-                    getDoc(doc(db, "users", firebaseUser.uid)),
-                    getDoc(doc(db, "profiles", firebaseUser.uid)),
-                  ]);
+        // Non-blocking: handle users/profile docs in background
+        // Skip for unverified password accounts to prevent quota drain attacks
+        if (!isUnverifiedPassword) {
+          setTimeout(() => {
+            if (!alive) return;
+            (async () => {
+              try {
+                const [userDoc, profileDoc] = await Promise.all([
+                  getDoc(doc(db, "users", firebaseUser.uid)),
+                  getDoc(doc(db, "profiles", firebaseUser.uid)),
+                ]);
 
-                  if (!alive) return;
+                if (!alive) return;
 
-                  if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    if ((userData?.role === "admin" || userData?.isAdmin === true) && !hasAdminRole) {
-                      if (!revertedRef.current.has(firebaseUser.uid)) {
-                        revertedRef.current.add(firebaseUser.uid);
-                        console.warn("🚨 Unauthorized admin detected, reverting:", firebaseUser.uid);
-                        try {
-                          await setDoc(doc(db, "users", firebaseUser.uid), {
-                            email: firebaseUser.email,
-                            role: "user",
-                            isAdmin: false,
-                            created_at: userData.created_at || new Date().toISOString(),
-                            flagged_at: new Date().toISOString(),
-                            flagged_reason: "unauthorized_admin_revert",
-                          });
-                        } catch (revertErr) {
-                          console.warn("Could not revert users doc (likely permissions):", revertErr);
-                        }
-                      }
-                    }
-                  } else if (alive) {
-                    await setDoc(doc(db, "users", firebaseUser.uid), {
-                      email: firebaseUser.email,
-                      role: "user",
-                      isAdmin: false,
-                      created_at: new Date().toISOString(),
-                    });
-                  }
-
-                  if (!alive) return;
-
-                  if (!profileDoc.exists()) {
-                    await setDoc(doc(db, "profiles", firebaseUser.uid), {
-                      email: firebaseUser.email,
-                      full_name: firebaseUser.displayName || null,
-                      balance: 0,
-                      created_at: new Date().toISOString(),
-                    });
-                  }
-                } catch {
-                  // Background sync — non-critical
+                // Create user doc if it doesn't exist
+                if (!userDoc.exists()) {
+                  await setDoc(doc(db, "users", firebaseUser.uid), {
+                    email: firebaseUser.email,
+                    role: "user",
+                    isAdmin: false,
+                    created_at: new Date().toISOString(),
+                  });
                 }
-              })();
-            }, 3000); // 3s delay to let product queries complete first
-          }
+
+                if (!alive) return;
+
+                // Create profile doc if it doesn't exist
+                if (!profileDoc.exists()) {
+                  await setDoc(doc(db, "profiles", firebaseUser.uid), {
+                    email: firebaseUser.email,
+                    full_name: firebaseUser.displayName || null,
+                    balance: 0,
+                    created_at: new Date().toISOString(),
+                  });
+                }
+              } catch {
+                // Background sync — non-critical
+              }
+            })();
+          }, 3000);
+        }
       } else {
         setIsAdmin(false);
       }
@@ -240,6 +222,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { error: { code: 'auth/blocked', message: 'Account suspended' } };
     }
     try {
+      // Clear cached role before login to force fresh check
+      try { localStorage.removeItem('valnix_role_cache_v1'); } catch { /* */ }
       await signInWithEmailAndPassword(auth, email, password);
       return { error: null };
     } catch (error) {
@@ -253,8 +237,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
-      // Security: NEVER allow signUp to create admin users
-      // Only create Firestore docs if email is NOT spam (double check)
       if (!isSpamEmailPattern(email)) {
         await setDoc(doc(db, "users", result.user.uid), {
           email: result.user.email,
@@ -277,6 +259,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = useCallback(async (): Promise<{ error: any }> => {
     try {
+      // Clear cached role before login to force fresh check
+      try { localStorage.removeItem('valnix_role_cache_v1'); } catch { /* */ }
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -286,7 +270,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       const userDoc = await getDoc(doc(db, "users", result.user.uid));
       if (!userDoc.exists()) {
-        // Security: NEVER allow Google login to create admin users
         await setDoc(doc(db, "users", result.user.uid), {
           email: result.user.email,
           role: "user",
