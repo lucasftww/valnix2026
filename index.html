@@ -331,10 +331,11 @@
       var path = location.pathname;
       if (/^\/(admin|checkout|card-callback)(\/|$)/.test(path)) return;
 
-      if (window.__utmify_loaded) return;
+      if (window.__utmify_loaded === true) return;
       window.__utmify_loaded = true;
 
       var load = function () {
+        if (!document.head) return setTimeout(load, 50);
         var s = document.createElement("script");
         s.src = "https://cdn.utmify.com.br/scripts/utms/latest.js";
         s.async = true;
