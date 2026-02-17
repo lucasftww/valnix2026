@@ -97,6 +97,7 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             disabled={isLoading}
+            autoComplete="email"
             className="bg-transparent border-0 border-b border-border/30 rounded-none text-foreground text-sm focus:border-foreground/50 focus-visible:ring-0 focus-visible:ring-offset-0 transition-colors placeholder:text-muted-foreground/50 px-0 h-10"
             required
             aria-label="Endereço de e-mail para newsletter"
