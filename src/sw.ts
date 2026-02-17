@@ -36,7 +36,7 @@ registerRoute(
         cacheKeyWillBeUsed: async ({ request }) => {
           const url = new URL(request.url);
           url.search = ''; // strip all query params
-          return url.href;
+          return new Request(url.toString(), request);
         },
       },
       new ExpirationPlugin({ maxEntries: 1, maxAgeSeconds: 60 * 60 * 24 }),
