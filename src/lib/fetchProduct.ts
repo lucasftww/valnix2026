@@ -1,5 +1,5 @@
-import { doc, getDoc, type DocumentSnapshot } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+import { doc, getDocFromServer, type DocumentSnapshot } from "firebase/firestore";
+import { db, appCheckReady } from "@/integrations/firebase/config";
 import type { Product } from "@/types";
 import type { FirebaseError } from "firebase/app";
 
@@ -34,11 +34,14 @@ export const logFetchTimeout = (productId: string, error: unknown) => {
  * - Returns null for genuinely non-existent or inactive products
  */
 export async function fetchProduct(productId: string): Promise<Product | null> {
+  // Wait for App Check token before querying
+  await appCheckReady;
+  
   const ref = doc(db, "products", productId);
 
   const attempt = (): Promise<DocumentSnapshot> =>
     Promise.race<DocumentSnapshot>([
-      getDoc(ref),
+      getDocFromServer(ref),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("PRODUCT_FETCH_TIMEOUT")), TIMEOUT_MS)
       ),

@@ -1,33 +1,28 @@
 import { getDocs, getDocsFromServer, type Query, type QuerySnapshot } from "firebase/firestore";
+import { appCheckReady } from "@/integrations/firebase/config";
 
 const QUERY_TIMEOUT_MS = 15000;
 
 /**
- * Resilient Firestore fetch. If cache returns empty, retries from server.
+ * Resilient Firestore fetch.
+ * 1. Waits for App Check token to be ready (prevents "Missing permissions" errors)
+ * 2. Fetches from server directly (avoids stale cache issues)
+ * 3. Retries once on timeout/network errors
  */
 export async function resilientGetDocs(q: Query): Promise<QuerySnapshot> {
-  const attempt = (fromServer = false): Promise<QuerySnapshot> =>
+  // Wait for App Check token before any Firestore query
+  await appCheckReady;
+
+  const attempt = (): Promise<QuerySnapshot> =>
     Promise.race<QuerySnapshot>([
-      fromServer ? getDocsFromServer(q) : getDocs(q),
+      getDocsFromServer(q),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("FIRESTORE_QUERY_TIMEOUT")), QUERY_TIMEOUT_MS)
       ),
     ]);
 
   try {
-    const snapshot = await attempt(false);
-    
-    // If cache returned empty, try server to avoid stale empty cache
-    if (snapshot.empty && snapshot.metadata.fromCache) {
-      console.info("[Firestore] Cache returned empty, retrying from server...");
-      try {
-        return await attempt(true);
-      } catch {
-        return snapshot; // server failed, return cache result
-      }
-    }
-    
-    return snapshot;
+    return await attempt();
   } catch (err) {
     const msg = (err as Error)?.message ?? "";
     const code = (err as any)?.code ?? "";
@@ -36,11 +31,13 @@ export async function resilientGetDocs(q: Query): Promise<QuerySnapshot> {
       code.includes("unavailable") ||
       code.includes("deadline-exceeded") ||
       code.includes("resource-exhausted") ||
-      msg.toLowerCase().includes("network");
+      msg.toLowerCase().includes("network") ||
+      msg.toLowerCase().includes("permission");
 
     if (isRetryable) {
-      await new Promise((r) => setTimeout(r, 1500));
-      return attempt(true); // retry directly from server
+      console.info("[Firestore] Retrying query after error:", msg || code);
+      await new Promise((r) => setTimeout(r, 2000));
+      return attempt();
     }
     throw err;
   }
