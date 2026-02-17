@@ -43,39 +43,49 @@ export const useFeaturedProducts = () => {
   return useQuery({
     queryKey: [QUERY_KEYS.BEST_SELLING],
     queryFn: async (): Promise<ProductCardData[]> => {
-      try {
+      // Race: Firestore vs API fallback — use whichever responds first
+      const firestoreFetch = (async () => {
         const productsQuery = query(
           collection(db, "products"),
           where("featured", "==", true),
           limit(50)
         );
-
         const productsSnapshot = await resilientGetDocs(productsQuery);
-        
         console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs, fromCache: ${productsSnapshot.metadata.fromCache}`);
-
         const featuredActive = productsSnapshot.docs
           .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
           .filter((p) => p?.is_active)
           .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
           .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT);
-        
         console.log(`[Products] After is_active filter: ${featuredActive.length} products`);
-
         return featuredActive.map(mapToProductCard);
-      } catch (err) {
-        // Fallback to API proxy on ANY Firestore failure
-        console.warn("[Products] Firestore failed, trying API fallback:", (err as Error)?.message || err);
-        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+      })();
+
+      // Start API fallback after a short delay (gives Firestore a head start)
+      const apiFetch = new Promise<ProductCardData[]>((resolve, reject) => {
+        setTimeout(async () => {
+          try {
+            const products = await fetchFeaturedProductsFallback();
+            resolve(
+              products
+                .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
+                .map(mapToProductCard)
+            );
+          } catch (e) {
+            reject(e);
+          }
+        }, 3000); // 3s head start for Firestore
+      });
+
+      try {
+        return await Promise.race([firestoreFetch, apiFetch]);
+      } catch {
+        // If the race winner threw, wait for the other
         try {
-          const products = await fetchFeaturedProductsFallback();
-          return products
-            .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-            .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
-            .map(mapToProductCard);
-        } catch (fallbackErr) {
-          console.error("[Products] API fallback also failed:", fallbackErr);
-          throw err; // throw original error
+          return await apiFetch;
+        } catch {
+          return await firestoreFetch;
         }
       }
     },
@@ -84,8 +94,8 @@ export const useFeaturedProducts = () => {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: true,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(1500 * 2 ** attempt, 8000),
+    retry: 1,
+    retryDelay: 2000,
   });
 };
 
@@ -130,31 +140,42 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
     queryFn: async (): Promise<ProductWithReviews[]> => {
       if (!categorySlug) return [];
       
-      try {
+      const firestoreFetch = (async () => {
         const productsQuery = query(
           collection(db, "products"),
           where("category", "==", categorySlug)
         );
-
         const productsSnapshot = await resilientGetDocs(productsQuery);
-
         return productsSnapshot.docs
           .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
           .filter((p) => p?.is_active)
           .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
           .map(mapToProductWithReviews);
-      } catch (err) {
-        console.warn("[Products] Firestore failed for category, trying API fallback:", categorySlug, (err as Error)?.message || err);
-        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+      })();
+
+      const apiFetch = new Promise<ProductWithReviews[]>((resolve, reject) => {
+        setTimeout(async () => {
+          try {
+            const products = await fetchCategoryProductsFallback(categorySlug);
+            resolve(
+              products
+                .filter((p: any) => p?.is_active)
+                .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+                .map(mapToProductWithReviews)
+            );
+          } catch (e) {
+            reject(e);
+          }
+        }, 3000);
+      });
+
+      try {
+        return await Promise.race([firestoreFetch, apiFetch]);
+      } catch {
         try {
-          const products = await fetchCategoryProductsFallback(categorySlug);
-          return products
-            .filter((p: any) => p?.is_active)
-            .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-            .map(mapToProductWithReviews);
-        } catch (fallbackErr) {
-          console.error("[Products] API fallback also failed for category:", fallbackErr);
-          throw err;
+          return await apiFetch;
+        } catch {
+          return await firestoreFetch;
         }
       }
     },
