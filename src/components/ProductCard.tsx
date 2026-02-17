@@ -44,6 +44,7 @@ const ProductCardComponent = ({
     const slow = ["slow-2g", "2g"].includes(conn?.effectiveType);
     if (conn?.saveData || slow) return;
     prefetchTriggered.current = true;
+    if (!productId) return;
     // Prefetch JS chunk + data in parallel (uses shared fetchProduct with timeout)
     import("@/pages/ProductDetail");
     queryClient
