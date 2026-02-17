@@ -35,7 +35,7 @@ const ProductDetail = () => {
   const { id } = useParams();
   const navigate = useNavigate();
   const { addItem, updateQuantity: updateCartQuantity } = useCart();
-  const { user } = useAuth();
+  // Auth removed — product detail is public
   const [quantity, setQuantity] = useState(1);
   const [mobileSection, setMobileSection] = useState<string | null>(null);
   

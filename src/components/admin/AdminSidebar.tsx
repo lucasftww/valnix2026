@@ -44,15 +44,15 @@ const systemMenuItems = [
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const { state, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
-  const { user, signOut } = useAuth();
+  const { signOut } = useAuth();
   const isCollapsed = state === "collapsed";
 
-  const handleSignOut = async () => {
-    await signOut();
+  const handleSignOut = () => {
+    signOut();
     navigate("/");
   };
 
-  const userInitials = user?.email?.slice(0, 2).toUpperCase() || "AD";
+  const userInitials = "AD";
 
   const renderMenuItem = (item: typeof mainMenuItems[0]) => (
     <SidebarMenuItem key={item.id}>
@@ -173,7 +173,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
             </Avatar>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-200 truncate">{user?.email}</p>
+                <p className="text-sm font-medium text-neutral-200 truncate">Admin</p>
                 <p className="text-[10px] text-neutral-500">Administrador</p>
               </div>
             )}

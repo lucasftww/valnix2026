@@ -344,7 +344,7 @@ export default function OrderDelivery() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { user } = useAuth();
+  // Auth removed — delivery is accessed via hash, no user needed
   const [order, setOrder] = useState<GuestOrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);

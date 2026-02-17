@@ -1,9 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invokeFunction } from "@/lib/apiHelper";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -142,23 +142,17 @@ const formatCurrency = (value: number) => {
 
 // ── Component ─────────────────────────────────────────────────────
 export const AdminOrders = () => {
-  const { user } = useAuth();
   const { toast } = useToast();
-
-  const getFirebaseToken = useCallback(async () => {
-    if (!user) return null;
-    return user.getIdToken();
-  }, [user]);
 
   const { data: orders = [], isLoading: loading, refetch: refetchOrders } = useQuery({
     queryKey: ['admin-orders'],
     queryFn: async () => {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       if (!token) return [];
       const res = await invokeFunction("admin-data", {
         method: "GET",
         queryParams: { resource: "orders" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -179,7 +173,7 @@ export const AdminOrders = () => {
       ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       return ordersData;
     },
-    enabled: !!user,
+    enabled: true,
     refetchInterval: 60000,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

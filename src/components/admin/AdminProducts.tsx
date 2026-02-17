@@ -1,6 +1,6 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -59,11 +59,7 @@ interface Product {
   terms_conditions?: string | null;
 }
 
-const getFirebaseToken = async () => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return user.getIdToken();
-};
+const getAdminTokenFn = () => requireAdminToken();
 
 export const AdminProducts = () => {
   const { toast } = useToast();

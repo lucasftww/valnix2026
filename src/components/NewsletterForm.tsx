@@ -23,20 +23,13 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
   const [email, setEmail] = useState("");
   const [isLoading, setIsLoading] = useState(false);
   const { toast } = useToast();
-  const { user } = useAuth();
+  // Auth removed — newsletter is open to all
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!user) {
-      toast({
-        title: "Você deve logar primeiro",
-        description: "Faça login para assinar nossa newsletter",
-        variant: "destructive",
-      });
-      return;
-    }
-    
+
+
     const validation = newsletterSchema.safeParse({ email });
     
     if (!validation.success) {
