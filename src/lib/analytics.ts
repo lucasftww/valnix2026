@@ -46,7 +46,10 @@ export async function trackAnalyticsEvent(
       },
     });
   } catch (e) {
-    console.warn('⚠️ Analytics event failed:', e);
+    // Best-effort: never spam console in production
+    if (import.meta.env.DEV) {
+      console.warn('⚠️ Analytics event failed:', e);
+    }
   }
 }
 
