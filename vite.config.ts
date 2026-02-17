@@ -59,11 +59,11 @@ export default defineConfig(({ mode }) => ({
           'vendor': ['react', 'react-dom', 'react-router-dom'],
           'query': ['@tanstack/react-query'],
           'ui-core': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
-          'ui-extra': ['@radix-ui/react-accordion', '@radix-ui/react-select', '@radix-ui/react-tabs'],
           'firebase-core': ['firebase/app', 'firebase/auth', 'firebase/app-check'],
           'firebase-db': ['firebase/firestore'],
-          'charts': ['recharts'],
-          'carousel': ['embla-carousel-react', 'embla-carousel-autoplay'],
+          // charts, ui-extra, carousel: NOT in manualChunks so Vite
+          // only loads them when the importing route is navigated to
+          // (avoids unnecessary modulepreload on homepage)
         },
         assetFileNames: (assetInfo) => {
           if (!assetInfo.name) return 'assets/[name]-[hash][extname]';
