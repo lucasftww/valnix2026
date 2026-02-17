@@ -14,6 +14,7 @@ function getCorsHeaders(req: Request) {
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
     "Access-Control-Allow-Headers": "content-type",
+    "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   };
 }

@@ -31,6 +31,7 @@ export async function invokeFunction(
 
   const fetchHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
+    'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
     ...headers,
   };
 
