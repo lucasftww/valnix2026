@@ -111,8 +111,8 @@ export const useProductById = (productId: string | undefined) => {
     refetchOnMount: false,
     refetchOnReconnect: true,
     retry: (failureCount, error) =>
-      failureCount < 2 && shouldRetryProductFetch(error),
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+      failureCount < 3 && shouldRetryProductFetch(error),
+    retryDelay: (attempt) => Math.min(1500 * 2 ** attempt, 8000),
     meta: { productId },
   });
 };
