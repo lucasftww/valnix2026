@@ -179,6 +179,21 @@ Deno.serve(async (req) => {
         data = { product: product.is_active ? product : null };
       }
 
+    } else if (type === "check-role") {
+      // Check admin role for a given Firebase UID via server-side Firestore
+      const uid = url.searchParams.get("uid");
+      if (!uid) return new Response(JSON.stringify({ error: "uid required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      const accessToken = await getFirebaseAccessToken();
+      const roleDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
+      const roleRes = await fetch(roleDocUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+      if (!roleRes.ok) {
+        data = { isAdmin: false };
+      } else {
+        const roleDoc = await roleRes.json();
+        const role = roleDoc.fields?.role?.stringValue;
+        data = { isAdmin: role === "admin" };
+      }
+
     } else {
       return new Response(JSON.stringify({ error: "Invalid type" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }

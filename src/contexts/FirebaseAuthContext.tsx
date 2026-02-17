@@ -94,6 +94,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // ── Check admin role — use local cache first, then validate in background ──
         const cachedAdmin = getCachedRole(firebaseUser.uid);
         let hasAdminRole = cachedAdmin ?? false;
+
+        // Fallback: check role via edge function when Firestore fails
+        const checkRoleViaApi = async (uid: string): Promise<boolean> => {
+          try {
+            const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+            const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role&uid=${uid}`, {
+              headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
+            });
+            if (!res.ok) return false;
+            const data = await res.json();
+            return data.isAdmin === true;
+          } catch {
+            return false;
+          }
+        };
         
         if (cachedAdmin !== null) {
           // Use cached value immediately for fast render
@@ -107,19 +122,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               setCachedRole(firebaseUser.uid, serverAdmin);
             }
             hasAdminRole = serverAdmin;
-          }).catch(() => { /* use cached */ });
+          }).catch(async () => {
+            // Firestore failed — try API fallback
+            console.warn("[Auth] Firestore role check failed, trying API fallback");
+            const apiAdmin = await checkRoleViaApi(firebaseUser.uid);
+            if (!alive) return;
+            if (apiAdmin !== cachedAdmin) {
+              setIsAdmin(apiAdmin);
+              setCachedRole(firebaseUser.uid, apiAdmin);
+            }
+            hasAdminRole = apiAdmin;
+          });
         } else {
-          // No cache — fetch with timeout
+          // No cache — fetch with timeout, fallback to API
           try {
             const roleResult = await Promise.race([
               getDoc(doc(db, "user_roles", firebaseUser.uid)),
               new Promise<null>((r) => setTimeout(() => r(null), 3000)),
             ]);
-            hasAdminRole = roleResult?.exists?.() && roleResult.data()?.role === "admin";
+            if (roleResult) {
+              hasAdminRole = roleResult.exists?.() && roleResult.data()?.role === "admin";
+            } else {
+              // Timeout — try API fallback
+              console.warn("[Auth] Firestore role check timed out, trying API fallback");
+              hasAdminRole = await checkRoleViaApi(firebaseUser.uid);
+            }
             if (alive) setIsAdmin(hasAdminRole);
             setCachedRole(firebaseUser.uid, hasAdminRole);
           } catch {
-            setIsAdmin(false);
+            // Firestore error — try API fallback
+            console.warn("[Auth] Firestore role check error, trying API fallback");
+            try {
+              hasAdminRole = await checkRoleViaApi(firebaseUser.uid);
+              if (alive) setIsAdmin(hasAdminRole);
+              setCachedRole(firebaseUser.uid, hasAdminRole);
+            } catch {
+              setIsAdmin(false);
+            }
           }
         }
 
