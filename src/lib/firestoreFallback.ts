@@ -68,6 +68,11 @@ export async function fetchCategoriesFallback() {
   return data.categories || [];
 }
 
+export async function fetchCategoryBySlugFallback(slug: string): Promise<any | null> {
+  const categories = await fetchCategoriesFallback();
+  return categories.find((c: any) => c.slug === slug && c.is_active) || null;
+}
+
 export async function fetchCategoryProductsFallback(slug: string) {
   const key = JSON.stringify({ type: "category", slug });
   const lsData = getLsCache(key);

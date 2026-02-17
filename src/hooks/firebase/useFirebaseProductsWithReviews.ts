@@ -3,6 +3,8 @@ import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { fetchProduct, shouldRetryProductFetch } from "@/lib/fetchProduct";
+import { fetchCategoryProductsFallback, fetchProductFallback, fetchCategoryBySlugFallback } from "@/lib/firestoreFallback";
+import { markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import type { Category, Review, Product } from "@/types";
 
 import { generateConsistentSalesAndReviews } from "./useFirebaseProducts";
@@ -28,29 +30,41 @@ export const useProductsWithReviews = (category: string) => {
     queryKey: ["products-with-reviews", category],
     queryFn: async () => {
       if (!category) return [];
-      
-      const productsQuery = query(
-        collection(db, "products"),
-        where("category", "==", category)
-      );
-      
-      const productsSnapshot = await resilientGetDocs(productsQuery);
-      
-      if (productsSnapshot.empty) return [];
 
-      const products = productsSnapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
-        .filter((p) => p?.is_active)
-        .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0));
+      let firestoreResult: ProductWithReviews[] | null = null;
+      let apiResult: ProductWithReviews[] | null = null;
 
-      return products.map(product => {
-        const stats = generateConsistentSalesAndReviews(product.id);
-        return {
-          ...product,
-          sold: stats.sold,
-          reviewCount: stats.reviewCount
-        } as ProductWithReviews;
-      });
+      const mapProducts = (products: any[]): ProductWithReviews[] =>
+        products
+          .filter((p: any) => p?.is_active)
+          .sort((a: any, b: any) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
+          .map((product: any) => {
+            const stats = generateConsistentSalesAndReviews(product.id);
+            return { ...product, sold: stats.sold, reviewCount: stats.reviewCount } as ProductWithReviews;
+          });
+
+      const firestoreFetch = (async () => {
+        const productsQuery = query(
+          collection(db, "products"),
+          where("category", "==", category)
+        );
+        const productsSnapshot = await resilientGetDocs(productsQuery);
+        const raw = productsSnapshot.docs.map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }));
+        return mapProducts(raw);
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
+
+      const apiFetch = (async () => {
+        const products = await fetchCategoryProductsFallback(category);
+        return mapProducts(products);
+      })().then(r => { apiResult = r; return r; }).catch(() => null);
+
+      const first = await Promise.race([firestoreFetch, apiFetch]);
+      if (first && first.length > 0) return first;
+
+      await Promise.allSettled([firestoreFetch, apiFetch]);
+      if (firestoreResult && (firestoreResult as ProductWithReviews[]).length > 0) return firestoreResult;
+      if (apiResult && (apiResult as ProductWithReviews[]).length > 0) return apiResult;
+      return [];
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -59,29 +73,18 @@ export const useProductsWithReviews = (category: string) => {
   });
 };
 
-// Hook para buscar categoria por slug
+// Hook para buscar categoria por slug — with API fallback
 export const useCategoryBySlug = (slug: string | undefined) => {
   return useQuery({
     queryKey: ["category", slug],
     queryFn: async (): Promise<Category | null> => {
       if (!slug) return null;
-      
-      const categoriesQuery = query(
-        collection(db, "categories"),
-        where("slug", "==", slug)
-      );
-      
-      const snapshot = await resilientGetDocs(categoriesQuery);
-      
-      if (snapshot.empty) return null;
-      
-      const docSnap = snapshot.docs[0];
-      const data = docSnap.data();
 
-      if (!data.is_active) return null;
-      
-      return {
-        id: docSnap.id,
+      let firestoreResult: Category | null | undefined = undefined;
+      let apiResult: Category | null | undefined = undefined;
+
+      const mapCategory = (data: any, id: string): Category => ({
+        id,
         name: data.name,
         slug: data.slug,
         description: data.description || null,
@@ -90,35 +93,79 @@ export const useCategoryBySlug = (slug: string | undefined) => {
         parent_id: data.parent_id || null,
         is_active: data.is_active,
         display_order: data.display_order,
-        show_on_homepage: data.show_on_homepage || null
-      } as Category;
+        show_on_homepage: data.show_on_homepage || null,
+      } as Category);
+
+      const firestoreFetch = (async () => {
+        const categoriesQuery = query(
+          collection(db, "categories"),
+          where("slug", "==", slug)
+        );
+        const snapshot = await resilientGetDocs(categoriesQuery);
+        if (snapshot.empty) return null;
+        const docSnap = snapshot.docs[0];
+        const data = docSnap.data();
+        if (!data.is_active) return null;
+        return mapCategory(data, docSnap.id);
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
+
+      const apiFetch = (async () => {
+        const cat = await fetchCategoryBySlugFallback(slug);
+        if (!cat) return null;
+        return mapCategory(cat, cat.id);
+      })().then(r => { apiResult = r; return r; }).catch(() => null);
+
+      const first = await Promise.race([firestoreFetch, apiFetch]);
+      if (first) return first;
+
+      await Promise.allSettled([firestoreFetch, apiFetch]);
+      if (firestoreResult !== undefined && firestoreResult !== null) return firestoreResult;
+      if (apiResult !== undefined && apiResult !== null) return apiResult;
+      return null;
     },
-    staleTime: 60 * 60 * 1000, // 1h — categories rarely change
+    staleTime: 60 * 60 * 1000,
     gcTime: 2 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
 
-// Hook para buscar produto por ID — uses shared fetchProduct
+// Hook para buscar produto por ID — with API fallback race
 export const useProductById = (productId: string | undefined) => {
   return useQuery({
     queryKey: ['product', productId],
-    queryFn: ({ queryKey }) => fetchProduct(queryKey[1] as string),
+    queryFn: async () => {
+      if (!productId) return null;
+
+      let firestoreResult: any = undefined;
+      let apiResult: any = undefined;
+
+      const firestoreFetch = (async () => {
+        return await fetchProduct(productId);
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
+
+      const apiFetch = (async () => {
+        return await fetchProductFallback(productId);
+      })().then(r => { apiResult = r; return r; }).catch(() => null);
+
+      const first = await Promise.race([firestoreFetch, apiFetch]);
+      if (first) return first;
+
+      await Promise.allSettled([firestoreFetch, apiFetch]);
+      if (firestoreResult) return firestoreResult;
+      if (apiResult) return apiResult;
+      return null;
+    },
     enabled: typeof productId === "string",
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: true,
-    retry: (failureCount, error) =>
-      failureCount < 3 && shouldRetryProductFetch(error),
-    retryDelay: (attempt) => Math.min(1500 * 2 ** attempt, 8000),
+    retry: 1,
+    retryDelay: 2000,
     meta: { productId },
   });
 };
-
-// Log timeout once on final failure (not on every retry)
-// Usage: set queryClient defaultOptions.mutations.onError or use in component via useEffect on isError
 
 // Hook para buscar reviews por categoria
 export const useProductReviews = (category: string | undefined) => {
