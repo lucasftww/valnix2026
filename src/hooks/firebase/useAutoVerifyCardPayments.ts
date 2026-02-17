@@ -53,10 +53,10 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
           const data = await response.json();
 
           if (data.success) {
-            console.log(`✅ Auto-verified card payment for order ${order.id} (server-side confirm)`);
+            if (import.meta.env.DEV) console.log(`✅ Auto-verified card payment for order ${order.id}`);
             onOrderUpdated?.();
           } else {
-            console.log(`ℹ️ Card order ${order.id}: ${data.error || data.status || 'not confirmed yet'}`);
+            if (import.meta.env.DEV) console.log(`ℹ️ Card order ${order.id}: ${data.error || data.status || 'not confirmed yet'}`);
           }
         } catch (error) {
           console.warn(`⚠️ Auto-verify card failed for order ${order.id}:`, error);
