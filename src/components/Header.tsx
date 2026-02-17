@@ -167,6 +167,7 @@ const HeaderComponent = () => {
                   variant="ghost" 
                   size="sm" 
                   className="gap-2 h-10 px-2 sm:px-3 rounded-full hover:bg-secondary"
+                  aria-label={`Menu da conta de ${getDisplayName()}`}
                 >
                   <Avatar className="h-7 w-7 border border-primary/30">
                     <AvatarImage src={profile?.avatar_url || ""} alt="Avatar" />
@@ -218,13 +219,14 @@ const HeaderComponent = () => {
               </DropdownMenuContent>
             </DropdownMenu>
           ) : (
-            <Link to="/auth">
+            <Link to="/auth" aria-label="Entrar na conta">
               <Button 
                 variant="ghost" 
                 size="sm" 
                 className="gap-2 h-10 px-3 rounded-full hover:bg-secondary"
+                aria-label="Entrar na conta"
               >
-                <User className="h-4 w-4" />
+                <User className="h-4 w-4" aria-hidden="true" />
                 <span className="hidden sm:inline text-sm font-medium">Entrar</span>
               </Button>
             </Link>

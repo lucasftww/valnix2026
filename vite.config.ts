@@ -81,7 +81,19 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000,
     minify: 'esbuild',
     reportCompressedSize: false,
-    target: 'es2020',
+    target: 'esnext',
     cssMinify: true,
+    modulePreload: {
+      // Only preload chunks that are directly imported (not lazy chunks)
+      resolveDependencies: (filename, deps) => {
+        // Skip preloading admin-only or lazy chunks
+        return deps.filter(dep => 
+          !dep.includes('charts') && 
+          !dep.includes('carousel') && 
+          !dep.includes('Admin') &&
+          !dep.includes('recharts')
+        );
+      },
+    },
   }
 }));
