@@ -44,12 +44,14 @@ const tabTitles: Record<string, { title: string; description: string }> = {
 };
 
 export default function Admin() {
-  const { isAdmin, loading } = useAuth();
+  const { isAdmin, loading, signIn } = useAuth();
   const navigate = useNavigate();
-  const [checkingAuth, setCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["dashboard"]));
   const [searchQuery, setSearchQuery] = useState("");
+  const [password, setPassword] = useState("");
+  const [loginError, setLoginError] = useState("");
+  const [loggingIn, setLoggingIn] = useState(false);
 
   useAdminPrefetch();
 
@@ -59,26 +61,45 @@ export default function Admin() {
     }
   }, []);
 
-  useEffect(() => {
-    if (!loading) {
-      if (!isAdmin) {
-        navigate("/");
-      } else {
-        setCheckingAuth(false);
-      }
+  const handleLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoginError("");
+    setLoggingIn(true);
+    const { error } = await signIn(password);
+    if (error) {
+      setLoginError("Acesso negado");
+      setPassword("");
     }
-  }, [isAdmin, loading, navigate]);
+    setLoggingIn(false);
+  };
 
-  if (loading || checkingAuth) {
+  if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
-        <div className="flex flex-col items-center gap-4">
-          <div className="relative">
-            <div className="w-16 h-16 border-4 border-primary/20 rounded-full" />
-            <div className="w-16 h-16 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
-          </div>
-          <p className="text-muted-foreground animate-pulse">Carregando painel...</p>
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="w-10 h-10 border-3 border-primary/20 rounded-full relative">
+          <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
         </div>
+      </div>
+    );
+  }
+
+  if (!isAdmin) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
+          <Input
+            type="password"
+            placeholder="Senha"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            autoFocus
+            className="text-center"
+          />
+          {loginError && <p className="text-sm text-destructive text-center">{loginError}</p>}
+          <Button type="submit" className="w-full" disabled={loggingIn || !password}>
+            {loggingIn ? "..." : "Entrar"}
+          </Button>
+        </form>
       </div>
     );
   }
