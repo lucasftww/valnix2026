@@ -165,32 +165,31 @@ export const useProduct = (productId: string | undefined) => {
     queryKey: [QUERY_KEYS.PRODUCT, productId],
     queryFn: async () => {
       if (!productId) return null;
-      try {
+
+      // Race: Firestore vs API fallback — both start immediately
+      const firestoreFetch = (async () => {
         const { fetchProduct } = await import("@/lib/fetchProduct");
         return await fetchProduct(productId);
-      } catch (err) {
-        console.warn("[Products] Firestore failed for product, trying API fallback:", productId, (err as Error)?.message || err);
-        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
-        try {
-          const { fetchProductFallback } = await import("@/lib/firestoreFallback");
-          return fetchProductFallback(productId);
-        } catch (fallbackErr) {
-          console.error("[Products] API fallback also failed for product:", fallbackErr);
-          throw err;
-        }
+      })();
+
+      const apiFetch = (async () => {
+        const { fetchProductFallback } = await import("@/lib/firestoreFallback");
+        return await fetchProductFallback(productId);
+      })();
+
+      try {
+        const result = await Promise.race([firestoreFetch, apiFetch]);
+        return result;
+      } catch {
+        // If the race winner threw, try the other
+        try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
     enabled: !!productId,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    retry: (failureCount, error) => {
-      if (failureCount >= 3) return false;
-      const msg = (error as Error)?.message ?? "";
-      const code = (error as any)?.code ?? "";
-      if (msg.includes("PRODUCT_FETCH_TIMEOUT")) return true;
-      return code.includes("unavailable") || code.includes("deadline-exceeded") || msg.toLowerCase().includes("network");
-    },
-    retryDelay: (attempt) => Math.min(1500 * 2 ** attempt, 8000),
+    retry: 1,
+    retryDelay: 2000,
   });
 };
