@@ -27,22 +27,16 @@ verify_jwt = false
 [functions.upload-r2]
 verify_jwt = false
 
-[functions.restore-orders]
-verify_jwt = false
-
 [functions.process-delivery]
-verify_jwt = false
-
-[functions.checkout-balance]
-verify_jwt = false
-
-[functions.create-order]
 verify_jwt = false
 
 [functions.cleanup-orders]
 verify_jwt = false
 
 [functions.cleanup-ttl]
+verify_jwt = false
+
+[functions.create-order]
 verify_jwt = false
 
 [functions.guest-order]

@@ -160,7 +160,7 @@ Deno.serve(async (req: Request) => {
     let results: any[] = [];
     try {
       results = await runQuery(token, {
-        from: [{ collectionId: 'orders' }],
+        from: [{ collectionId: 'guest_orders' }],
         where: {
           compositeFilter: {
             op: 'AND',
@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
       });
     } catch {
       results = await runQuery(token, {
-        from: [{ collectionId: 'orders' }],
+        from: [{ collectionId: 'guest_orders' }],
         where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
         limit: 500,
       });

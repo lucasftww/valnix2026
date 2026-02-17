@@ -189,7 +189,7 @@ async function queryOrdersSince(cutoffISO: string): Promise<any[]> {
 
   for (let page = 0; page < 40; page++) {
     const structuredQuery: any = {
-      from: [{ collectionId: 'orders' }],
+      from: [{ collectionId: 'guest_orders' }],
       where: {
         fieldFilter: {
           field: { fieldPath: 'created_at' },
@@ -224,7 +224,7 @@ async function queryOrdersSince(cutoffISO: string): Promise<any[]> {
       // Fallback: if index doesn't exist, use unpaginated query with simple filter
       console.warn(`⚠️ Paginated order query failed (page ${page}), falling back to simple query`);
       if (page === 0) {
-        return queryCollectionFiltered('orders', 'created_at', 'GREATER_THAN_OR_EQUAL', { stringValue: cutoffISO });
+        return queryCollectionFiltered('guest_orders', 'created_at', 'GREATER_THAN_OR_EQUAL', { stringValue: cutoffISO });
       }
       break;
     }
@@ -408,7 +408,7 @@ Deno.serve(async (req) => {
         const [profiles, users, orders] = await Promise.all([
           queryCollection("profiles"),
           queryCollection("users"),
-          queryCollection("orders"),
+          queryCollection("guest_orders"),
         ]);
 
         // Build order stats per user
@@ -459,7 +459,7 @@ Deno.serve(async (req) => {
         if (!userId) return new Response(JSON.stringify({ error: "userId required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-        const orders = await queryCollectionFiltered("orders", "user_id", "EQUAL", { stringValue: userId });
+        const orders = await queryCollectionFiltered("guest_orders", "user_id", "EQUAL", { stringValue: userId });
         orders.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
 
         return new Response(JSON.stringify({ orders: orders.slice(0, 10) }),
@@ -496,7 +496,7 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "orders") {
-        const orders = await queryCollection("orders");
+        const orders = await queryCollection("guest_orders");
         // Convert Firestore timestamps
         for (const o of orders) {
           if (o.created_at && typeof o.created_at === 'object' && o.created_at.seconds) {
@@ -517,7 +517,20 @@ Deno.serve(async (req) => {
         if (!orderId) return new Response(JSON.stringify({ error: "orderId required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-        const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: orderId });
+        // Read items from subcollection guest_orders/{orderId}/items
+        const accessToken = await getFirebaseAccessToken();
+        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=100`;
+        const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+        let items: any[] = [];
+        if (itemsRes.ok) {
+          const data = await itemsRes.json();
+          items = (data.documents || []).map((doc: any) => {
+            const fields = doc.fields || {};
+            const obj: any = { id: doc.name.split('/').pop() };
+            for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
+            return obj;
+          });
+        }
         return new Response(JSON.stringify({ items }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -589,12 +602,26 @@ Deno.serve(async (req) => {
         const allPaid = orders.filter((o: any) => o.payment_status === 'paid');
         const paidIds = new Set(allPaid.map((o: any) => o.id));
 
-        // Fetch order_items paginated (these could be many)
-        const orderItems = await queryCollectionPaginated("order_items", 500);
+        // Fetch order items from subcollections of paid orders (in parallel batches)
+        const accessTokenItems = await getFirebaseAccessToken();
+        const itemBatches = await Promise.all(allPaid.map(async (order: any) => {
+          try {
+            const iUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${order.id}/items?pageSize=50`;
+            const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${accessTokenItems}` } });
+            if (!iRes.ok) return [];
+            const iData = await iRes.json();
+            return (iData.documents || []).map((doc: any) => {
+              const fields = doc.fields || {};
+              const obj: any = { id: doc.name.split('/').pop(), order_id: order.id };
+              for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
+              return obj;
+            });
+          } catch { return []; }
+        }));
+        const orderItems = itemBatches.flat();
 
         const productSales: Record<string, { quantity: number; revenue: number }> = {};
         for (const item of orderItems) {
-          if (!paidIds.has(item.order_id)) continue;
           const name = item.product_name || 'Desconhecido';
           if (!productSales[name]) productSales[name] = { quantity: 0, revenue: 0 };
           productSales[name].quantity += Number(item.quantity) || 0;
@@ -905,13 +932,11 @@ Deno.serve(async (req) => {
         }
 
         // Firestore is case-sensitive — query both lowercase and original casing
-        const ordersLower = await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: email });
+        const ordersLower = await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: email });
         const ordersOriginal = rawEmail !== email
-          ? await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: rawEmail })
+          ? await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: rawEmail })
           : [];
-        // Also try uppercase variant
-        const ordersUpper = await queryCollectionFiltered("orders", "customer_email", "EQUAL", { stringValue: email.toUpperCase() });
-        // Deduplicate by id
+        const ordersUpper = await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: email.toUpperCase() });
         const seenIds = new Set<string>();
         const orders: typeof ordersLower = [];
         for (const o of [...ordersLower, ...ordersOriginal, ...ordersUpper]) {
@@ -927,14 +952,20 @@ Deno.serve(async (req) => {
 
         for (const order of orders) {
           try {
-            // Delete order_items for this order
-            const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: order.id });
-            for (const item of items) {
-              await deleteFirestoreDoc("order_items", item.id);
-              deletedItems++;
+            // Delete subcollection items first
+            const accessToken = await getFirebaseAccessToken();
+            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${order.id}/items`;
+            const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            if (itemsRes.ok) {
+              const itemsData = await itemsRes.json();
+              for (const item of (itemsData.documents || [])) {
+                const itemId = item.name.split('/').pop()!;
+                await deleteFirestoreDoc(`guest_orders/${order.id}/items`, itemId);
+                deletedItems++;
+              }
             }
             // Delete the order itself
-            await deleteFirestoreDoc("orders", order.id);
+            await deleteFirestoreDoc("guest_orders", order.id);
           } catch (err: any) {
             errors.push(`order ${order.id}: ${err.message || err}`);
           }
@@ -1065,8 +1096,8 @@ Deno.serve(async (req) => {
                 fields: {
                   action: { stringValue: 'balance_update' },
                   target_user_id: { stringValue: docId },
-                  admin_uid: { stringValue: userData.uid },
-                  admin_email: { stringValue: userData.email },
+                  admin_uid: { stringValue: 'hmac_admin' },
+                  admin_email: { stringValue: 'admin@hmac' },
                   previous_balance: { doubleValue: Number(previousBalance) },
                   new_balance: { doubleValue: Number(body.balance) },
                   ip: { stringValue: clientIp },
@@ -1074,7 +1105,7 @@ Deno.serve(async (req) => {
                 },
               }),
             });
-            console.log(`📝 AUDIT: Balance update by ${userData.email} for user ${docId}: ${previousBalance} → ${body.balance}`);
+            console.log(`📝 AUDIT: Balance update by hmac_admin for user ${docId}: ${previousBalance} → ${body.balance}`);
           } catch (auditErr) {
             console.error('⚠️ Audit log failed (non-blocking):', auditErr);
           }
@@ -1099,60 +1130,26 @@ Deno.serve(async (req) => {
           if (ORDERS_EDITABLE_FIELDS.includes(key)) safeBody[key] = body[key];
         }
         safeBody['updated_at'] = new Date().toISOString();
-        const success = await updateFirestoreDoc("orders", docId, safeBody);
+        const success = await updateFirestoreDoc("guest_orders", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
       if (resource === "order-items") {
         const ORDER_ITEMS_ALLOWED_FIELDS = ['delivery_code', 'delivered_at', 'admin_notes'];
+        const orderId = body.orderId; // Required: parent order ID for subcollection path
+        if (!orderId) {
+          return new Response(JSON.stringify({ error: "orderId required for order-items update" }),
+            { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
         const safeBody: Record<string, unknown> = {};
         for (const key of Object.keys(body)) {
           if (ORDER_ITEMS_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
         }
-        // Auto-set delivered_at when delivery_code is provided
         if (safeBody.delivery_code && !safeBody.delivered_at) {
           safeBody.delivered_at = new Date().toISOString();
         }
-        const success = await updateFirestoreDoc("order_items", docId, safeBody);
-
-        // ── Sync delivery_code to guest_orders/{hash}/items subcollection ──
-        if (success && safeBody.delivery_code) {
-          try {
-            const itemDoc = await getFirestoreDoc("order_items", docId);
-            const orderId = itemDoc?.fields?.order_id?.stringValue;
-            const itemProductName = itemDoc?.fields?.product_name?.stringValue;
-            if (orderId) {
-              const guestResults = await queryCollectionFiltered("guest_orders", "order_id", "EQUAL", { stringValue: orderId });
-              if (guestResults.length > 0) {
-                const guestHash = guestResults[0].id;
-                const accessToken = await getFirebaseAccessToken();
-                // List subcollection items
-                const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items`;
-                const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-                if (itemsRes.ok) {
-                  const itemsData = await itemsRes.json();
-                  for (const guestItem of (itemsData.documents || [])) {
-                    const gFields = guestItem.fields || {};
-                    if (!gFields.delivery_code?.stringValue && gFields.product_name?.stringValue === itemProductName) {
-                      const gItemId = guestItem.name.split('/').pop()!;
-                      const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items/${gItemId}?updateMask.fieldPaths=delivery_code`;
-                      await fetch(updateUrl, {
-                        method: 'PATCH',
-                        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-                        body: JSON.stringify({ fields: { delivery_code: { stringValue: safeBody.delivery_code } } }),
-                      });
-                      console.log(`📦 Synced delivery_code to guest_orders/${guestHash}/items/${gItemId}`);
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          } catch (syncErr) {
-            console.warn('⚠️ guest_orders sync failed (non-blocking):', syncErr);
-          }
-        }
+        const success = await updateFirestoreDoc(`guest_orders/${orderId}/items`, docId, safeBody);
 
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -1199,7 +1196,7 @@ Deno.serve(async (req) => {
         // Read current order for audit
         try {
           const accessToken = await getFirebaseAccessToken();
-          const orderUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/orders/${docId}`;
+          const orderUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${docId}`;
           const orderRes = await fetch(orderUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
           const orderData = orderRes.ok ? await orderRes.json() : null;
           const prevPaymentStatus = orderData?.fields?.payment_status?.stringValue ?? 'unknown';
@@ -1215,8 +1212,8 @@ Deno.serve(async (req) => {
               fields: {
                 action: { stringValue: 'verify_payment' },
                 order_id: { stringValue: docId },
-                admin_uid: { stringValue: userData.uid },
-                admin_email: { stringValue: userData.email },
+                admin_uid: { stringValue: 'hmac_admin' },
+                admin_email: { stringValue: 'admin@hmac' },
                 previous_payment_status: { stringValue: prevPaymentStatus },
                 new_payment_status: { stringValue: newPaymentStatus },
                 previous_status: { stringValue: prevStatus },
@@ -1226,7 +1223,7 @@ Deno.serve(async (req) => {
               },
             }),
           });
-          console.log(`📝 AUDIT: Verify payment by ${userData.email} for order ${docId}: ${prevPaymentStatus} → ${newPaymentStatus}`);
+          console.log(`📝 AUDIT: Verify payment by hmac_admin for order ${docId}: ${prevPaymentStatus} → ${newPaymentStatus}`);
         } catch (auditErr) {
           console.error('⚠️ Audit log failed (non-blocking):', auditErr);
         }
@@ -1237,7 +1234,7 @@ Deno.serve(async (req) => {
         };
         if (newStatus) updateData.status = newStatus;
 
-        const success = await updateFirestoreDoc("orders", docId, updateData);
+        const success = await updateFirestoreDoc("guest_orders", docId, updateData);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -1296,11 +1293,20 @@ Deno.serve(async (req) => {
 
         // 3. Also delete user's orders and order_items
         try {
-          const userOrders = await queryCollectionFiltered("orders", "user_id", "EQUAL", { stringValue: docId });
+          const userOrders = await queryCollectionFiltered("guest_orders", "user_id", "EQUAL", { stringValue: docId });
           for (const order of userOrders) {
-            const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: order.id });
-            await Promise.allSettled(items.map(item => deleteFirestoreDoc("order_items", item.id)));
-            await deleteFirestoreDoc("orders", order.id);
+            // Delete subcollection items
+            const accessToken = await getFirebaseAccessToken();
+            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${order.id}/items`;
+            const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+            if (itemsRes.ok) {
+              const itemsData = await itemsRes.json();
+              await Promise.allSettled((itemsData.documents || []).map((item: any) => {
+                const itemId = item.name.split('/').pop()!;
+                return deleteFirestoreDoc(`guest_orders/${order.id}/items`, itemId);
+              }));
+            }
+            await deleteFirestoreDoc("guest_orders", order.id);
           }
           console.log(`🗑️ Deleted ${userOrders.length} orders for user ${docId}`);
         } catch (orderErr) {
@@ -1312,12 +1318,18 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "orders") {
-        // Delete order and its items
-        const items = await queryCollectionFiltered("order_items", "order_id", "EQUAL", { stringValue: docId });
-        for (const item of items) {
-          await deleteFirestoreDoc("order_items", item.id);
+        // Delete order subcollection items first, then the order
+        const accessToken = await getFirebaseAccessToken();
+        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${docId}/items`;
+        const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+        if (itemsRes.ok) {
+          const itemsData = await itemsRes.json();
+          for (const item of (itemsData.documents || [])) {
+            const itemId = item.name.split('/').pop()!;
+            await deleteFirestoreDoc(`guest_orders/${docId}/items`, itemId);
+          }
         }
-        await deleteFirestoreDoc("orders", docId);
+        await deleteFirestoreDoc("guest_orders", docId);
         return new Response(JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
