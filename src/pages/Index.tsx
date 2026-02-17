@@ -44,7 +44,7 @@ const IndexComponent = () => {
       <main className="flex-1">
         {/* Search Bar Mobile */}
         <div className="md:hidden px-4 py-3 bg-background">
-          <SearchBar />
+          <SearchBar inputId="search-mobile" />
         </div>
         
         <ProductGrid />

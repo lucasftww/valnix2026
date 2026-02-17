@@ -16,10 +16,14 @@ interface Product {
   is_active?: boolean;
 }
 
+interface SearchBarProps {
+  inputId?: string;
+}
+
 // Singleton para cache do catálogo (persiste entre remontagens)
 let catalogCache: Product[] | null = null;
 
-const SearchBarComponent = () => {
+const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
   const [query, setQuery] = useState("");
   const [results, setResults] = useState<Product[]>([]);
   const [isOpen, setIsOpen] = useState(false);
@@ -146,7 +150,7 @@ const SearchBarComponent = () => {
       <div className="relative">
         <Input
           ref={inputRef}
-          id="search"
+          id={inputId}
           name="search"
           type="search"
           placeholder="O que está buscando?"
