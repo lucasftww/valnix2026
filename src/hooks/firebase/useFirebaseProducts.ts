@@ -64,17 +64,19 @@ export const useFeaturedProducts = () => {
 
         return featuredActive.map(mapToProductCard);
       } catch (err) {
-        // Fallback to API proxy when Firestore is blocked (ad blocker)
-        if (isBlockedByAdBlocker(err)) {
-          console.info("[Products] Firestore blocked, using API fallback");
-          markFirestorePossiblyBlocked(err);
+        // Fallback to API proxy on ANY Firestore failure
+        console.warn("[Products] Firestore failed, trying API fallback:", (err as Error)?.message || err);
+        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+        try {
           const products = await fetchFeaturedProductsFallback();
           return products
             .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
             .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
             .map(mapToProductCard);
+        } catch (fallbackErr) {
+          console.error("[Products] API fallback also failed:", fallbackErr);
+          throw err; // throw original error
         }
-        throw err;
       }
     },
     staleTime: 30 * 60 * 1000,
@@ -142,16 +144,18 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
           .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
           .map(mapToProductWithReviews);
       } catch (err) {
-        if (isBlockedByAdBlocker(err)) {
-          console.info("[Products] Firestore blocked, using API fallback for category:", categorySlug);
-          markFirestorePossiblyBlocked(err);
+        console.warn("[Products] Firestore failed for category, trying API fallback:", categorySlug, (err as Error)?.message || err);
+        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+        try {
           const products = await fetchCategoryProductsFallback(categorySlug);
           return products
             .filter((p: any) => p?.is_active)
             .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
             .map(mapToProductWithReviews);
+        } catch (fallbackErr) {
+          console.error("[Products] API fallback also failed for category:", fallbackErr);
+          throw err;
         }
-        throw err;
       }
     },
     enabled: !!categorySlug,
@@ -171,13 +175,15 @@ export const useProduct = (productId: string | undefined) => {
         const { fetchProduct } = await import("@/lib/fetchProduct");
         return await fetchProduct(productId);
       } catch (err) {
-        if (isBlockedByAdBlocker(err)) {
-          console.info("[Products] Firestore blocked, using API fallback for product:", productId);
-          markFirestorePossiblyBlocked(err);
+        console.warn("[Products] Firestore failed for product, trying API fallback:", productId, (err as Error)?.message || err);
+        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+        try {
           const { fetchProductFallback } = await import("@/lib/firestoreFallback");
           return fetchProductFallback(productId);
+        } catch (fallbackErr) {
+          console.error("[Products] API fallback also failed for product:", fallbackErr);
+          throw err;
         }
-        throw err;
       }
     },
     enabled: !!productId,
