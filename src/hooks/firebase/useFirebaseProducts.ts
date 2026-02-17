@@ -1,32 +1,31 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, limit, getDocs } from "firebase/firestore";
+import { collection, query, where, limit, getDocs, getDocsFromServer } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
 import type { ProductCardData, ProductWithReviews } from "@/types";
 
-// Função utilitária para gerar VENDAS e AVALIAÇÕES consistentes baseadas no ID do produto
-// Vendas são SEMPRE maiores que avaliações (realista: nem todo mundo avalia)
-// Taxa de avaliação: entre 5% e 20% das vendas viram avaliações
 const generateConsistentSalesAndReviews = (productId: string): { sold: number; reviewCount: number } => {
-  // Hash do ID para gerar números pseudo-aleatórios mas consistentes
   const hash = productId.split('').reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 1), 0);
   const hash2 = productId.split('').reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 3) * 7, 0);
-  
-  // Vendas: entre 800 e 8000 (números realistas)
   const baseSold = 800 + (hash % 7200);
-  // Adiciona variação para parecer mais natural (ex: 2.303, 1.847)
   const soldVariation = hash2 % 100;
   const sold = baseSold + soldVariation;
-  
-  // Taxa de avaliação: entre 5% e 18% das vendas (realista)
-  const reviewRate = 0.05 + ((hash2 % 13) / 100); // 5% a 18%
+  const reviewRate = 0.05 + ((hash2 % 13) / 100);
   const reviewCount = Math.floor(sold * reviewRate);
-  
   return { sold, reviewCount };
 };
 
-// Export para uso em outros lugares
 export { generateConsistentSalesAndReviews };
+
+// Resilient fetch: try server first, fallback to cache if offline
+async function resilientGetDocs<T>(q: ReturnType<typeof query>) {
+  try {
+    return await getDocsFromServer(q);
+  } catch {
+    // Server unreachable (offline) — fallback to local cache
+    return await getDocs(q);
+  }
+}
 
 // Hook para produtos em destaque (home)
 export const useFeaturedProducts = () => {
@@ -39,7 +38,7 @@ export const useFeaturedProducts = () => {
         limit(50)
       );
 
-      const productsSnapshot = await getDocs(productsQuery);
+      const productsSnapshot = await resilientGetDocs(productsQuery);
 
       const featuredActive = productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
@@ -84,7 +83,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
         where("category", "==", categorySlug)
       );
 
-      const productsSnapshot = await getDocs(productsQuery);
+      const productsSnapshot = await resilientGetDocs(productsQuery);
 
       return productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
@@ -111,7 +110,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
             sold: stats.sold,
             delivery_info: p.delivery_info,
             delivery_type: p.delivery_type,
-            auto_delivery_codes: null, // 🔒 SECURITY: codes are in secure server-only collection
+            auto_delivery_codes: null,
             instructions: p.instructions,
             terms_conditions: p.terms_conditions,
             rich_description: p.rich_description,
@@ -137,8 +136,14 @@ export const useProduct = (productId: string | undefined) => {
     queryFn: async () => {
       if (!productId) return null;
       
-      const { doc: docRef, getDoc } = await import("firebase/firestore");
-      const productDoc = await getDoc(docRef(db, "products", productId));
+      const { doc: docRef, getDoc, getDocFromServer } = await import("firebase/firestore");
+      
+      let productDoc;
+      try {
+        productDoc = await getDocFromServer(docRef(db, "products", productId));
+      } catch {
+        productDoc = await getDoc(docRef(db, "products", productId));
+      }
       
       if (!productDoc.exists()) return null;
       
