@@ -104,7 +104,7 @@ const HeaderComponent = () => {
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className="md:hidden h-10 w-10 hover:bg-secondary rounded-full" 
+                className="md:hidden h-12 w-12 hover:bg-secondary rounded-full" 
                 aria-label="Abrir menu"
               >
                 <Menu className="h-5 w-5" />
