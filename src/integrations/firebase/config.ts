@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -15,6 +16,17 @@ const firebaseConfig = {
 
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
+
+// Initialize App Check with reCAPTCHA v3 (blocks direct API abuse)
+// The site key is public/publishable — the secret key is configured in Firebase Console
+try {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
+    isTokenAutoRefreshEnabled: true,
+  });
+} catch (e) {
+  console.warn("App Check initialization failed:", e);
+}
 
 // Initialize services with persistent local cache (IndexedDB)
 export const auth = getAuth(app);
