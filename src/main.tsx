@@ -1,3 +1,7 @@
+// Bootstrap scripts (token strip, UTM detection, FB Pixel, UTMify loader)
+// Must run before React to capture URL params early
+import "./bootstrap";
+
 import { createRoot } from "react-dom/client";
 
 // Critical font weight only — others loaded after paint
