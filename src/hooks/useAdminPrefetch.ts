@@ -1,22 +1,20 @@
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
+import { requireAdminToken } from "@/lib/adminAuth";
 
 /**
  * Prefetches all admin data in parallel when the admin page mounts.
- * This ensures that switching tabs is instant from the first click.
  */
 export const useAdminPrefetch = () => {
   const queryClient = useQueryClient();
 
   useEffect(() => {
     const prefetch = async () => {
-      const user = auth.currentUser;
-      if (!user) return;
+      let token: string;
+      try { token = requireAdminToken(); } catch { return; }
 
-      const token = await user.getIdToken();
-      const headers = { "x-firebase-token": token };
+      const headers = { "x-admin-token": token };
 
       const resources = [
         { key: "admin-stats", resource: "dashboard-stats" },
@@ -26,9 +24,7 @@ export const useAdminPrefetch = () => {
         { key: "admin-coupons", resource: "coupons" },
       ];
 
-      // Fire all prefetches in parallel — don't await sequentially
       resources.forEach(({ key, resource }) => {
-        // Only prefetch if not already in cache
         const existing = queryClient.getQueryData([key]);
         if (existing) return;
 

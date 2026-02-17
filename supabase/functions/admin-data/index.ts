@@ -13,7 +13,7 @@ function getCorsHeaders(req: Request) {
   const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-firebase-token",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
     "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
   };
 }
@@ -62,63 +62,39 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
-async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
-  try {
-    const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY');
-    if (!apiKey) throw new Error('FIREBASE_WEB_API_KEY not configured');
-    const res = await fetch(
-      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const user = data.users?.[0];
-    if (!user?.localId) return null;
-    return { uid: user.localId, email: user.email || '' };
-  } catch { return null; }
-}
+// ── HMAC Admin Token Verification ──────────────────────────────────
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000; // 24 hours
 
-// Cache admin status per UID to avoid hammering Firestore on concurrent requests
-const adminCache = new Map<string, { isAdmin: boolean; expiresAt: number }>();
-const ADMIN_CACHE_TTL = 5 * 60_000; // 5 minutes
+async function verifyAdminToken(token: string): Promise<boolean> {
+  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+  if (!adminPassword) return false;
 
-async function isAdminInFirestore(uid: string): Promise<boolean> {
-  // Check cache first
-  const cached = adminCache.get(uid);
-  if (cached && Date.now() < cached.expiresAt) {
-    return cached.isAdmin;
-  }
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
 
-  try {
-    const accessToken = await getFirebaseAccessToken();
-    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    if (!res.ok) {
-      const errText = await res.text();
-      console.error(`❌ isAdminInFirestore failed for uid=${uid} | status=${res.status} | body=${errText}`);
-      // On quota errors, don't cache the failure — let it retry
-      if (res.status === 429) return false;
-      adminCache.set(uid, { isAdmin: false, expiresAt: Date.now() + ADMIN_CACHE_TTL });
-      return false;
-    }
-    const doc = await res.json();
-    const role = doc.fields?.role?.stringValue;
-    const isAdmin = role === 'admin';
-    adminCache.set(uid, { isAdmin, expiresAt: Date.now() + ADMIN_CACHE_TTL });
-    return isAdmin;
-  } catch (err) {
-    console.error(`❌ isAdminInFirestore exception for uid=${uid}:`, err);
-    return false;
-  }
-}
+  const [timestampHex, providedHmac] = parts;
+  const timestamp = parseInt(timestampHex, 16);
+  if (isNaN(timestamp)) return false;
 
-// Periodic cleanup of admin cache
-setInterval(() => {
   const now = Date.now();
-  for (const [k, v] of adminCache) {
-    if (v.expiresAt <= now) adminCache.delete(k);
+  if (now - timestamp > TOKEN_TTL_MS) return false;
+  if (timestamp > now + 60_000) return false;
+
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(adminPassword),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:admin`));
+  const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+
+  if (providedHmac.length !== expectedHmac.length) return false;
+  let diff = 0;
+  for (let i = 0; i < providedHmac.length; i++) {
+    diff |= providedHmac.charCodeAt(i) ^ expectedHmac.charCodeAt(i);
   }
-}, 300_000);
+  return diff === 0;
+}
 
 // ── Firestore helpers ──────────────────────────────────────────────
 function extractValue(val: any): any {
@@ -400,24 +376,18 @@ Deno.serve(async (req) => {
   }
 
   try {
-    // Auth check
-    const firebaseToken = req.headers.get("x-firebase-token");
-    if (!firebaseToken) {
-      return new Response(JSON.stringify({ error: "Firebase token required" }),
+    // Auth check — HMAC admin token
+    const adminToken = req.headers.get("x-admin-token");
+    if (!adminToken) {
+      return new Response(JSON.stringify({ error: "Admin token required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const userData = await verifyFirebaseToken(firebaseToken);
-    if (!userData) {
-      return new Response(JSON.stringify({ error: "Invalid Firebase token" }),
+    const isValid = await verifyAdminToken(adminToken);
+    if (!isValid) {
+      console.warn(`🚨 BLOCKED admin-data attempt | ip=${clientIp} | resource=${new URL(req.url).searchParams.get("resource")} | method=${req.method} | time=${new Date().toISOString()}`);
+      return new Response(JSON.stringify({ error: "Invalid or expired admin token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    const adminStatus = await isAdminInFirestore(userData.uid);
-    if (!adminStatus) {
-      console.warn(`🚨 BLOCKED admin-data attempt | uid=${userData.uid} | email=${userData.email} | resource=${new URL(req.url).searchParams.get("resource")} | method=${req.method} | origin=${req.headers.get("Origin") || "unknown"} | ip=${req.headers.get("x-forwarded-for") || "unknown"} | time=${new Date().toISOString()}`);
-      return new Response(JSON.stringify({ error: "Admin access required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     const url = new URL(req.url);
