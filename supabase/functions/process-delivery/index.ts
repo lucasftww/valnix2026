@@ -293,7 +293,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Validate order exists and is paid ──
-    const orderDoc = await getFirestoreDoc('orders', orderId);
+    const orderDoc = await getFirestoreDoc('guest_orders', orderId);
     if (!orderDoc?.fields) {
       return new Response(JSON.stringify({ success: false, error: 'Order not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
         const ageMs = Date.now() - new Date(tokenCreatedAt).getTime();
         if (ageMs > 10 * 60 * 1000) {
           console.warn(`🚫 [${orderId}] delivery_token expired (age: ${Math.round(ageMs / 1000)}s)`);
-          try { await updateFirestoreDoc('orders', orderId, { delivery_token: null }); } catch {}
+          try { await updateFirestoreDoc('guest_orders', orderId, { delivery_token: null }); } catch {}
           return new Response(JSON.stringify({ success: false, error: 'Forbidden: delivery token expired' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
       // Anti-race: claim token with unique consumer ID, then verify ownership
       const consumerId = crypto.randomUUID();
       try {
-        await updateFirestoreDoc('orders', orderId, {
+        await updateFirestoreDoc('guest_orders', orderId, {
           delivery_token: null,
           delivery_token_created_at: null,
           delivery_token_consumer: consumerId,
@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       // Verify we won the race (last-writer-wins → only our consumerId should be there)
-      const recheck = await getFirestoreDoc('orders', orderId);
+      const recheck = await getFirestoreDoc('guest_orders', orderId);
       const actualConsumer = recheck?.fields?.delivery_token_consumer?.stringValue;
       if (actualConsumer !== consumerId) {
         console.warn(`🚫 [${orderId}] delivery_token race lost (winner: ${actualConsumer}, ours: ${consumerId})`);
@@ -356,9 +356,12 @@ Deno.serve(async (req) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // ── Get order items ──
-    const itemsResults = await queryFirestore('order_items', 'order_id', 'EQUAL', orderId);
-    if (!itemsResults || !Array.isArray(itemsResults)) {
+    // ── Get order items from subcollection ──
+    const accessToken = await getFirebaseAccessToken();
+    const itemsListUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=100`;
+    const itemsListRes = await fetch(itemsListUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    const itemsResults = itemsListRes.ok ? (await itemsListRes.json()).documents?.map((doc: any) => ({ document: doc })) || [] : [];
+    if (!itemsResults || !Array.isArray(itemsResults) || itemsResults.length === 0) {
       return new Response(JSON.stringify({ success: false, error: 'No order items found' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
@@ -407,7 +410,7 @@ Deno.serve(async (req) => {
         const codes: string[] = [];
         for (let i = 0; i < quantity; i++) codes.push(generateFakeDeliveryCode(productCategory));
         const codeStr = codes.join(',');
-        await updateFirestoreDoc('order_items', itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
+        await updateFirestoreDoc(`guest_orders/${orderId}/items`, itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
         results.push({ itemId, productId, status: 'delivered', codes: codeStr });
         deliveredCount++;
         console.log(`✅ [${orderId}] auto_fake: ${codes.length} code(s) → item ${itemId}`);
@@ -456,14 +459,13 @@ Deno.serve(async (req) => {
 
           // Step 2: Write delivery code to order_item
           try {
-            await updateFirestoreDoc('order_items', itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
+            await updateFirestoreDoc(`guest_orders/${orderId}/items`, itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
           } catch (writeErr) {
             // COMPENSATE: best-effort reinsert codes back into product
             console.error(`❌ [${orderId}] Failed to write delivery_code to item ${itemId}, compensating...`, writeErr);
             try {
               const reinsertCodes = [...usedCodes.map((c: string) => ({ stringValue: c })), ...remainingCodes];
               await updateFirestoreArray('product_codes', productId, 'codes', reinsertCodes);
-              console.log(`🔄 [${orderId}] Compensated: ${usedCodes.length} code(s) reinserted into product ${productId}`);
             } catch (compErr) {
               console.error(`🚨 [${orderId}] COMPENSATION FAILED for product ${productId}! Codes may be lost:`, usedCodes, compErr);
             }
@@ -493,60 +495,9 @@ Deno.serve(async (req) => {
     let orderStatus = orderDoc.fields.status?.stringValue || 'processing';
 
     if (allItemsHandled) {
-      await updateFirestoreDoc('orders', orderId, { status: 'completed', updated_at: new Date().toISOString() });
+      await updateFirestoreDoc('guest_orders', orderId, { status: 'completed', updated_at: new Date().toISOString() });
       orderStatus = 'completed';
       console.log(`✅ [${orderId}] Order auto-completed (all ${deliveredCount} items delivered)`);
-    }
-
-    // ── Sync delivery codes to guest_orders/{hash}/items subcollection ──
-    if (deliveredCount > 0) {
-      try {
-        // Find guest_order by order_id
-        const guestResults = await queryFirestore('guest_orders', 'order_id', 'EQUAL', orderId);
-        const guestDoc = Array.isArray(guestResults) ? guestResults.find((r: any) => r.document) : null;
-        if (guestDoc?.document) {
-          const guestDocName = guestDoc.document.name;
-          const guestHash = guestDocName.split('/').pop()!;
-          const accessToken = await getFirebaseAccessToken();
-
-          // List items in subcollection
-          const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items`;
-          const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-          if (itemsRes.ok) {
-            const itemsData = await itemsRes.json();
-            const guestItems = itemsData.documents || [];
-
-          for (const result of results) {
-              if (result.status === 'delivered' && result.codes) {
-                // Match guest item by product_id (not by "first empty") to avoid wrong assignment
-                let matched = false;
-                for (const guestItem of guestItems) {
-                  const fields = guestItem.fields || {};
-                  const guestProductId = fields.product_id?.stringValue;
-                  const existingCode = fields.delivery_code?.stringValue;
-                  if (guestProductId === result.productId && !existingCode) {
-                    const guestItemId = guestItem.name.split('/').pop()!;
-                    const updateUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${guestHash}/items/${guestItemId}?updateMask.fieldPaths=delivery_code`;
-                    await fetch(updateUrl, {
-                      method: 'PATCH',
-                      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-                      body: JSON.stringify({ fields: { delivery_code: { stringValue: result.codes } } }),
-                    });
-                    matched = true;
-                    break;
-                  }
-                }
-                if (!matched) {
-                  console.warn(`⚠️ [${orderId}] No matching guest item for product ${result.productId}`);
-                }
-              }
-            }
-            console.log(`📦 [${orderId}] Synced delivery codes to guest_orders/${guestHash}/items`);
-          }
-        }
-      } catch (syncErr) {
-        console.warn(`⚠️ [${orderId}] guest_orders sync failed (non-blocking):`, syncErr);
-      }
     }
 
     return new Response(JSON.stringify({

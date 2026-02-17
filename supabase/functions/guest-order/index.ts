@@ -275,18 +275,36 @@ Deno.serve(async (req) => {
         { status: 429, headers: jsonHeaders });
     }
 
-    // Read guest_orders/{hash}
-    const docUrl = `${firestoreBase}/guest_orders/${hash}`;
-    const docRes = await fetch(docUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    // Query guest_orders by hash field (orderId is now the doc ID)
+    const queryUrl = `${firestoreBase}:runQuery`;
+    const queryRes = await fetch(queryUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({
+        structuredQuery: {
+          from: [{ collectionId: 'guest_orders' }],
+          where: { fieldFilter: { field: { fieldPath: 'hash' }, op: 'EQUAL', value: { stringValue: hash } } },
+          limit: 1,
+        },
+      }),
+    });
 
-    if (docRes.status === 404 || !docRes.ok) {
-      await docRes.text(); // consume
+    if (!queryRes.ok) {
+      await queryRes.text();
       return new Response(JSON.stringify({ error: 'Order not found' }),
         { status: 404, headers: jsonHeaders });
     }
 
-    const docData = await docRes.json();
-    const fields = docData.fields || {};
+    const queryResults = await queryRes.json();
+    const matchedDoc = Array.isArray(queryResults) ? queryResults.find((r: any) => r.document) : null;
+
+    if (!matchedDoc?.document) {
+      return new Response(JSON.stringify({ error: 'Order not found' }),
+        { status: 404, headers: jsonHeaders });
+    }
+
+    const fields = matchedDoc.document.fields || {};
+    const orderId = matchedDoc.document.name.split('/').pop()!;
 
     // Handle timestampValue OR stringValue for expiration
     const expiresIso = readIsoTimestamp(fields.expires_at);
@@ -295,8 +313,8 @@ Deno.serve(async (req) => {
         { status: 410, headers: jsonHeaders });
     }
 
-    // List subcollection items — try simple GET first (more reliable), fallback to runQuery
-    const listUrl = `${firestoreBase}/guest_orders/${hash}/items?pageSize=50`;
+    // List subcollection items using orderId as parent
+    const listUrl = `${firestoreBase}/guest_orders/${orderId}/items?pageSize=50`;
     const itemsRes = await fetch(listUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -313,7 +331,7 @@ Deno.serve(async (req) => {
     if (itemsRes.ok) {
       const itemsData = await itemsRes.json();
       const docs = itemsData.documents || [];
-      console.log(`📦 Found ${docs.length} items in guest_orders/${hash}/items`);
+      console.log(`📦 Found ${docs.length} items in guest_orders/${orderId}/items`);
       for (const itemDoc of docs) {
         const f = itemDoc.fields || {};
         items.push({
@@ -332,8 +350,8 @@ Deno.serve(async (req) => {
 
     // Build response (only safe fields)
     const response = {
-      order_id: fields.order_id?.stringValue || null,
-      email: fields.email?.stringValue || null,
+      order_id: orderId,
+      email: fields.customer_email?.stringValue || fields.email?.stringValue || null,
       customer_name: fields.customer_name?.stringValue || null,
       customer_phone: fields.customer_phone?.stringValue || null,
       total_amount: Number(fields.total_amount?.doubleValue || fields.total_amount?.integerValue || 0),

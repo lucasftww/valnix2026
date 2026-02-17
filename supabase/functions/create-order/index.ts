@@ -382,8 +382,17 @@ Deno.serve(async (req) => {
     }
 
     const now = new Date().toISOString();
+    const orderId = crypto.randomUUID();
 
-    // Create order document with SERVER-CALCULATED total
+    // Generate hash for guest delivery URL
+    const hashChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
+    let guestHash = '';
+    for (let i = 0; i < 12; i++) guestHash += hashChars.charAt(Math.floor(Math.random() * hashChars.length));
+
+    const expiresAt = new Date();
+    expiresAt.setDate(expiresAt.getDate() + 30);
+
+    // Build unified order document (single source of truth)
     const orderData: Record<string, unknown> = {
       user_id: userId,
       customer_name: String(order.customer_name).trim().slice(0, 200),
@@ -396,6 +405,12 @@ Deno.serve(async (req) => {
       status: 'pending',
       payment_status: 'pending',
       payment_method: order.payment_method ? String(order.payment_method).slice(0, 20) : null,
+      hash: guestHash,
+      expires_at: expiresAt.toISOString(),
+      guest_session_id: userId.startsWith('guest_') ? userId : null,
+      linked: !userId.startsWith('guest_'),
+      coupon_id: order.coupon_id ? String(order.coupon_id) : null,
+      coupon_code: order.coupon_code ? String(order.coupon_code) : null,
       fbc: order.fbc || null,
       fbp: order.fbp || null,
       event_source_url: order.event_source_url || null,
@@ -411,140 +426,56 @@ Deno.serve(async (req) => {
       updated_at: now,
     };
 
-    const orderId = await addFirestoreDoc('orders', orderData);
-    if (!orderId) {
+    // Write order to guest_orders/{orderId}
+    const accessToken = await getFirebaseAccessToken();
+    const guestFields: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(orderData)) {
+      if (v === null || v === undefined) guestFields[k] = { nullValue: null };
+      else if (typeof v === 'string') guestFields[k] = { stringValue: v };
+      else if (typeof v === 'number') guestFields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
+      else if (typeof v === 'boolean') guestFields[k] = { booleanValue: v };
+      else guestFields[k] = { stringValue: String(v) };
+    }
+    const orderDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}`;
+    const orderRes = await fetch(orderDocUrl, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+      body: JSON.stringify({ fields: guestFields }),
+    });
+    if (!orderRes.ok) {
+      console.error(`❌ Failed to create order ${orderId}:`, await orderRes.text());
       return new Response(JSON.stringify({ error: 'Failed to create order' }), { status: 500, headers: { ...cors, 'Content-Type': 'application/json' } });
     }
 
-    console.log(`✅ Order created: ${orderId} for user ${userId}`);
+    console.log(`✅ Order created: ${orderId} (hash: ${guestHash}) for user ${userId}`);
 
-    // Create order items in PARALLEL (use cached product data — no extra reads)
-    await Promise.all(items.map((item: any) => {
+    // Write items to subcollection guest_orders/{orderId}/items/{idx}
+    await Promise.all(items.map(async (item: any, idx: number) => {
       const cachedProduct = productCache.get(String(item.product_id));
       const realItemPrice = cachedProduct ? Number(cachedProduct.price?.doubleValue || cachedProduct.price?.integerValue || 0) : 0;
       const itemQty = Number(item.quantity) || 1;
-      const itemData: Record<string, unknown> = {
-        order_id: orderId,
-        product_id: String(item.product_id || ''),
-        product_name: String(item.product_name || '').slice(0, 200),
-        product_image: item.product_image || null,
-        quantity: itemQty,
-        unit_price: realItemPrice,
-        total_price: Math.round(realItemPrice * itemQty * 100) / 100,
-        delivery_code: null,
-        delivery_type: item.delivery_type || 'manual',
-        created_at: now,
+      const itemFields: Record<string, unknown> = {
+        product_name: { stringValue: String(item.product_name || '').slice(0, 200) },
+        product_image: item.product_image ? { stringValue: String(item.product_image) } : { nullValue: null },
+        product_id: { stringValue: String(item.product_id || '') },
+        quantity: { integerValue: String(itemQty) },
+        unit_price: { doubleValue: realItemPrice },
+        total_price: { doubleValue: Math.round(realItemPrice * itemQty * 100) / 100 },
+        delivery_code: { nullValue: null },
+        delivery_type: { stringValue: item.delivery_type || 'manual' },
+        order_id: { stringValue: orderId },
+        created_at: { stringValue: now },
       };
-      return addFirestoreDoc('order_items', itemData);
+      const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items/${idx}`;
+      const itemRes = await fetch(itemUrl, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+        body: JSON.stringify({ fields: itemFields }),
+      });
+      if (!itemRes.ok) console.warn(`⚠️ guest_orders/${orderId}/items/${idx} write failed: ${itemRes.status}`);
     }));
 
-    console.log(`✅ ${items.length} order items created for order ${orderId}`);
-
-    // ── PARALLEL: Coupon save + Guest order creation ──────────────────
-    let guestHash: string | null = null;
-
-    const [, guestResult] = await Promise.allSettled([
-      // 1. Save coupon info (fire-and-forget style)
-      (async () => {
-        if (!order.coupon_id || !order.coupon_code) return;
-        const accessToken = await getFirebaseAccessToken();
-        const fieldPaths = 'updateMask.fieldPaths=coupon_id&updateMask.fieldPaths=coupon_code';
-        const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/orders/${orderId}?${fieldPaths}`;
-        const res = await fetch(url, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-          body: JSON.stringify({
-            fields: {
-              coupon_id: { stringValue: String(order.coupon_id) },
-              coupon_code: { stringValue: String(order.coupon_code) },
-            },
-          }),
-        });
-        if (!res.ok) console.warn('⚠️ Failed to save coupon info:', res.status);
-      })(),
-
-      // 2. Create guest_order for /order/:hash access
-      (async () => {
-        const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
-        let hash = '';
-        for (let i = 0; i < 12; i++) hash += chars.charAt(Math.floor(Math.random() * chars.length));
-
-        const expiresAt = new Date();
-        expiresAt.setDate(expiresAt.getDate() + 30);
-
-        const serverItemPrices = new Map<string, number>();
-        for (const item of items) {
-          const cached = productCache.get(String(item.product_id));
-          if (cached) {
-            serverItemPrices.set(String(item.product_id), Number(cached.price?.doubleValue || cached.price?.integerValue || 0));
-          }
-        }
-
-        const guestOrderData: Record<string, unknown> = {
-          order_id: orderId,
-          email: String(order.customer_email).trim().toLowerCase(),
-          customer_name: order.customer_name || null,
-          customer_phone: order.customer_phone || null,
-          guest_session_id: userId.startsWith('guest_') ? userId : null,
-          user_id: userId.startsWith('guest_') ? null : userId,
-          linked: !userId.startsWith('guest_'),
-          total_amount: serverTotal,
-          payment_method: order.payment_method || 'pix',
-          created_at: now,
-          expires_at: expiresAt.toISOString(),
-        };
-
-        const accessToken = await getFirebaseAccessToken();
-        const guestFields: Record<string, unknown> = {};
-        for (const [k, v] of Object.entries(guestOrderData)) {
-          if (v === null || v === undefined) guestFields[k] = { nullValue: null };
-          else if (typeof v === 'string') guestFields[k] = { stringValue: v };
-          else if (typeof v === 'number') guestFields[k] = Number.isInteger(v) ? { integerValue: String(v) } : { doubleValue: v };
-          else if (typeof v === 'boolean') guestFields[k] = { booleanValue: v };
-          else guestFields[k] = { stringValue: String(v) };
-        }
-        const guestDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}`;
-        const guestRes = await fetch(guestDocUrl, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-          body: JSON.stringify({ fields: guestFields }),
-        });
-        if (!guestRes.ok) throw new Error(`guest_orders write failed: ${guestRes.status}`);
-
-        // Write items to subcollection IN PARALLEL
-        await Promise.all(items.map(async (it: any, idx: number) => {
-          const realPrice = serverItemPrices.get(String(it.product_id)) || 0;
-          const qty = Number(it.quantity) || 1;
-          const itemFields: Record<string, unknown> = {
-            product_name: { stringValue: String(it.product_name || '') },
-            product_image: it.product_image ? { stringValue: String(it.product_image) } : { nullValue: null },
-            product_id: { stringValue: String(it.product_id || '') },
-            quantity: { integerValue: String(qty) },
-            unit_price: { doubleValue: realPrice },
-            total_price: { doubleValue: Math.round(realPrice * qty * 100) / 100 },
-            delivery_code: { nullValue: null },
-            order_id: { stringValue: orderId },
-          };
-          const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${hash}/items/${idx}`;
-          const itemRes = await fetch(itemUrl, {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-            body: JSON.stringify({ fields: itemFields }),
-          });
-          if (!itemRes.ok) console.warn(`⚠️ guest_orders/${hash}/items/${idx} write failed: ${itemRes.status}`);
-        }));
-
-        console.log(`✅ Guest order saved with hash as docId: ${hash} (${items.length} items in subcollection)`);
-        return hash;
-      })(),
-    ]);
-
-    // Extract guestHash from settled result
-    if (guestResult.status === 'fulfilled' && guestResult.value) {
-      guestHash = guestResult.value as string;
-    } else if (guestResult.status === 'rejected') {
-      console.warn('⚠️ Failed to save guest order:', guestResult.reason);
-    }
+    console.log(`✅ ${items.length} items created for order ${orderId}`);
 
     return new Response(JSON.stringify({ success: true, orderId, guestHash }), {
       status: 200,
