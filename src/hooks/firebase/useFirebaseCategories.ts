@@ -45,7 +45,7 @@ export const useCategories = () => {
   return useQuery({
     queryKey: [QUERY_KEYS.CATEGORIES],
     queryFn: async (): Promise<Category[]> => {
-      // Race: Firestore vs API fallback
+      // Race: Firestore vs API fallback — both start immediately
       const firestoreFetch = (async () => {
         const snapshot = await resilientGetDocs(collection(db, "categories"));
         const raw = snapshot.docs
@@ -54,25 +54,15 @@ export const useCategories = () => {
         return deduplicateCategories(raw);
       })();
 
-      const apiFetch = new Promise<Category[]>((resolve, reject) => {
-        setTimeout(async () => {
-          try {
-            const raw = await fetchCategoriesFallback();
-            resolve(deduplicateCategories(raw.filter((c: any) => c?.is_active)));
-          } catch (e) {
-            reject(e);
-          }
-        }, 3000);
-      });
+      const apiFetch = (async () => {
+        const raw = await fetchCategoriesFallback();
+        return deduplicateCategories(raw.filter((c: any) => c?.is_active));
+      })();
 
       try {
         return await Promise.race([firestoreFetch, apiFetch]);
       } catch {
-        try {
-          return await apiFetch;
-        } catch {
-          return await firestoreFetch;
-        }
+        try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
     staleTime: 60 * 60 * 1000,
