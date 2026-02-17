@@ -33,7 +33,7 @@ const isProduction = PRODUCTION_DOMAINS.some(
 if (!isProduction) {
   // Enable debug token for non-production environments
   // This tells Firebase SDK to use a debug token instead of reCAPTCHA
-  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "55382aa4-8a5a-433f-8e2a-7204060e7fc7";
 }
 
 try {
