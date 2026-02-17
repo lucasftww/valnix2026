@@ -3,6 +3,7 @@ import react from "@vitejs/plugin-react-swc";
 import path from "path";
 import { componentTagger } from "lovable-tagger";
 import { VitePWA } from 'vite-plugin-pwa';
+import { visualizer } from 'rollup-plugin-visualizer';
 
 
 // https://vitejs.dev/config/
@@ -45,6 +46,13 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
       },
+    }),
+    mode === 'production' && visualizer({
+      filename: 'dist/bundle-report.html',
+      open: false,
+      gzipSize: true,
+      brotliSize: true,
+      template: 'treemap',
     }),
   ].filter(Boolean),
   resolve: {
