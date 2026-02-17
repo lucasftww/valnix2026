@@ -2,10 +2,11 @@ import { memo } from "react";
 import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
 import { useFeaturedProducts } from "@/hooks/firebase";
+import { Button } from "./ui/button";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "./ui/carousel";
 
 const ProductGridComponent = () => {
-  const { data: products = [], isLoading, error } = useFeaturedProducts();
+  const { data: products = [], isLoading, error, refetch } = useFeaturedProducts();
   
   if (isLoading) {
     return (
@@ -30,7 +31,12 @@ const ProductGridComponent = () => {
         <div className="text-center py-12">
           <div className="text-5xl mb-4">⚠️</div>
           <h3 className="text-xl font-bold mb-2">Erro ao carregar produtos</h3>
-          <p className="text-muted-foreground">Tente recarregar a página</p>
+          <p className="text-muted-foreground mb-4">
+            {error.message || "Tente recarregar a página"}
+          </p>
+          <Button onClick={() => refetch()} variant="outline">
+            Tentar novamente
+          </Button>
         </div>
       </section>
     );
