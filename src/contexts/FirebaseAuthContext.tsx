@@ -123,62 +123,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
         }
 
-          // Non-blocking: handle users/profile docs in background
-          (async () => {
+          // Non-blocking: handle users/profile docs in background with heavy delay
+          // This prevents competing with product data for Firestore quota
+          setTimeout(() => {
             if (!alive) return;
-            try {
-              const [userDoc, profileDoc] = await Promise.all([
-                getDoc(doc(db, "users", firebaseUser.uid)),
-                getDoc(doc(db, "profiles", firebaseUser.uid)),
-              ]);
+            (async () => {
+              try {
+                const [userDoc, profileDoc] = await Promise.all([
+                  getDoc(doc(db, "users", firebaseUser.uid)),
+                  getDoc(doc(db, "profiles", firebaseUser.uid)),
+                ]);
 
-              if (!alive) return;
+                if (!alive) return;
 
-              // ── AUTO-REVERT: If users doc claims admin but user_roles says no ──
-              if (userDoc.exists()) {
-                const userData = userDoc.data();
-                if ((userData?.role === "admin" || userData?.isAdmin === true) && !hasAdminRole) {
-                  if (!revertedRef.current.has(firebaseUser.uid)) {
-                    revertedRef.current.add(firebaseUser.uid);
-                    console.warn("🚨 Unauthorized admin detected, reverting:", firebaseUser.uid);
-                    try {
-                      await setDoc(doc(db, "users", firebaseUser.uid), {
-                        email: firebaseUser.email,
-                        role: "user",
-                        isAdmin: false,
-                        created_at: userData.created_at || new Date().toISOString(),
-                        flagged_at: new Date().toISOString(),
-                        flagged_reason: "unauthorized_admin_revert",
-                      });
-                    } catch (revertErr) {
-                      console.warn("Could not revert users doc (likely permissions):", revertErr);
+                if (userDoc.exists()) {
+                  const userData = userDoc.data();
+                  if ((userData?.role === "admin" || userData?.isAdmin === true) && !hasAdminRole) {
+                    if (!revertedRef.current.has(firebaseUser.uid)) {
+                      revertedRef.current.add(firebaseUser.uid);
+                      console.warn("🚨 Unauthorized admin detected, reverting:", firebaseUser.uid);
+                      try {
+                        await setDoc(doc(db, "users", firebaseUser.uid), {
+                          email: firebaseUser.email,
+                          role: "user",
+                          isAdmin: false,
+                          created_at: userData.created_at || new Date().toISOString(),
+                          flagged_at: new Date().toISOString(),
+                          flagged_reason: "unauthorized_admin_revert",
+                        });
+                      } catch (revertErr) {
+                        console.warn("Could not revert users doc (likely permissions):", revertErr);
+                      }
                     }
                   }
+                } else if (alive) {
+                  await setDoc(doc(db, "users", firebaseUser.uid), {
+                    email: firebaseUser.email,
+                    role: "user",
+                    isAdmin: false,
+                    created_at: new Date().toISOString(),
+                  });
                 }
-              } else if (alive) {
-                // New user — create users doc (non-admin)
-                await setDoc(doc(db, "users", firebaseUser.uid), {
-                  email: firebaseUser.email,
-                  role: "user",
-                  isAdmin: false,
-                  created_at: new Date().toISOString(),
-                });
-              }
 
-              if (!alive) return;
+                if (!alive) return;
 
-              if (!profileDoc.exists()) {
-                await setDoc(doc(db, "profiles", firebaseUser.uid), {
-                  email: firebaseUser.email,
-                  full_name: firebaseUser.displayName || null,
-                  balance: 0,
-                  created_at: new Date().toISOString(),
-                });
+                if (!profileDoc.exists()) {
+                  await setDoc(doc(db, "profiles", firebaseUser.uid), {
+                    email: firebaseUser.email,
+                    full_name: firebaseUser.displayName || null,
+                    balance: 0,
+                    created_at: new Date().toISOString(),
+                  });
+                }
+              } catch {
+                // Background sync — non-critical
               }
-            } catch (bgError) {
-              console.error("Background profile sync error:", bgError);
-            }
-          })();
+            })();
+          }, 3000); // 3s delay to let product queries complete first
       } else {
         setIsAdmin(false);
       }

@@ -58,8 +58,9 @@ export const useFeaturedProducts = () => {
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    retry: 3,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
+    refetchOnReconnect: true,
+    retry: 1,
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
   });
 };
 
