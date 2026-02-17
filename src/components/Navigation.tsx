@@ -83,13 +83,13 @@ const NavigationComponent = () => {
                       </Button>
                     </Link>
                     {openDropdown === category.id && (
-                      <div className="absolute left-0 top-full pt-2 z-50" role="menu">
-                        <div className="bg-card border border-border/20 rounded-xl shadow-2xl shadow-black/30 min-w-[200px] py-1">
+                      <div className="absolute left-0 top-full pt-2 z-50">
+                        <ul className="bg-card border border-border/20 rounded-xl shadow-2xl shadow-black/30 min-w-[200px] py-1" role="menu">
                           {category.children!.map((child) => (
+                            <li key={child.id} role="none">
                             <Link
-                              key={child.id}
                               to={`/${child.slug}`}
-                              className="w-full px-4 py-2.5 text-left text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm font-medium block"
+                              className="w-full px-4 py-2.5 min-h-[44px] flex items-center text-left text-muted-foreground hover:text-foreground hover:bg-muted/50 transition-colors text-sm font-medium"
                               role="menuitem"
                               aria-label={`Ver produtos de ${child.name}`}
                             >
@@ -98,8 +98,9 @@ const NavigationComponent = () => {
                               )}
                               {child.name.toUpperCase()}
                             </Link>
+                            </li>
                           ))}
-                        </div>
+                        </ul>
                       </div>
                     )}
                   </>
