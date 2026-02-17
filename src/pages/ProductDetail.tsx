@@ -4,7 +4,6 @@ import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
 import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Minus, Plus, Star, ChevronDown } from "lucide-react";
 import { useState, useMemo, useEffect, useRef, lazy, Suspense, memo, useCallback } from "react";
 import { useProductById, useProductReviews } from "@/hooks/firebase/useFirebaseProductsWithReviews";
@@ -56,7 +55,7 @@ const ProductDetail = () => {
   useEffect(() => {
     if (product?.name) {
       import("@/lib/analytics").then(({ trackViewContentEvent }) => {
-        trackViewContentEvent(user?.uid || null, product.name, product.category || undefined);
+        trackViewContentEvent(null, product.name, product.category || undefined);
       });
     }
   }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps

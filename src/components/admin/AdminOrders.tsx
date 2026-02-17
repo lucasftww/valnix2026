@@ -288,10 +288,10 @@ export const AdminOrders = () => {
   const handleRestoreOrders = async () => {
     setRestoringOrders(true);
     try {
-      const token = await user?.getIdToken();
+      const token = requireAdminToken();
       const response = await invokeFunction('restore-orders', {
         method: 'GET',
-        headers: { 'x-firebase-token': token || '' },
+        headers: { 'x-admin-token': token },
       });
       const data = await response.json();
       if (data.success) {
@@ -330,12 +330,12 @@ export const AdminOrders = () => {
         // Safety: recent orders (< 5min) preserved
       }
 
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       for (const order of toDelete) {
         await invokeFunction("admin-data", {
           method: "DELETE",
           queryParams: { resource: "orders", id: order.id },
-          headers: { "x-firebase-token": token || "" },
+          headers: { "x-admin-token": token },
         });
       }
 
@@ -353,11 +353,11 @@ export const AdminOrders = () => {
     if (!deleteOrderId) return;
     setDeletingOrder(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       await invokeFunction("admin-data", {
         method: "DELETE",
         queryParams: { resource: "orders", id: deleteOrderId },
-        headers: { "x-firebase-token": token || "" },
+        headers: { "x-admin-token": token },
       });
       toast({ title: "Pedido excluído" });
       fetchOrders();
@@ -377,9 +377,6 @@ export const AdminOrders = () => {
     setVerifyingPayment(order.id);
     try {
       const isCard = order.payment_method === 'card';
-      const idToken = user ? await user.getIdToken() : null;
-      const headers: Record<string, string> = {};
-      if (idToken && !isCard) headers['Authorization'] = `Bearer ${idToken}`;
 
       const endpoint = isCard
         ? 'flowpay-card'
@@ -390,16 +387,15 @@ export const AdminOrders = () => {
       const response = await invokeFunction(endpoint, {
         method: 'GET',
         queryParams: qp,
-        headers: idToken && !isCard ? { 'Authorization': `Bearer ${idToken}` } : {},
       });
 
       const data = await response.json();
       if (data.success && data.status === 'COMPLETED') {
-        const token = await getFirebaseToken();
+        const token = requireAdminToken();
         await invokeFunction("admin-data", {
           method: "PUT",
           queryParams: { resource: "verify-payment" },
-          headers: { "x-firebase-token": token || "" },
+          headers: { "x-admin-token": token },
           body: { id: order.id, payment_status: 'paid', status: 'processing' },
         });
         
@@ -421,11 +417,11 @@ export const AdminOrders = () => {
     setLoadingDetail(true);
     setDetailAddons([]);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const itemsRes = await invokeFunction("admin-data", {
         method: "GET",
         queryParams: { resource: "order-items", orderId: order.id },
-        headers: { "x-firebase-token": token || "" },
+        headers: { "x-admin-token": token },
       });
       if (!itemsRes.ok) throw new Error(`HTTP ${itemsRes.status}`);
       const itemsData = await itemsRes.json();
@@ -433,10 +429,10 @@ export const AdminOrders = () => {
 
       // Fetch upsell addons via edge function (service_role) since RLS restricts anon reads
       try {
-        const token = await getFirebaseToken();
+        const token2 = requireAdminToken();
         const res = await invokeFunction("admin-post-payment", {
           method: "GET",
-          headers: { "x-firebase-token": token || "" },
+          headers: { "x-admin-token": token2 },
         });
         if (res.ok) {
           const result = await res.json();
@@ -462,11 +458,11 @@ export const AdminOrders = () => {
     }
     setSendingEmail(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       await invokeFunction("admin-data", {
         method: "PUT",
         queryParams: { resource: "order-items" },
-        headers: { "x-firebase-token": token || "" },
+        headers: { "x-admin-token": token },
         body: { id: itemId, delivery_code: deliveryCode.trim() },
       });
       const targetOrder = detailOrder;
@@ -474,7 +470,7 @@ export const AdminOrders = () => {
         await invokeFunction("admin-data", {
           method: "PUT",
           queryParams: { resource: "orders" },
-          headers: { "x-firebase-token": token || "" },
+          headers: { "x-admin-token": token },
           body: { id: targetOrder.id, status: "completed" },
         });
       }
@@ -497,11 +493,11 @@ export const AdminOrders = () => {
     }
     setSendingEmail(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       await invokeFunction("admin-data", {
         method: "PUT",
         queryParams: { resource: "order-items" },
-        headers: { "x-firebase-token": token || "" },
+        headers: { "x-admin-token": token },
         body: { id: itemId, delivery_code: editDeliveryCode.trim() },
       });
       
@@ -518,11 +514,11 @@ export const AdminOrders = () => {
 
   const updateOrderStatus = async (orderId: string, newStatus: string) => {
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       await invokeFunction("admin-data", {
         method: "PUT",
         queryParams: { resource: "orders" },
-        headers: { "x-firebase-token": token || "" },
+        headers: { "x-admin-token": token },
         body: { id: orderId, status: newStatus },
       });
       
@@ -778,11 +774,11 @@ export const AdminOrders = () => {
                   e.preventDefault();
                   setCleaningEmail(true);
                   try {
-                    const token = await user?.getIdToken();
+                    const token = requireAdminToken();
                     const res = await invokeFunction("admin-data", {
                       method: "POST",
                       queryParams: { resource: "cleanup-orders" },
-                      headers: { "x-firebase-token": token || "" },
+                      headers: { "x-admin-token": token },
                       body: { email: cleanupEmail },
                     });
                     const data = await res.json();
@@ -1138,14 +1134,14 @@ export const AdminOrders = () => {
                         onClick={async () => {
                           setReprocessingDelivery(true);
                           try {
-                            const token = await user?.getIdToken();
+                            const token = requireAdminToken();
                             if (!token) {
                               toast({ title: "Sem autenticação", description: "Faça login como admin novamente.", variant: "destructive" });
                               return;
                             }
                             const res = await invokeFunction("process-delivery", {
                               method: "POST",
-                              headers: { Authorization: `Bearer ${token}` },
+                              headers: { "x-admin-token": token },
                               body: { orderId: detailOrder.id },
                             });
                             const data = await res.json();

@@ -8,7 +8,6 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
 import { QRCodeSVG } from "qrcode.react";
 import { Progress } from "@/components/ui/progress";
@@ -684,7 +683,7 @@ export default function OrderDelivery() {
         </Card>
 
         {/* CTA: Create account */}
-        {!user && !order.linked && (
+        {!order.linked && (
           <Card className="bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
             <CardContent className="p-5 text-center space-y-3">
               <ShoppingBag className="w-8 h-8 text-primary mx-auto" />
