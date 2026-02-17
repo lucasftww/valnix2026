@@ -43,7 +43,7 @@ export const useFeaturedProducts = () => {
   return useQuery({
     queryKey: [QUERY_KEYS.BEST_SELLING],
     queryFn: async (): Promise<ProductCardData[]> => {
-      // Race: Firestore vs API fallback — use whichever responds first
+      // Race: Firestore vs API fallback — both start immediately
       const firestoreFetch = (async () => {
         const productsQuery = query(
           collection(db, "products"),
@@ -51,42 +51,27 @@ export const useFeaturedProducts = () => {
           limit(50)
         );
         const productsSnapshot = await resilientGetDocs(productsQuery);
-        console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs, fromCache: ${productsSnapshot.metadata.fromCache}`);
-        const featuredActive = productsSnapshot.docs
+        console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs`);
+        return productsSnapshot.docs
           .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
           .filter((p) => p?.is_active)
           .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
-          .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT);
-        console.log(`[Products] After is_active filter: ${featuredActive.length} products`);
-        return featuredActive.map(mapToProductCard);
+          .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
+          .map(mapToProductCard);
       })();
 
-      // Start API fallback after a short delay (gives Firestore a head start)
-      const apiFetch = new Promise<ProductCardData[]>((resolve, reject) => {
-        setTimeout(async () => {
-          try {
-            const products = await fetchFeaturedProductsFallback();
-            resolve(
-              products
-                .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-                .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
-                .map(mapToProductCard)
-            );
-          } catch (e) {
-            reject(e);
-          }
-        }, 3000); // 3s head start for Firestore
-      });
+      const apiFetch = (async () => {
+        const products = await fetchFeaturedProductsFallback();
+        return products
+          .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+          .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
+          .map(mapToProductCard);
+      })();
 
       try {
         return await Promise.race([firestoreFetch, apiFetch]);
       } catch {
-        // If the race winner threw, wait for the other
-        try {
-          return await apiFetch;
-        } catch {
-          return await firestoreFetch;
-        }
+        try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
     staleTime: 30 * 60 * 1000,
@@ -153,30 +138,18 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
           .map(mapToProductWithReviews);
       })();
 
-      const apiFetch = new Promise<ProductWithReviews[]>((resolve, reject) => {
-        setTimeout(async () => {
-          try {
-            const products = await fetchCategoryProductsFallback(categorySlug);
-            resolve(
-              products
-                .filter((p: any) => p?.is_active)
-                .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-                .map(mapToProductWithReviews)
-            );
-          } catch (e) {
-            reject(e);
-          }
-        }, 3000);
-      });
+      const apiFetch = (async () => {
+        const products = await fetchCategoryProductsFallback(categorySlug!);
+        return products
+          .filter((p: any) => p?.is_active)
+          .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+          .map(mapToProductWithReviews);
+      })();
 
       try {
         return await Promise.race([firestoreFetch, apiFetch]);
       } catch {
-        try {
-          return await apiFetch;
-        } catch {
-          return await firestoreFetch;
-        }
+        try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
     enabled: !!categorySlug,

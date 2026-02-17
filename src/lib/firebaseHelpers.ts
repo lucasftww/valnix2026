@@ -1,7 +1,7 @@
 import { getDocs, getDocsFromServer, type Query, type QuerySnapshot } from "firebase/firestore";
 import { appCheckReady } from "@/integrations/firebase/config";
 
-const QUERY_TIMEOUT_MS = 6000; // 6s — fast fail, fallback handles the rest
+const QUERY_TIMEOUT_MS = 4000; // 4s — fast fail, fallback handles the rest
 
 /**
  * Resilient Firestore fetch.
