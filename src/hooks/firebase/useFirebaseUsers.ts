@@ -68,6 +68,8 @@ export const useAdminUsers = () => {
         balance: u.balance || 0,
       })) as FirebaseUser[];
     },
+    staleTime: 2 * 60 * 1000, // 2 min — avoid refetching on tab switch
+    gcTime: 10 * 60 * 1000, // 10 min — keep in cache
   });
 };
 
