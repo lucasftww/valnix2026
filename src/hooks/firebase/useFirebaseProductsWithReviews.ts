@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, doc, getDoc, getDocFromCache, getDocFromServer } from "firebase/firestore";
+import { collection, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import type { Category, Review, Product } from "@/types";
@@ -106,40 +106,20 @@ export const useProductById = (productId: string | undefined) => {
     queryFn: async (): Promise<Product | null> => {
       if (!productId) return null;
       
-      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
-        Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
-
       const ref = doc(db, "products", productId);
 
-      // Try cache first
-      try {
-        const cached = await withTimeout(getDocFromCache(ref), 2000);
-        if (cached && cached.exists()) {
-          const data = cached.data();
-          if (!data.is_active) return null;
-          return { id: cached.id, ...data } as Product;
-        }
-      } catch { /* cache miss */ }
+      // getDoc with persistent cache already checks local cache first, then network
+      // Single call with a reasonable timeout instead of 3 sequential attempts
+      const result = await Promise.race([
+        getDoc(ref),
+        new Promise<null>((r) => setTimeout(() => r(null), 8000)),
+      ]);
 
-      // Try default getDoc with timeout
-      try {
-        const productDoc = await withTimeout(getDoc(ref), 6000);
-        if (productDoc && productDoc.exists()) {
-          const data = productDoc.data();
-          if (!data.is_active) return null;
-          return { id: productDoc.id, ...data } as Product;
-        }
-      } catch { /* failed */ }
-
-      // Force server
-      try {
-        const serverDoc = await withTimeout(getDocFromServer(ref), 6000);
-        if (serverDoc && serverDoc.exists()) {
-          const data = serverDoc.data();
-          if (!data.is_active) return null;
-          return { id: serverDoc.id, ...data } as Product;
-        }
-      } catch { /* server failed */ }
+      if (result && result.exists()) {
+        const data = result.data();
+        if (!data.is_active) return null;
+        return { id: result.id, ...data } as Product;
+      }
 
       return null;
     },

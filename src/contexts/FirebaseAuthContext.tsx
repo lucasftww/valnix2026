@@ -68,10 +68,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // ── PERF: Check admin role FIRST (fast, single read), deferred to avoid blocking render ──
+        // ── Check admin role — use timeout to avoid blocking render ──
         try {
-          const roleDoc = await getDoc(doc(db, "user_roles", firebaseUser.uid));
-          const hasAdminRole = roleDoc.exists() && roleDoc.data()?.role === "admin";
+          const roleResult = await Promise.race([
+            getDoc(doc(db, "user_roles", firebaseUser.uid)),
+            new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+          ]);
+          const hasAdminRole = roleResult?.exists?.() && roleResult.data()?.role === "admin";
           setIsAdmin(hasAdminRole);
 
           // Non-blocking: handle users/profile docs in background

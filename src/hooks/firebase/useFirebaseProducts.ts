@@ -128,40 +128,19 @@ export const useProduct = (productId: string | undefined) => {
     queryFn: async () => {
       if (!productId) return null;
       
-      const { doc: docRef, getDoc, getDocFromServer, getDocFromCache } = await import("firebase/firestore");
-      
-      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
-        Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+      const { doc: docRef, getDoc } = await import("firebase/firestore");
 
-      // Try cache first (no network/App Check needed)
-      try {
-        const cached = await withTimeout(getDocFromCache(docRef(db, "products", productId)), 2000);
-        if (cached && cached.exists()) {
-          const data = cached.data();
-          if (!data.is_active) return null;
-          return { id: cached.id, ...data };
-        }
-      } catch { /* cache miss */ }
+      // getDoc with persistent cache checks local first, then network — single call
+      const result = await Promise.race([
+        getDoc(docRef(db, "products", productId)),
+        new Promise<null>((r) => setTimeout(() => r(null), 8000)),
+      ]);
 
-      // Try default getDoc with timeout
-      try {
-        const productDoc = await withTimeout(getDoc(docRef(db, "products", productId)), 6000);
-        if (productDoc && productDoc.exists()) {
-          const data = productDoc.data();
-          if (!data.is_active) return null;
-          return { id: productDoc.id, ...data };
-        }
-      } catch { /* failed */ }
-
-      // Force server with timeout  
-      try {
-        const serverDoc = await withTimeout(getDocFromServer(docRef(db, "products", productId)), 6000);
-        if (serverDoc && serverDoc.exists()) {
-          const data = serverDoc.data();
-          if (!data.is_active) return null;
-          return { id: serverDoc.id, ...data };
-        }
-      } catch { /* server failed too */ }
+      if (result && result.exists()) {
+        const data = result.data();
+        if (!data.is_active) return null;
+        return { id: result.id, ...data };
+      }
       
       return null;
     },
