@@ -161,10 +161,12 @@ export default defineConfig(({ mode }) => ({
       output: {
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom'],
-          'ui-core': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu', '@radix-ui/react-popover'],
+          'query': ['@tanstack/react-query'],
+          'ui-core': ['@radix-ui/react-dialog', '@radix-ui/react-dropdown-menu'],
           'ui-extra': ['@radix-ui/react-accordion', '@radix-ui/react-select', '@radix-ui/react-tabs'],
           'firebase-core': ['firebase/app', 'firebase/auth'],
           'firebase-db': ['firebase/firestore'],
+          'firebase-check': ['firebase/app-check'],
           'charts': ['recharts'],
           'carousel': ['embla-carousel-react', 'embla-carousel-autoplay'],
         },

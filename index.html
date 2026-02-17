@@ -5,11 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <!-- Critical CSS inlined to avoid render-blocking -->
     <style>
-      *{touch-action:pan-x pan-y;-webkit-user-select:none;user-select:none;box-sizing:border-box}
-      html,body{overscroll-behavior-x:none;-webkit-text-size-adjust:100%;touch-action:pan-x pan-y;margin:0;padding:0}
-      img{pointer-events:none;-webkit-user-drag:none}
+      html,body{overscroll-behavior-x:none;-webkit-text-size-adjust:100%;touch-action:pan-x pan-y;margin:0;padding:0;box-sizing:border-box}
       body{background:#000;color:#fafafa;font-family:'Poppins',system-ui,sans-serif}
       #root{min-height:100vh;display:flex;flex-direction:column}
+      img{pointer-events:none;-webkit-user-drag:none}
+      a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
     </style>
     <meta name="theme-color" content="#EE4444" />
     
