@@ -90,6 +90,10 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
           item.id === newItem.id ? { ...item, quantity: item.quantity + 1 } : item
         );
       }
+      // Prefetch checkout chunk on first item added
+      if (prev.length === 0) {
+        import("@/App").then(m => m.prefetchCheckout?.()).catch(() => {});
+      }
       return [...prev, { ...newItem, quantity: 1 }];
     });
   }, []);

@@ -28,6 +28,10 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
     navigate("/checkout");
   }, [onOpenChange, navigate]);
 
+  const handlePrefetchCheckout = useCallback(() => {
+    import("@/App").then(m => m.prefetchCheckout?.()).catch(() => {});
+  }, []);
+
   const handleClose = useCallback(() => {
     onOpenChange?.(false);
   }, [onOpenChange]);
@@ -165,6 +169,8 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
 
               <Button 
                 onClick={handleCheckout}
+                onMouseEnter={handlePrefetchCheckout}
+                onTouchStart={handlePrefetchCheckout}
                 className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl gap-2 shadow-lg shadow-primary/20"
               >
                 Finalizar Compra
