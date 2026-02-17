@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -17,22 +16,10 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// App Check with reCAPTCHA v3 — NON-BLOCKING
-// Token is obtained in background; Firestore queries proceed immediately.
-// Firebase SDK attaches App Check tokens automatically once available.
-const RECAPTCHA_SITE_KEY = "6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J";
-
-try {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-    isTokenAutoRefreshEnabled: true,
-  });
-  console.log("[AppCheck] Initialized successfully");
-} catch (err) {
-  console.warn("[AppCheck] Init failed:", (err as Error).message);
-}
-
-// No longer blocks queries — resolve immediately
+// App Check DISABLED — reCAPTCHA key returning 401 Unauthorized in loop.
+// The reCAPTCHA v3 site key (6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J) needs to be
+// properly configured in Google Cloud reCAPTCHA console before re-enabling.
+// Keep enforcement OFF in Firebase Console until this is resolved.
 export const appCheckReady = Promise.resolve();
 
 // Initialize services
