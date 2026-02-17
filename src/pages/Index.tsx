@@ -4,7 +4,7 @@ import { Helmet } from "react-helmet-async";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
 import { SearchBar } from "@/components/SearchBar";
-import { HeroBanner } from "@/components/HeroBanner";
+
 import { ProductGrid } from "@/components/ProductGrid";
 import { useCategoryPrefetch } from "@/hooks/useCategoryPrefetch";
 
@@ -46,7 +46,7 @@ const IndexComponent = () => {
         <div className="md:hidden px-4 py-3 bg-background">
           <SearchBar />
         </div>
-        <HeroBanner />
+        
         <ProductGrid />
         <div className="content-lazy">
           <Suspense fallback={<div className="h-20" />}>

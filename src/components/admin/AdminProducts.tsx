@@ -24,8 +24,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-const ReactQuill = lazy(() => import('react-quill'));
-import 'react-quill/dist/quill.snow.css';
+import { Textarea } from "@/components/ui/textarea";
 import { ImageUploader } from "./ImageUploader";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS } from "@/lib/constants";
@@ -645,31 +644,14 @@ export const AdminProducts = () => {
                     <p className="text-xs text-muted-foreground mb-2">
                       Esta é a descrição principal que aparece na aba "Descrição" do produto
                     </p>
-                    <div className="border border-border/50 rounded-md bg-neutral-900 overflow-hidden">
-                      <Suspense fallback={<div className="min-h-[250px] bg-neutral-800 animate-pulse rounded" />}>
-                        <ReactQuill
-                          theme="snow"
-                          value={formData.rich_description || ""}
-                          onChange={(value: string) => { setFormData(prev => ({ ...prev, rich_description: value })); }}
-                          modules={{
-                            toolbar: [
-                              [{ 'header': [1, 2, 3, false] }],
-                              ['bold', 'italic', 'underline', 'strike'],
-                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                              ['link', 'image'],
-                              [{ 'align': [] }],
-                              [{ 'color': [] }, { 'background': [] }],
-                              ['clean']
-                            ]
-                          }}
-                          className="min-h-[250px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[200px]"
-                          placeholder="Escreva a descrição completa do produto..."
-                        />
-                      </Suspense>
-                    </div>
-                    <p className="text-xs text-muted-foreground flex items-center gap-1">
-                      <ImageIcon className="w-3 h-3" />
-                      Use o ícone de imagem na barra para adicionar fotos à descrição
+                    <Textarea
+                      value={formData.rich_description || ""}
+                      onChange={(e) => setFormData(prev => ({ ...prev, rich_description: e.target.value }))}
+                      placeholder="Escreva a descrição completa do produto (HTML suportado)..."
+                      className="min-h-[250px] bg-neutral-900 border-border/50 text-foreground"
+                    />
+                    <p className="text-xs text-muted-foreground">
+                      Suporta HTML para formatação avançada
                     </p>
                   </div>
                 </TabsContent>
@@ -680,26 +662,12 @@ export const AdminProducts = () => {
                     <p className="text-xs text-muted-foreground mb-2">
                       Estas instruções aparecem na aba "Instruções" do produto
                     </p>
-                    <div className="border border-border/50 rounded-md bg-neutral-900 overflow-hidden">
-                      <Suspense fallback={<div className="min-h-[180px] bg-neutral-800 animate-pulse rounded" />}>
-                        <ReactQuill
-                          theme="snow"
-                          value={formData.instructions || ""}
-                          onChange={(value: string) => { setFormData(prev => ({ ...prev, instructions: value })); }}
-                          modules={{
-                            toolbar: [
-                              [{ 'header': [1, 2, 3, false] }],
-                              ['bold', 'italic', 'underline'],
-                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                              ['link'],
-                              ['clean']
-                            ]
-                          }}
-                          className="min-h-[180px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[130px]"
-                          placeholder="Ex: 1. Acesse o site oficial. 2. Faça login na sua conta..."
-                        />
-                      </Suspense>
-                    </div>
+                    <Textarea
+                      value={formData.instructions || ""}
+                      onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
+                      placeholder="Ex: 1. Acesse o site oficial. 2. Faça login na sua conta..."
+                      className="min-h-[180px] bg-neutral-900 border-border/50 text-foreground"
+                    />
                   </div>
 
                   <div className="space-y-2">
@@ -707,26 +675,12 @@ export const AdminProducts = () => {
                     <p className="text-xs text-muted-foreground mb-2">
                       Aparece na aba "Terms conditions" do produto (opcional)
                     </p>
-                    <div className="border border-border/50 rounded-md bg-neutral-900 overflow-hidden">
-                      <Suspense fallback={<div className="min-h-[180px] bg-neutral-800 animate-pulse rounded" />}>
-                        <ReactQuill
-                          theme="snow"
-                          value={formData.terms_conditions || ""}
-                          onChange={(value: string) => { setFormData(prev => ({ ...prev, terms_conditions: value })); }}
-                          modules={{
-                            toolbar: [
-                              [{ 'header': [1, 2, 3, false] }],
-                              ['bold', 'italic', 'underline'],
-                              [{ 'list': 'ordered'}, { 'list': 'bullet' }],
-                              ['link'],
-                              ['clean']
-                            ]
-                          }}
-                          className="min-h-[180px] [&_.ql-toolbar]:bg-neutral-800 [&_.ql-toolbar]:border-border/50 [&_.ql-container]:border-border/50 [&_.ql-editor]:text-foreground [&_.ql-editor]:min-h-[130px]"
-                          placeholder="Ex: Este produto é apenas para uso pessoal..."
-                        />
-                      </Suspense>
-                    </div>
+                    <Textarea
+                      value={formData.terms_conditions || ""}
+                      onChange={(e) => setFormData(prev => ({ ...prev, terms_conditions: e.target.value }))}
+                      placeholder="Ex: Este produto é apenas para uso pessoal..."
+                      className="min-h-[180px] bg-neutral-900 border-border/50 text-foreground"
+                    />
                   </div>
                 </TabsContent>
 
