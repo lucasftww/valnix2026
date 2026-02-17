@@ -19,7 +19,8 @@ const app = initializeApp(firebaseConfig);
 
 // App Check with reCAPTCHA v3 — only on production domains
 // Preview/dev domains are not registered in reCAPTCHA console, so skip there.
-const PRODUCTION_HOSTS = ["www.valnix.com.br", "valnix.com.br", "valnix2026.lovable.app"];
+// Non-blocking: if App Check fails, Firestore queries still proceed (monitoring mode).
+const PRODUCTION_HOSTS = ["www.valnix.com.br", "valnix.com.br"];
 const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
 if (isProduction) {
@@ -30,7 +31,7 @@ if (isProduction) {
       isTokenAutoRefreshEnabled: true,
     });
   } catch (err) {
-    console.warn("[AppCheck] Init failed:", (err as Error).message);
+    console.warn("[AppCheck] Init failed, continuing without App Check:", (err as Error).message);
   }
 }
 
