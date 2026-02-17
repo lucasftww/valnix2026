@@ -4,14 +4,13 @@ import { Button } from "./ui/button";
 
 /**
  * Detects if an ad blocker is blocking Firestore connections.
- * Shows a non-intrusive banner asking users to whitelist the site.
+ * Uses passive detection via Firestore error events instead of active fetch.
  */
 const AdBlockDetectorComponent = () => {
   const [isBlocked, setIsBlocked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
   useEffect(() => {
-    // Don't show if already dismissed this session
     try {
       if (sessionStorage.getItem("valnix_adblock_dismissed")) {
         setDismissed(true);
@@ -19,28 +18,21 @@ const AdBlockDetectorComponent = () => {
       }
     } catch {}
 
-    // Test if Firestore is reachable by making a lightweight HEAD request
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 5000);
-
-    fetch("https://firestore.googleapis.com/", {
-      method: "HEAD",
-      mode: "no-cors",
-      signal: controller.signal,
-    })
-      .then(() => {
-        // no-cors always resolves with opaque response — this means NOT blocked
-        setIsBlocked(false);
-      })
-      .catch(() => {
-        // If fetch fails completely, likely blocked by extension
+    // Passive detection: listen for the global flag set by product hooks
+    // when Firestore connections fail with network/unavailable errors
+    const checkInterval = setInterval(() => {
+      if ((window as any).__valnix_firestore_blocked) {
         setIsBlocked(true);
-      })
-      .finally(() => clearTimeout(timeout));
+        clearInterval(checkInterval);
+      }
+    }, 2000);
+
+    // Stop checking after 15s
+    const timeout = setTimeout(() => clearInterval(checkInterval), 15000);
 
     return () => {
+      clearInterval(checkInterval);
       clearTimeout(timeout);
-      controller.abort();
     };
   }, []);
 
