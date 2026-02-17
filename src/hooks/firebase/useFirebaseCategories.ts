@@ -61,7 +61,8 @@ export const useCategories = () => {
 
       try {
         return await Promise.race([firestoreFetch, apiFetch]);
-      } catch {
+      } catch (err) {
+        markFirestorePossiblyBlocked(err);
         try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },

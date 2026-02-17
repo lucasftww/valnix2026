@@ -70,7 +70,8 @@ export const useFeaturedProducts = () => {
 
       try {
         return await Promise.race([firestoreFetch, apiFetch]);
-      } catch {
+      } catch (err) {
+        markFirestorePossiblyBlocked(err);
         try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
@@ -148,7 +149,8 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
 
       try {
         return await Promise.race([firestoreFetch, apiFetch]);
-      } catch {
+      } catch (err) {
+        markFirestorePossiblyBlocked(err);
         try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
@@ -178,10 +180,9 @@ export const useProduct = (productId: string | undefined) => {
       })();
 
       try {
-        const result = await Promise.race([firestoreFetch, apiFetch]);
-        return result;
-      } catch {
-        // If the race winner threw, try the other
+        return await Promise.race([firestoreFetch, apiFetch]);
+      } catch (err) {
+        markFirestorePossiblyBlocked(err);
         try { return await apiFetch; } catch { return await firestoreFetch; }
       }
     },
