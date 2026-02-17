@@ -41,7 +41,14 @@ const ProductDetail = () => {
   
 
   // Buscar produto com Firebase
-  const { data: product, isLoading, isError, refetch } = useProductById(id);
+  const { data: product, isLoading, isError, error: fetchError, refetch } = useProductById(id);
+
+  // Log timeout once on final failure for observability
+  useEffect(() => {
+    if (isError && fetchError && id) {
+      import("@/lib/fetchProduct").then(({ logFetchTimeout }) => logFetchTimeout(id, fetchError));
+    }
+  }, [isError, fetchError, id]);
 
   // Track ViewContent when product loads
   useEffect(() => {
