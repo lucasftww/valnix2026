@@ -10,7 +10,7 @@ import {
 } from "firebase/auth";
 import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
-import { isBlockedEmail, isBlockedUid } from "@/lib/blockedEmails";
+import { isBlockedEmail, isBlockedUid, isSpamEmailPattern } from "@/lib/blockedEmails";
 
 // ── Security: admin role is determined ONLY by "user_roles" collection ──
 // The "users" collection is NOT trusted for admin status (users can write to it)
@@ -44,13 +44,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (firebaseUser) {
         // Block banned UIDs immediately
         if (isBlockedUid(firebaseUser.uid)) {
+          console.warn("🚫 Blocked UID detected, signing out:", firebaseUser.uid);
           await firebaseSignOut(auth);
+          setUser(null);
+          setIsAdmin(false);
+          return;
+        }
+
+        // Block spam email patterns — auto sign out and skip ALL Firestore writes
+        if (firebaseUser.email && (isBlockedEmail(firebaseUser.email) || isSpamEmailPattern(firebaseUser.email))) {
+          console.warn("🚫 Spam/blocked email detected, signing out:", firebaseUser.email);
+          await firebaseSignOut(auth);
+          setUser(null);
+          setIsAdmin(false);
+          return;
+        }
+
+        // Skip Firestore doc creation for unverified emails to prevent quota drain attacks
+        // The attacker creates accounts via direct API calls — those accounts won't have verified emails
+        if (!firebaseUser.emailVerified && firebaseUser.providerData?.[0]?.providerId === 'password') {
+          // Still allow login but DON'T create Firestore docs until email is verified
           setIsAdmin(false);
           return;
         }
 
         // ── PERF: Check admin role FIRST (fast, single read) ──
-        // Profile/users doc creation can happen async without blocking UI
         try {
           const roleDoc = await getDoc(doc(db, "user_roles", firebaseUser.uid));
           const hasAdminRole = roleDoc.exists() && roleDoc.data()?.role === "admin";
@@ -132,18 +150,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   const signUp = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
-    if (isBlockedEmail(email)) {
+    if (isBlockedEmail(email) || isSpamEmailPattern(email)) {
       return { error: { code: 'auth/blocked', message: 'Account suspended' } };
     }
     try {
       const result = await createUserWithEmailAndPassword(auth, email, password);
       // Security: NEVER allow signUp to create admin users
-      await setDoc(doc(db, "users", result.user.uid), {
-        email: result.user.email,
-        role: "user",
-        isAdmin: false,
-        created_at: new Date().toISOString(),
-      });
+      // Only create Firestore docs if email is NOT spam (double check)
+      if (!isSpamEmailPattern(email)) {
+        await setDoc(doc(db, "users", result.user.uid), {
+          email: result.user.email,
+          role: "user",
+          isAdmin: false,
+          created_at: new Date().toISOString(),
+        });
+      }
       return { error: null };
     } catch (error) {
       return { error };
