@@ -13,7 +13,7 @@ function getCorsHeaders(req: Request) {
   const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
   return {
     "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-firebase-token",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
     "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
   };
 }
@@ -62,32 +62,28 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
-async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; email: string } | null> {
-  try {
-    const apiKey = Deno.env.get('FIREBASE_WEB_API_KEY');
-    if (!apiKey) throw new Error('FIREBASE_WEB_API_KEY not configured');
-    const res = await fetch(
-      `https://www.googleapis.com/identitytoolkit/v3/relyingparty/getAccountInfo?key=${apiKey}`,
-      { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ idToken }) }
-    );
-    if (!res.ok) return null;
-    const data = await res.json();
-    const user = data.users?.[0];
-    if (!user?.localId) return null;
-    return { uid: user.localId, email: user.email || '' };
-  } catch { return null; }
-}
+// ── HMAC Admin Token Verification ──────────────────────────────────
+const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
 
-// ── Admin check via Firestore user_roles ───────────────────────────
-async function isAdminInFirestore(uid: string): Promise<boolean> {
-  try {
-    const accessToken = await getFirebaseAccessToken();
-    const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
-    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    if (!res.ok) return false;
-    const doc = await res.json();
-    return doc.fields?.role?.stringValue === 'admin';
-  } catch { return false; }
+async function verifyAdminToken(token: string): Promise<boolean> {
+  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+  if (!adminPassword) return false;
+  const parts = token.split(".");
+  if (parts.length !== 2) return false;
+  const [timestampHex, providedHmac] = parts;
+  const timestamp = parseInt(timestampHex, 16);
+  if (isNaN(timestamp)) return false;
+  const now = Date.now();
+  if (now - timestamp > TOKEN_TTL_MS) return false;
+  if (timestamp > now + 60_000) return false;
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey("raw", enc.encode(adminPassword), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:admin`));
+  const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  if (providedHmac.length !== expectedHmac.length) return false;
+  let diff = 0;
+  for (let i = 0; i < providedHmac.length; i++) { diff |= providedHmac.charCodeAt(i) ^ expectedHmac.charCodeAt(i); }
+  return diff === 0;
 }
 
 // ── Firestore helpers ──────────────────────────────────────────────
@@ -229,24 +225,16 @@ Deno.serve(async (req) => {
       });
     }
 
-    const firebaseToken = req.headers.get("x-firebase-token");
-    if (!firebaseToken) {
-      return new Response(JSON.stringify({ error: "Firebase token required" }),
+    const adminToken = req.headers.get("x-admin-token");
+    if (!adminToken) {
+      return new Response(JSON.stringify({ error: "Admin token required" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    const userData = await verifyFirebaseToken(firebaseToken);
-    if (!userData) {
-      return new Response(JSON.stringify({ error: "Invalid Firebase token" }),
+    const isValid = await verifyAdminToken(adminToken);
+    if (!isValid) {
+      return new Response(JSON.stringify({ error: "Invalid or expired admin token" }),
         { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-    }
-
-    // Check admin via Firestore user_roles collection (not hardcoded emails)
-    const adminStatus = await isAdminInFirestore(userData.uid);
-    if (!adminStatus) {
-      console.warn(`⚠️ Unauthorized admin attempt: ${userData.email} (${userData.uid})`);
-      return new Response(JSON.stringify({ error: "Admin access required" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
     if (req.method === "GET") {
