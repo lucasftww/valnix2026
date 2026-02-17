@@ -73,12 +73,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const token = await firebaseUser.getIdToken();
       const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role`, {
+        signal: controller.signal,
         headers: {
           'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
           'Authorization': `Bearer ${token}`,
         },
       });
+      clearTimeout(timeoutId);
       if (!res.ok) return false;
       const data = await res.json();
       return data.isAdmin === true;
