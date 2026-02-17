@@ -25,7 +25,10 @@ const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 const Cart = lazy(() => import("./pages/Cart"));
 const Auth = lazy(() => import("./pages/Auth"));
 const Admin = lazy(() => import("./pages/Admin"));
-const Checkout = lazy(() => import("./pages/Checkout"));
+const checkoutImport = () => import("./pages/Checkout");
+const Checkout = lazy(checkoutImport);
+// Export for prefetch when user adds to cart
+export const prefetchCheckout = () => { checkoutImport(); };
 const MyOrders = lazy(() => import("./pages/MyOrders"));
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
