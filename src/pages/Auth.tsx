@@ -158,7 +158,7 @@ export default function Auth() {
           <img src={vLogo} alt="Valnix Logo" className="h-16 sm:h-20 md:h-24 w-auto drop-shadow-lg" />
         </Link>
         
-        <Card className="w-full max-w-md shadow-2xl border-primary/20 bg-card/95 backdrop-blur-sm">
+        <Card className="w-full max-w-md shadow-2xl border-primary/20 bg-card">
           <CardHeader className="space-y-1.5 px-5 sm:px-6 pt-6 pb-4 sm:pt-7 sm:pb-5 text-center">
             <CardTitle className="text-2xl sm:text-3xl font-bold">
               Bem-vindo

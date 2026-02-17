@@ -93,8 +93,8 @@ export const useCategoryBySlug = (slug: string | undefined) => {
         show_on_homepage: data.show_on_homepage || null
       } as Category;
     },
-    staleTime: 5 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    staleTime: 60 * 60 * 1000, // 1h — categories rarely change
+    gcTime: 2 * 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };

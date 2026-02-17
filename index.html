@@ -1,6 +1,11 @@
 <!doctype html>
 <html lang="pt-BR">
   <head>
+    <!-- Preconnect to critical origins (early in <head> for max benefit) -->
+    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://www.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://identitytoolkit.googleapis.com" crossorigin />
+    <link rel="preconnect" href="https://pub-73a0e04cd31c43799c084ebb2f9dcb49.r2.dev" crossorigin />
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <!-- Critical CSS inlined to avoid render-blocking -->
@@ -24,13 +29,10 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     
-    <!-- Preconnect to critical domains (fonts are now self-hosted) -->
-    <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin />
-    <link rel="preconnect" href="https://pub-73a0e04cd31c43799c084ebb2f9dcb49.r2.dev" crossorigin />
+    <!-- DNS prefetch for secondary domains -->
     <link rel="preconnect" href="https://tiupdhnjdcmgbqifwkrd.supabase.co" crossorigin />
     <link rel="dns-prefetch" href="https://media.discordapp.net" />
-    <link rel="dns-prefetch" href="https://www.googleapis.com" />
-    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+    <link rel="dns-prefetch" href="https://connect.facebook.net" />
     <link rel="dns-prefetch" href="https://connect.facebook.net" />
     
     
