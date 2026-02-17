@@ -44,6 +44,10 @@ export const useFeaturedProducts = () => {
     queryKey: [QUERY_KEYS.BEST_SELLING],
     queryFn: async (): Promise<ProductCardData[]> => {
       // Race: Firestore vs API fallback — both start immediately
+      // .catch(() => null) on each prevents "Uncaught (in promise)" for the loser
+      let firestoreResult: ProductCardData[] | null = null;
+      let apiResult: ProductCardData[] | null = null;
+
       const firestoreFetch = (async () => {
         const productsQuery = query(
           collection(db, "products"),
@@ -58,7 +62,7 @@ export const useFeaturedProducts = () => {
           .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
           .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
           .map(mapToProductCard);
-      })();
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
 
       const apiFetch = (async () => {
         const products = await fetchFeaturedProductsFallback();
@@ -66,14 +70,17 @@ export const useFeaturedProducts = () => {
           .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
           .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
           .map(mapToProductCard);
-      })();
+      })().then(r => { apiResult = r; return r; }).catch(() => null);
 
-      try {
-        return await Promise.race([firestoreFetch, apiFetch]);
-      } catch (err) {
-        markFirestorePossiblyBlocked(err);
-        try { return await apiFetch; } catch { return await firestoreFetch; }
-      }
+      // Wait for the first non-null result
+      const first = await Promise.race([firestoreFetch, apiFetch]);
+      if (first && first.length > 0) return first;
+
+      // If winner returned null/empty, wait for the other
+      await Promise.allSettled([firestoreFetch, apiFetch]);
+      if (firestoreResult && firestoreResult.length > 0) return firestoreResult;
+      if (apiResult && apiResult.length > 0) return apiResult;
+      return [];
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -125,7 +132,10 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
     queryKey: [QUERY_KEYS.CATEGORY_PRODUCTS, categorySlug],
     queryFn: async (): Promise<ProductWithReviews[]> => {
       if (!categorySlug) return [];
-      
+
+      let firestoreResult: ProductWithReviews[] | null = null;
+      let apiResult: ProductWithReviews[] | null = null;
+
       const firestoreFetch = (async () => {
         const productsQuery = query(
           collection(db, "products"),
@@ -137,7 +147,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
           .filter((p) => p?.is_active)
           .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
           .map(mapToProductWithReviews);
-      })();
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
 
       const apiFetch = (async () => {
         const products = await fetchCategoryProductsFallback(categorySlug!);
@@ -145,14 +155,15 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
           .filter((p: any) => p?.is_active)
           .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
           .map(mapToProductWithReviews);
-      })();
+      })().then(r => { apiResult = r; return r; }).catch(() => null);
 
-      try {
-        return await Promise.race([firestoreFetch, apiFetch]);
-      } catch (err) {
-        markFirestorePossiblyBlocked(err);
-        try { return await apiFetch; } catch { return await firestoreFetch; }
-      }
+      const first = await Promise.race([firestoreFetch, apiFetch]);
+      if (first && first.length > 0) return first;
+
+      await Promise.allSettled([firestoreFetch, apiFetch]);
+      if (firestoreResult && firestoreResult.length > 0) return firestoreResult;
+      if (apiResult && apiResult.length > 0) return apiResult;
+      return [];
     },
     enabled: !!categorySlug,
     staleTime: 30 * 60 * 1000,
@@ -168,23 +179,26 @@ export const useProduct = (productId: string | undefined) => {
     queryFn: async () => {
       if (!productId) return null;
 
-      // Race: Firestore vs API fallback — both start immediately
+      let firestoreResult: any = undefined;
+      let apiResult: any = undefined;
+
       const firestoreFetch = (async () => {
         const { fetchProduct } = await import("@/lib/fetchProduct");
         return await fetchProduct(productId);
-      })();
+      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
 
       const apiFetch = (async () => {
         const { fetchProductFallback } = await import("@/lib/firestoreFallback");
         return await fetchProductFallback(productId);
-      })();
+      })().then(r => { apiResult = r; return r; }).catch(() => null);
 
-      try {
-        return await Promise.race([firestoreFetch, apiFetch]);
-      } catch (err) {
-        markFirestorePossiblyBlocked(err);
-        try { return await apiFetch; } catch { return await firestoreFetch; }
-      }
+      const first = await Promise.race([firestoreFetch, apiFetch]);
+      if (first) return first;
+
+      await Promise.allSettled([firestoreFetch, apiFetch]);
+      if (firestoreResult) return firestoreResult;
+      if (apiResult) return apiResult;
+      return null;
     },
     enabled: !!productId,
     staleTime: 30 * 60 * 1000,
