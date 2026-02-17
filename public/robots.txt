@@ -18,7 +18,5 @@ Disallow: /auth
 Disallow: /checkout
 Disallow: /my-orders
 Disallow: /profile
-Disallow: /seed-database
-Disallow: /migrate-database
 
 Sitemap: https://www.valnix.com.br/sitemap.xml
