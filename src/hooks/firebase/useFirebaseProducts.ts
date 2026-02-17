@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, limit, getDocs, getDocsFromServer } from "firebase/firestore";
+import { collection, query, where, limit, getDocsFromServer } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
 import type { ProductCardData, ProductWithReviews } from "@/types";
@@ -39,19 +39,8 @@ export const useFeaturedProducts = () => {
         limit(50)
       );
 
-      // Try cache first with timeout, fallback to server-only
-      let productsSnapshot;
-      try {
-        productsSnapshot = await Promise.race([
-          getDocs(productsQuery),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("cache_timeout")), 8000)
-          ),
-        ]);
-      } catch (e) {
-        console.warn("Firestore cache timeout, fetching from server...");
-        productsSnapshot = await getDocsFromServer(productsQuery);
-      }
+      // Always fetch from server to avoid stale/corrupted IndexedDB cache
+      const productsSnapshot = await getDocsFromServer(productsQuery);
 
       const featuredActive = productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
@@ -75,10 +64,10 @@ export const useFeaturedProducts = () => {
         };
       });
     },
-    staleTime: 30 * 60 * 1000, // 30 min - cache agressivo
-    gcTime: 60 * 60 * 1000,    // 1 hora
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-    refetchOnMount: true,
+    refetchOnMount: false,
     retry: 3,
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 10000),
   });
@@ -96,18 +85,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
         where("category", "==", categorySlug)
       );
 
-      let productsSnapshot;
-      try {
-        productsSnapshot = await Promise.race([
-          getDocs(productsQuery),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("cache_timeout")), 8000)
-          ),
-        ]);
-      } catch (e) {
-        console.warn("Firestore cache timeout (category), fetching from server...");
-        productsSnapshot = await getDocsFromServer(productsQuery);
-      }
+      const productsSnapshot = await getDocsFromServer(productsQuery);
 
       return productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
@@ -147,8 +125,8 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
         });
     },
     enabled: !!categorySlug,
-    staleTime: 30 * 60 * 1000, // 30 min
-    gcTime: 60 * 60 * 1000,    // 1 hora
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
   });
 };
@@ -160,20 +138,8 @@ export const useProduct = (productId: string | undefined) => {
     queryFn: async () => {
       if (!productId) return null;
       
-      const { doc: docRef, getDoc, getDocFromServer } = await import("firebase/firestore");
-      
-      let productDoc;
-      try {
-        productDoc = await Promise.race([
-          getDoc(docRef(db, "products", productId)),
-          new Promise<never>((_, reject) =>
-            setTimeout(() => reject(new Error("cache_timeout")), 8000)
-          ),
-        ]);
-      } catch (e) {
-        console.warn("Firestore cache timeout (product), fetching from server...");
-        productDoc = await getDocFromServer(docRef(db, "products", productId));
-      }
+      const { doc: docRef, getDocFromServer } = await import("firebase/firestore");
+      const productDoc = await getDocFromServer(docRef(db, "products", productId));
       
       if (!productDoc.exists()) return null;
       
