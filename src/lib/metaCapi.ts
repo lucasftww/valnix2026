@@ -77,18 +77,22 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       if (import.meta.env.DEV) console.log(`📡 Meta CAPI ${data.event_name} sent`);
     });
 
-    // Browser-side Pixel dedup: fire fbq with same event_id
+    // Browser-side Pixel dedup: only fire for whitelisted standard events
     try {
-      const fbq = (window as any).fbq;
-      if (typeof fbq === 'function') {
-        fbq('track', data.event_name, {
-          value: data.value,
-          currency: 'BRL',
-          content_name: data.content_name,
-          content_ids: data.content_ids,
-          contents: data.contents,
-          num_items: data.num_items,
-        }, { eventID: eventId });
+      const PIXEL_WHITELIST = ['InitiateCheckout', 'Purchase'] as const;
+      const pixelEvent = PIXEL_WHITELIST.find(e => e === data.event_name);
+      if (pixelEvent) {
+        const fbq = (window as any).fbq;
+        if (typeof fbq === 'function') {
+          fbq('track', pixelEvent, {
+            value: data.value,
+            currency: 'BRL',
+            content_name: data.content_name,
+            content_ids: data.content_ids,
+            contents: data.contents,
+            num_items: data.num_items,
+          }, { eventID: eventId });
+        }
       }
     } catch { /* best-effort pixel */ }
   } catch (e) {
