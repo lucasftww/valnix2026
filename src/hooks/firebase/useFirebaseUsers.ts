@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 
 // Convert Firestore Timestamp or string to ISO string
@@ -35,22 +35,16 @@ export interface FirebaseOrder {
   payment_status: string;
 }
 
-async function getFirebaseToken(): Promise<string> {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return user.getIdToken();
-}
-
-// Fetch all users via admin-data edge function (server-side, bypasses Firestore rules)
+// Fetch all users via admin-data edge function
 export const useAdminUsers = () => {
   return useQuery({
     queryKey: ["firebase-admin-users"],
     queryFn: async () => {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const response = await invokeFunction('admin-data', {
         method: 'GET',
         queryParams: { resource: 'users' },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
       });
 
       if (!response.ok) {
@@ -68,22 +62,22 @@ export const useAdminUsers = () => {
         balance: u.balance || 0,
       })) as FirebaseUser[];
     },
-    staleTime: 2 * 60 * 1000, // 2 min — avoid refetching on tab switch
-    gcTime: 10 * 60 * 1000, // 10 min — keep in cache
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 };
 
-// Fetch orders for a specific user via edge function
+// Fetch orders for a specific user
 export const useUserOrders = (userId: string | null) => {
   return useQuery({
     queryKey: ["firebase-user-orders", userId],
     queryFn: async () => {
       if (!userId) return [];
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const response = await invokeFunction('admin-data', {
         method: 'GET',
         queryParams: { resource: 'user-orders', userId },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
       });
 
       if (!response.ok) return [];
@@ -100,18 +94,18 @@ export const useUserOrders = (userId: string | null) => {
   });
 };
 
-// Check if user is admin via edge function (avoids direct Firestore read blocked by rules)
+// Check if user is admin
 export const useIsUserAdmin = (userId: string | null) => {
   return useQuery({
     queryKey: ["firebase-user-admin", userId],
     queryFn: async () => {
       if (!userId) return false;
       try {
-        const token = await getFirebaseToken();
+        const token = requireAdminToken();
         const response = await invokeFunction('admin-data', {
           method: 'GET',
           queryParams: { resource: 'check-admin', userId },
-          headers: { 'x-firebase-token': token },
+          headers: { 'x-admin-token': token },
         });
         if (!response.ok) return false;
         const data = await response.json();
@@ -124,25 +118,25 @@ export const useIsUserAdmin = (userId: string | null) => {
   });
 };
 
-// Update user balance via edge function
+// Update user balance
 export const updateUserBalance = async (userId: string, newBalance: number): Promise<void> => {
-  const token = await getFirebaseToken();
+  const token = requireAdminToken();
   const response = await invokeFunction('admin-data', {
     method: 'PUT',
     queryParams: { resource: 'users' },
-    headers: { 'x-firebase-token': token },
+    headers: { 'x-admin-token': token },
     body: { id: userId, balance: newBalance },
   });
   if (!response.ok) throw new Error('Failed to update balance');
 };
 
-// Delete user via edge function
+// Delete user
 export const deleteFirebaseUser = async (userId: string): Promise<void> => {
-  const token = await getFirebaseToken();
+  const token = requireAdminToken();
   const response = await invokeFunction('admin-data', {
     method: 'DELETE',
     queryParams: { resource: 'users', id: userId },
-    headers: { 'x-firebase-token': token },
+    headers: { 'x-admin-token': token },
   });
   if (!response.ok) throw new Error('Failed to delete user');
 };

@@ -7,7 +7,7 @@ import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
 import { invokeFunction } from "@/lib/apiHelper";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { auth } from "@/integrations/firebase/config";
+
 import { trackPurchaseEvent } from "@/lib/analytics";
 import { sendPurchaseFromClient } from "@/lib/metaCapi";
 
@@ -103,13 +103,9 @@ export function PixPayment({
         return;
       }
       try {
-        const currentUser = auth.currentUser;
-        const idToken = currentUser ? await currentUser.getIdToken() : null;
-
         const response = await invokeFunction('flowpay-pix', {
           method: 'GET',
           queryParams: { action: 'status', chargeId: transactionId, orderId },
-          headers: idToken ? { 'Authorization': `Bearer ${idToken}` } : {},
         });
         const data = await response.json();
         

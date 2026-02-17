@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -49,12 +49,6 @@ interface Coupon {
   created_at: string;
 }
 
-const getFirebaseToken = async () => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return user.getIdToken();
-};
-
 export const AdminCoupons = () => {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingCoupon, setEditingCoupon] = useState<Coupon | null>(null);
@@ -76,11 +70,11 @@ export const AdminCoupons = () => {
   const fetchCoupons = async () => {
     try {
       setIsLoading(true);
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "GET",
         queryParams: { resource: "coupons" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -113,11 +107,11 @@ export const AdminCoupons = () => {
   const handleCreate = async (data: typeof formData) => {
     setIsSaving(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "POST",
         queryParams: { resource: "coupons" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
         body: {
           code: data.code.toUpperCase(),
           description: data.description || null,
@@ -147,11 +141,11 @@ export const AdminCoupons = () => {
   const handleUpdate = async (id: string, data: typeof formData) => {
     setIsSaving(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "PUT",
         queryParams: { resource: "coupons" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
         body: {
           id,
           code: data.code.toUpperCase(),
@@ -179,11 +173,11 @@ export const AdminCoupons = () => {
 
   const handleDelete = async (id: string) => {
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "DELETE",
         queryParams: { resource: "coupons", id },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
       });
       if (!res.ok) throw new Error("Failed to delete coupon");
       

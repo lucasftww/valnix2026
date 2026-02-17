@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 import { QUERY_KEYS } from "@/lib/constants";
 import { Button } from "@/components/ui/button";
@@ -18,12 +18,6 @@ import type { Category } from "@/types";
 interface CategoryNode extends Category {
   children: CategoryNode[];
 }
-
-const getFirebaseToken = async () => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return user.getIdToken();
-};
 
 export const CategoryManager = () => {
   const { toast } = useToast();
@@ -47,11 +41,11 @@ export const CategoryManager = () => {
   const loadCategories = async () => {
     setIsLoading(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "GET",
         queryParams: { resource: "categories" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -84,19 +78,7 @@ export const CategoryManager = () => {
   };
 
   useEffect(() => {
-    // Wait for Firebase Auth to be ready before loading
-    const unsubscribe = auth.onAuthStateChanged((user) => {
-      if (user) {
-        loadCategories();
-        unsubscribe();
-      }
-    });
-    // If user is already authenticated, load immediately
-    if (auth.currentUser) {
-      unsubscribe();
-      loadCategories();
-    }
-    return () => unsubscribe();
+    loadCategories();
   }, []);
 
   const invalidate = () => {
@@ -156,7 +138,7 @@ export const CategoryManager = () => {
 
     setIsSaving(true);
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const catData: any = {
         name: formData.name,
         slug: formData.slug,
@@ -170,7 +152,7 @@ export const CategoryManager = () => {
         const res = await invokeFunction("admin-data", {
           method: "PUT",
           queryParams: { resource: "categories" },
-          headers: { "x-firebase-token": token },
+          headers: { "x-admin-token": token },
           body: { id: editingCategory.id, ...catData, updated_at: new Date().toISOString() },
         });
         if (!res.ok) throw new Error("Failed to update category");
@@ -179,7 +161,7 @@ export const CategoryManager = () => {
         const res = await invokeFunction("admin-data", {
           method: "POST",
           queryParams: { resource: "categories" },
-          headers: { "x-firebase-token": token },
+          headers: { "x-admin-token": token },
           body: {
             ...catData,
             display_order: categories.length,
@@ -206,11 +188,11 @@ export const CategoryManager = () => {
   const handleDelete = async (id: string) => {
     if (!confirm("Tem certeza que deseja excluir esta categoria?")) return;
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "DELETE",
         queryParams: { resource: "categories", id },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
       });
       if (!res.ok) throw new Error("Failed to delete category");
       
@@ -228,13 +210,12 @@ export const CategoryManager = () => {
     setCategories(items);
 
     try {
-      const token = await getFirebaseToken();
-      // Update display_order for each category
+      const token = requireAdminToken();
       for (let i = 0; i < items.length; i++) {
         await invokeFunction("admin-data", {
           method: "PUT",
           queryParams: { resource: "categories" },
-          headers: { "x-firebase-token": token },
+          headers: { "x-admin-token": token },
           body: { id: items[i].id, display_order: i },
         });
       }

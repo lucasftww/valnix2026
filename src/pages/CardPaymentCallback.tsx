@@ -2,7 +2,6 @@ import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { auth } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 import { sendPurchaseFromClient } from "@/lib/metaCapi";
 
@@ -34,13 +33,8 @@ export default function CardPaymentCallback() {
 
     const checkStatus = async () => {
       try {
-        // 🔒 Pass auth token or delivery token for ownership validation
-        const currentUser = auth.currentUser;
-        const idToken = currentUser ? await currentUser.getIdToken() : null;
         const statusHeaders: Record<string, string> = {};
-        if (idToken) {
-          statusHeaders['Authorization'] = `Bearer ${idToken}`;
-        } else if (stored?.deliveryToken) {
+        if (stored?.deliveryToken) {
           statusHeaders['x-delivery-token'] = stored.deliveryToken;
         }
 
@@ -55,20 +49,15 @@ export default function CardPaymentCallback() {
           setStatus("paid");
           if (intervalRef.current) clearInterval(intervalRef.current);
 
-          // 🔒 Call server-side confirm endpoint instead of client-side writes
           if (!confirmCalledRef.current) {
             confirmCalledRef.current = true;
             try {
-              const currentUser = auth.currentUser;
-              const idToken = currentUser ? await currentUser.getIdToken() : null;
               const headers: Record<string, string> = {};
-              if (idToken) {
-                headers['Authorization'] = `Bearer ${idToken}`;
-              } else if (stored?.deliveryToken) {
+              if (stored?.deliveryToken) {
                 headers['x-delivery-token'] = stored.deliveryToken;
               }
 
-              if (idToken || stored?.deliveryToken) {
+              if (stored?.deliveryToken) {
                 const confirmRes = await invokeFunction('flowpay-card', {
                   method: 'POST',
                   queryParams: { action: 'confirm' },
@@ -91,7 +80,7 @@ export default function CardPaymentCallback() {
           sendPurchaseFromClient({
             orderId,
             value: stored?.amount,
-            userId: currentUser?.uid,
+            userId: stored?.userId,
             email: stored?.customerEmail,
             name: stored?.customerName,
             productNames: stored?.productNames,

@@ -4,7 +4,7 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import imageCompression from "browser-image-compression";
 import { invokeFunction } from "@/lib/apiHelper";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 
 type ImagePreset = 'product' | 'banner' | 'icon';
 
@@ -113,17 +113,14 @@ export const ImageUploader = ({
 
       setCompressionProgress("Enviando para Cloudflare R2...");
 
-      // Get Firebase auth token
-      const user = auth.currentUser;
-      if (!user) throw new Error("Usuário não autenticado");
-      const token = await user.getIdToken();
+      const token = requireAdminToken();
 
       // Convert to base64 and upload via edge function
       const base64 = await fileToBase64(compressedFile);
 
       const response = await invokeFunction("upload-r2", {
         body: { fileBase64: base64, fileName, contentType: "image/webp" },
-        headers: { Authorization: `Bearer ${token}` },
+        headers: { "x-admin-token": token },
       });
 
       if (!response.ok) {
