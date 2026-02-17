@@ -103,12 +103,13 @@ export const useCategoryBySlug = (slug: string | undefined) => {
 export const useProductById = (productId: string | undefined) => {
   return useQuery({
     queryKey: ['product', productId],
-    queryFn: () => fetchProduct(productId!),
-    enabled: !!productId,
+    queryFn: ({ queryKey }) => fetchProduct(queryKey[1] as string),
+    enabled: typeof productId === "string",
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
+    refetchOnReconnect: true,
     retry: (failureCount, error) => failureCount < 2 && shouldRetryProductFetch(error),
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
