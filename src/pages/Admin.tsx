@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { useAdminPrefetch } from "@/hooks/useAdminPrefetch";
 import { Search, Bell, Settings, ChevronRight } from "lucide-react";
 
 // Direct imports — no lazy loading for instant tab switching
@@ -86,6 +87,9 @@ export default function Admin() {
       </div>
     );
   }
+
+  // Prefetch all admin data in parallel on mount
+  useAdminPrefetch();
 
   const currentTab = tabTitles[activeTab] || tabTitles.dashboard;
 

@@ -181,7 +181,8 @@ export const AdminOrders = () => {
     },
     enabled: !!user,
     refetchInterval: 60000,
-    staleTime: 30000,
+    staleTime: 2 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   });
 
   const fetchOrders = useCallback(() => { refetchOrders(); }, [refetchOrders]);
@@ -551,10 +552,16 @@ export const AdminOrders = () => {
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center py-20">
-      <div className="flex flex-col items-center gap-3">
-        <Loader2 className="w-8 h-8 animate-spin text-primary" />
-        <p className="text-sm text-muted-foreground">Carregando pedidos...</p>
+    <div className="space-y-4">
+      <div className="flex gap-3">
+        {Array.from({ length: 4 }).map((_, i) => (
+          <div key={i} className="h-10 w-28 bg-muted animate-pulse rounded" />
+        ))}
+      </div>
+      <div className="space-y-3">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+        ))}
       </div>
     </div>
   );
