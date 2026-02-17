@@ -65,8 +65,10 @@ export const ImageUploader = ({
       setCompressionProgress("Iniciando otimização...");
       const compressedFile = await imageCompression(file, options);
       
-      console.log(`✅ Imagem otimizada: ${file.name} (${file.type}) → WebP`);
-      console.log(`   Tamanho: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
+      if (import.meta.env.DEV) {
+        console.log(`✅ Imagem otimizada: ${file.name} (${file.type}) → WebP`);
+        console.log(`   Tamanho: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
+      }
       
       setCompressionProgress(null);
       return compressedFile;

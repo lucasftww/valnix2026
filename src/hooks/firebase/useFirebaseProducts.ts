@@ -55,7 +55,7 @@ export const useFeaturedProducts = () => {
           limit(50)
         );
         const productsSnapshot = await resilientGetDocs(productsQuery);
-        console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs`);
+        if (import.meta.env.DEV) console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs`);
         return productsSnapshot.docs
           .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
           .filter((p) => p?.is_active)

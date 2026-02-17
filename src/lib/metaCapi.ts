@@ -74,7 +74,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
     };
 
     invokeFunctionFireAndForget('meta-capi', payload).then(() => {
-      console.log(`📡 Meta CAPI ${data.event_name} sent`);
+      if (import.meta.env.DEV) console.log(`📡 Meta CAPI ${data.event_name} sent`);
     });
   } catch (e) {
     console.warn('⚠️ Meta CAPI helper error:', e);

@@ -114,7 +114,7 @@ export function PixPayment({
         const data = await response.json();
         
         if (data.success && data.status === 'COMPLETED') {
-          console.log('✅ Payment confirmed via polling!');
+          if (import.meta.env.DEV) console.log('✅ Payment confirmed via polling!');
           clearInterval(pollInterval);
           handlePaymentSuccess();
         }

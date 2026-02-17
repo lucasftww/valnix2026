@@ -46,7 +46,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           const data = await response.json();
 
           if (data.success && data.status === 'COMPLETED') {
-            console.log(`✅ Auto-verified PIX payment for order ${order.id} (server-side)`);
+            if (import.meta.env.DEV) console.log(`✅ Auto-verified PIX payment for order ${order.id}`);
             onOrderUpdated?.();
           }
         } catch (error) {

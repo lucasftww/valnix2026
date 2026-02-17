@@ -76,9 +76,9 @@ export default function CardPaymentCallback() {
                   body: { orderId, paymentId },
                 });
                 const confirmResult = await confirmRes.json();
-                console.log(`🔒 Server-side card confirm result for ${orderId}:`, confirmResult);
+                if (import.meta.env.DEV) console.log(`🔒 Server-side card confirm result for ${orderId}:`, confirmResult);
               } else {
-                console.log(`ℹ️ No auth — card payment will be handled by admin auto-verify`);
+                if (import.meta.env.DEV) console.log(`ℹ️ No auth — card payment will be handled by admin auto-verify`);
               }
             } catch (confirmErr) {
               console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
