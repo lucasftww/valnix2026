@@ -5,8 +5,6 @@ import {
   createUserWithEmailAndPassword,
   signOut as firebaseSignOut,
   onAuthStateChanged,
-  GoogleAuthProvider,
-  signInWithPopup,
 } from "firebase/auth";
 import { auth, db } from "@/integrations/firebase/config";
 import { doc, getDoc, setDoc } from "firebase/firestore";
@@ -252,6 +250,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signInWithGoogle = useCallback(async (): Promise<{ error: any }> => {
     try {
       try { localStorage.removeItem(ROLE_CACHE_KEY); } catch { /* */ }
+      // Lazy-load Google Auth to reduce initial bundle size (~30KB)
+      const { GoogleAuthProvider, signInWithPopup } = await import("firebase/auth");
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);

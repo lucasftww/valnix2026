@@ -162,15 +162,14 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
           className="w-full pl-4 pr-12 h-11 md:h-10 bg-muted/50 border border-border/20 rounded-full text-sm text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/50 focus:border-primary/30 focus:bg-muted/70 transition-all"
           aria-label="Buscar produtos"
           aria-autocomplete="list"
-          aria-controls="search-results"
-          aria-expanded={isOpen && results.length > 0}
+          {...(isOpen && results.length > 0 ? { "aria-controls": "search-results", "aria-expanded": true } : { "aria-expanded": false })}
         />
         {query ? (
           <Button
             variant="ghost"
             size="sm"
             onClick={handleClear}
-            className="absolute right-3 top-1/2 -translate-y-1/2 h-8 w-8 p-0 hover:bg-secondary rounded-full"
+            className="absolute right-2 top-1/2 -translate-y-1/2 h-10 w-10 p-0 hover:bg-secondary rounded-full"
             aria-label="Limpar busca"
           >
             <X className="h-4 w-4" />
@@ -191,9 +190,11 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
               <button
                 key={product.id}
                 onClick={() => handleSelect(product.id)}
-                className={`w-full flex items-center gap-3 p-3 hover:bg-secondary/80 active:scale-[0.99] transition-all text-left ${
+                className={`w-full flex items-center gap-3 p-3 min-h-[48px] hover:bg-secondary/80 active:scale-[0.99] transition-all text-left ${
                   index === selectedIndex ? 'bg-secondary/80' : ''
                 }`}
+                role="option"
+                aria-selected={index === selectedIndex}
                 aria-label={`Ver produto ${product.name}`}
               >
                 <img
