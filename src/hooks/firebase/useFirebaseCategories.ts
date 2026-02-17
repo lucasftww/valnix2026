@@ -52,13 +52,15 @@ export const useCategories = () => {
           .filter((c) => c?.is_active);
         return deduplicateCategories(raw);
       } catch (err) {
-        if (isBlockedByAdBlocker(err)) {
-          console.info("[Categories] Firestore blocked, using API fallback");
-          markFirestorePossiblyBlocked(err);
+        console.warn("[Categories] Firestore failed, trying API fallback:", (err as Error)?.message || err);
+        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+        try {
           const raw = await fetchCategoriesFallback();
           return deduplicateCategories(raw.filter((c: any) => c?.is_active));
+        } catch (fallbackErr) {
+          console.error("[Categories] API fallback also failed:", fallbackErr);
+          throw err;
         }
-        throw err;
       }
     },
     staleTime: 60 * 60 * 1000,

@@ -54,7 +54,12 @@ export async function fetchProduct(productId: string): Promise<Product | null> {
     // Retry once on timeout/network
     if (shouldRetryProductFetch(err)) {
       await new Promise((r) => setTimeout(r, 1500));
-      snap = await attempt();
+      try {
+        snap = await attempt();
+      } catch {
+        // Both attempts failed — let caller handle fallback
+        throw err;
+      }
     } else {
       throw err;
     }
