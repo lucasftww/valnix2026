@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, getDocs } from "firebase/firestore";
+import { collection } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
+import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { QUERY_KEYS, CACHE_TIMES } from "@/lib/constants";
 import type { Category } from "@/types";
 
@@ -12,7 +13,7 @@ export const useCategories = () => {
     queryKey: [QUERY_KEYS.CATEGORIES],
     queryFn: async (): Promise<Category[]> => {
       // Evita índice composto (where + orderBy). Carrega tudo e filtra/ordena client-side.
-      const snapshot = await getDocs(collection(db, "categories"));
+      const snapshot = await resilientGetDocs(collection(db, "categories"));
 
       const raw = snapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))

@@ -4,8 +4,9 @@ import { Button } from "./ui/button";
 import { Link } from "react-router-dom";
 import { useCategoriesTree } from "@/hooks/firebase";
 import { useQueryClient } from "@tanstack/react-query";
-import { collection, getDocs, query, where } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
+import { resilientGetDocs } from "@/lib/firebaseHelpers";
 
 const NavigationComponent = () => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -20,7 +21,7 @@ const NavigationComponent = () => {
           collection(db, "products"),
           where("category", "==", categorySlug)
         );
-        const snapshot = await getDocs(q);
+        const snapshot = await resilientGetDocs(q);
 
         type ProductDoc = { id: string; is_active?: boolean; display_order?: number; [key: string]: unknown };
         
