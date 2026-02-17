@@ -56,6 +56,9 @@ export function PixPayment({
     if (paymentConfirmed) return;
     setPaymentConfirmed(true);
     
+    // Clear InitiateCheckout flag on confirmed payment
+    try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
+    
     // Track Purchase event for PIX payments
     trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
     

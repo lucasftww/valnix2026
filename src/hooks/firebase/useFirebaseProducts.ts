@@ -4,6 +4,7 @@ import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { fetchFeaturedProductsFallback, fetchCategoryProductsFallback } from "@/lib/firestoreFallback";
+import { isBlockedByAdBlocker, markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import type { ProductCardData, ProductWithReviews } from "@/types";
 
 const generateConsistentSalesAndReviews = (productId: string): { sold: number; reviewCount: number } => {
@@ -19,18 +20,7 @@ const generateConsistentSalesAndReviews = (productId: string): { sold: number; r
 
 export { generateConsistentSalesAndReviews };
 
-/** Check if error is likely caused by ad blocker blocking Firestore */
-function isBlockedByAdBlocker(err: unknown): boolean {
-  const msg = (err as Error)?.message?.toLowerCase() ?? "";
-  const code = (err as any)?.code ?? "";
-  return (
-    code === "unavailable" ||
-    msg.includes("failed to fetch") ||
-    msg.includes("network") ||
-    msg.includes("err_blocked") ||
-    msg.includes("could not reach")
-  );
-}
+// isBlockedByAdBlocker and markFirestorePossiblyBlocked are now imported from @/lib/firestoreBlockDetect
 
 function mapToProductCard(p: any): ProductCardData {
   const stats = generateConsistentSalesAndReviews(p.id);
@@ -77,7 +67,7 @@ export const useFeaturedProducts = () => {
         // Fallback to API proxy when Firestore is blocked (ad blocker)
         if (isBlockedByAdBlocker(err)) {
           console.info("[Products] Firestore blocked, using API fallback");
-          (window as any).__valnix_firestore_blocked = true;
+          markFirestorePossiblyBlocked(err);
           const products = await fetchFeaturedProductsFallback();
           return products
             .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
@@ -154,6 +144,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
       } catch (err) {
         if (isBlockedByAdBlocker(err)) {
           console.info("[Products] Firestore blocked, using API fallback for category:", categorySlug);
+          markFirestorePossiblyBlocked(err);
           const products = await fetchCategoryProductsFallback(categorySlug);
           return products
             .filter((p: any) => p?.is_active)
@@ -182,6 +173,7 @@ export const useProduct = (productId: string | undefined) => {
       } catch (err) {
         if (isBlockedByAdBlocker(err)) {
           console.info("[Products] Firestore blocked, using API fallback for product:", productId);
+          markFirestorePossiblyBlocked(err);
           const { fetchProductFallback } = await import("@/lib/firestoreFallback");
           return fetchProductFallback(productId);
         }

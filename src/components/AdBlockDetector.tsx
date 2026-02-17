@@ -18,21 +18,24 @@ const AdBlockDetectorComponent = () => {
       }
     } catch {}
 
-    // Passive detection: listen for the global flag set by product hooks
-    // when Firestore connections fail with network/unavailable errors
-    const checkInterval = setInterval(() => {
+    // Passive detection: poll the global flag set by Firestore hooks
+    // Uses short interval (500ms) for responsive detection, stops after 15s
+    let timer: ReturnType<typeof setTimeout>;
+
+    const check = () => {
       if ((window as any).__valnix_firestore_blocked) {
         setIsBlocked(true);
-        clearInterval(checkInterval);
+        return;
       }
-    }, 2000);
+      timer = setTimeout(check, 500);
+    };
 
-    // Stop checking after 15s
-    const timeout = setTimeout(() => clearInterval(checkInterval), 15000);
+    check(); // immediate first check
+    const stop = setTimeout(() => clearTimeout(timer), 15000);
 
     return () => {
-      clearInterval(checkInterval);
-      clearTimeout(timeout);
+      clearTimeout(timer);
+      clearTimeout(stop);
     };
   }, []);
 

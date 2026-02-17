@@ -3,22 +3,11 @@ import { collection } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { fetchCategoriesFallback } from "@/lib/firestoreFallback";
+import { isBlockedByAdBlocker, markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import { QUERY_KEYS, CACHE_TIMES } from "@/lib/constants";
 import type { Category } from "@/types";
 
 export type { Category } from "@/types";
-
-function isBlockedByAdBlocker(err: unknown): boolean {
-  const msg = (err as Error)?.message?.toLowerCase() ?? "";
-  const code = (err as any)?.code ?? "";
-  return (
-    code === "unavailable" ||
-    msg.includes("failed to fetch") ||
-    msg.includes("network") ||
-    msg.includes("err_blocked") ||
-    msg.includes("could not reach")
-  );
-}
 
 function deduplicateCategories(raw: any[]): Category[] {
   const score = (c: any) => {
@@ -65,6 +54,7 @@ export const useCategories = () => {
       } catch (err) {
         if (isBlockedByAdBlocker(err)) {
           console.info("[Categories] Firestore blocked, using API fallback");
+          markFirestorePossiblyBlocked(err);
           const raw = await fetchCategoriesFallback();
           return deduplicateCategories(raw.filter((c: any) => c?.is_active));
         }
