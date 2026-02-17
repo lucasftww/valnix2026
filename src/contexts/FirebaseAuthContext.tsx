@@ -36,6 +36,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Track if we've already reverted a rogue admin doc to avoid loops
   const revertedRef = useRef(new Set<string>());
 
+  // ── Cached role check with TTL (avoids Firestore read every page load) ──
+  const ROLE_CACHE_KEY = 'valnix_role_cache';
+  const ROLE_CACHE_TTL = 10 * 60 * 1000; // 10 min
+
+  const getCachedRole = useCallback((uid: string): boolean | null => {
+    try {
+      const raw = localStorage.getItem(ROLE_CACHE_KEY);
+      if (!raw) return null;
+      const parsed = JSON.parse(raw);
+      if (parsed.uid !== uid) return null;
+      if (Date.now() - parsed.ts > ROLE_CACHE_TTL) return null;
+      return parsed.isAdmin === true;
+    } catch { return null; }
+  }, []);
+
+  const setCachedRole = useCallback((uid: string, admin: boolean) => {
+    try {
+      localStorage.setItem(ROLE_CACHE_KEY, JSON.stringify({ uid, isAdmin: admin, ts: Date.now() }));
+    } catch { /* quota */ }
+  }, []);
+
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       setUser(firebaseUser);
@@ -68,14 +89,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        // ── Check admin role — use timeout to avoid blocking render ──
-        try {
-          const roleResult = await Promise.race([
-            getDoc(doc(db, "user_roles", firebaseUser.uid)),
-            new Promise<null>((r) => setTimeout(() => r(null), 3000)),
-          ]);
-          const hasAdminRole = roleResult?.exists?.() && roleResult.data()?.role === "admin";
-          setIsAdmin(hasAdminRole);
+        // ── Check admin role — use local cache first, then validate in background ──
+        const cachedAdmin = getCachedRole(firebaseUser.uid);
+        let hasAdminRole = cachedAdmin ?? false;
+        
+        if (cachedAdmin !== null) {
+          // Use cached value immediately for fast render
+          setIsAdmin(cachedAdmin);
+          // Validate in background (non-blocking)
+          getDoc(doc(db, "user_roles", firebaseUser.uid)).then((roleDoc) => {
+            const serverAdmin = roleDoc.exists() && roleDoc.data()?.role === "admin";
+            if (serverAdmin !== cachedAdmin) {
+              setIsAdmin(serverAdmin);
+              setCachedRole(firebaseUser.uid, serverAdmin);
+            }
+            hasAdminRole = serverAdmin;
+          }).catch(() => { /* use cached */ });
+        } else {
+          // No cache — fetch with timeout
+          try {
+            const roleResult = await Promise.race([
+              getDoc(doc(db, "user_roles", firebaseUser.uid)),
+              new Promise<null>((r) => setTimeout(() => r(null), 3000)),
+            ]);
+            hasAdminRole = roleResult?.exists?.() && roleResult.data()?.role === "admin";
+            setIsAdmin(hasAdminRole);
+            setCachedRole(firebaseUser.uid, hasAdminRole);
+          } catch {
+            setIsAdmin(false);
+          }
+        }
 
           // Non-blocking: handle users/profile docs in background
           (async () => {
@@ -128,17 +171,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               console.error("Background profile sync error:", bgError);
             }
           })();
-        } catch (error) {
-          console.error("Error checking admin status:", error);
-          setIsAdmin(false);
-        }
       } else {
         setIsAdmin(false);
       }
     });
 
     return () => unsubscribe();
-  }, []);
+  }, [getCachedRole, setCachedRole]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
     if (isBlockedEmail(email)) {
@@ -177,6 +216,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signOut = useCallback(async () => {
     await firebaseSignOut(auth);
     setIsAdmin(false);
+    try { localStorage.removeItem(ROLE_CACHE_KEY); } catch { /* */ }
   }, []);
 
   const signInWithGoogle = useCallback(async (): Promise<{ error: any }> => {

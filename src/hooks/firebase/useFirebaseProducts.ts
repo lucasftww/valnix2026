@@ -130,23 +130,28 @@ export const useProduct = (productId: string | undefined) => {
       
       const { doc: docRef, getDoc } = await import("firebase/firestore");
 
-      // getDoc with persistent cache checks local first, then network — single call
+      const TIMEOUT_MS = 8000;
       const result = await Promise.race([
-        getDoc(docRef(db, "products", productId)),
-        new Promise<null>((r) => setTimeout(() => r(null), 8000)),
+        getDoc(docRef(db, "products", productId)).catch((e) => { throw e; }),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('PRODUCT_FETCH_TIMEOUT')), TIMEOUT_MS)
+        ),
       ]);
 
-      if (result && result.exists()) {
-        const data = result.data();
-        if (!data.is_active) return null;
-        return { id: result.id, ...data };
-      }
-      
-      return null;
+      if (!result.exists()) return null;
+      const data = result.data();
+      if (!data.is_active) return null;
+      return { id: result.id, ...data };
     },
     enabled: !!productId,
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
+    retry: (failureCount, error) => {
+      if (failureCount >= 2) return false;
+      const msg = (error as Error)?.message || '';
+      return msg.includes('TIMEOUT') || msg.includes('unavailable') || msg.includes('network');
+    },
+    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 };
