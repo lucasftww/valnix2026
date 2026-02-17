@@ -139,7 +139,7 @@ Deno.serve(async (req) => {
     const cached = cache.get(cacheKey);
     if (cached && Date.now() < cached.expiresAt) {
       return new Response(JSON.stringify(cached.data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT" },
+        headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT", "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600" },
       });
     }
 
@@ -202,7 +202,7 @@ Deno.serve(async (req) => {
     cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL });
 
     return new Response(JSON.stringify(data), {
-      headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS" },
+      headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS", "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600" },
     });
   } catch (error) {
     console.error("Error:", error);
