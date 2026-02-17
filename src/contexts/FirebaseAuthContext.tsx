@@ -70,11 +70,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // ── Role check via Edge Function (authenticated with Firebase ID token) ──
   const checkRoleViaApi = useCallback(async (firebaseUser: User): Promise<boolean> => {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 8000);
     try {
       const token = await firebaseUser.getIdToken();
       const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 8000);
       const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role`, {
         signal: controller.signal,
         headers: {
@@ -82,12 +82,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           'Authorization': `Bearer ${token}`,
         },
       });
-      clearTimeout(timeoutId);
       if (!res.ok) return false;
       const data = await res.json();
       return data.isAdmin === true;
     } catch {
       return false;
+    } finally {
+      clearTimeout(timeoutId);
     }
   }, []);
 
