@@ -237,12 +237,16 @@ export const AdminCoupons = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center py-20">
-        <div className="relative">
-          <div className="w-12 h-12 border-4 border-primary/20 rounded-full" />
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
+      <div className="space-y-4">
+        <div className="flex justify-between">
+          <div className="h-10 w-48 bg-muted animate-pulse rounded" />
+          <div className="h-10 w-32 bg-muted animate-pulse rounded" />
         </div>
-        <p className="text-muted-foreground mt-4">Carregando cupons...</p>
+        <div className="space-y-3">
+          {Array.from({ length: 4 }).map((_, i) => (
+            <div key={i} className="h-16 bg-muted animate-pulse rounded-lg" />
+          ))}
+        </div>
       </div>
     );
   }
