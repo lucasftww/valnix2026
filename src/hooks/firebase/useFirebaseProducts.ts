@@ -31,12 +31,16 @@ export const useFeaturedProducts = () => {
       );
 
       const productsSnapshot = await resilientGetDocs(productsQuery);
+      
+      console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs, fromCache: ${productsSnapshot.metadata.fromCache}`);
 
       const featuredActive = productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
         .filter((p) => p?.is_active)
         .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
         .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT);
+      
+      console.log(`[Products] After is_active filter: ${featuredActive.length} products`);
 
       return featuredActive.map((p) => {
         const stats = generateConsistentSalesAndReviews(p.id);
