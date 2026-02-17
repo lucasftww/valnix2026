@@ -8,7 +8,7 @@ import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
 import { NewsletterForm } from "@/components/NewsletterForm";
-import { useCategories } from "@/hooks/firebase";
+import { useCategories } from "@/hooks/firebase/useFirebaseCategories";
 import {
   Accordion,
   AccordionContent,

@@ -1,7 +1,7 @@
 import { memo } from "react";
 import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
-import { useFeaturedProducts } from "@/hooks/firebase";
+import { useFeaturedProducts } from "@/hooks/firebase/useFirebaseProducts";
 import { Button } from "./ui/button";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "./ui/carousel";
 

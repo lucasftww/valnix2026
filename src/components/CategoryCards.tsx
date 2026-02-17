@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
-import { useHomeCategories } from "@/hooks/firebase";
+import { useHomeCategories } from "@/hooks/firebase/useFirebaseCategories";
 import type { Category } from "@/types";
 
 const CategoryCardItem = memo(({ category }: { category: Category }) => {

@@ -6,7 +6,7 @@ import { FloatingContactButtons } from "@/components/FloatingContactButtons";
 import { ProductCard } from "@/components/ProductCard";
 import { ProductSkeleton } from "@/components/ProductSkeleton";
 import { CategorySidebar } from "@/components/CategorySidebar";
-import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/firebase";
+import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/firebase/useFirebaseProductsWithReviews";
 import { Helmet } from "react-helmet-async";
 
 

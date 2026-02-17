@@ -2,7 +2,7 @@ import { memo, useCallback, useState } from "react";
 import { ChevronDown } from "lucide-react";
 import { Button } from "./ui/button";
 import { Link } from "react-router-dom";
-import { useCategoriesTree } from "@/hooks/firebase";
+import { useCategoriesTree } from "@/hooks/firebase/useFirebaseCategories";
 import { useQueryClient } from "@tanstack/react-query";
 import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
@@ -63,24 +63,23 @@ const NavigationComponent = () => {
               >
                 {hasChildren ? (
                   <>
-                    <Link to={categoryLink} aria-label={`Ver produtos de ${category.name}`}>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="text-muted-foreground hover:text-foreground hover:bg-transparent whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
-                        aria-label={`${category.name} - expandir subcategorias`}
-                      >
-                        {category.icon_url && (
-                          <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
-                        )}
-                        {category.name}
-                        <ChevronDown 
-                          className={`ml-1 h-3 w-3 transition-transform duration-200 ${
-                            openDropdown === category.id ? 'rotate-180' : ''
-                          }`}
-                          aria-hidden="true"
-                        />
-                      </Button>
+                    <Link 
+                      to={categoryLink} 
+                      className="inline-flex items-center h-9 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
+                      aria-label={`Ver produtos de ${category.name}`}
+                      aria-expanded={openDropdown === category.id}
+                      aria-haspopup="true"
+                    >
+                      {category.icon_url && (
+                        <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
+                      )}
+                      {category.name}
+                      <ChevronDown 
+                        className={`ml-1 h-3 w-3 transition-transform duration-200 ${
+                          openDropdown === category.id ? 'rotate-180' : ''
+                        }`}
+                        aria-hidden="true"
+                      />
                     </Link>
                     {openDropdown === category.id && (
                       <div className="absolute left-0 top-full pt-2 z-50">
@@ -105,17 +104,15 @@ const NavigationComponent = () => {
                     )}
                   </>
                 ) : (
-                  <Link to={categoryLink} aria-label={`Ver produtos de ${category.name}`}>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="text-muted-foreground hover:text-foreground hover:bg-transparent whitespace-nowrap font-medium transition-all h-9 text-[13px] tracking-wide rounded-full"
-                    >
-                      {category.icon_url && (
-                        <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
-                      )}
-                      {category.name}
-                    </Button>
+                  <Link 
+                    to={categoryLink} 
+                    className="inline-flex items-center h-9 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
+                    aria-label={`Ver produtos de ${category.name}`}
+                  >
+                    {category.icon_url && (
+                      <img src={category.icon_url} alt="" aria-hidden="true" className="h-4 w-4 mr-1.5 opacity-70" width={16} height={16} loading="lazy" />
+                    )}
+                    {category.name}
                   </Link>
                 )}
               </div>

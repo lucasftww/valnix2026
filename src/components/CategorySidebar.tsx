@@ -1,4 +1,4 @@
-import { useCategoriesTree } from "@/hooks/firebase";
+import { useCategoriesTree } from "@/hooks/firebase/useFirebaseCategories";
 import { Link, useLocation } from "react-router-dom";
 import { ChevronRight } from "lucide-react";
 import { Skeleton } from "./ui/skeleton";

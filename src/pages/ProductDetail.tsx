@@ -7,7 +7,7 @@ import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Minus, Plus, Star, ChevronDown } from "lucide-react";
 import { useState, useMemo, useEffect, useRef, lazy, Suspense, memo, useCallback } from "react";
-import { useProductById, useProductReviews } from "@/hooks/firebase";
+import { useProductById, useProductReviews } from "@/hooks/firebase/useFirebaseProductsWithReviews";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import pixLogo from "@/assets/pix-logo.png";
 import DOMPurify from "dompurify";
