@@ -89,18 +89,36 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>): Prom
   return parts[parts.length - 1] || null;
 }
 
-async function getFirestoreDoc(col: string, docId: string, retries = 2): Promise<Record<string, any> | null> {
+// In-memory cache for product data (survives across requests in same isolate)
+const productMemCache = new Map<string, { fields: Record<string, any>; expiresAt: number }>();
+const PRODUCT_CACHE_TTL = 10 * 60_000; // 10 minutes
+
+async function getFirestoreDoc(col: string, docId: string, retries = 3): Promise<Record<string, any> | null> {
+  // Check memory cache for products (most common read)
+  if (col === 'products') {
+    const cached = productMemCache.get(docId);
+    if (cached && Date.now() < cached.expiresAt) {
+      return cached.fields;
+    }
+  }
+
   const accessToken = await getFirebaseAccessToken();
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
   for (let attempt = 0; attempt <= retries; attempt++) {
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
     if (res.ok) {
       const data = await res.json();
-      return data.fields || null;
+      const fields = data.fields || null;
+      // Cache product reads
+      if (col === 'products' && fields) {
+        productMemCache.set(docId, { fields, expiresAt: Date.now() + PRODUCT_CACHE_TTL });
+      }
+      return fields;
     }
     if (res.status === 429 && attempt < retries) {
-      console.warn(`⚠️ Firestore 429 for ${col}/${docId}, retrying in ${(attempt + 1) * 1000}ms...`);
-      await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+      const delay = Math.min((attempt + 1) * 2000, 8000); // 2s, 4s, 6s
+      console.warn(`⚠️ Firestore 429 for ${col}/${docId}, retrying in ${delay}ms (attempt ${attempt + 1}/${retries})...`);
+      await new Promise(r => setTimeout(r, delay));
       continue;
     }
     if (res.status === 404) return null;
@@ -110,6 +128,14 @@ async function getFirestoreDoc(col: string, docId: string, retries = 2): Promise
   }
   return null;
 }
+
+// Periodic cleanup of product cache
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of productMemCache) {
+    if (v.expiresAt <= now) productMemCache.delete(k);
+  }
+}, 300_000);
 
 // ── Firebase ID Token Verification ─────────────────────────────────
 async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; email?: string } | null> {
