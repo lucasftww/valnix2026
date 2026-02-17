@@ -123,7 +123,7 @@ async function buildUserData(params: {
   if (params.userAgent) userData.client_user_agent = params.userAgent;
   if (params.fbc) userData.fbc = params.fbc;
   if (params.fbp) userData.fbp = params.fbp;
-  userData.country = 'br';
+  userData.country = await sha256('br');
   return userData;
 }
 
