@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { useCart } from "@/contexts/CartContext";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Minus, Plus, Star, ChevronDown } from "lucide-react";
-import { useState, useMemo, useEffect, lazy, Suspense, memo, useCallback } from "react";
+import { useState, useMemo, useEffect, useRef, lazy, Suspense, memo, useCallback } from "react";
 import { useProductById, useProductReviews } from "@/hooks/firebase";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import pixLogo from "@/assets/pix-logo.png";
@@ -43,12 +43,14 @@ const ProductDetail = () => {
   // Buscar produto com Firebase
   const { data: product, isLoading, isError, error: fetchError, refetch } = useProductById(id);
 
-  // Log timeout once on final failure for observability
+  // Log timeout once per product on final failure (no duplicates on re-render)
+  const loggedRef = useRef(new Set<string>());
   useEffect(() => {
-    if (isError && fetchError && id) {
-      import("@/lib/fetchProduct").then(({ logFetchTimeout }) => logFetchTimeout(id, fetchError));
-    }
-  }, [isError, fetchError, id]);
+    if (!id || !isError || !fetchError) return;
+    if (loggedRef.current.has(id)) return;
+    loggedRef.current.add(id);
+    import("@/lib/fetchProduct").then(({ logFetchTimeout }) => logFetchTimeout(id, fetchError));
+  }, [id, isError, fetchError]);
 
   // Track ViewContent when product loads
   useEffect(() => {
