@@ -128,27 +128,38 @@ export const useProduct = (productId: string | undefined) => {
     queryFn: async () => {
       if (!productId) return null;
       
-      const { doc: docRef, getDoc, getDocFromServer } = await import("firebase/firestore");
+      const { doc: docRef, getDoc, getDocFromServer, getDocFromCache } = await import("firebase/firestore");
       
-      // Try cache first, fall back to server if empty
-      let productDoc = await getDoc(docRef(db, "products", productId));
-      if (!productDoc.exists()) {
-        try {
-          productDoc = await getDocFromServer(docRef(db, "products", productId));
-        } catch {
-          // Server also failed, keep the empty result
+      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
+        Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+
+      // Try cache first (no network/App Check needed)
+      try {
+        const cached = await withTimeout(getDocFromCache(docRef(db, "products", productId)), 3000);
+        if (cached && cached.exists()) return { id: cached.id, ...cached.data() };
+      } catch { /* cache miss */ }
+
+      // Try default getDoc with timeout
+      try {
+        const productDoc = await withTimeout(getDoc(docRef(db, "products", productId)), 8000);
+        if (productDoc && productDoc.exists()) {
+          const data = productDoc.data();
+          if (!data.is_active) return null;
+          return { id: productDoc.id, ...data };
         }
-      }
+      } catch { /* failed */ }
+
+      // Force server with timeout  
+      try {
+        const serverDoc = await withTimeout(getDocFromServer(docRef(db, "products", productId)), 8000);
+        if (serverDoc && serverDoc.exists()) {
+          const data = serverDoc.data();
+          if (!data.is_active) return null;
+          return { id: serverDoc.id, ...data };
+        }
+      } catch { /* server failed too */ }
       
-      if (!productDoc.exists()) return null;
-      
-      const data = productDoc.data();
-      if (!data.is_active) return null;
-      
-      return {
-        id: productDoc.id,
-        ...data
-      };
+      return null;
     },
     enabled: !!productId,
     staleTime: 30 * 60 * 1000,

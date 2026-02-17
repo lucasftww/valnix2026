@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, doc, getDoc, getDocFromCache, getDocFromServer } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import type { Category, Review, Product } from "@/types";
@@ -106,36 +106,42 @@ export const useProductById = (productId: string | undefined) => {
     queryFn: async (): Promise<Product | null> => {
       if (!productId) return null;
       
-      const productDoc = await getDoc(doc(db, "products", productId));
-      
-      if (!productDoc.exists()) return null;
-      
-      const data = productDoc.data();
-      if (!data.is_active) return null;
-      
-      return {
-        id: productDoc.id,
-        name: data.name,
-        description: data.description || null,
-        rich_description: data.rich_description || null,
-        price: data.price,
-        old_price: data.old_price || null,
-        discount: data.discount || null,
-        image_url: data.image_url || null,
-        icon_url: data.icon_url || null,
-        category: data.category,
-        is_active: data.is_active,
-        featured: data.featured || false,
-        display_order: data.display_order || 0,
-        stock: data.stock || null,
-        sold: data.sold || null,
-        delivery_type: data.delivery_type || null,
-        delivery_info: data.delivery_info || null,
-        instructions: data.instructions || null,
-        terms_conditions: data.terms_conditions || null,
-        video_url: data.video_url || null,
-        product_type: data.product_type || null
-      } as Product;
+      const withTimeout = <T,>(p: Promise<T>, ms: number): Promise<T | null> =>
+        Promise.race([p, new Promise<null>((r) => setTimeout(() => r(null), ms))]);
+
+      const ref = doc(db, "products", productId);
+
+      // Try cache first
+      try {
+        const cached = await withTimeout(getDocFromCache(ref), 3000);
+        if (cached && cached.exists()) {
+          const data = cached.data();
+          if (!data.is_active) return null;
+          return { id: cached.id, ...data } as Product;
+        }
+      } catch { /* cache miss */ }
+
+      // Try default getDoc with timeout
+      try {
+        const productDoc = await withTimeout(getDoc(ref), 8000);
+        if (productDoc && productDoc.exists()) {
+          const data = productDoc.data();
+          if (!data.is_active) return null;
+          return { id: productDoc.id, ...data } as Product;
+        }
+      } catch { /* failed */ }
+
+      // Force server
+      try {
+        const serverDoc = await withTimeout(getDocFromServer(ref), 8000);
+        if (serverDoc && serverDoc.exists()) {
+          const data = serverDoc.data();
+          if (!data.is_active) return null;
+          return { id: serverDoc.id, ...data } as Product;
+        }
+      } catch { /* server failed */ }
+
+      return null;
     },
     enabled: !!productId,
     staleTime: 10 * 60 * 1000,
