@@ -24,6 +24,17 @@ const PRODUCTION_HOSTS = ["www.valnix.com.br", "valnix.com.br"];
 const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
 if (isProduction) {
+  // ── Global safety net: suppress unhandled rejections from App Check / reCAPTCHA SDK ──
+  // The Firebase App Check SDK + reCAPTCHA internally reject promises on timeout/network
+  // that we cannot catch with try/catch (auto-refresh, internal retries).
+  // This filters ONLY those cases to avoid polluting the console without masking real bugs.
+  window.addEventListener("unhandledrejection", (event) => {
+    const msg = String(event.reason?.message || event.reason || "");
+    if (/Timeout \(b\)|AppCheck|recaptcha/i.test(msg)) {
+      event.preventDefault();
+    }
+  });
+
   try {
     const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
     const appCheck = initializeAppCheck(app, {
@@ -31,28 +42,25 @@ if (isProduction) {
       isTokenAutoRefreshEnabled: true,
     });
 
-    // Proactively get first token with timeout to catch & suppress reCAPTCHA timeouts
-    // This prevents "Uncaught (in promise) Timeout" from polluting the console
+    // Warmup: proactively get first token with timeout
+    const warmupTimeout = new Promise<null>((resolve) =>
+      setTimeout(() => resolve(null), 8000)
+    );
     Promise.race([
-      getToken(appCheck, /* forceRefresh */ false),
-      new Promise((_, reject) => setTimeout(() => reject(new Error("AppCheck token timeout")), 8000)),
+      getToken(appCheck, false),
+      warmupTimeout,
     ]).catch(() => {
-      // Silent: App Check token failed (adblock/network/timeout)
-      // Firestore continues in monitoring mode without App Check
+      // Silent: token failed (adblock/network/timeout)
     });
-  } catch (err) {
+  } catch {
     // Sync init failure — continue without App Check
   }
-}
 
-export const appCheckReady = Promise.resolve();
-
-// Reduce Firestore SDK console noise in production (hides "unavailable" warnings from adblock/network)
-if (isProduction) {
+  // Reduce Firestore SDK console noise in production
   setLogLevel("error");
 }
 
-// Initialize services
+export const appCheckReady = Promise.resolve();
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache()
