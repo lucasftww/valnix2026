@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useMemo, useEffect } from "react";
 import { db } from "@/integrations/firebase/config";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
+import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { toast } from "sonner";
 
 export interface CartItem {
@@ -113,7 +114,7 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       const couponsRef = collection(db, "coupons");
       const q = query(couponsRef, where("code", "==", code.toUpperCase()));
-      const snapshot = await getDocs(q);
+      const snapshot = await resilientGetDocs(q);
 
       if (snapshot.empty) {
         toast.error("Cupom não encontrado");

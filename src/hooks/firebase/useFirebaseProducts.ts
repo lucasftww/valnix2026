@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, limit, getDocs, getDocsFromServer } from "firebase/firestore";
+import { collection, query, where, limit } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
+import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import type { ProductCardData, ProductWithReviews } from "@/types";
 
 const generateConsistentSalesAndReviews = (productId: string): { sold: number; reviewCount: number } => {
@@ -17,15 +18,6 @@ const generateConsistentSalesAndReviews = (productId: string): { sold: number; r
 
 export { generateConsistentSalesAndReviews };
 
-// Resilient fetch: try server first, fallback to cache if offline
-async function resilientGetDocs<T>(q: ReturnType<typeof query>) {
-  try {
-    return await getDocsFromServer(q);
-  } catch {
-    // Server unreachable (offline) — fallback to local cache
-    return await getDocs(q);
-  }
-}
 
 // Hook para produtos em destaque (home)
 export const useFeaturedProducts = () => {

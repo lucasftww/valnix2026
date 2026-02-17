@@ -3,8 +3,9 @@ import { Search, X } from "lucide-react";
 import { Input } from "./ui/input";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
-import { collection, getDocs, limit, query as fsQuery } from "firebase/firestore";
+import { collection, limit, query as fsQuery } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
+import { resilientGetDocs } from "@/lib/firebaseHelpers";
 
 interface Product {
   id: string;
@@ -32,7 +33,7 @@ const SearchBarComponent = () => {
     if (catalogCache) return catalogCache;
 
     const q = fsQuery(collection(db, "products"), limit(500));
-    const snapshot = await getDocs(q);
+    const snapshot = await resilientGetDocs(q);
     const items = snapshot.docs.map((docSnap) => {
       const data = docSnap.data() as Record<string, unknown>;
       return {

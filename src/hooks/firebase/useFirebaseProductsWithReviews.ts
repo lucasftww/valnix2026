@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
+import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import type { Category, Review, Product } from "@/types";
 
 import { generateConsistentSalesAndReviews } from "./useFirebaseProducts";
@@ -32,7 +33,7 @@ export const useProductsWithReviews = (category: string) => {
         where("category", "==", category)
       );
       
-      const productsSnapshot = await getDocs(productsQuery);
+      const productsSnapshot = await resilientGetDocs(productsQuery);
       
       if (productsSnapshot.empty) return [];
 
@@ -70,7 +71,7 @@ export const useCategoryBySlug = (slug: string | undefined) => {
         where("slug", "==", slug)
       );
       
-      const snapshot = await getDocs(categoriesQuery);
+      const snapshot = await resilientGetDocs(categoriesQuery);
       
       if (snapshot.empty) return null;
       
@@ -157,7 +158,7 @@ export const useProductReviews = (category: string | undefined) => {
         where("category", "==", category)
       );
       
-      const snapshot = await getDocs(reviewsQuery);
+      const snapshot = await resilientGetDocs(reviewsQuery);
 
       return snapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
