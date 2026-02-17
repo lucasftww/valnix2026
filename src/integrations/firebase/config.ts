@@ -24,7 +24,7 @@ const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
 if (isProduction) {
   try {
-    const RECAPTCHA_SITE_KEY = "COLE_SUA_CHAVE_V3_AQUI";
+    const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
     initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
