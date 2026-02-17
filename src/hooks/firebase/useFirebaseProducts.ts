@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, limit, getDocsFromServer } from "firebase/firestore";
+import { collection, query, where, limit, getDocs } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
 import type { ProductCardData, ProductWithReviews } from "@/types";
@@ -39,8 +39,7 @@ export const useFeaturedProducts = () => {
         limit(50)
       );
 
-      // Always fetch from server to avoid stale/corrupted IndexedDB cache
-      const productsSnapshot = await getDocsFromServer(productsQuery);
+      const productsSnapshot = await getDocs(productsQuery);
 
       const featuredActive = productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
@@ -85,7 +84,7 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
         where("category", "==", categorySlug)
       );
 
-      const productsSnapshot = await getDocsFromServer(productsQuery);
+      const productsSnapshot = await getDocs(productsQuery);
 
       return productsSnapshot.docs
         .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
@@ -138,8 +137,8 @@ export const useProduct = (productId: string | undefined) => {
     queryFn: async () => {
       if (!productId) return null;
       
-      const { doc: docRef, getDocFromServer } = await import("firebase/firestore");
-      const productDoc = await getDocFromServer(docRef(db, "products", productId));
+      const { doc: docRef, getDoc } = await import("firebase/firestore");
+      const productDoc = await getDoc(docRef(db, "products", productId));
       
       if (!productDoc.exists()) return null;
       
