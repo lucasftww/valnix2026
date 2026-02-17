@@ -137,11 +137,14 @@ Deno.serve(async (req) => {
     const slug = url.searchParams.get("slug") || "";
     const id = url.searchParams.get("id") || "";
     const cacheKey = `${type}_${slug || id || "all"}`;
-    const cached = cache.get(cacheKey);
-    if (cached && Date.now() < cached.expiresAt) {
-      return new Response(JSON.stringify(cached.data), {
-        headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT", "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600" },
-      });
+    // Don't cache check-role (per-user, security-sensitive)
+    if (type !== "check-role") {
+      const cached = cache.get(cacheKey);
+      if (cached && Date.now() < cached.expiresAt) {
+        return new Response(JSON.stringify(cached.data), {
+          headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "HIT", "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600" },
+        });
+      }
     }
 
     let data: any;
@@ -181,9 +184,34 @@ Deno.serve(async (req) => {
       }
 
     } else if (type === "check-role") {
-      // Check admin role for a given Firebase UID via server-side Firestore
-      const uid = url.searchParams.get("uid");
-      if (!uid) return new Response(JSON.stringify({ error: "uid required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      // ── Validate Firebase ID token to derive UID (no arbitrary uid accepted) ──
+      const authHeader = req.headers.get("Authorization") || "";
+      const idToken = authHeader.replace("Bearer ", "");
+      if (!idToken) {
+        return new Response(JSON.stringify({ error: "Authorization required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Verify Firebase ID token via Google Identity Toolkit
+      const webApiKey = Deno.env.get("FIREBASE_WEB_API_KEY");
+      if (!webApiKey) {
+        console.error("FIREBASE_WEB_API_KEY not configured");
+        return new Response(JSON.stringify({ isAdmin: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      const verifyRes = await fetch(
+        `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${webApiKey}`,
+        { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ idToken }) }
+      );
+      if (!verifyRes.ok) {
+        return new Response(JSON.stringify({ isAdmin: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      const verifyData = await verifyRes.json();
+      const uid = verifyData.users?.[0]?.localId;
+      if (!uid) {
+        return new Response(JSON.stringify({ isAdmin: false }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
+      // Check role via Firestore with service account
       const accessToken = await getFirebaseAccessToken();
       const roleDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
       const roleRes = await fetch(roleDocUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
@@ -199,8 +227,10 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ error: "Invalid type" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
 
-    // Cache the result
-    cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL });
+    // Cache the result (skip check-role — per-user, security-sensitive)
+    if (type !== "check-role") {
+      cache.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL });
+    }
 
     return new Response(JSON.stringify(data), {
       headers: { ...corsHeaders, "Content-Type": "application/json", "X-Cache": "MISS", "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600" },

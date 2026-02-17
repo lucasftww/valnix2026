@@ -49,7 +49,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
 };
 
 export default function Admin() {
-  const { isAdmin, loading, user } = useAuth();
+  const { isAdmin, loading, user, roleLoading } = useAuth();
   const navigate = useNavigate();
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -64,7 +64,8 @@ export default function Admin() {
   }, []);
 
   useEffect(() => {
-    if (!loading) {
+    // Wait for both auth and role to be resolved
+    if (!loading && !roleLoading) {
       if (!user) {
         navigate("/auth");
       } else if (!isAdmin) {
@@ -73,9 +74,9 @@ export default function Admin() {
         setCheckingAuth(false);
       }
     }
-  }, [isAdmin, loading, user, navigate]);
+  }, [isAdmin, loading, roleLoading, user, navigate]);
 
-  if (loading || checkingAuth) {
+  if (loading || roleLoading || checkingAuth) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-background via-background to-primary/5">
         <div className="flex flex-col items-center gap-4">
