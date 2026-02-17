@@ -1,7 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -17,32 +16,31 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// App Check: reCAPTCHA v3 for production, debug mode for dev/preview
-// Without a valid App Check token, Firestore enforcement rejects ALL queries.
-const PRODUCTION_DOMAINS = [
+// App Check: Only initialize on production domains where reCAPTCHA v3 key is registered.
+// On other domains, App Check is NOT initialized — Firestore enforcement must be
+// set to "Unenforced" in Firebase Console for this to work, OR the domain must be
+// added to the reCAPTCHA v3 allowed domains list.
+const APPCHECK_DOMAINS = [
   "valnix.com.br",
   "www.valnix.com.br",
-  "valnix2026.lovable.app",
 ];
 
 const currentHost = window.location.hostname;
-const isProduction = PRODUCTION_DOMAINS.some(
-  (d) => currentHost === d || currentHost.endsWith("." + d)
+const shouldEnableAppCheck = APPCHECK_DOMAINS.some(
+  (d) => currentHost === d
 );
 
-if (!isProduction) {
-  // Enable debug token for non-production environments
-  // This tells Firebase SDK to use a debug token instead of reCAPTCHA
-  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = "55382aa4-8a5a-433f-8e2a-7204060e7fc7";
-}
-
-try {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
-    isTokenAutoRefreshEnabled: true,
+if (shouldEnableAppCheck) {
+  import("firebase/app-check").then(({ initializeAppCheck, ReCaptchaV3Provider }) => {
+    try {
+      initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
+        isTokenAutoRefreshEnabled: true,
+      });
+    } catch (e) {
+      console.warn("App Check init failed:", e);
+    }
   });
-} catch (e) {
-  console.warn("App Check initialization failed:", e);
 }
 
 // Initialize services with persistent local cache (IndexedDB)
