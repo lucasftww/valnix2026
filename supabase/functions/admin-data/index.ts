@@ -83,10 +83,19 @@ async function isAdminInFirestore(uid: string): Promise<boolean> {
     const accessToken = await getFirebaseAccessToken();
     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
     const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-    if (!res.ok) return false;
+    if (!res.ok) {
+      const errText = await res.text();
+      console.error(`❌ isAdminInFirestore failed for uid=${uid} | status=${res.status} | body=${errText}`);
+      return false;
+    }
     const doc = await res.json();
-    return doc.fields?.role?.stringValue === 'admin';
-  } catch { return false; }
+    const role = doc.fields?.role?.stringValue;
+    console.log(`🔍 isAdminInFirestore uid=${uid} | role=${role} | hasFields=${!!doc.fields}`);
+    return role === 'admin';
+  } catch (err) {
+    console.error(`❌ isAdminInFirestore exception for uid=${uid}:`, err);
+    return false;
+  }
 }
 
 // ── Firestore helpers ──────────────────────────────────────────────
