@@ -154,9 +154,9 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
                 value={formData.name}
                 onChange={(e) => onInputChange("name", e.target.value)}
                 onBlur={() => onBlur("name")}
-                placeholder="NOME SOBRENOME"
+                placeholder="Nome Sobrenome"
                 autoComplete="name"
-                className={getInputClassName("name", `${inputBase} uppercase`)}
+                className={getInputClassName("name", `${inputBase} capitalize`)}
               />
               <ValidationIcon isValid={validation.name} show={touched.name || false} />
             </div>
