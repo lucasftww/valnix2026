@@ -74,8 +74,8 @@ const AdBlockDetectorComponent = () => {
             variant="ghost"
             size="icon"
             onClick={handleDismiss}
-            className="h-8 w-8 rounded-full hover:bg-secondary flex-shrink-0 -mt-1 -mr-1"
-            aria-label="Fechar aviso"
+            className="h-10 w-10 rounded-full hover:bg-secondary flex-shrink-0 -mt-1 -mr-1"
+            aria-label="Fechar aviso de bloqueador de anúncios"
           >
             <X className="w-4 h-4" />
           </Button>

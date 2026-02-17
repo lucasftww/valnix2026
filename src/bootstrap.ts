@@ -48,26 +48,29 @@
   }
 })();
 
-// ── 3. Facebook Pixel Base — deferred to after page load ──
+// ── 3. Facebook Pixel Base — deferred with requestIdleCallback after load ──
 (function initFbPixel() {
   window.addEventListener('load', () => {
-    const f = window as any;
-    if (f.fbq) return;
-    const n: any = f.fbq = function () {
-      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-    };
-    if (!f._fbq) f._fbq = n;
-    n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
-    const t = document.createElement('script');
-    t.async = true;
-    t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-    const s = document.getElementsByTagName('script')[0];
-    s.parentNode!.insertBefore(t, s);
-    f.fbq('set', 'autoConfig', false, '1939179866693535');
-    f.fbq('init', '1939179866693535');
-    // PageView with deterministic event_id for CAPI dedup
-    const pvId = `pageview_${window.location.pathname}_${new Date().toISOString().slice(0, 13)}`;
-    f.fbq('track', 'PageView', {}, { eventID: pvId });
+    const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 2000));
+    ric(() => {
+      const f = window as any;
+      if (f.fbq) return;
+      const n: any = f.fbq = function () {
+        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+      };
+      if (!f._fbq) f._fbq = n;
+      n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+      const t = document.createElement('script');
+      t.async = true;
+      t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+      const s = document.getElementsByTagName('script')[0];
+      s.parentNode!.insertBefore(t, s);
+      f.fbq('set', 'autoConfig', false, '1939179866693535');
+      f.fbq('init', '1939179866693535');
+      // PageView with deterministic event_id for CAPI dedup
+      const pvId = `pageview_${window.location.pathname}_${new Date().toISOString().slice(0, 13)}`;
+      f.fbq('track', 'PageView', {}, { eventID: pvId });
+    });
   }, { once: true });
 })();
 

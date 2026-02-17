@@ -42,33 +42,36 @@ if (isProduction) {
     });
   }
 
-  try {
-    const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
-    const appCheck = initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-      isTokenAutoRefreshEnabled: true,
-    });
+  // Reduce Firestore SDK console noise in production
+  setLogLevel("error");
 
-    // Warmup: proactively get first token with timeout + cleanup
-    const warmup = (): Promise<void> => {
-      let timeoutId: ReturnType<typeof setTimeout>;
-      const timeout = new Promise<null>((resolve) => {
-        timeoutId = setTimeout(() => resolve(null), 8000);
+  // Defer App Check initialization to after first paint to avoid blocking LCP
+  const initAppCheckLazy = () => {
+    try {
+      const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
+      const appCheck = initializeAppCheck(app, {
+        provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+        isTokenAutoRefreshEnabled: true,
       });
 
-      return Promise.race([getToken(appCheck, false), timeout])
+      // Warmup with short timeout
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), 5000);
+      });
+
+      _appCheckReady = Promise.race([getToken(appCheck, false), timeout])
         .catch(() => null)
         .finally(() => clearTimeout(timeoutId!))
         .then(() => undefined);
-    };
+    } catch {
+      // Init failure — continue without App Check
+    }
+  };
 
-    _appCheckReady = warmup();
-  } catch {
-    // Sync init failure — continue without App Check
-  }
-
-  // Reduce Firestore SDK console noise in production
-  setLogLevel("error");
+  // Use requestIdleCallback to defer heavy reCAPTCHA loading
+  const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
+  ric(initAppCheckLazy);
 }
 
 export const appCheckReady = _appCheckReady;
