@@ -23,17 +23,24 @@ const app = initializeApp(firebaseConfig);
 const PRODUCTION_HOSTS = ["www.valnix.com.br", "valnix.com.br"];
 const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
+// Declare global flag for idempotent handler registration
+declare global {
+  interface Window { __valnix_unhandled_rejection_hooked?: boolean; }
+}
+
+let _appCheckReady: Promise<void> = Promise.resolve();
+
 if (isProduction) {
-  // ── Global safety net: suppress unhandled rejections from App Check / reCAPTCHA SDK ──
-  // The Firebase App Check SDK + reCAPTCHA internally reject promises on timeout/network
-  // that we cannot catch with try/catch (auto-refresh, internal retries).
-  // This filters ONLY those cases to avoid polluting the console without masking real bugs.
-  window.addEventListener("unhandledrejection", (event) => {
-    const msg = String(event.reason?.message || event.reason || "");
-    if (/Timeout \(b\)|AppCheck|recaptcha/i.test(msg)) {
-      event.preventDefault();
-    }
-  });
+  // ── Idempotent safety net: suppress unhandled rejections from App Check / reCAPTCHA SDK ──
+  if (!window.__valnix_unhandled_rejection_hooked) {
+    window.__valnix_unhandled_rejection_hooked = true;
+    window.addEventListener("unhandledrejection", (event) => {
+      const msg = String(event.reason?.message || event.reason || "");
+      if (/Timeout \(b\)|AppCheck|recaptcha/i.test(msg)) {
+        event.preventDefault();
+      }
+    });
+  }
 
   try {
     const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
@@ -42,16 +49,20 @@ if (isProduction) {
       isTokenAutoRefreshEnabled: true,
     });
 
-    // Warmup: proactively get first token with timeout
-    const warmupTimeout = new Promise<null>((resolve) =>
-      setTimeout(() => resolve(null), 8000)
-    );
-    Promise.race([
-      getToken(appCheck, false),
-      warmupTimeout,
-    ]).catch(() => {
-      // Silent: token failed (adblock/network/timeout)
-    });
+    // Warmup: proactively get first token with timeout + cleanup
+    const warmup = (): Promise<void> => {
+      let timeoutId: ReturnType<typeof setTimeout>;
+      const timeout = new Promise<null>((resolve) => {
+        timeoutId = setTimeout(() => resolve(null), 8000);
+      });
+
+      return Promise.race([getToken(appCheck, false), timeout])
+        .catch(() => null)
+        .finally(() => clearTimeout(timeoutId!))
+        .then(() => undefined);
+    };
+
+    _appCheckReady = warmup();
   } catch {
     // Sync init failure — continue without App Check
   }
@@ -60,7 +71,7 @@ if (isProduction) {
   setLogLevel("error");
 }
 
-export const appCheckReady = Promise.resolve();
+export const appCheckReady = _appCheckReady;
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache()
