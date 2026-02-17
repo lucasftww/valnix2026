@@ -183,26 +183,7 @@ export default defineConfig(({ mode }) => ({
       }
     },
     chunkSizeWarningLimit: 1000,
-    minify: 'terser',
-    terserOptions: {
-      compress: {
-        drop_console: true,
-        drop_debugger: true,
-        passes: 3,
-        pure_funcs: ['console.log', 'console.info', 'console.warn'],
-        dead_code: true,
-        collapse_vars: true,
-        reduce_vars: true,
-        hoist_funs: true,
-      },
-      mangle: {
-        safari10: true,
-        toplevel: true,
-      },
-      format: {
-        comments: false,
-      }
-    },
+    minify: 'esbuild',
     reportCompressedSize: false,
     target: 'es2020',
     cssMinify: true,

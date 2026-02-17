@@ -3,16 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Search, Bell, Settings, ChevronRight } from "lucide-react";
 
-// Direct imports — Admin page is already lazy-loaded from App.tsx
-// so all tabs load together in one chunk for instant tab switching
-import { AdminDashboard } from "@/components/admin/AdminDashboard";
-import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
-import { AdminProducts } from "@/components/admin/AdminProducts";
-import { AdminOrders } from "@/components/admin/AdminOrders";
-import { AdminUsers } from "@/components/admin/AdminUsers";
-import { AdminCategories } from "@/components/admin/AdminCategories";
-import { AdminCoupons } from "@/components/admin/AdminCoupons";
-import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
+import { lazy, Suspense } from "react";
+
+// Lazy load admin tabs — /admin is already lazy-loaded from App.tsx
+// Each tab loads its own chunk on demand for faster initial admin load
+const AdminDashboard = lazy(() => import("@/components/admin/AdminDashboard").then(m => ({ default: m.AdminDashboard })));
+const AdminAnalytics = lazy(() => import("@/components/admin/AdminAnalytics").then(m => ({ default: m.AdminAnalytics })));
+const AdminProducts = lazy(() => import("@/components/admin/AdminProducts").then(m => ({ default: m.AdminProducts })));
+const AdminOrders = lazy(() => import("@/components/admin/AdminOrders").then(m => ({ default: m.AdminOrders })));
+const AdminUsers = lazy(() => import("@/components/admin/AdminUsers").then(m => ({ default: m.AdminUsers })));
+const AdminCategories = lazy(() => import("@/components/admin/AdminCategories").then(m => ({ default: m.AdminCategories })));
+const AdminCoupons = lazy(() => import("@/components/admin/AdminCoupons").then(m => ({ default: m.AdminCoupons })));
+const AdminPostPaymentPages = lazy(() => import("@/components/admin/AdminPostPaymentPages").then(m => ({ default: m.AdminPostPaymentPages })));
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Input } from "@/components/ui/input";
@@ -190,14 +192,16 @@ export default function Admin() {
           {/* Main Content */}
           <main className="flex-1 overflow-auto">
             <div className="p-6 max-w-7xl mx-auto">
-                {mountedTabs.has("dashboard") && <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}><AdminDashboard /></div>}
-                {mountedTabs.has("analytics") && <div style={{ display: activeTab === "analytics" ? "block" : "none" }}><AdminAnalytics /></div>}
-                {mountedTabs.has("products") && <div style={{ display: activeTab === "products" ? "block" : "none" }}><AdminProducts /></div>}
-                {mountedTabs.has("categories") && <div style={{ display: activeTab === "categories" ? "block" : "none" }}><AdminCategories /></div>}
-                {mountedTabs.has("orders") && <div style={{ display: activeTab === "orders" ? "block" : "none" }}><AdminOrders /></div>}
-                {mountedTabs.has("users") && <div style={{ display: activeTab === "users" ? "block" : "none" }}><AdminUsers /></div>}
-                {mountedTabs.has("coupons") && <div style={{ display: activeTab === "coupons" ? "block" : "none" }}><AdminCoupons /></div>}
-                {mountedTabs.has("post-payment") && <div style={{ display: activeTab === "post-payment" ? "block" : "none" }}><AdminPostPaymentPages /></div>}
+                <Suspense fallback={<div className="flex items-center justify-center py-20"><div className="w-8 h-8 border-2 border-primary/20 border-t-primary rounded-full animate-spin" /></div>}>
+                  {mountedTabs.has("dashboard") && <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}><AdminDashboard /></div>}
+                  {mountedTabs.has("analytics") && <div style={{ display: activeTab === "analytics" ? "block" : "none" }}><AdminAnalytics /></div>}
+                  {mountedTabs.has("products") && <div style={{ display: activeTab === "products" ? "block" : "none" }}><AdminProducts /></div>}
+                  {mountedTabs.has("categories") && <div style={{ display: activeTab === "categories" ? "block" : "none" }}><AdminCategories /></div>}
+                  {mountedTabs.has("orders") && <div style={{ display: activeTab === "orders" ? "block" : "none" }}><AdminOrders /></div>}
+                  {mountedTabs.has("users") && <div style={{ display: activeTab === "users" ? "block" : "none" }}><AdminUsers /></div>}
+                  {mountedTabs.has("coupons") && <div style={{ display: activeTab === "coupons" ? "block" : "none" }}><AdminCoupons /></div>}
+                  {mountedTabs.has("post-payment") && <div style={{ display: activeTab === "post-payment" ? "block" : "none" }}><AdminPostPaymentPages /></div>}
+                </Suspense>
             </div>
           </main>
 
