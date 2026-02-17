@@ -325,7 +325,23 @@
     <!-- noscript pixel removed — no PageView event needed -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- UTMify: click tracking & link attribution only (conversions handled by CAPI) -->
-    <script defer src="https://cdn.utmify.com.br/scripts/utms/latest.js" data-utmify-prevent-xcod-sck data-utmify-prevent-subids></script>
+    <!-- UTMify: load once, skip admin/checkout, defer to idle -->
+    <script>
+      (function(){
+        var path = window.location.pathname;
+        if (/^\/(admin|checkout|card-callback)/.test(path)) return;
+        var ric = window.requestIdleCallback || function(cb){ setTimeout(cb, 200); };
+        ric(function(){
+          if (document.querySelector('script[data-utms="true"]')) return;
+          var s = document.createElement("script");
+          s.src = "https://cdn.utmify.com.br/scripts/utms/latest.js";
+          s.async = true;
+          s.dataset.utms = "true";
+          s.setAttribute("data-utmify-prevent-xcod-sck", "");
+          s.setAttribute("data-utmify-prevent-subids", "");
+          document.head.appendChild(s);
+        });
+      })();
+    </script>
   </body>
 </html>
