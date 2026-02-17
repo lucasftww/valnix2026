@@ -42,16 +42,17 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}'],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
         runtimeCaching: [
-          // UTMify latest.js — CacheFirst to block SDK self-reinject (multiple loads)
-          // First fetch is cached; all subsequent reinjects by the SDK are served from cache
+          // UTMify latest.js — cache to block SDK self-reinject (matches with or without query params)
           {
-            urlPattern: /^https:\/\/cdn\.utmify\.com\.br\/scripts\/utms\/latest\.js/i,
-            handler: 'CacheFirst',
+            urlPattern: ({ url }) =>
+              url.hostname === "cdn.utmify.com.br" &&
+              url.pathname === "/scripts/utms/latest.js",
+            handler: 'StaleWhileRevalidate',
             options: {
               cacheName: 'vendor-utmify-v1',
               expiration: {
-                maxEntries: 1,
-                maxAgeSeconds: 60 * 60 * 24 * 7 // 7 days
+                maxEntries: 2,
+                maxAgeSeconds: 60 * 60 * 24 // 1 day
               },
               cacheableResponse: {
                 statuses: [0, 200]
