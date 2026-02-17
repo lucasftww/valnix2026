@@ -128,7 +128,6 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const q = fs.query(couponsRef, fs.where("code", "==", code.toUpperCase()));
 
       // Inline resilient fetch with timeout
-      await config.appCheckReady;
       const firestorePromise = fs.getDocsFromServer(q);
       const timeout = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error("TIMEOUT")), 5000)
