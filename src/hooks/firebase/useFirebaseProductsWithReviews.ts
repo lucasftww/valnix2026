@@ -1,7 +1,8 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, doc, getDoc } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
+import { fetchProduct, shouldRetryProductFetch } from "@/lib/fetchProduct";
 import type { Category, Review, Product } from "@/types";
 
 import { generateConsistentSalesAndReviews } from "./useFirebaseProducts";
@@ -51,8 +52,8 @@ export const useProductsWithReviews = (category: string) => {
         } as ProductWithReviews;
       });
     },
-    staleTime: 30 * 60 * 1000, // 30 min - cache agressivo
-    gcTime: 60 * 60 * 1000,    // 1 hora
+    staleTime: 30 * 60 * 1000,
+    gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
   });
@@ -67,7 +68,6 @@ export const useCategoryBySlug = (slug: string | undefined) => {
       
       const categoriesQuery = query(
         collection(db, "categories"),
-        // Evita índice composto: filtra por slug e aplica is_active client-side
         where("slug", "==", slug)
       );
       
@@ -99,41 +99,17 @@ export const useCategoryBySlug = (slug: string | undefined) => {
   });
 };
 
-// Hook para buscar produto por ID
+// Hook para buscar produto por ID — uses shared fetchProduct
 export const useProductById = (productId: string | undefined) => {
   return useQuery({
     queryKey: ['product', productId],
-    queryFn: async (): Promise<Product | null> => {
-      if (!productId) return null;
-      
-      const ref = doc(db, "products", productId);
-
-      // Single getDoc (persistent cache checks local first, then network)
-      // On timeout, throw error so React Query shows isError + allows retry
-      const TIMEOUT_MS = 8000;
-      const result = await Promise.race([
-        getDoc(ref).catch((e) => { throw e; }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('PRODUCT_FETCH_TIMEOUT')), TIMEOUT_MS)
-        ),
-      ]);
-
-      if (!result.exists()) return null; // genuinely not found
-      const data = result.data();
-      if (!data.is_active) return null; // inactive product
-      return { id: result.id, ...data } as Product;
-    },
+    queryFn: () => fetchProduct(productId!),
     enabled: !!productId,
     staleTime: 10 * 60 * 1000,
     gcTime: 15 * 60 * 1000,
     refetchOnWindowFocus: false,
     refetchOnMount: false,
-    retry: (failureCount, error) => {
-      // Retry timeouts and network errors, not "not found"
-      if (failureCount >= 2) return false;
-      const msg = (error as Error)?.message || '';
-      return msg.includes('TIMEOUT') || msg.includes('unavailable') || msg.includes('network');
-    },
+    retry: (failureCount, error) => failureCount < 2 && shouldRetryProductFetch(error),
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });
 };
@@ -147,7 +123,6 @@ export const useProductReviews = (category: string | undefined) => {
       
       const reviewsQuery = query(
         collection(db, "product_reviews"),
-        // Evita índice composto: ordena client-side
         where("category", "==", category)
       );
       

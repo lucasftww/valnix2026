@@ -37,7 +37,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const revertedRef = useRef(new Set<string>());
 
   // ── Cached role check with TTL (avoids Firestore read every page load) ──
-  const ROLE_CACHE_KEY = 'valnix_role_cache';
+  const ROLE_CACHE_KEY = 'valnix_role_cache_v1';
   const ROLE_CACHE_TTL = 10 * 60 * 1000; // 10 min
 
   const getCachedRole = useCallback((uid: string): boolean | null => {
@@ -58,7 +58,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   useEffect(() => {
+    let alive = true;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      if (!alive) return;
       setUser(firebaseUser);
       setLoading(false);
       
@@ -95,9 +97,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         
         if (cachedAdmin !== null) {
           // Use cached value immediately for fast render
-          setIsAdmin(cachedAdmin);
+          if (alive) setIsAdmin(cachedAdmin);
           // Validate in background (non-blocking)
           getDoc(doc(db, "user_roles", firebaseUser.uid)).then((roleDoc) => {
+            if (!alive) return;
             const serverAdmin = roleDoc.exists() && roleDoc.data()?.role === "admin";
             if (serverAdmin !== cachedAdmin) {
               setIsAdmin(serverAdmin);
@@ -113,7 +116,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               new Promise<null>((r) => setTimeout(() => r(null), 3000)),
             ]);
             hasAdminRole = roleResult?.exists?.() && roleResult.data()?.role === "admin";
-            setIsAdmin(hasAdminRole);
+            if (alive) setIsAdmin(hasAdminRole);
             setCachedRole(firebaseUser.uid, hasAdminRole);
           } catch {
             setIsAdmin(false);
@@ -145,7 +148,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                         flagged_reason: "unauthorized_admin_revert",
                       });
                     } catch (revertErr) {
-                      console.error("Failed to revert rogue admin doc:", revertErr);
+                      console.warn("Could not revert users doc (likely permissions):", revertErr);
                     }
                   }
                 }
@@ -176,7 +179,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     });
 
-    return () => unsubscribe();
+    return () => { alive = false; unsubscribe(); };
   }, [getCachedRole, setCachedRole]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
