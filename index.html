@@ -325,43 +325,27 @@
     <!-- noscript pixel removed — no PageView event needed -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- UTMify: load once, skip admin/checkout, block SDK self-reinject -->
+    <!-- UTMify: load once, skip admin/checkout, defer to idle -->
     <script>
-      (function(){
-        var path = window.location.pathname;
-        if (/^\/(admin|checkout|card-callback)/.test(path)) return;
+    (function () {
+      var path = location.pathname;
+      if (/^\/(admin|checkout|card-callback)(\/|$)/.test(path)) return;
 
-        // Block UTMify SDK from re-injecting itself via dynamic <script> tags
-        var utmifyLoaded = false;
-        var observer = new MutationObserver(function(mutations) {
-          mutations.forEach(function(m) {
-            m.addedNodes.forEach(function(node) {
-              if (node.nodeName === 'SCRIPT' && node.src && /utmify\.com\.br.*latest\.js/i.test(node.src)) {
-                if (utmifyLoaded) {
-                  node.parentNode && node.parentNode.removeChild(node);
-                } else {
-                  utmifyLoaded = true;
-                }
-              }
-            });
-          });
-        });
-        observer.observe(document.documentElement, { childList: true, subtree: true });
+      if (window.__utmify_loaded) return;
+      window.__utmify_loaded = true;
 
-        // Load once via requestIdleCallback
-        var ric = window.requestIdleCallback || function(cb){ setTimeout(cb, 200); };
-        ric(function(){
-          if (document.querySelector('script[data-utms="true"]')) return;
-          utmifyLoaded = true;
-          var s = document.createElement("script");
-          s.src = "https://cdn.utmify.com.br/scripts/utms/latest.js";
-          s.async = true;
-          s.dataset.utms = "true";
-          s.setAttribute("data-utmify-prevent-xcod-sck", "");
-          s.setAttribute("data-utmify-prevent-subids", "");
-          document.head.appendChild(s);
-        });
-      })();
+      var load = function () {
+        var s = document.createElement("script");
+        s.src = "https://cdn.utmify.com.br/scripts/utms/latest.js";
+        s.async = true;
+        s.setAttribute("data-utmify-prevent-xcod-sck", "");
+        s.setAttribute("data-utmify-prevent-subids", "");
+        document.head.appendChild(s);
+      };
+
+      var ric = window.requestIdleCallback || function (cb) { setTimeout(cb, 200); };
+      ric(load);
+    })();
     </script>
   </body>
 </html>
