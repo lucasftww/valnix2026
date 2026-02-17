@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaEnterpriseProvider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -24,9 +24,9 @@ const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
 if (isProduction) {
   try {
-    const RECAPTCHA_SITE_KEY = "6Lfp5W4sAAAAIR-mL7hv-Q6BnE1MPQ1s3BiATit";
+    const RECAPTCHA_SITE_KEY = "COLE_SUA_CHAVE_V3_AQUI";
     initializeAppCheck(app, {
-      provider: new ReCaptchaEnterpriseProvider(RECAPTCHA_SITE_KEY),
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
     });
   } catch (err) {
