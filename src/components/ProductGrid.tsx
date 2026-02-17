@@ -1,12 +1,12 @@
 import { memo } from "react";
 import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
-import { useFeaturedProducts } from "@/hooks/firebase/useFirebaseProducts";
+import { useFeaturedProductsApi } from "@/hooks/useApiData";
 import { Button } from "./ui/button";
 import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "./ui/carousel";
 
 const ProductGridComponent = () => {
-  const { data: products = [], isLoading, error, refetch } = useFeaturedProducts();
+  const { data: products = [], isLoading, error, refetch } = useFeaturedProductsApi();
   
   if (isLoading) {
     return (

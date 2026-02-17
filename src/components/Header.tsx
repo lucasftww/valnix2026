@@ -6,7 +6,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { SearchBar } from "./SearchBar";
 import { CartSidebar } from "./CartSidebar";
-import { useCategories } from "@/hooks/firebase/useFirebaseCategories";
+import { useCategoriesApi } from "@/hooks/useApiData";
 import {
   Sheet,
   SheetContent,
@@ -21,7 +21,7 @@ const HeaderComponent = () => {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   
-  const { data: categories = [] } = useCategories();
+  const { data: categories = [] } = useCategoriesApi();
 
   const handleCloseMobileMenu = useCallback(() => {
     setMobileMenuOpen(false);
