@@ -17,16 +17,31 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize App Check with reCAPTCHA v3 BEFORE any Firestore calls
-// This MUST be synchronous — if lazy-loaded, queries fire without App Check token
-// and get rejected by enforcement. The actual reCAPTCHA script loads async internally.
-try {
-  initializeAppCheck(app, {
-    provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
-    isTokenAutoRefreshEnabled: true,
-  });
-} catch (e) {
-  console.warn("App Check initialization failed:", e);
+// Initialize App Check with reCAPTCHA v3 only on authorized domains
+// Preview/dev domains are NOT registered in reCAPTCHA, causing 401 errors
+// that block ALL Firestore queries when enforcement is active.
+const RECAPTCHA_AUTHORIZED_DOMAINS = [
+  "valnix.com.br",
+  "www.valnix.com.br",
+  "valnix2026.lovable.app",
+];
+
+const currentHost = window.location.hostname;
+const isAuthorizedDomain = RECAPTCHA_AUTHORIZED_DOMAINS.some(
+  (d) => currentHost === d || currentHost.endsWith("." + d)
+);
+
+if (isAuthorizedDomain) {
+  try {
+    initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
+      isTokenAutoRefreshEnabled: true,
+    });
+  } catch (e) {
+    console.warn("App Check initialization failed:", e);
+  }
+} else {
+  console.info("App Check skipped: domain not in authorized list");
 }
 
 // Initialize services with persistent local cache (IndexedDB)
