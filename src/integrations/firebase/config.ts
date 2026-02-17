@@ -23,55 +23,43 @@ const app = initializeApp(firebaseConfig);
 const PRODUCTION_HOSTS = ["www.valnix.com.br", "valnix.com.br"];
 const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 
-// Declare global flag for idempotent handler registration
-declare global {
-  interface Window { __valnix_unhandled_rejection_hooked?: boolean; }
-}
+// requestIdleCallback fallback for Safari (no global augmentation needed — just use at call site)
 
 let _appCheckReady: Promise<void> = Promise.resolve();
 
 if (isProduction) {
-  // ── Idempotent safety net: suppress unhandled rejections from App Check / reCAPTCHA SDK ──
-  if (!window.__valnix_unhandled_rejection_hooked) {
-    window.__valnix_unhandled_rejection_hooked = true;
-    window.addEventListener("unhandledrejection", (event) => {
-      const msg = String(event.reason?.message || event.reason || "");
-      if (/Timeout \(b\)|AppCheck|recaptcha/i.test(msg)) {
-        event.preventDefault();
-      }
-    });
-  }
-
   // Reduce Firestore SDK console noise in production
   setLogLevel("error");
 
-  // Defer App Check initialization to after first paint to avoid blocking LCP
-  const initAppCheckLazy = () => {
-    try {
-      const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
-      const appCheck = initializeAppCheck(app, {
-        provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
-        isTokenAutoRefreshEnabled: true,
-      });
+  // Initialize App Check synchronously (required before first Firestore call)
+  // but defer the warmup token fetch to avoid blocking LCP
+  try {
+    const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
+    const appCheck = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
 
-      // Warmup with short timeout
+    // Warmup token fetch — non-blocking, with timeout
+    // App Check is already registered above; this just pre-fetches the first token
+    const warmup = (): Promise<void> => {
       let timeoutId: ReturnType<typeof setTimeout>;
       const timeout = new Promise<null>((resolve) => {
         timeoutId = setTimeout(() => resolve(null), 5000);
       });
 
-      _appCheckReady = Promise.race([getToken(appCheck, false), timeout])
+      return Promise.race([getToken(appCheck, false), timeout])
         .catch(() => null)
         .finally(() => clearTimeout(timeoutId!))
         .then(() => undefined);
-    } catch {
-      // Init failure — continue without App Check
-    }
-  };
+    };
 
-  // Use requestIdleCallback to defer heavy reCAPTCHA loading
-  const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
-  ric(initAppCheckLazy);
+    // Defer warmup to after first paint, but App Check itself is already registered
+    const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
+    ric(() => { _appCheckReady = warmup(); });
+  } catch {
+    // Sync init failure — continue without App Check
+  }
 }
 
 export const appCheckReady = _appCheckReady;
