@@ -3,7 +3,7 @@ import { db, appCheckReady } from "@/integrations/firebase/config";
 import type { Product } from "@/types";
 import type { FirebaseError } from "firebase/app";
 
-const TIMEOUT_MS = 15000; // 15s — generous for cold starts + App Check
+const TIMEOUT_MS = 4000; // 4s — fast fail, race handles fallback
 
 /** Determine if a fetch error is retryable (timeout, network, quota) */
 export const shouldRetryProductFetch = (error: unknown): boolean => {
@@ -51,18 +51,8 @@ export async function fetchProduct(productId: string): Promise<Product | null> {
   try {
     snap = await attempt();
   } catch (err) {
-    // Retry once on timeout/network
-    if (shouldRetryProductFetch(err)) {
-      await new Promise((r) => setTimeout(r, 1500));
-      try {
-        snap = await attempt();
-      } catch {
-        // Both attempts failed — let caller handle fallback
-        throw err;
-      }
-    } else {
-      throw err;
-    }
+    // No internal retry — let the caller's race handle fallback
+    throw err;
   }
 
   if (!snap.exists()) return null;
