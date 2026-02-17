@@ -29,31 +29,25 @@ export const logFetchTimeout = (productId: string, error: unknown) => {
 /**
  * Shared product fetcher used by both useProductById hook and ProductCard prefetch.
  * - Single getDoc call (persistent cache checks local first, then network)
- * - Timeout throws error (not null) so caller can distinguish timeout vs not-found
- * - Retries once on timeout/network error
+ * - Timeout throws error so caller can distinguish timeout vs not-found
  * - Returns null for genuinely non-existent or inactive products
+ * - Catches losing promise to prevent "Uncaught (in promise)"
  */
 export async function fetchProduct(productId: string): Promise<Product | null> {
-  // Wait for App Check token before querying
   await appCheckReady;
   
   const ref = doc(db, "products", productId);
 
-  const attempt = (): Promise<DocumentSnapshot> =>
-    Promise.race<DocumentSnapshot>([
-      getDocFromServer(ref),
-      new Promise<never>((_, reject) =>
-        setTimeout(() => reject(new Error("PRODUCT_FETCH_TIMEOUT")), TIMEOUT_MS)
-      ),
-    ]);
+  const firestorePromise = getDocFromServer(ref);
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("PRODUCT_FETCH_TIMEOUT")), TIMEOUT_MS)
+  );
 
-  let snap: DocumentSnapshot;
-  try {
-    snap = await attempt();
-  } catch (err) {
-    // No internal retry — let the caller's race handle fallback
-    throw err;
-  }
+  // Prevent "Uncaught (in promise)" for the loser of the race
+  firestorePromise.catch(() => {});
+  timeoutPromise.catch(() => {});
+
+  const snap = await Promise.race<DocumentSnapshot>([firestorePromise, timeoutPromise]);
 
   if (!snap.exists()) return null;
   const data = snap.data();

@@ -5,18 +5,22 @@ const QUERY_TIMEOUT_MS = 4000; // 4s — fast fail, fallback handles the rest
 
 /**
  * Resilient Firestore fetch.
- * 1. Waits for App Check token to be ready (prevents "Missing permissions" errors)
- * 2. Fetches from server directly (avoids stale cache issues)
- * 3. NO retry — let the caller handle fallback quickly
+ * 1. Waits for App Check token to be ready
+ * 2. Fetches from server directly (avoids stale cache)
+ * 3. NO retry — caller handles fallback
+ * 4. Catches losing promise to prevent "Uncaught (in promise)"
  */
 export async function resilientGetDocs(q: Query): Promise<QuerySnapshot> {
-  // Wait for App Check token before any Firestore query
   await appCheckReady;
 
-  return Promise.race<QuerySnapshot>([
-    getDocsFromServer(q),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("FIRESTORE_QUERY_TIMEOUT")), QUERY_TIMEOUT_MS)
-    ),
-  ]);
+  const firestorePromise = getDocsFromServer(q);
+  const timeoutPromise = new Promise<never>((_, reject) =>
+    setTimeout(() => reject(new Error("FIRESTORE_QUERY_TIMEOUT")), QUERY_TIMEOUT_MS)
+  );
+
+  // Prevent "Uncaught (in promise)" for the loser of the race
+  firestorePromise.catch(() => {});
+  timeoutPromise.catch(() => {});
+
+  return Promise.race<QuerySnapshot>([firestorePromise, timeoutPromise]);
 }
