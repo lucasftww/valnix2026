@@ -92,6 +92,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
 
         // ── Check admin role — use local cache first, then validate in background ──
+        console.log("[Auth] Checking admin role for UID:", firebaseUser.uid, "Email:", firebaseUser.email);
         const cachedAdmin = getCachedRole(firebaseUser.uid);
         let hasAdminRole = cachedAdmin ?? false;
 
@@ -102,10 +103,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role&uid=${uid}`, {
               headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
             });
-            if (!res.ok) return false;
+            if (!res.ok) {
+              console.warn("[Auth] API role check failed with status:", res.status);
+              return false;
+            }
             const data = await res.json();
+            console.log("[Auth] API role check result:", data);
             return data.isAdmin === true;
-          } catch {
+          } catch (err) {
+            console.warn("[Auth] API role check error:", err);
             return false;
           }
         };
@@ -142,10 +148,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             ]);
             if (roleResult) {
               hasAdminRole = roleResult.exists?.() && roleResult.data()?.role === "admin";
+              console.log("[Auth] Firestore role result:", hasAdminRole, "exists:", roleResult.exists?.(), "data:", roleResult.data());
             } else {
               // Timeout — try API fallback
               console.warn("[Auth] Firestore role check timed out, trying API fallback");
               hasAdminRole = await checkRoleViaApi(firebaseUser.uid);
+              console.log("[Auth] API fallback admin result:", hasAdminRole);
             }
             if (alive) setIsAdmin(hasAdminRole);
             setCachedRole(firebaseUser.uid, hasAdminRole);
