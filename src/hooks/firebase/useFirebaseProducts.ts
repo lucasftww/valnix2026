@@ -77,6 +77,7 @@ export const useFeaturedProducts = () => {
         // Fallback to API proxy when Firestore is blocked (ad blocker)
         if (isBlockedByAdBlocker(err)) {
           console.info("[Products] Firestore blocked, using API fallback");
+          (window as any).__valnix_firestore_blocked = true;
           const products = await fetchFeaturedProductsFallback();
           return products
             .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))

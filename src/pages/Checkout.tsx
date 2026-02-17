@@ -111,12 +111,16 @@ export default function Checkout() {
     }
   }, [items.length, paymentData, navigate]);
 
-  // Track InitiateCheckout once when items are ready (not blind mount)
+  // Track InitiateCheckout once per session (persisted via sessionStorage)
   // NO form PII here — user hasn't typed yet. Only auth-known data.
-  const initiateCheckoutFiredRef = useRef(false);
+  const initiateCheckoutFiredRef = useRef(() => {
+    try { return sessionStorage.getItem('valnix_ic_fired') === '1'; } catch { return false; }
+  });
   useEffect(() => {
-    if (items.length > 0 && !initiateCheckoutFiredRef.current) {
-      initiateCheckoutFiredRef.current = true;
+    if (items.length > 0 && !initiateCheckoutFiredRef.current()) {
+      // Mark as fired in both ref and sessionStorage
+      initiateCheckoutFiredRef.current = () => true;
+      try { sessionStorage.setItem('valnix_ic_fired', '1'); } catch {}
       trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
       sendInitiateCheckout({
         userId: effectiveUserId,
@@ -128,7 +132,7 @@ export default function Checkout() {
         prices: items.map(i => i.price),
       });
     }
-  }, [items.length, finalPrice, effectiveUserId, user?.email]); // deps: wait for items + auth hydration
+  }, [items.length, finalPrice, effectiveUserId, user?.email]);
 
   // Load user profile
   useEffect(() => {
@@ -326,6 +330,7 @@ export default function Checkout() {
         });
 
         saveCheckoutDataToProfile();
+        try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
         clearCart();
 
         if (guestHash) {
@@ -394,6 +399,7 @@ export default function Checkout() {
         }));
 
         saveCheckoutDataToProfile();
+        try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
         clearCart();
         window.open(cardData.paymentUrl, '_blank');
         navigate(`/card-callback?order_id=${orderId}&payment_id=${cardData.paymentId}`);
@@ -458,6 +464,8 @@ export default function Checkout() {
       }
 
       saveCheckoutDataToProfile();
+      // Clear IC flag so a new checkout session can fire it again
+      try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
       setPaymentData({
         qrCodeText: pixData.brCode, transactionId: pixData.chargeId,
         amount: orderAmount, orderId, guestHash: pixGuestHash,
