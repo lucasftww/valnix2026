@@ -49,8 +49,12 @@ const ProductCardComponent = ({
     queryClient.prefetchQuery({
       queryKey: [QUERY_KEYS.PRODUCT, productId],
       queryFn: async () => {
-        const { fetchProduct } = await import("@/lib/fetchProduct");
-        return fetchProduct(productId);
+        try {
+          const { fetchProduct } = await import("@/lib/fetchProduct");
+          return await fetchProduct(productId);
+        } catch {
+          return null; // prefetch is best-effort — don't pollute cache with errors
+        }
       },
       ...CACHE_TIMES.MODERATE,
     });

@@ -125,11 +125,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
           // Non-blocking: handle users/profile docs in background
           (async () => {
+            if (!alive) return;
             try {
               const [userDoc, profileDoc] = await Promise.all([
                 getDoc(doc(db, "users", firebaseUser.uid)),
                 getDoc(doc(db, "profiles", firebaseUser.uid)),
               ]);
+
+              if (!alive) return;
 
               // ── AUTO-REVERT: If users doc claims admin but user_roles says no ──
               if (userDoc.exists()) {
@@ -152,7 +155,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                     }
                   }
                 }
-              } else {
+              } else if (alive) {
                 // New user — create users doc (non-admin)
                 await setDoc(doc(db, "users", firebaseUser.uid), {
                   email: firebaseUser.email,
@@ -161,6 +164,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                   created_at: new Date().toISOString(),
                 });
               }
+
+              if (!alive) return;
 
               if (!profileDoc.exists()) {
                 await setDoc(doc(db, "profiles", firebaseUser.uid), {
