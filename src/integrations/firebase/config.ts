@@ -1,5 +1,4 @@
 import { initializeApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
 import { initializeFirestore, memoryLocalCache, setLogLevel } from "firebase/firestore";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
@@ -21,7 +20,6 @@ if (PRODUCTION_HOSTS.includes(window.location.hostname)) {
   setLogLevel("error");
 }
 
-export const auth = getAuth(app);
 export const db = initializeFirestore(app, {
   localCache: memoryLocalCache()
 });

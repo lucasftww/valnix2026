@@ -33,21 +33,17 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
 
         try {
           const { invokeFunction } = await import("@/lib/apiHelper");
-          const { auth } = await import("@/integrations/firebase/config");
-          const currentUser = auth.currentUser;
-          const idToken = currentUser ? await currentUser.getIdToken() : null;
-
-          if (!idToken) {
-            console.warn(`⚠️ No admin auth token for card verify ${order.id}`);
+          const { requireAdminToken } = await import("@/lib/adminAuth");
+          let token: string;
+          try { token = requireAdminToken(); } catch { 
+            console.warn(`⚠️ No admin token for card verify ${order.id}`);
             continue;
           }
 
-          // Call server-side confirm which verifies payment, marks paid,
-          // calls process-delivery, increments coupon, fires analytics
           const response = await invokeFunction('flowpay-card', {
             method: 'POST',
             queryParams: { action: 'confirm' },
-            headers: { 'Authorization': `Bearer ${idToken}` },
+            headers: { 'x-admin-token': token },
             body: { orderId: order.id, paymentId: order.flowpay_charge_id },
           });
           const data = await response.json();

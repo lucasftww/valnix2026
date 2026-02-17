@@ -27,7 +27,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { useAdminUsers, useUserOrders, updateUserBalance, deleteFirebaseUser, type FirebaseUser } from "@/hooks/firebase/useFirebaseUsers";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
@@ -118,13 +118,11 @@ export const AdminUsers = () => {
     if (!confirm("Tem certeza? Isso vai remover perfis órfãos (sem conta no Firebase Auth) e emails bloqueados.")) return;
     setCleaningUp(true);
     try {
-      const user = auth.currentUser;
-      if (!user) throw new Error("Not authenticated");
-      const token = await user.getIdToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "POST",
         queryParams: { resource: "cleanup-users" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
         body: {},
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

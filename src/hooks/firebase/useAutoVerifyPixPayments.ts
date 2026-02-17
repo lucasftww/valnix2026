@@ -1,6 +1,5 @@
 import { useEffect, useRef } from 'react';
 import type { Order } from './useFirebaseOrders';
-import { auth } from '@/integrations/firebase/config';
 
 /**
  * Auto-verifies pending PIX payments by calling the FlowPay status endpoint.
@@ -27,12 +26,6 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
     if (!pendingPixOrders.length) return;
 
     const verifyOrders = async () => {
-      // 🔒 Pass Firebase auth token so server-side fallback can trigger side-effects
-      const currentUser = auth.currentUser;
-      const idToken = currentUser ? await currentUser.getIdToken() : null;
-      const headers: Record<string, string> = {};
-      if (idToken) headers['Authorization'] = `Bearer ${idToken}`;
-
       for (const order of pendingPixOrders) {
         verifiedRef.current.add(order.id);
         
@@ -41,7 +34,6 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           const response = await invokeFunction('flowpay-pix', {
             method: 'GET',
             queryParams: { action: 'status', chargeId: order.flowpay_charge_id, orderId: order.id },
-            headers,
           });
           const data = await response.json();
 

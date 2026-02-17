@@ -1,5 +1,5 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
@@ -21,17 +21,7 @@ import {
 const formatCurrency = (value: number) =>
   value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-
-
-const getFirebaseToken = async () => {
-  const user = auth.currentUser;
-  if (!user) throw new Error("Not authenticated");
-  return user.getIdToken();
-};
-
 type Period = 'today' | '7d' | '30d';
-
-// Stats are now aggregated server-side
 
 export const AdminDashboard = () => {
   const queryClient = useQueryClient();
@@ -40,11 +30,11 @@ export const AdminDashboard = () => {
   const { data: rawData, isLoading, refetch, isFetching } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction("admin-data", {
         method: "GET",
         queryParams: { resource: "dashboard-stats" },
-        headers: { "x-firebase-token": token },
+        headers: { "x-admin-token": token },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();

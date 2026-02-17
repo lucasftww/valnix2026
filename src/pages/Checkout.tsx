@@ -4,7 +4,6 @@ import { useCart, CartItem } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
-import { auth } from "@/integrations/firebase/config";
 
 import { Loader2 } from "lucide-react";
 import { PixPayment } from "@/components/checkout/PixPayment";
@@ -63,7 +62,6 @@ interface PaymentData {
 
 export default function Checkout() {
   const { items, totalPrice, finalPrice, discount, appliedCoupon, clearCart, applyCoupon, removeCoupon, removeItem, updateQuantity } = useCart();
-  const user = auth.currentUser;
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -82,15 +80,14 @@ export default function Checkout() {
   const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Generate a stable guest ID for non-logged users
+  // Generate a stable guest ID
   const guestId = useMemo(() => {
-    if (user) return null;
     const stored = sessionStorage.getItem('valnix_guest_id');
     if (stored) return stored;
     const id = `guest_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
     sessionStorage.setItem('valnix_guest_id', id);
     return id;
-  }, [user]);
+  }, []);
 
   // Read UTM params from sessionStorage
   const utmParams = useMemo(() => {
@@ -101,7 +98,7 @@ export default function Checkout() {
     return {} as Record<string, string>;
   }, []);
 
-  const effectiveUserId = user?.uid || guestId || 'guest';
+  const effectiveUserId = guestId || 'guest';
 
   // Redirect if cart is empty (and not on payment screen)
   useEffect(() => {
@@ -131,14 +128,13 @@ export default function Checkout() {
     trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
     sendInitiateCheckout({
       userId: effectiveUserId,
-      userEmail: user?.email || undefined,
       value: finalPrice,
       productNames: items.map(i => i.name),
       productIds: items.map(i => i.id),
       quantities: items.map(i => i.quantity),
       prices: items.map(i => i.price),
     });
-  }, [items, finalPrice, effectiveUserId, user?.email]);
+  }, [items, finalPrice, effectiveUserId]);
 
   // Clear IC flag when cart empties (allows re-fire on new checkout)
   useEffect(() => {
@@ -148,20 +144,7 @@ export default function Checkout() {
     }
   }, [items.length]);
 
-  // Pre-fill form with auth data if available (admin testing)
-  useEffect(() => {
-    if (!user) return;
-    setFormData(prev => {
-      if (prev.email) return prev;
-      const updated = {
-        ...prev,
-        name: prev.name || user.displayName || "",
-        email: prev.email || user.email || "",
-      };
-      try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
-      return updated;
-    });
-  }, [user]);
+
 
   const validation = useMemo(() => ({
     name: formData.name.trim().length >= 3 && formData.name.trim().split(' ').length >= 2,
@@ -242,7 +225,7 @@ export default function Checkout() {
       // ─── CARD PAYMENT ────────────────────────────────────────────────
       if (paymentMethod === "card") {
         const cpfDigits = formData.document.replace(/\D/g, '');
-        const cardToken = user ? await user.getIdToken() : null;
+        const cardToken = null;
         const orderItemsData = items.map(item => ({
           product_id: item.id, product_name: item.name, product_image: item.image,
           quantity: item.quantity, unit_price: item.price, total_price: item.price * item.quantity,
@@ -252,7 +235,7 @@ export default function Checkout() {
         const { orderId, guestHash: _cardHash } = await createOrderServerSide({
           user_id: effectiveUserId,
           customer_name: formData.name,
-          customer_email: formData.email || user?.email || "",
+          customer_email: formData.email || "",
           customer_phone: formData.phone || "",
           total_amount: orderAmount,
           notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Cartão` : "Cartão",
@@ -273,7 +256,7 @@ export default function Checkout() {
             amount: Math.round(orderAmount * 100), orderId,
             description: `Pedido ${orderId.substring(0, 8)}`,
             customer: {
-              name: formData.name, email: formData.email || user?.email || undefined,
+              name: formData.name, email: formData.email || undefined,
               phone: formData.phone || undefined, taxId: cpfDigits,
             },
           },
@@ -286,7 +269,7 @@ export default function Checkout() {
         const deliveryToken = cardData.deliveryToken || null;
         sessionStorage.setItem('valnix_card_payment', JSON.stringify({
           orderId, paymentId: cardData.paymentId, deliveryToken, guestHash: _cardHash,
-          customerName: formData.name, customerEmail: formData.email || user?.email || "",
+          customerName: formData.name, customerEmail: formData.email || "",
           customerPhone: formData.phone || "", userId: effectiveUserId,
           productNames: items.map(i => i.name),
           productIds: items.map(i => i.id),
@@ -306,7 +289,7 @@ export default function Checkout() {
 
       // ─── PIX PAYMENT ─────────────────────────────────────────────────
       const cpfDigits = formData.document.replace(/\D/g, '');
-      const firebaseIdToken = user ? await user.getIdToken() : null;
+      const firebaseIdToken = null;
       const orderItemsData = items.map(item => ({
         product_id: item.id, product_name: item.name, product_image: item.image,
         quantity: item.quantity, unit_price: item.price, total_price: item.price * item.quantity,
@@ -316,7 +299,7 @@ export default function Checkout() {
       const { orderId, guestHash: pixGuestHash } = await createOrderServerSide({
         user_id: effectiveUserId,
         customer_name: formData.name,
-        customer_email: formData.email || user?.email || "",
+        customer_email: formData.email || "",
         customer_phone: formData.phone || "",
         total_amount: orderAmount,
         notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
@@ -333,12 +316,12 @@ export default function Checkout() {
       const pixResponse = await invokeFunction('flowpay-pix', {
         method: 'POST',
         queryParams: { action: 'create' },
-        headers: firebaseIdToken ? { 'Authorization': `Bearer ${firebaseIdToken}` } : {},
+        headers: {},
         body: {
           amount: Math.round(orderAmount * 100), orderId,
           description: `Pedido ${orderId.substring(0, 8)}`,
           customer: {
-            name: formData.name, email: formData.email || user?.email || undefined,
+            name: formData.name, email: formData.email || undefined,
             phone: formData.phone || undefined, taxId: cpfDigits,
           },
         },
@@ -376,7 +359,7 @@ export default function Checkout() {
       setLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, clearCart, navigate, user, effectiveUserId]);
+  }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, clearCart, navigate, effectiveUserId]);
 
   // ─── PIX PAYMENT SCREEN ────────────────────────────────────────────────
   if (paymentData) {
@@ -393,7 +376,7 @@ export default function Checkout() {
               amount={paymentData.amount}
               orderId={paymentData.orderId}
               guestHash={paymentData.guestHash || undefined}
-              customerEmail={formData.email || user?.email || undefined}
+              customerEmail={formData.email || undefined}
               customerName={formData.name || undefined}
               customerId={effectiveUserId}
               productNames={items.map(item => item.name)}
