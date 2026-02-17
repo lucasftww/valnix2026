@@ -135,13 +135,17 @@ export const useProduct = (productId: string | undefined) => {
 
       // Try cache first (no network/App Check needed)
       try {
-        const cached = await withTimeout(getDocFromCache(docRef(db, "products", productId)), 3000);
-        if (cached && cached.exists()) return { id: cached.id, ...cached.data() };
+        const cached = await withTimeout(getDocFromCache(docRef(db, "products", productId)), 2000);
+        if (cached && cached.exists()) {
+          const data = cached.data();
+          if (!data.is_active) return null;
+          return { id: cached.id, ...data };
+        }
       } catch { /* cache miss */ }
 
       // Try default getDoc with timeout
       try {
-        const productDoc = await withTimeout(getDoc(docRef(db, "products", productId)), 8000);
+        const productDoc = await withTimeout(getDoc(docRef(db, "products", productId)), 6000);
         if (productDoc && productDoc.exists()) {
           const data = productDoc.data();
           if (!data.is_active) return null;
@@ -151,7 +155,7 @@ export const useProduct = (productId: string | undefined) => {
 
       // Force server with timeout  
       try {
-        const serverDoc = await withTimeout(getDocFromServer(docRef(db, "products", productId)), 8000);
+        const serverDoc = await withTimeout(getDocFromServer(docRef(db, "products", productId)), 6000);
         if (serverDoc && serverDoc.exists()) {
           const data = serverDoc.data();
           if (!data.is_active) return null;

@@ -113,7 +113,7 @@ export const useProductById = (productId: string | undefined) => {
 
       // Try cache first
       try {
-        const cached = await withTimeout(getDocFromCache(ref), 3000);
+        const cached = await withTimeout(getDocFromCache(ref), 2000);
         if (cached && cached.exists()) {
           const data = cached.data();
           if (!data.is_active) return null;
@@ -123,7 +123,7 @@ export const useProductById = (productId: string | undefined) => {
 
       // Try default getDoc with timeout
       try {
-        const productDoc = await withTimeout(getDoc(ref), 8000);
+        const productDoc = await withTimeout(getDoc(ref), 6000);
         if (productDoc && productDoc.exists()) {
           const data = productDoc.data();
           if (!data.is_active) return null;
@@ -133,7 +133,7 @@ export const useProductById = (productId: string | undefined) => {
 
       // Force server
       try {
-        const serverDoc = await withTimeout(getDocFromServer(ref), 8000);
+        const serverDoc = await withTimeout(getDocFromServer(ref), 6000);
         if (serverDoc && serverDoc.exists()) {
           const data = serverDoc.data();
           if (!data.is_active) return null;
