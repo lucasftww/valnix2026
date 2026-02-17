@@ -84,7 +84,19 @@ export const CategoryManager = () => {
   };
 
   useEffect(() => {
-    loadCategories();
+    // Wait for Firebase Auth to be ready before loading
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (user) {
+        loadCategories();
+        unsubscribe();
+      }
+    });
+    // If user is already authenticated, load immediately
+    if (auth.currentUser) {
+      unsubscribe();
+      loadCategories();
+    }
+    return () => unsubscribe();
   }, []);
 
   const invalidate = () => {
