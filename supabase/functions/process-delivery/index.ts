@@ -293,7 +293,7 @@ Deno.serve(async (req) => {
     }
 
     // ── Validate order exists and is paid ──
-    const orderDoc = await getFirestoreDoc('guest_orders', orderId);
+    const orderDoc = await getFirestoreDoc('ordens', orderId);
     if (!orderDoc?.fields) {
       return new Response(JSON.stringify({ success: false, error: 'Order not found' }),
         { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -320,7 +320,7 @@ Deno.serve(async (req) => {
         const ageMs = Date.now() - new Date(tokenCreatedAt).getTime();
         if (ageMs > 10 * 60 * 1000) {
           console.warn(`🚫 [${orderId}] delivery_token expired (age: ${Math.round(ageMs / 1000)}s)`);
-          try { await updateFirestoreDoc('guest_orders', orderId, { delivery_token: null }); } catch {}
+          try { await updateFirestoreDoc('ordens', orderId, { delivery_token: null }); } catch {}
           return new Response(JSON.stringify({ success: false, error: 'Forbidden: delivery token expired' }),
             { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
@@ -328,7 +328,7 @@ Deno.serve(async (req) => {
       // Anti-race: claim token with unique consumer ID, then verify ownership
       const consumerId = crypto.randomUUID();
       try {
-        await updateFirestoreDoc('guest_orders', orderId, {
+        await updateFirestoreDoc('ordens', orderId, {
           delivery_token: null,
           delivery_token_created_at: null,
           delivery_token_consumer: consumerId,
@@ -340,7 +340,7 @@ Deno.serve(async (req) => {
           { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       }
       // Verify we won the race (last-writer-wins → only our consumerId should be there)
-      const recheck = await getFirestoreDoc('guest_orders', orderId);
+      const recheck = await getFirestoreDoc('ordens', orderId);
       const actualConsumer = recheck?.fields?.delivery_token_consumer?.stringValue;
       if (actualConsumer !== consumerId) {
         console.warn(`🚫 [${orderId}] delivery_token race lost (winner: ${actualConsumer}, ours: ${consumerId})`);
@@ -358,7 +358,7 @@ Deno.serve(async (req) => {
 
     // ── Get order items from subcollection ──
     const accessToken = await getFirebaseAccessToken();
-    const itemsListUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=100`;
+    const itemsListUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=100`;
     const itemsListRes = await fetch(itemsListUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
     const itemsResults = itemsListRes.ok ? (await itemsListRes.json()).documents?.map((doc: any) => ({ document: doc })) || [] : [];
     if (!itemsResults || !Array.isArray(itemsResults) || itemsResults.length === 0) {
@@ -410,7 +410,7 @@ Deno.serve(async (req) => {
         const codes: string[] = [];
         for (let i = 0; i < quantity; i++) codes.push(generateFakeDeliveryCode(productCategory));
         const codeStr = codes.join(',');
-        await updateFirestoreDoc(`guest_orders/${orderId}/items`, itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
+        await updateFirestoreDoc(`ordens/${orderId}/items`, itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
         results.push({ itemId, productId, status: 'delivered', codes: codeStr });
         deliveredCount++;
         console.log(`✅ [${orderId}] auto_fake: ${codes.length} code(s) → item ${itemId}`);
@@ -459,7 +459,7 @@ Deno.serve(async (req) => {
 
           // Step 2: Write delivery code to order_item
           try {
-            await updateFirestoreDoc(`guest_orders/${orderId}/items`, itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
+            await updateFirestoreDoc(`ordens/${orderId}/items`, itemId, { delivery_code: codeStr, delivered_at: new Date().toISOString() });
           } catch (writeErr) {
             // COMPENSATE: best-effort reinsert codes back into product
             console.error(`❌ [${orderId}] Failed to write delivery_code to item ${itemId}, compensating...`, writeErr);
@@ -495,7 +495,7 @@ Deno.serve(async (req) => {
     let orderStatus = orderDoc.fields.status?.stringValue || 'processing';
 
     if (allItemsHandled) {
-      await updateFirestoreDoc('guest_orders', orderId, { status: 'completed', updated_at: new Date().toISOString() });
+      await updateFirestoreDoc('ordens', orderId, { status: 'completed', updated_at: new Date().toISOString() });
       orderStatus = 'completed';
       console.log(`✅ [${orderId}] Order auto-completed (all ${deliveredCount} items delivered)`);
     }

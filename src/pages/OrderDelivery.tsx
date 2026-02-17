@@ -356,7 +356,7 @@ export default function OrderDelivery() {
 
   // No longer need single upsell config — UpsellSequence handles it
 
-  // Fetch guest order + items via Edge Function (Firestore is deny-all for guest_orders)
+  // Fetch guest order + items via Edge Function (Firestore is deny-all for ordens)
   useEffect(() => {
     if (!hash) { setNotFound(true); setLoading(false); return; }
 

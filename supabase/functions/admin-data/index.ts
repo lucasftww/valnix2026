@@ -189,7 +189,7 @@ async function queryOrdersSince(cutoffISO: string): Promise<any[]> {
 
   for (let page = 0; page < 40; page++) {
     const structuredQuery: any = {
-      from: [{ collectionId: 'guest_orders' }],
+      from: [{ collectionId: 'ordens' }],
       where: {
         fieldFilter: {
           field: { fieldPath: 'created_at' },
@@ -224,7 +224,7 @@ async function queryOrdersSince(cutoffISO: string): Promise<any[]> {
       // Fallback: if index doesn't exist, use unpaginated query with simple filter
       console.warn(`⚠️ Paginated order query failed (page ${page}), falling back to simple query`);
       if (page === 0) {
-        return queryCollectionFiltered('guest_orders', 'created_at', 'GREATER_THAN_OR_EQUAL', { stringValue: cutoffISO });
+        return queryCollectionFiltered('ordens', 'created_at', 'GREATER_THAN_OR_EQUAL', { stringValue: cutoffISO });
       }
       break;
     }
@@ -408,7 +408,7 @@ Deno.serve(async (req) => {
         const [profiles, users, orders] = await Promise.all([
           queryCollection("profiles"),
           queryCollection("users"),
-          queryCollection("guest_orders"),
+          queryCollection("ordens"),
         ]);
 
         // Build order stats per user
@@ -459,7 +459,7 @@ Deno.serve(async (req) => {
         if (!userId) return new Response(JSON.stringify({ error: "userId required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-        const orders = await queryCollectionFiltered("guest_orders", "user_id", "EQUAL", { stringValue: userId });
+        const orders = await queryCollectionFiltered("ordens", "user_id", "EQUAL", { stringValue: userId });
         orders.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
 
         return new Response(JSON.stringify({ orders: orders.slice(0, 10) }),
@@ -496,7 +496,7 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "orders") {
-        const orders = await queryCollection("guest_orders");
+        const orders = await queryCollection("ordens");
         // Convert Firestore timestamps
         for (const o of orders) {
           if (o.created_at && typeof o.created_at === 'object' && o.created_at.seconds) {
@@ -517,9 +517,9 @@ Deno.serve(async (req) => {
         if (!orderId) return new Response(JSON.stringify({ error: "orderId required" }),
           { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
-        // Read items from subcollection guest_orders/{orderId}/items
+        // Read items from subcollection ordens/{orderId}/items
         const accessToken = await getFirebaseAccessToken();
-        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=100`;
+        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=100`;
         const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
         let items: any[] = [];
         if (itemsRes.ok) {
@@ -606,7 +606,7 @@ Deno.serve(async (req) => {
         const accessTokenItems = await getFirebaseAccessToken();
         const itemBatches = await Promise.all(allPaid.map(async (order: any) => {
           try {
-            const iUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${order.id}/items?pageSize=50`;
+            const iUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${order.id}/items?pageSize=50`;
             const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${accessTokenItems}` } });
             if (!iRes.ok) return [];
             const iData = await iRes.json();
@@ -932,11 +932,11 @@ Deno.serve(async (req) => {
         }
 
         // Firestore is case-sensitive — query both lowercase and original casing
-        const ordersLower = await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: email });
+        const ordersLower = await queryCollectionFiltered("ordens", "customer_email", "EQUAL", { stringValue: email });
         const ordersOriginal = rawEmail !== email
-          ? await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: rawEmail })
+          ? await queryCollectionFiltered("ordens", "customer_email", "EQUAL", { stringValue: rawEmail })
           : [];
-        const ordersUpper = await queryCollectionFiltered("guest_orders", "customer_email", "EQUAL", { stringValue: email.toUpperCase() });
+        const ordersUpper = await queryCollectionFiltered("ordens", "customer_email", "EQUAL", { stringValue: email.toUpperCase() });
         const seenIds = new Set<string>();
         const orders: typeof ordersLower = [];
         for (const o of [...ordersLower, ...ordersOriginal, ...ordersUpper]) {
@@ -954,49 +954,49 @@ Deno.serve(async (req) => {
           try {
             // Delete subcollection items first
             const accessToken = await getFirebaseAccessToken();
-            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${order.id}/items`;
+            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${order.id}/items`;
             const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             if (itemsRes.ok) {
               const itemsData = await itemsRes.json();
               for (const item of (itemsData.documents || [])) {
                 const itemId = item.name.split('/').pop()!;
-                await deleteFirestoreDoc(`guest_orders/${order.id}/items`, itemId);
+                await deleteFirestoreDoc(`ordens/${order.id}/items`, itemId);
                 deletedItems++;
               }
             }
             // Delete the order itself
-            await deleteFirestoreDoc("guest_orders", order.id);
+            await deleteFirestoreDoc("ordens", order.id);
           } catch (err: any) {
             errors.push(`order ${order.id}: ${err.message || err}`);
           }
         }
 
-        // Also clean guest_orders matching this email (including subcollection items)
+        // Also clean ordens matching this email via "email" field (including subcollection items)
         let deletedGuest = 0;
         try {
-          const guestLower = await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: email });
-          const guestUpper = email !== email.toUpperCase() ? await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: email.toUpperCase() }) : [];
-          const guestOriginal = rawEmail !== email ? await queryCollectionFiltered("guest_orders", "email", "EQUAL", { stringValue: rawEmail }) : [];
+          const guestLower = await queryCollectionFiltered("ordens", "email", "EQUAL", { stringValue: email });
+          const guestUpper = email !== email.toUpperCase() ? await queryCollectionFiltered("ordens", "email", "EQUAL", { stringValue: email.toUpperCase() }) : [];
+          const guestOriginal = rawEmail !== email ? await queryCollectionFiltered("ordens", "email", "EQUAL", { stringValue: rawEmail }) : [];
           const guestSeen = new Set<string>();
           const guestOrders = [...guestLower, ...guestUpper, ...guestOriginal].filter(g => { if (guestSeen.has(g.id)) return false; guestSeen.add(g.id); return true; });
           for (const g of guestOrders) {
             // Delete subcollection items first
             try {
               const accessToken = await getFirebaseAccessToken();
-              const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${g.id}/items`;
+              const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${g.id}/items`;
               const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
               if (itemsRes.ok) {
                 const itemsData = await itemsRes.json();
                 for (const item of (itemsData.documents || [])) {
                   const itemId = item.name.split('/').pop()!;
-                  await deleteFirestoreDoc(`guest_orders/${g.id}/items`, itemId);
+                  await deleteFirestoreDoc(`ordens/${g.id}/items`, itemId);
                 }
               }
             } catch { /* subcollection may not exist */ }
-            await deleteFirestoreDoc("guest_orders", g.id);
+            await deleteFirestoreDoc("ordens", g.id);
             deletedGuest++;
           }
-        } catch { /* guest_orders may not exist */ }
+        } catch { /* ordens may not exist */ }
 
         // Also clean sale_addons
         let deletedAddons = 0;
@@ -1130,7 +1130,7 @@ Deno.serve(async (req) => {
           if (ORDERS_EDITABLE_FIELDS.includes(key)) safeBody[key] = body[key];
         }
         safeBody['updated_at'] = new Date().toISOString();
-        const success = await updateFirestoreDoc("guest_orders", docId, safeBody);
+        const success = await updateFirestoreDoc("ordens", docId, safeBody);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -1149,7 +1149,7 @@ Deno.serve(async (req) => {
         if (safeBody.delivery_code && !safeBody.delivered_at) {
           safeBody.delivered_at = new Date().toISOString();
         }
-        const success = await updateFirestoreDoc(`guest_orders/${orderId}/items`, docId, safeBody);
+        const success = await updateFirestoreDoc(`ordens/${orderId}/items`, docId, safeBody);
 
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -1196,7 +1196,7 @@ Deno.serve(async (req) => {
         // Read current order for audit
         try {
           const accessToken = await getFirebaseAccessToken();
-          const orderUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${docId}`;
+          const orderUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${docId}`;
           const orderRes = await fetch(orderUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
           const orderData = orderRes.ok ? await orderRes.json() : null;
           const prevPaymentStatus = orderData?.fields?.payment_status?.stringValue ?? 'unknown';
@@ -1234,7 +1234,7 @@ Deno.serve(async (req) => {
         };
         if (newStatus) updateData.status = newStatus;
 
-        const success = await updateFirestoreDoc("guest_orders", docId, updateData);
+        const success = await updateFirestoreDoc("ordens", docId, updateData);
         return new Response(JSON.stringify({ success }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
@@ -1293,20 +1293,20 @@ Deno.serve(async (req) => {
 
         // 3. Also delete user's orders and order_items
         try {
-          const userOrders = await queryCollectionFiltered("guest_orders", "user_id", "EQUAL", { stringValue: docId });
+          const userOrders = await queryCollectionFiltered("ordens", "user_id", "EQUAL", { stringValue: docId });
           for (const order of userOrders) {
             // Delete subcollection items
             const accessToken = await getFirebaseAccessToken();
-            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${order.id}/items`;
+            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${order.id}/items`;
             const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
             if (itemsRes.ok) {
               const itemsData = await itemsRes.json();
               await Promise.allSettled((itemsData.documents || []).map((item: any) => {
                 const itemId = item.name.split('/').pop()!;
-                return deleteFirestoreDoc(`guest_orders/${order.id}/items`, itemId);
+                return deleteFirestoreDoc(`ordens/${order.id}/items`, itemId);
               }));
             }
-            await deleteFirestoreDoc("guest_orders", order.id);
+            await deleteFirestoreDoc("ordens", order.id);
           }
           console.log(`🗑️ Deleted ${userOrders.length} orders for user ${docId}`);
         } catch (orderErr) {
@@ -1320,16 +1320,16 @@ Deno.serve(async (req) => {
       if (resource === "orders") {
         // Delete order subcollection items first, then the order
         const accessToken = await getFirebaseAccessToken();
-        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${docId}/items`;
+        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${docId}/items`;
         const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
         if (itemsRes.ok) {
           const itemsData = await itemsRes.json();
           for (const item of (itemsData.documents || [])) {
             const itemId = item.name.split('/').pop()!;
-            await deleteFirestoreDoc(`guest_orders/${docId}/items`, itemId);
+            await deleteFirestoreDoc(`ordens/${docId}/items`, itemId);
           }
         }
-        await deleteFirestoreDoc("guest_orders", docId);
+        await deleteFirestoreDoc("ordens", docId);
         return new Response(JSON.stringify({ success: true }),
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }

@@ -298,7 +298,7 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
   let parentPhone: string | undefined;
   let parentEventSourceUrl: string | undefined;
   try {
-    const parentOrder = await getFirestoreDoc('guest_orders', orderId);
+    const parentOrder = await getFirestoreDoc('ordens', orderId);
     if (parentOrder) {
       parentFbc = parentOrder.fbc?.stringValue || undefined;
       parentFbp = parentOrder.fbp?.stringValue || undefined;
@@ -512,7 +512,7 @@ Deno.serve(async (req) => {
       console.log(`💰 Payment confirmed for charge: ${chargeId}, value: ${paidValue}`);
 
       // Find order in Firestore
-      const queryResults = await queryFirestore('guest_orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+      const queryResults = await queryFirestore('ordens', 'flowpay_charge_id', 'EQUAL', chargeId);
 
       if (!queryResults || !queryResults[0]?.document) {
         // Check if it's an upsell addon in Firestore
@@ -543,7 +543,7 @@ Deno.serve(async (req) => {
       const customerEmail = orderFields?.customer_email?.stringValue;
       const userId = orderFields?.user_id?.stringValue;
 
-      await updateFirestoreDoc('guest_orders', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+      await updateFirestoreDoc('ordens', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
       console.log(`✅ Order ${orderId} marked as paid via webhook`);
 
       // 🔒 Call process-delivery (single-writer) via internal key
@@ -560,7 +560,7 @@ Deno.serve(async (req) => {
       let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
       try {
         const accessToken2 = await getFirebaseAccessToken();
-        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=50`;
+        const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=50`;
         const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken2}` } });
         if (itemsRes.ok) {
           const itemsData = await itemsRes.json();
@@ -644,14 +644,14 @@ Deno.serve(async (req) => {
 
       if (!isUpsell) {
         // 🔒 Server-side price recalculation
-        const orderFields = await getFirestoreDoc('guest_orders', orderId);
+        const orderFields = await getFirestoreDoc('ordens', orderId);
         if (!orderFields) {
           return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         }
 
         // Read items from subcollection
         const accessToken3 = await getFirebaseAccessToken();
-        const orderItemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=100`;
+        const orderItemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=100`;
         const orderItemsRes = await fetch(orderItemsUrl, { headers: { 'Authorization': `Bearer ${accessToken3}` } });
         const orderItemsData = orderItemsRes.ok ? await orderItemsRes.json() : { documents: [] };
         const orderItemsResults = (orderItemsData.documents || []).map((doc: any) => ({ document: doc }));
@@ -767,7 +767,7 @@ Deno.serve(async (req) => {
 
       if (orderId && !isUpsell) {
         try {
-          await updateFirestoreDoc('guest_orders', orderId, {
+          await updateFirestoreDoc('ordens', orderId, {
             flowpay_charge_id: data.charge.id,
             ...(utmParameters ? { utm_parameters: utmParameters } : {}),
             ...(clientIpAtCreate ? { client_ip: clientIpAtCreate } : {}),
@@ -813,7 +813,7 @@ Deno.serve(async (req) => {
       }
 
       // Verify the orderId actually belongs to this chargeId before returning any data
-      const ownershipCheck = await getFirestoreDoc('guest_orders', expectedOrderId);
+      const ownershipCheck = await getFirestoreDoc('ordens', expectedOrderId);
       if (!ownershipCheck || ownershipCheck.flowpay_charge_id?.stringValue !== chargeId) {
         // Also check sale_addons for upsell
         const isUpsellOwner = expectedOrderId.startsWith('upsell-');
@@ -848,7 +848,7 @@ Deno.serve(async (req) => {
       // Side-effects: FlowPay API is source of truth — if COMPLETED, process payment
       if (data.charge?.status === 'COMPLETED' && canAttemptSideEffects) {
         try {
-          const queryResults = await queryFirestore('guest_orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+          const queryResults = await queryFirestore('ordens', 'flowpay_charge_id', 'EQUAL', chargeId);
           const orderDoc = queryResults?.[0]?.document;
 
           if (orderDoc) {
@@ -864,7 +864,7 @@ Deno.serve(async (req) => {
               const fbName = orderFields?.customer_name?.stringValue || '';
               const fbPhone = orderFields?.customer_phone?.stringValue || '';
 
-              await updateFirestoreDoc('guest_orders', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+              await updateFirestoreDoc('ordens', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
               try {
                 await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecretForStatus });
               } catch {}
@@ -876,7 +876,7 @@ Deno.serve(async (req) => {
               let pollingProductNames = `Pedido #${orderId.substring(0, 8)}`;
               try {
                 const accessToken4 = await getFirebaseAccessToken();
-                const pollingItemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=50`;
+                const pollingItemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=50`;
                 const pollingItemsRes = await fetch(pollingItemsUrl, { headers: { 'Authorization': `Bearer ${accessToken4}` } });
                 if (pollingItemsRes.ok) {
                   const pollingItemsData = await pollingItemsRes.json();

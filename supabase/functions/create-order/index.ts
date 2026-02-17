@@ -426,7 +426,7 @@ Deno.serve(async (req) => {
       updated_at: now,
     };
 
-    // Write order to guest_orders/{orderId}
+    // Write order to ordens/{orderId}
     const accessToken = await getFirebaseAccessToken();
     const guestFields: Record<string, unknown> = {};
     for (const [k, v] of Object.entries(orderData)) {
@@ -436,7 +436,7 @@ Deno.serve(async (req) => {
       else if (typeof v === 'boolean') guestFields[k] = { booleanValue: v };
       else guestFields[k] = { stringValue: String(v) };
     }
-    const orderDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}`;
+    const orderDocUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}`;
     const orderRes = await fetch(orderDocUrl, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -449,7 +449,7 @@ Deno.serve(async (req) => {
 
     console.log(`✅ Order created: ${orderId} (hash: ${guestHash}) for user ${userId}`);
 
-    // Write items to subcollection guest_orders/{orderId}/items/{idx}
+    // Write items to subcollection ordens/{orderId}/items/{idx}
     await Promise.all(items.map(async (item: any, idx: number) => {
       const cachedProduct = productCache.get(String(item.product_id));
       const realItemPrice = cachedProduct ? Number(cachedProduct.price?.doubleValue || cachedProduct.price?.integerValue || 0) : 0;
@@ -466,13 +466,13 @@ Deno.serve(async (req) => {
         order_id: { stringValue: orderId },
         created_at: { stringValue: now },
       };
-      const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items/${idx}`;
+      const itemUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items/${idx}`;
       const itemRes = await fetch(itemUrl, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
         body: JSON.stringify({ fields: itemFields }),
       });
-      if (!itemRes.ok) console.warn(`⚠️ guest_orders/${orderId}/items/${idx} write failed: ${itemRes.status}`);
+      if (!itemRes.ok) console.warn(`⚠️ ordens/${orderId}/items/${idx} write failed: ${itemRes.status}`);
     }));
 
     console.log(`✅ ${items.length} items created for order ${orderId}`);

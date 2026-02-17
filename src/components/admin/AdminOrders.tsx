@@ -757,7 +757,7 @@ export const AdminOrders = () => {
             <AlertDialogHeader>
               <AlertDialogTitle>Limpar pedidos por email</AlertDialogTitle>
               <AlertDialogDescription>
-                Todos os pedidos, itens, guest_orders e sale_addons deste email serão excluídos permanentemente.
+                Todos os pedidos, itens e sale_addons deste email serão excluídos permanentemente.
               </AlertDialogDescription>
             </AlertDialogHeader>
             <Input
