@@ -1,6 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
+import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -16,10 +17,24 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// App Check DISABLED — enforcement must also be disabled in Firebase Console
-// The reCAPTCHA v3 key was causing 401/403 errors blocking all Firestore queries.
-// Re-enable after fixing reCAPTCHA configuration.
-export const appCheckReady = Promise.resolve();
+// App Check with reCAPTCHA v3
+const RECAPTCHA_SITE_KEY = "6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J";
+
+let appCheckInstance: ReturnType<typeof initializeAppCheck> | null = null;
+
+export const appCheckReady: Promise<void> = new Promise((resolve) => {
+  try {
+    appCheckInstance = initializeAppCheck(app, {
+      provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
+      isTokenAutoRefreshEnabled: true,
+    });
+    console.log("[AppCheck] Initialized successfully");
+    resolve();
+  } catch (err) {
+    console.warn("[AppCheck] Init failed, continuing without:", (err as Error).message);
+    resolve(); // resolve anyway so queries aren't blocked
+  }
+});
 
 // Initialize services
 export const auth = getAuth(app);
