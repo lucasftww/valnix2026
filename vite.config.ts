@@ -81,7 +81,7 @@ export default defineConfig(({ mode }) => ({
     chunkSizeWarningLimit: 1000,
     minify: 'esbuild',
     reportCompressedSize: false,
-    target: 'esnext',
+    target: 'es2020',
     cssMinify: true,
     modulePreload: {
       // Only preload chunks that are directly imported (not lazy chunks)

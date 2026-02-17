@@ -24,7 +24,7 @@ export const FloatingContactButtons = () => {
         {/* Botão fechar */}
         <button
           onClick={() => setIsVisible(false)}
-          className="absolute -top-2 -right-2 h-7 w-7 rounded-full bg-muted/90 hover:bg-muted flex items-center justify-center z-10 transition-colors shadow-sm"
+          className="absolute -top-2 -right-2 h-8 w-8 rounded-full bg-muted/90 hover:bg-muted flex items-center justify-center z-10 transition-colors shadow-sm"
           aria-label="Fechar botão de contato"
         >
           <X className="h-3.5 w-3.5 text-foreground" />
