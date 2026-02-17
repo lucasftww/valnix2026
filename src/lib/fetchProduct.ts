@@ -3,7 +3,7 @@ import { db } from "@/integrations/firebase/config";
 import type { Product } from "@/types";
 import type { FirebaseError } from "firebase/app";
 
-const TIMEOUT_MS = 8000;
+const TIMEOUT_MS = 15000; // 15s — generous for cold starts + App Check
 
 /** Determine if a fetch error is retryable (timeout, network, quota) */
 export const shouldRetryProductFetch = (error: unknown): boolean => {
@@ -30,17 +30,32 @@ export const logFetchTimeout = (productId: string, error: unknown) => {
  * Shared product fetcher used by both useProductById hook and ProductCard prefetch.
  * - Single getDoc call (persistent cache checks local first, then network)
  * - Timeout throws error (not null) so caller can distinguish timeout vs not-found
+ * - Retries once on timeout/network error
  * - Returns null for genuinely non-existent or inactive products
  */
 export async function fetchProduct(productId: string): Promise<Product | null> {
   const ref = doc(db, "products", productId);
 
-  const snap = await Promise.race<DocumentSnapshot>([
-    getDoc(ref),
-    new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("PRODUCT_FETCH_TIMEOUT")), TIMEOUT_MS)
-    ),
-  ]);
+  const attempt = (): Promise<DocumentSnapshot> =>
+    Promise.race<DocumentSnapshot>([
+      getDoc(ref),
+      new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("PRODUCT_FETCH_TIMEOUT")), TIMEOUT_MS)
+      ),
+    ]);
+
+  let snap: DocumentSnapshot;
+  try {
+    snap = await attempt();
+  } catch (err) {
+    // Retry once on timeout/network
+    if (shouldRetryProductFetch(err)) {
+      await new Promise((r) => setTimeout(r, 1500));
+      snap = await attempt();
+    } else {
+      throw err;
+    }
+  }
 
   if (!snap.exists()) return null;
   const data = snap.data();

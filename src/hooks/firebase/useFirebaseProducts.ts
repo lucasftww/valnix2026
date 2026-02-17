@@ -59,8 +59,8 @@ export const useFeaturedProducts = () => {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: true,
-    retry: 1,
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 4000),
+    retry: 3,
+    retryDelay: (attempt) => Math.min(1500 * 2 ** attempt, 8000),
   });
 };
 
@@ -136,12 +136,12 @@ export const useProduct = (productId: string | undefined) => {
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
     retry: (failureCount, error) => {
-      if (failureCount >= 2) return false;
+      if (failureCount >= 3) return false;
       const msg = (error as Error)?.message ?? "";
       const code = (error as any)?.code ?? "";
       if (msg.includes("PRODUCT_FETCH_TIMEOUT")) return true;
       return code.includes("unavailable") || code.includes("deadline-exceeded") || msg.toLowerCase().includes("network");
     },
-    retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    retryDelay: (attempt) => Math.min(1500 * 2 ** attempt, 8000),
   });
 };
