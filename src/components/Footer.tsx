@@ -84,8 +84,8 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
                       ))}
                     </CarouselContent>
                     <div className="flex justify-center gap-3 mt-6">
-                      <CarouselPrevious className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-10 w-10" aria-label="Ver benefício anterior" />
-                      <CarouselNext className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-10 w-10" aria-label="Ver próximo benefício" />
+                      <CarouselPrevious className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-12 w-12" aria-label="Ver benefício anterior" />
+                      <CarouselNext className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-12 w-12" aria-label="Ver próximo benefício" />
                     </div>
                   </Carousel>
                 </div>
