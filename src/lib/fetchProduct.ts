@@ -19,6 +19,13 @@ export const shouldRetryProductFetch = (error: unknown): boolean => {
   );
 };
 
+/** Log timeout with productId for observability */
+export const logFetchTimeout = (productId: string, error: unknown) => {
+  if ((error as Error)?.message?.includes("PRODUCT_FETCH_TIMEOUT")) {
+    console.warn("Product fetch timeout", { productId });
+  }
+};
+
 /**
  * Shared product fetcher used by both useProductById hook and ProductCard prefetch.
  * - Single getDoc call (persistent cache checks local first, then network)
