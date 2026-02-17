@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
-import { useUserOrders, useOrderItems, Order } from "@/hooks/firebase";
+import { useUserOrders, useOrderItems, type Order } from "@/hooks/firebase/useFirebaseOrders";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";

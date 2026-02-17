@@ -7,7 +7,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { SearchBar } from "./SearchBar";
 import { CartSidebar } from "./CartSidebar";
-import { useCategories } from "@/hooks/firebase";
+import { useCategories } from "@/hooks/firebase/useFirebaseCategories";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import {
@@ -113,6 +113,7 @@ const HeaderComponent = () => {
             <SheetContent 
               side="left" 
               className="w-[280px] p-0 bg-background border-r border-border/30"
+              aria-describedby={undefined}
             >
               <SheetHeader className="px-5 py-4 border-b border-border/30">
                 <SheetTitle className="text-left text-sm font-semibold text-primary uppercase tracking-wider">

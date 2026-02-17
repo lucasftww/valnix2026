@@ -57,6 +57,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
        <SheetContent 
         side="right" 
         className="w-full sm:w-[400px] p-0 flex flex-col bg-background border-l border-border/30"
+        aria-describedby={undefined}
       >
         <SheetHeader className="px-5 py-4 border-b border-border/20 bg-secondary/50">
           <SheetTitle className="flex items-center gap-3 text-foreground">

@@ -1,7 +1,7 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Star, ChevronRight } from "lucide-react";
-import { useCategoryProducts } from "@/hooks/firebase";
+import { useCategoryProducts } from "@/hooks/firebase/useFirebaseProducts";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import { formatPrice, ROUTES } from "@/lib/constants";
 import {
