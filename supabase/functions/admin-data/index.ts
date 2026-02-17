@@ -78,7 +78,17 @@ async function verifyFirebaseToken(idToken: string): Promise<{ uid: string; emai
   } catch { return null; }
 }
 
+// Cache admin status per UID to avoid hammering Firestore on concurrent requests
+const adminCache = new Map<string, { isAdmin: boolean; expiresAt: number }>();
+const ADMIN_CACHE_TTL = 5 * 60_000; // 5 minutes
+
 async function isAdminInFirestore(uid: string): Promise<boolean> {
+  // Check cache first
+  const cached = adminCache.get(uid);
+  if (cached && Date.now() < cached.expiresAt) {
+    return cached.isAdmin;
+  }
+
   try {
     const accessToken = await getFirebaseAccessToken();
     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/user_roles/${uid}`;
@@ -86,17 +96,29 @@ async function isAdminInFirestore(uid: string): Promise<boolean> {
     if (!res.ok) {
       const errText = await res.text();
       console.error(`❌ isAdminInFirestore failed for uid=${uid} | status=${res.status} | body=${errText}`);
+      // On quota errors, don't cache the failure — let it retry
+      if (res.status === 429) return false;
+      adminCache.set(uid, { isAdmin: false, expiresAt: Date.now() + ADMIN_CACHE_TTL });
       return false;
     }
     const doc = await res.json();
     const role = doc.fields?.role?.stringValue;
-    console.log(`🔍 isAdminInFirestore uid=${uid} | role=${role} | hasFields=${!!doc.fields}`);
-    return role === 'admin';
+    const isAdmin = role === 'admin';
+    adminCache.set(uid, { isAdmin, expiresAt: Date.now() + ADMIN_CACHE_TTL });
+    return isAdmin;
   } catch (err) {
     console.error(`❌ isAdminInFirestore exception for uid=${uid}:`, err);
     return false;
   }
 }
+
+// Periodic cleanup of admin cache
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of adminCache) {
+    if (v.expiresAt <= now) adminCache.delete(k);
+  }
+}, 300_000);
 
 // ── Firestore helpers ──────────────────────────────────────────────
 function extractValue(val: any): any {
