@@ -2,6 +2,28 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react
 import { useQuery } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
+import { format } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import {
+  Table,
+  TableBody,
+  TableCaption,
+  TableCell,
+  TableFooter,
+  TableHead,
+  TableRow,
+} from "@/components/ui/table"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { Badge } from "@/components/ui/badge";
+import { Skeleton } from "@/components/ui/skeleton";
+import { MoreHorizontal } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -59,8 +81,6 @@ interface Product {
   terms_conditions?: string | null;
 }
 
-const getAdminTokenFn = () => requireAdminToken();
-
 export const AdminProducts = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -68,11 +88,11 @@ export const AdminProducts = () => {
   const { data: products = [], isLoading: loadingProducts, refetch: refetchProducts } = useQuery({
     queryKey: ['admin-products'],
     queryFn: async () => {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const response = await invokeFunction('admin-data', {
         method: 'GET',
         queryParams: { resource: 'products' },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
       });
       if (!response.ok) throw new Error('Failed to fetch products');
       const data = await response.json();
@@ -88,11 +108,11 @@ export const AdminProducts = () => {
   const { data: categories = [], refetch: refetchCategories } = useQuery({
     queryKey: ['admin-categories'],
     queryFn: async () => {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const response = await invokeFunction('admin-data', {
         method: 'GET',
         queryParams: { resource: 'categories' },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
       });
       if (!response.ok) throw new Error('Failed to fetch categories');
       const data = await response.json();
@@ -143,7 +163,7 @@ export const AdminProducts = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     const now = new Date().toISOString();
     const productData = {
       name: formData.name,
@@ -170,12 +190,12 @@ export const AdminProducts = () => {
     };
 
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       if (editingProduct) {
         const res = await invokeFunction('admin-data', {
           method: 'PUT',
           queryParams: { resource: 'products' },
-          headers: { 'x-firebase-token': token },
+          headers: { 'x-admin-token': token },
           body: { id: editingProduct.id, ...productData },
         });
         if (!res.ok) throw new Error('Failed to update product');
@@ -184,7 +204,7 @@ export const AdminProducts = () => {
         const res = await invokeFunction('admin-data', {
           method: 'POST',
           queryParams: { resource: 'products' },
-          headers: { 'x-firebase-token': token },
+          headers: { 'x-admin-token': token },
           body: { id: newId, ...productData, created_at: now },
         });
         if (!res.ok) throw new Error('Failed to create product');
@@ -256,18 +276,18 @@ export const AdminProducts = () => {
         updated_at: now,
       };
 
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction('admin-data', {
         method: 'POST',
         queryParams: { resource: 'products' },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
         body: { id: newId, ...duplicatedProduct },
       });
       if (!res.ok) throw new Error('Failed to duplicate product');
 
       const newProduct = { id: newId, ...duplicatedProduct } as Product;
       handleEdit(newProduct);
-      
+
       fetchProducts();
       invalidateQueries();
     } catch (error: any) {
@@ -283,11 +303,11 @@ export const AdminProducts = () => {
     if (!confirm("Tem certeza que deseja excluir este produto?")) return;
 
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction('admin-data', {
         method: 'DELETE',
         queryParams: { resource: 'products', id },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
       });
       if (!res.ok) throw new Error('Failed to delete product');
 
@@ -308,11 +328,11 @@ export const AdminProducts = () => {
     setTogglingIds(prev => new Set(prev).add(productId));
     queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, is_active: newActive } : p));
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction('admin-data', {
         method: 'PUT',
         queryParams: { resource: 'products' },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
         body: { id: productId, is_active: newActive, updated_at: new Date().toISOString() },
       });
       if (!res.ok) throw new Error('Failed to toggle active');
@@ -326,41 +346,25 @@ export const AdminProducts = () => {
   };
 
   const handleToggleFeatured = async (productId: string, currentFeatured: boolean) => {
-    if (togglingIds.has(productId)) return; // Prevent double-click
-    
+    if (togglingIds.has(productId)) return;
     const newFeatured = !currentFeatured;
-    
-    // Mark as toggling
     setTogglingIds(prev => new Set(prev).add(productId));
-    
-    // Optimistic update - update only this product locally
     queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, featured: newFeatured } : p));
-    
     try {
-      const token = await getFirebaseToken();
+      const token = requireAdminToken();
       const res = await invokeFunction('admin-data', {
         method: 'PUT',
         queryParams: { resource: 'products' },
-        headers: { 'x-firebase-token': token },
+        headers: { 'x-admin-token': token },
         body: { id: productId, featured: newFeatured, updated_at: new Date().toISOString() },
       });
       if (!res.ok) throw new Error('Failed to toggle featured');
-      
       invalidateQueries();
     } catch (error: any) {
-      // Revert on error
       queryClient.setQueryData(['admin-products'], (prev: Product[] | undefined) => (prev || []).map(p => p.id === productId ? { ...p, featured: currentFeatured } : p));
-      toast({
-        title: "Erro ao atualizar",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao atualizar", description: error.message, variant: "destructive" });
     } finally {
-      setTogglingIds(prev => {
-        const next = new Set(prev);
-        next.delete(productId);
-        return next;
-      });
+      setTogglingIds(prev => { const next = new Set(prev); next.delete(productId); return next; });
     }
   };
 
@@ -409,7 +413,6 @@ export const AdminProducts = () => {
     return filteredProducts.slice(start, start + ITEMS_PER_PAGE);
   }, [filteredProducts, currentPage]);
 
-  // Reset page when filters change
   useEffect(() => { setCurrentPage(1); }, [searchTerm, filterCategory, filterActive]);
 
   const hasActiveFilters = searchTerm || filterCategory !== "all" || filterActive !== "all";
@@ -465,471 +468,219 @@ export const AdminProducts = () => {
                 <TabsContent value="basic" className="space-y-4">
                   <div className="space-y-2">
                     <Label htmlFor="name">Nome do Produto *</Label>
-                    <Input
-                      id="name"
-                      value={formData.name}
-                      onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                      placeholder="Ex: 1200 VP Valorant"
-                      required
-                    />
+                    <Input id="name" value={formData.name} onChange={(e) => setFormData({ ...formData, name: e.target.value })} placeholder="Ex: 1200 VP Valorant" required />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="category">Categoria *</Label>
-                    <Select
-                      value={formData.category}
-                      onValueChange={(value) => setFormData({ ...formData, category: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma categoria" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categories.map((cat) => (
-                          <SelectItem key={cat.id} value={cat.slug}>
-                            {cat.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="price">Preço (R$) *</Label>
-                      <Input
-                        id="price"
-                        type="number"
-                        step="0.01"
-                        value={formData.price}
-                        onChange={(e) => setFormData({ ...formData, price: e.target.value })}
-                        placeholder="0.00"
-                        required
-                      />
+                      <Input id="price" type="number" step="0.01" value={formData.price} onChange={(e) => setFormData({ ...formData, price: e.target.value })} required />
                     </div>
-                    
                     <div className="space-y-2">
                       <Label htmlFor="old_price">Preço Antigo (R$)</Label>
-                      <Input
-                        id="old_price"
-                        type="number"
-                        step="0.01"
-                        value={formData.old_price}
-                        onChange={(e) => setFormData({ ...formData, old_price: e.target.value })}
-                        placeholder="0.00"
-                      />
+                      <Input id="old_price" type="number" step="0.01" value={formData.old_price} onChange={(e) => setFormData({ ...formData, old_price: e.target.value })} />
                     </div>
                   </div>
-
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="discount">Desconto (%)</Label>
-                      <Input
-                        id="discount"
-                        type="number"
-                        value={formData.discount}
-                        onChange={(e) => setFormData({ ...formData, discount: e.target.value })}
-                        placeholder="0"
-                      />
+                      <Input id="discount" type="number" value={formData.discount} onChange={(e) => setFormData({ ...formData, discount: e.target.value })} />
                     </div>
-
+                    <div className="space-y-2">
+                      <Label htmlFor="category">Categoria *</Label>
+                      <Select value={formData.category} onValueChange={(v) => setFormData({ ...formData, category: v })}>
+                        <SelectTrigger><SelectValue placeholder="Selecione" /></SelectTrigger>
+                        <SelectContent>
+                          {categories.map((c: Category) => (
+                            <SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="sold">Vendidos</Label>
-                      <Input
-                        id="sold"
-                        type="number"
-                        value={formData.sold}
-                        onChange={(e) => setFormData({ ...formData, sold: e.target.value })}
-                        placeholder="0"
-                      />
+                      <Input id="sold" type="number" value={formData.sold} onChange={(e) => setFormData({ ...formData, sold: e.target.value })} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="display_order">Ordem de Exibição</Label>
+                      <Input id="display_order" type="number" value={formData.display_order} onChange={(e) => setFormData({ ...formData, display_order: e.target.value })} />
                     </div>
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="display_order">Ordem de Exibição</Label>
-                    <Input
-                      id="display_order"
-                      type="number"
-                      value={formData.display_order}
-                      onChange={(e) => setFormData({ ...formData, display_order: e.target.value })}
-                      placeholder="0"
-                    />
-                    <p className="text-xs text-muted-foreground">Menor número aparece primeiro</p>
-                  </div>
-
-                  <div className="pt-2 border-t">
-                    <div className="flex items-center justify-between">
-                      <div className="space-y-0.5">
-                        <Label htmlFor="featured">Aparecer em Mais Vendidos</Label>
-                        <p className="text-xs text-muted-foreground">Exibe na seção da página inicial</p>
-                      </div>
-                      <Switch
-                        id="featured"
-                        checked={formData.featured}
-                        onCheckedChange={(checked) =>
-                          setFormData({ ...formData, featured: checked })
-                        }
-                      />
-                    </div>
+                  <div className="flex items-center gap-2">
+                    <Switch checked={formData.featured} onCheckedChange={(v) => setFormData({ ...formData, featured: v })} />
+                    <Label>Destaque na Home</Label>
                   </div>
                 </TabsContent>
 
                 <TabsContent value="delivery" className="space-y-4">
                   <div className="space-y-2">
-                    <Label htmlFor="delivery_type">Tipo de Entrega</Label>
-                    <Select
-                      value={formData.delivery_type}
-                      onValueChange={(value) => setFormData({ ...formData, delivery_type: value })}
-                    >
-                      <SelectTrigger>
-                        <SelectValue placeholder="Selecione o tipo de entrega" />
-                      </SelectTrigger>
+                    <Label>Tipo de Entrega</Label>
+                    <Select value={formData.delivery_type} onValueChange={(v) => setFormData({ ...formData, delivery_type: v })}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manual">Manual - Admin entrega</SelectItem>
-                        <SelectItem value="auto_fake">Automática Fake - Códigos aleatórios</SelectItem>
-                        <SelectItem value="auto_real">Automática Real - Códigos pré-cadastrados</SelectItem>
+                        <SelectItem value="manual">Manual</SelectItem>
+                        <SelectItem value="automatic">Automática</SelectItem>
                       </SelectContent>
                     </Select>
-                    <p className="text-xs text-muted-foreground">
-                      {formData.delivery_type === 'manual' && 'Você irá fornecer o código manualmente após a compra'}
-                      {formData.delivery_type === 'auto_fake' && 'Sistema gera códigos aleatórios automaticamente (formato: XXXX-XXXX-XXXX-XXXX)'}
-                      {formData.delivery_type === 'auto_real' && 'Sistema usa códigos reais cadastrados abaixo'}
-                    </p>
                   </div>
-
-                  {formData.delivery_type === 'auto_real' && (
+                  {formData.delivery_type === 'automatic' && (
                     <div className="space-y-2">
-                      <Label>Códigos de Entrega</Label>
-                      <div className="space-y-2">
-                        {formData.auto_delivery_codes.map((code, index) => (
-                          <div key={index} className="flex gap-2">
-                            <Input
-                              value={code}
-                              onChange={(e) => {
-                                const newCodes = [...formData.auto_delivery_codes];
-                                newCodes[index] = e.target.value;
-                                setFormData({ ...formData, auto_delivery_codes: newCodes });
-                              }}
-                              placeholder="Digite o código"
-                            />
-                            <Button
-                              type="button"
-                              variant="destructive"
-                              size="icon"
-                              onClick={() => {
-                                const newCodes = formData.auto_delivery_codes.filter((_, i) => i !== index);
-                                setFormData({ ...formData, auto_delivery_codes: newCodes });
-                              }}
-                              aria-label="Remover código"
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => {
-                            setFormData({
-                              ...formData,
-                              auto_delivery_codes: [...formData.auto_delivery_codes, '']
-                            });
-                          }}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Adicionar Código
-                        </Button>
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Estoque disponível: {formData.auto_delivery_codes.filter(c => c.trim()).length} códigos
-                      </p>
+                      <Label>Códigos de Entrega (um por linha)</Label>
+                      <Textarea
+                        value={formData.auto_delivery_codes.join('\n')}
+                        onChange={(e) => setFormData({ ...formData, auto_delivery_codes: e.target.value.split('\n').filter(Boolean) })}
+                        placeholder="Insira os códigos, um por linha"
+                        className="min-h-[120px]"
+                      />
+                      <p className="text-xs text-muted-foreground">{formData.auto_delivery_codes.length} código(s) cadastrado(s)</p>
                     </div>
                   )}
                 </TabsContent>
 
-                <TabsContent value="description" className="space-y-4 pt-4">
+                <TabsContent value="description" className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-foreground font-semibold">Descrição Completa (Com Imagens)</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Esta é a descrição principal que aparece na aba "Descrição" do produto
-                    </p>
-                    <Textarea
-                      value={formData.rich_description || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, rich_description: e.target.value }))}
-                      placeholder="Escreva a descrição completa do produto (HTML suportado)..."
-                      className="min-h-[250px] bg-neutral-900 border-border/50 text-foreground"
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Suporta HTML para formatação avançada
-                    </p>
+                    <Label>Descrição Simples</Label>
+                    <Textarea value={formData.description} onChange={(e) => setFormData({ ...formData, description: e.target.value })} placeholder="Descrição curta do produto" />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Descrição Rica (HTML)</Label>
+                    <Textarea value={formData.rich_description} onChange={(e) => setFormData({ ...formData, rich_description: e.target.value })} placeholder="<p>Descrição com HTML</p>" className="min-h-[200px] font-mono text-xs" />
                   </div>
                 </TabsContent>
 
-                <TabsContent value="extra" className="space-y-6 pt-4">
+                <TabsContent value="extra" className="space-y-4">
                   <div className="space-y-2">
-                    <Label className="text-foreground font-semibold">Instruções de Uso</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Estas instruções aparecem na aba "Instruções" do produto
-                    </p>
-                    <Textarea
-                      value={formData.instructions || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, instructions: e.target.value }))}
-                      placeholder="Ex: 1. Acesse o site oficial. 2. Faça login na sua conta..."
-                      className="min-h-[180px] bg-neutral-900 border-border/50 text-foreground"
-                    />
+                    <Label>Instruções de Uso (HTML)</Label>
+                    <Textarea value={formData.instructions} onChange={(e) => setFormData({ ...formData, instructions: e.target.value })} placeholder="<p>Como usar o produto</p>" className="min-h-[150px] font-mono text-xs" />
                   </div>
-
                   <div className="space-y-2">
-                    <Label className="text-foreground font-semibold">Termos e Condições</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Aparece na aba "Terms conditions" do produto (opcional)
-                    </p>
-                    <Textarea
-                      value={formData.terms_conditions || ""}
-                      onChange={(e) => setFormData(prev => ({ ...prev, terms_conditions: e.target.value }))}
-                      placeholder="Ex: Este produto é apenas para uso pessoal..."
-                      className="min-h-[180px] bg-neutral-900 border-border/50 text-foreground"
-                    />
+                    <Label>Termos e Condições (HTML)</Label>
+                    <Textarea value={formData.terms_conditions} onChange={(e) => setFormData({ ...formData, terms_conditions: e.target.value })} placeholder="<p>Termos de uso</p>" className="min-h-[150px] font-mono text-xs" />
                   </div>
                 </TabsContent>
 
-                <TabsContent value="media" className="space-y-6">
+                <TabsContent value="media" className="space-y-4">
                   <div className="space-y-2">
-                    <Label>Imagem Principal do Produto *</Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Esta é a imagem que aparece nos cards de produto
-                    </p>
-                    <ImageUploader
-                      currentImageUrl={formData.image_url}
-                      onImageUploaded={(url) => setFormData({ ...formData, image_url: url })}
-                      folder="products/main"
-                    />
+                    <Label>Imagem Principal</Label>
+                    <ImageUploader currentImageUrl={formData.image_url} onImageUploaded={(url) => setFormData({ ...formData, image_url: url })} />
                   </div>
-
                   <div className="space-y-2">
-                    <Label>
-                      <ImageIcon className="w-4 h-4 inline mr-2" />
-                      Imagem Adicional (Opcional)
-                    </Label>
-                    <p className="text-xs text-muted-foreground mb-2">
-                      Imagem extra para usar na descrição ou galeria
-                    </p>
-                    <ImageUploader
-                      currentImageUrl={formData.icon_url}
-                      onImageUploaded={(url) => setFormData({ ...formData, icon_url: url })}
-                      folder="products/extra"
-                    />
+                    <Label>Ícone</Label>
+                    <ImageUploader currentImageUrl={formData.icon_url} onImageUploaded={(url) => setFormData({ ...formData, icon_url: url })} />
                   </div>
-
                   <div className="space-y-2">
-                    <Label htmlFor="video_url">
-                      <Video className="w-4 h-4 inline mr-2" />
-                      Vídeo do Produto (Opcional)
-                    </Label>
-                    <Input
-                      id="video_url"
-                      type="url"
-                      value={formData.video_url}
-                      onChange={(e) => setFormData({ ...formData, video_url: e.target.value })}
-                      placeholder="https://youtube.com/embed/..."
-                    />
-                    <p className="text-xs text-muted-foreground">
-                      Cole o link embed do YouTube (formato: https://youtube.com/embed/VIDEO_ID)
-                    </p>
+                    <Label>URL do Vídeo</Label>
+                    <Input value={formData.video_url} onChange={(e) => setFormData({ ...formData, video_url: e.target.value })} placeholder="https://youtube.com/..." />
                   </div>
                 </TabsContent>
               </Tabs>
 
-              <Button type="submit" className="w-full" size="lg">
-                {editingProduct ? "Atualizar Produto" : "Criar Produto"}
+              <Button type="submit" className="w-full">
+                {editingProduct ? "Salvar Alterações" : "Criar Produto"}
               </Button>
             </form>
           </DialogContent>
         </Dialog>
       </div>
 
-      {/* Search & Filters Toolbar */}
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2 flex-wrap flex-1">
-          <div className="relative min-w-[220px] flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Buscar por nome, categoria, ID..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-9 h-9 bg-card/50"
-            />
-          </div>
-
-          <Select value={filterCategory} onValueChange={setFilterCategory}>
-            <SelectTrigger className="w-[160px] h-9 bg-card/50">
-              <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Categoria" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas</SelectItem>
-              {categories.map(cat => (
-                <SelectItem key={cat.id} value={cat.slug}>{cat.name}</SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          <Select value={filterActive} onValueChange={setFilterActive}>
-            <SelectTrigger className="w-[130px] h-9 bg-card/50">
-              <Package className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="active">Ativos</SelectItem>
-              <SelectItem value="inactive">Inativos</SelectItem>
-            </SelectContent>
-          </Select>
-
-          {hasActiveFilters && (
-            <Button variant="ghost" size="sm" className="h-9 text-muted-foreground" onClick={() => { setSearchTerm(""); setFilterCategory("all"); setFilterActive("all"); }}>
-              Limpar filtros
-            </Button>
-          )}
+      {/* Filters */}
+      <div className="flex flex-wrap gap-3 items-center">
+        <div className="relative flex-1 min-w-[200px] max-w-sm">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
+          <Input placeholder="Buscar produtos..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
         </div>
-        <span className="text-sm text-muted-foreground whitespace-nowrap">
-          {filteredProducts.length} produto{filteredProducts.length !== 1 ? 's' : ''}
-        </span>
+        <Select value={filterCategory} onValueChange={setFilterCategory}>
+          <SelectTrigger className="w-[160px]"><Filter className="w-3.5 h-3.5 mr-1.5" /><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todas categorias</SelectItem>
+            {categories.map((c: Category) => (
+              <SelectItem key={c.id} value={c.slug}>{c.name}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={filterActive} onValueChange={setFilterActive}>
+          <SelectTrigger className="w-[130px]"><SelectValue /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos</SelectItem>
+            <SelectItem value="active">Ativos</SelectItem>
+            <SelectItem value="inactive">Inativos</SelectItem>
+          </SelectContent>
+        </Select>
+        {hasActiveFilters && (
+          <Button variant="ghost" size="sm" onClick={() => { setSearchTerm(""); setFilterCategory("all"); setFilterActive("all"); }}>
+            Limpar filtros
+          </Button>
+        )}
+        <span className="text-sm text-muted-foreground ml-auto">{filteredProducts.length} produto(s)</span>
       </div>
 
-      {filteredProducts.length === 0 ? (
-        <Card className="border-border/50">
-          <CardContent className="py-16 text-center">
-            <Package className="w-12 h-12 text-muted-foreground/30 mx-auto mb-3" />
-            <p className="text-muted-foreground font-medium">Nenhum produto encontrado</p>
-            <p className="text-xs text-muted-foreground/70 mt-1">Ajuste os filtros ou crie um novo produto</p>
-          </CardContent>
-        </Card>
-      ) : (
-        <>
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
-            {paginatedProducts.map((product) => (
-              <Card key={product.id} className="overflow-hidden hover:shadow-lg transition-shadow bg-card border-border/50">
-                <CardHeader className="pb-3 bg-neutral-900/50">
-                  <div className="flex items-start justify-between gap-2">
-                    <CardTitle className="text-lg line-clamp-2 text-foreground">{product.name}</CardTitle>
-                    <div className="flex items-center gap-2">
-                      {product.featured && (
-                        <span className="text-[10px] font-medium text-primary bg-primary/10 px-2 py-0.5 rounded">
-                          DESTAQUE
-                        </span>
-                      )}
-                      <Switch
-                        checked={product.is_active}
-                        disabled={togglingIds.has(product.id)}
-                        onCheckedChange={() => handleToggleActive(product.id, product.is_active)}
-                        className="data-[state=checked]:bg-green-500"
-                      />
-                    </div>
+      {/* Products Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        {paginatedProducts.map((product: Product) => (
+          <Card key={product.id} className={`overflow-hidden transition-all ${!product.is_active ? 'opacity-50' : ''}`}>
+            <CardContent className="p-0">
+              <div className="flex gap-3 p-4">
+                {product.image_url ? (
+                  <img src={product.image_url} alt={product.name} className="w-16 h-16 object-contain rounded-lg bg-muted/30 shrink-0" loading="lazy" />
+                ) : (
+                  <div className="w-16 h-16 bg-muted/30 rounded-lg flex items-center justify-center shrink-0">
+                    <Package className="w-6 h-6 text-muted-foreground" />
                   </div>
-                </CardHeader>
-                <CardContent className="space-y-4 pt-4">
-                  {product.image_url && (
-                    <div className="relative aspect-video w-full overflow-hidden rounded-lg bg-neutral-800 border border-border/30">
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
-                        className="w-full h-full object-cover"
-                      />
-                    </div>
-                  )}
-                  <div className="grid grid-cols-2 gap-3 text-sm">
-                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                      <p className="text-muted-foreground text-xs">Preço</p>
-                      <p className="font-semibold text-primary">R$ {product.price?.toFixed(2) || "0.00"}</p>
-                    </div>
-                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                      <p className="text-muted-foreground text-xs">Vendas</p>
-                      <p className="font-medium text-foreground">{product.sold || 0}</p>
-                    </div>
-                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                      <p className="text-muted-foreground text-xs">Categoria</p>
-                      <p className="font-medium truncate text-foreground">{product.category}</p>
-                    </div>
-                    <div className="space-y-1 bg-neutral-900/50 rounded-lg p-2">
-                      <p className="text-muted-foreground text-xs">Ordem</p>
-                      <p className="font-medium text-foreground">{product.display_order || 0}</p>
-                    </div>
+                )}
+                <div className="flex-1 min-w-0">
+                  <h3 className="font-semibold text-sm truncate">{product.name}</h3>
+                  <p className="text-xs text-muted-foreground truncate">{product.category}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <span className="text-sm font-bold text-primary">R$ {product.price.toFixed(2).replace('.', ',')}</span>
+                    {product.old_price && product.old_price > product.price && (
+                      <span className="text-xs text-muted-foreground line-through">R$ {product.old_price.toFixed(2).replace('.', ',')}</span>
+                    )}
                   </div>
-                  
-                  {/* Toggle Mais Vendidos */}
-                  <div className="flex items-center justify-between p-2 bg-neutral-900/50 rounded-lg">
-                    <span className="text-xs text-muted-foreground">Mais Vendidos</span>
-                    <Switch
-                      checked={product.featured || false}
-                      onCheckedChange={() => handleToggleFeatured(product.id, product.featured || false)}
-                      disabled={togglingIds.has(product.id)}
-                      className="data-[state=checked]:bg-primary"
-                    />
-                  </div>
-                  
-                  <div className="flex gap-2 pt-2">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleEdit(product)}
-                      className="flex-1 bg-neutral-900 border-border/50 hover:bg-neutral-800"
-                    >
-                      <Pencil className="w-3.5 h-3.5 mr-1.5" />
-                      Editar
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleDuplicate(product)}
-                      className="flex-1 bg-neutral-900 border-border/50 hover:bg-neutral-800"
-                      title="Duplicar produto"
-                    >
-                      <Copy className="w-3.5 h-3.5 mr-1.5" />
-                      Duplicar
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleDelete(product.id)}
-                      className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Pagination */}
-          {totalPages > 1 && (
-            <div className="flex items-center justify-between pt-2">
-              <p className="text-sm text-muted-foreground">
-                Página {currentPage} de {totalPages}
-              </p>
-              <div className="flex items-center gap-1">
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage <= 1} onClick={() => setCurrentPage(p => p - 1)}>
-                  <ChevronLeft className="h-4 w-4" />
-                </Button>
-                {Array.from({ length: Math.min(totalPages, 5) }, (_, i) => {
-                  let page: number;
-                  if (totalPages <= 5) page = i + 1;
-                  else if (currentPage <= 3) page = i + 1;
-                  else if (currentPage >= totalPages - 2) page = totalPages - 4 + i;
-                  else page = currentPage - 2 + i;
-                  return (
-                    <Button key={page} variant={currentPage === page ? "default" : "outline"} size="sm" className="h-8 w-8 p-0 text-xs" onClick={() => setCurrentPage(page)}>
-                      {page}
-                    </Button>
-                  );
-                })}
-                <Button variant="outline" size="sm" className="h-8 w-8 p-0" disabled={currentPage >= totalPages} onClick={() => setCurrentPage(p => p + 1)}>
-                  <ChevronRight className="h-4 w-4" />
-                </Button>
+                </div>
               </div>
-            </div>
-          )}
-        </>
+              <div className="flex items-center justify-between px-4 py-2 border-t border-border/30 bg-muted/10">
+                <div className="flex items-center gap-2">
+                  <Switch
+                    checked={product.is_active}
+                    onCheckedChange={() => handleToggleActive(product.id, product.is_active)}
+                    disabled={togglingIds.has(product.id)}
+                  />
+                  <span className="text-[10px] text-muted-foreground">{product.is_active ? 'Ativo' : 'Inativo'}</span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleToggleFeatured(product.id, product.featured)} title={product.featured ? 'Remover destaque' : 'Destacar'}>
+                    <span className={`text-sm ${product.featured ? 'text-yellow-500' : 'text-muted-foreground'}`}>★</span>
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleDuplicate(product)} title="Duplicar">
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => handleEdit(product)} title="Editar">
+                    <Pencil className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive" onClick={() => handleDelete(product.id)} title="Excluir">
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-center gap-2 pt-4">
+          <Button variant="outline" size="sm" disabled={currentPage === 1} onClick={() => setCurrentPage(p => p - 1)}>
+            <ChevronLeft className="w-4 h-4" />
+          </Button>
+          <span className="text-sm text-muted-foreground">
+            {currentPage} / {totalPages}
+          </span>
+          <Button variant="outline" size="sm" disabled={currentPage === totalPages} onClick={() => setCurrentPage(p => p + 1)}>
+            <ChevronRight className="w-4 h-4" />
+          </Button>
+        </div>
       )}
     </div>
   );

@@ -4,7 +4,6 @@ import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
 import { db } from "@/integrations/firebase/config";
 import { collection, addDoc, serverTimestamp } from "firebase/firestore";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { z } from "zod";
 
 const newsletterSchema = z.object({
@@ -50,7 +49,7 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
       // Server-side deduplication can be added later if needed
       await addDoc(subscribersRef, {
         email: validation.data.email.toLowerCase(),
-        user_id: user.uid,
+        user_id: null,
         created_at: serverTimestamp(),
       });
       toast({

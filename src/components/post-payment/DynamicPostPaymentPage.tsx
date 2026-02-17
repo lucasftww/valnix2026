@@ -3,7 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
 import { db } from "@/integrations/firebase/config";
 import { collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { Loader2, Check, Zap, Star, Clock, Shield } from "lucide-react";
@@ -67,7 +66,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const isStandalone = !orderIdParam;
   const orderId = orderIdParam || `lead-${Date.now()}`;
   const { config, loading: configLoading } = usePostPaymentPage(addonType);
-  // Auth removed — post-payment doesn't need user context
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
@@ -108,14 +106,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   useEffect(() => {
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
-      if (pollingRef.current) return; // skip if previous poll still running
+      if (pollingRef.current) return;
       pollingRef.current = true;
       try {
-        const idToken = user ? await user.getIdToken() : null;
         const response = await invokeFunction("flowpay-pix", {
           method: "GET",
           queryParams: { action: "status", chargeId: pixData.chargeId, orderId: `upsell-${orderId}-${addonType}` },
-          headers: idToken ? { Authorization: `Bearer ${idToken}` } : {},
         });
         const data = await response.json();
         if (data.success && data.status === "COMPLETED") {
@@ -132,7 +128,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       }
     }, 5000);
     return () => clearInterval(poll);
-  }, [pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, user]);
+  }, [pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, orderId, addonType]);
 
   const handleAccept = async () => {
     if (!config || purchasing) return;
@@ -141,29 +137,27 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       // Fire-and-forget: record addon attempt
       insertSaleAddonAsync({
         order_id: orderId,
-        user_id: user?.uid || null,
+        user_id: null,
         addon_type: addonType,
         status: "pending",
         amount: config.price,
-        customer_email: user?.email || null,
-        customer_name: user?.displayName || null,
+        customer_email: null,
+        customer_name: null,
         utm_source: utmSource,
         utm_medium: utmMedium,
         utm_campaign: utmCampaign,
       });
 
-      // Create PIX charge immediately (don't wait for Firestore)
+      // Create PIX charge immediately
       const amountInCents = Math.round(config.price * 100);
-      const firebaseIdToken = await user?.getIdToken();
       const pixResponse = await invokeFunction("flowpay-pix", {
         method: "POST",
         queryParams: { action: "create" },
-        headers: firebaseIdToken ? { Authorization: `Bearer ${firebaseIdToken}` } : {},
         body: {
           amount: amountInCents,
           orderId: `upsell-${orderId}-${addonType}`,
           description: `Upsell ${config.title}`,
-          customer: { name: user?.displayName || "Cliente", email: user?.email || undefined },
+          customer: { name: "Cliente" },
         },
       });
       const data = await pixResponse.json();
@@ -185,13 +179,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   };
 
   const handleSkip = () => {
-    // Fire-and-forget: record skip (never blocks navigation)
     insertSaleAddonAsync({
       order_id: orderId,
       addon_type: addonType,
       status: "skipped",
       amount: 0,
-      user_id: user?.uid || null,
+      user_id: null,
       utm_source: utmSource,
       utm_medium: utmMedium,
       utm_campaign: utmCampaign,
@@ -275,12 +268,10 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   // Upsell offer view
   return (
     <div className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden">
-      {/* Aggressive red animated background */}
       <div className="absolute inset-0 bg-gradient-to-b from-red-950 via-red-900 to-black animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.3)_0%,transparent_70%)] animate-[pulse_3s_ease-in-out_infinite]" />
       
       <div className="max-w-lg w-full space-y-4 md:space-y-6 relative z-10">
-        {/* Header with badge */}
         <div className="text-center space-y-2 md:space-y-3">
           {config.badge_text && (
             <span className={`inline-block px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest ${badgeClass} shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-[pulse_1.5s_ease-in-out_infinite]`}>
@@ -296,7 +287,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           )}
         </div>
 
-        {/* Benefits */}
         <div className="bg-black/60 backdrop-blur-sm border border-red-900/50 rounded-2xl p-4 md:p-5 space-y-2.5 md:space-y-3 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
           {config.benefits.map((benefit, i) => (
             <div key={i} className="flex items-start gap-3">
@@ -308,7 +298,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           ))}
         </div>
 
-        {/* Pricing */}
         <div className="text-center space-y-1">
           {config.original_price && (
             <p className="text-red-300/50 line-through text-sm">
@@ -321,7 +310,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           <p className="text-xs text-red-300/60 font-medium">Pagamento único via PIX</p>
         </div>
 
-        {/* CTA */}
         <Button
           size="lg"
           className="w-full h-14 md:h-16 text-base md:text-lg font-black rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-red-400/30 uppercase tracking-wider"
@@ -332,14 +320,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           {config.button_accept_text}
         </Button>
 
-        {/* Skip - more visible on mobile */}
         <button
           onClick={handleSkip}
           className="w-full text-center text-red-300/50 hover:text-red-300/80 text-sm py-3 transition-colors underline underline-offset-4"
         >
           {config.button_skip_text}
         </button>
-
       </div>
     </div>
   );
