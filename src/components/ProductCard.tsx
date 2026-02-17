@@ -5,8 +5,8 @@ import { Link } from "react-router-dom";
 import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS, CACHE_TIMES, formatPrice, ROUTES } from "@/lib/constants";
 import { Star } from "lucide-react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/integrations/firebase/config";
+
+
 
 interface ProductCardProps {
   id: string | number;
@@ -43,6 +43,8 @@ const ProductCardComponent = ({
     queryClient.prefetchQuery({
       queryKey: [QUERY_KEYS.PRODUCT, productId],
       queryFn: async () => {
+        const { doc, getDoc } = await import("firebase/firestore");
+        const { db } = await import("@/integrations/firebase/config");
         const snap = await getDoc(doc(db, "products", productId));
         if (!snap.exists()) return null;
         const data = snap.data();

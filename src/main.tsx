@@ -1,15 +1,17 @@
 import { createRoot } from "react-dom/client";
 
-// Critical font weights — inlined for instant text rendering
+// Critical font weight only — others loaded after paint
 import "@fontsource/poppins/400.css";
-import "@fontsource/poppins/600.css";
-import "@fontsource/poppins/700.css";
 
 import App from "./App.tsx";
 import "./index.css";
 
-// Defer non-critical font weight after paint
-requestAnimationFrame(() => import("@fontsource/poppins/500.css"));
+// Defer non-critical font weights after first paint
+requestAnimationFrame(() => {
+  import("@fontsource/poppins/600.css");
+  import("@fontsource/poppins/700.css");
+  setTimeout(() => import("@fontsource/poppins/500.css"), 100);
+});
 
 // Auto-reload on chunk load failures (stale cache after deploy)
 window.addEventListener("error", (e) => {
