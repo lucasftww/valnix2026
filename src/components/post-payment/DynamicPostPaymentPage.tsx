@@ -67,7 +67,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const isStandalone = !orderIdParam;
   const orderId = orderIdParam || `lead-${Date.now()}`;
   const { config, loading: configLoading } = usePostPaymentPage(addonType);
-  const { user } = useAuth();
+  // Auth removed — post-payment doesn't need user context
   const { toast } = useToast();
   const isMobile = useIsMobile();
 

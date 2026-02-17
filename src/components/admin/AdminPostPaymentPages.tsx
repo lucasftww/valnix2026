@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { auth } from "@/integrations/firebase/config";
+import { requireAdminToken } from "@/lib/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -54,12 +54,12 @@ const routeMap: Record<string, string> = {
 
 async function callAdminPostPayment(method: string, body?: any, queryParams?: Record<string, string>) {
   const { invokeFunction } = await import("@/lib/apiHelper");
-  const token = await auth.currentUser?.getIdToken();
+  const token = requireAdminToken();
   const res = await invokeFunction("admin-post-payment", {
     method,
     body,
     queryParams,
-    headers: { "x-firebase-token": token || "" },
+    headers: { "x-admin-token": token || "" },
   });
   return res.json();
 }
