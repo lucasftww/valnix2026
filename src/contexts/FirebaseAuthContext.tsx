@@ -20,6 +20,7 @@ interface AuthContextType {
   user: User | null;
   loading: boolean;
   isAdmin: boolean;
+  roleLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
@@ -28,15 +29,18 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
+// ── Constants ──
+const ROLE_CACHE_KEY = 'valnix_role_cache_v1';
+const ROLE_CACHE_TTL = 10 * 60 * 1000; // 10 min
+const FIRESTORE_TIMEOUT_MS = 5000; // 5s for slow connections
+
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [roleLoading, setRoleLoading] = useState(false);
 
-  // ── Cached role check with TTL (avoids Firestore read every page load) ──
-  const ROLE_CACHE_KEY = 'valnix_role_cache_v1';
-  const ROLE_CACHE_TTL = 10 * 60 * 1000; // 10 min
-
+  // ── Cached role check with TTL ──
   const getCachedRole = useCallback((uid: string): boolean | null => {
     try {
       const raw = localStorage.getItem(ROLE_CACHE_KEY);
@@ -54,176 +58,172 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     } catch { /* quota */ }
   }, []);
 
+  // ── Role check via Firestore with timeout ──
+  const checkRoleViaFirestore = useCallback(async (uid: string): Promise<boolean> => {
+    const roleResult = await Promise.race([
+      getDoc(doc(db, "user_roles", uid)),
+      new Promise<null>((r) => setTimeout(() => r(null), FIRESTORE_TIMEOUT_MS)),
+    ]);
+    if (!roleResult) return false; // timeout
+    return roleResult.exists?.() && roleResult.data()?.role === "admin";
+  }, []);
+
+  // ── Role check via Edge Function (authenticated with Firebase ID token) ──
+  const checkRoleViaApi = useCallback(async (firebaseUser: User): Promise<boolean> => {
+    try {
+      const token = await firebaseUser.getIdToken();
+      const baseUrl = import.meta.env.VITE_SUPABASE_URL;
+      const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role`, {
+        headers: {
+          'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY,
+          'Authorization': `Bearer ${token}`,
+        },
+      });
+      if (!res.ok) return false;
+      const data = await res.json();
+      return data.isAdmin === true;
+    } catch {
+      return false;
+    }
+  }, []);
+
+  // ── Resolve admin role via race (Firestore vs API) ──
+  const resolveAdminRole = useCallback(async (firebaseUser: User): Promise<boolean> => {
+    let firestoreResult: boolean | null = null;
+    let apiResult: boolean | null = null;
+
+    const fsFetch = checkRoleViaFirestore(firebaseUser.uid)
+      .then(r => { firestoreResult = r; return r; })
+      .catch(() => null);
+    const apiFetch = checkRoleViaApi(firebaseUser)
+      .then(r => { apiResult = r; return r; })
+      .catch(() => null);
+
+    const first = await Promise.race([fsFetch, apiFetch]);
+    if (first === true) return true;
+
+    // If first was false/null, wait for the other
+    await Promise.allSettled([fsFetch, apiFetch]);
+    return firestoreResult === true || apiResult === true;
+  }, [checkRoleViaFirestore, checkRoleViaApi]);
+
   useEffect(() => {
     let alive = true;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!alive) return;
+
+      // ── CRITICAL: always reset admin state immediately on user change ──
+      setIsAdmin(false);
       setUser(firebaseUser);
-      setLoading(false);
-      
-      if (firebaseUser) {
-        // Block banned UIDs immediately
-        if (isBlockedUid(firebaseUser.uid)) {
-          await firebaseSignOut(auth);
-          setUser(null);
-          setIsAdmin(false);
-          return;
-        }
 
-        // Block spam email patterns — auto sign out
-        if (firebaseUser.email && (isBlockedEmail(firebaseUser.email) || isSpamEmailPattern(firebaseUser.email))) {
-          await firebaseSignOut(auth);
-          setUser(null);
-          setIsAdmin(false);
-          return;
-        }
+      if (!firebaseUser) {
+        setLoading(false);
+        setRoleLoading(false);
+        return;
+      }
 
-        const isUnverifiedPassword = !firebaseUser.emailVerified && firebaseUser.providerData?.[0]?.providerId === 'password';
+      // Block banned UIDs immediately
+      if (isBlockedUid(firebaseUser.uid)) {
+        await firebaseSignOut(auth);
+        setUser(null);
+        setLoading(false);
+        setRoleLoading(false);
+        return;
+      }
 
-        // ── Check admin role via user_roles collection (source of truth) ──
-        // Race: Firestore SDK vs API fallback — first to respond wins
-        const cachedAdmin = getCachedRole(firebaseUser.uid);
+      // Block spam email patterns
+      if (firebaseUser.email && (isBlockedEmail(firebaseUser.email) || isSpamEmailPattern(firebaseUser.email))) {
+        await firebaseSignOut(auth);
+        setUser(null);
+        setLoading(false);
+        setRoleLoading(false);
+        return;
+      }
 
-        // Fallback: check role via edge function when Firestore fails
-        const checkRoleViaApi = async (uid: string): Promise<boolean> => {
-          try {
-            const baseUrl = import.meta.env.VITE_SUPABASE_URL;
-            const res = await fetch(`${baseUrl}/functions/v1/site-data?type=check-role&uid=${uid}`, {
-              headers: { 'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY },
-            });
-            if (!res.ok) return false;
-            const data = await res.json();
-            return data.isAdmin === true;
-          } catch {
-            return false;
+      // Use .some() for reliable provider check
+      const isPasswordProvider = firebaseUser.providerData?.some(p => p.providerId === 'password') ?? false;
+      const isUnverifiedPassword = isPasswordProvider && !firebaseUser.emailVerified;
+
+      // ── Admin role check ──
+      setRoleLoading(true);
+      setLoading(false); // auth is resolved, role is still loading
+
+      const cachedAdmin = getCachedRole(firebaseUser.uid);
+
+      if (cachedAdmin === true) {
+        // Use cached value for fast render, but validate in background
+        if (alive) setIsAdmin(true);
+        if (alive) setRoleLoading(false);
+
+        // Validate in background (non-blocking)
+        (async () => {
+          const serverAdmin = await resolveAdminRole(firebaseUser);
+          if (!alive) return;
+          if (serverAdmin !== cachedAdmin) {
+            setIsAdmin(serverAdmin);
+            setCachedRole(firebaseUser.uid, serverAdmin);
           }
-        };
-
-        // Check role via Firestore with 3s timeout
-        const checkRoleViaFirestore = async (uid: string): Promise<boolean> => {
-          const roleResult = await Promise.race([
-            getDoc(doc(db, "user_roles", uid)),
-            new Promise<null>((r) => setTimeout(() => r(null), 3000)),
-          ]);
-          if (!roleResult) return false; // timeout
-          return roleResult.exists?.() && roleResult.data()?.role === "admin";
-        };
-        
-        if (cachedAdmin !== null) {
-          // Use cached value immediately for fast render
-          if (alive) setIsAdmin(cachedAdmin);
-          // Validate in background via race (non-blocking)
-          (async () => {
-            let firestoreResult: boolean | null = null;
-            let apiResult: boolean | null = null;
-
-            const fsFetch = checkRoleViaFirestore(firebaseUser.uid)
-              .then(r => { firestoreResult = r; return r; })
-              .catch(() => null);
-            const apiFetch = checkRoleViaApi(firebaseUser.uid)
-              .then(r => { apiResult = r; return r; })
-              .catch(() => null);
-
-            const first = await Promise.race([fsFetch, apiFetch]);
-            const serverAdmin = first ?? false;
-
-            if (!alive) return;
-            if (serverAdmin !== cachedAdmin) {
-              setIsAdmin(serverAdmin);
-              setCachedRole(firebaseUser.uid, serverAdmin);
-            }
-
-            // If first was false, wait for the other in case it returns true
-            if (!serverAdmin) {
-              await Promise.allSettled([fsFetch, apiFetch]);
-              const finalAdmin = firestoreResult === true || apiResult === true;
-              if (finalAdmin !== cachedAdmin && alive) {
-                setIsAdmin(finalAdmin);
-                setCachedRole(firebaseUser.uid, finalAdmin);
-              }
-            }
-          })();
-        } else {
-          // No cache — race Firestore and API simultaneously
-          let firestoreResult: boolean | null = null;
-          let apiResult: boolean | null = null;
-
-          const fsFetch = checkRoleViaFirestore(firebaseUser.uid)
-            .then(r => { firestoreResult = r; return r; })
-            .catch(() => null);
-          const apiFetch = checkRoleViaApi(firebaseUser.uid)
-            .then(r => { apiResult = r; return r; })
-            .catch(() => null);
-
-          const first = await Promise.race([fsFetch, apiFetch]);
-          let hasAdminRole = first === true;
-
-          // If first was false/null, wait for the other
-          if (!hasAdminRole) {
-            await Promise.allSettled([fsFetch, apiFetch]);
-            hasAdminRole = firestoreResult === true || apiResult === true;
-          }
-
-          if (alive) setIsAdmin(hasAdminRole);
+        })();
+      } else {
+        // No cache or cached as false — must verify server-side before granting admin
+        const hasAdminRole = await resolveAdminRole(firebaseUser);
+        if (alive) {
+          setIsAdmin(hasAdminRole);
+          setRoleLoading(false);
           setCachedRole(firebaseUser.uid, hasAdminRole);
         }
+      }
 
-        // Non-blocking: handle users/profile docs in background
-        // Skip for unverified password accounts to prevent quota drain attacks
-        if (!isUnverifiedPassword) {
-          setTimeout(() => {
-            if (!alive) return;
-            (async () => {
-              try {
-                const [userDoc, profileDoc] = await Promise.all([
-                  getDoc(doc(db, "users", firebaseUser.uid)),
-                  getDoc(doc(db, "profiles", firebaseUser.uid)),
-                ]);
+      // Non-blocking: handle users/profile docs in background
+      // Skip for unverified password accounts to prevent quota drain attacks
+      if (!isUnverifiedPassword) {
+        setTimeout(() => {
+          if (!alive) return;
+          (async () => {
+            try {
+              const [userDoc, profileDoc] = await Promise.all([
+                getDoc(doc(db, "users", firebaseUser.uid)),
+                getDoc(doc(db, "profiles", firebaseUser.uid)),
+              ]);
 
-                if (!alive) return;
+              if (!alive) return;
 
-                // Create user doc if it doesn't exist
-                if (!userDoc.exists()) {
-                  await setDoc(doc(db, "users", firebaseUser.uid), {
-                    email: firebaseUser.email,
-                    role: "user",
-                    isAdmin: false,
-                    created_at: new Date().toISOString(),
-                  });
-                }
-
-                if (!alive) return;
-
-                // Create profile doc if it doesn't exist
-                if (!profileDoc.exists()) {
-                  await setDoc(doc(db, "profiles", firebaseUser.uid), {
-                    email: firebaseUser.email,
-                    full_name: firebaseUser.displayName || null,
-                    balance: 0,
-                    created_at: new Date().toISOString(),
-                  });
-                }
-              } catch {
-                // Background sync — non-critical
+              if (!userDoc.exists()) {
+                await setDoc(doc(db, "users", firebaseUser.uid), {
+                  email: firebaseUser.email,
+                  role: "user",
+                  isAdmin: false,
+                  created_at: new Date().toISOString(),
+                });
               }
-            })();
-          }, 3000);
-        }
-      } else {
-        setIsAdmin(false);
+
+              if (!alive) return;
+
+              if (!profileDoc.exists()) {
+                await setDoc(doc(db, "profiles", firebaseUser.uid), {
+                  email: firebaseUser.email,
+                  full_name: firebaseUser.displayName || null,
+                  balance: 0,
+                  created_at: new Date().toISOString(),
+                });
+              }
+            } catch {
+              // Background sync — non-critical
+            }
+          })();
+        }, 3000);
       }
     });
 
     return () => { alive = false; unsubscribe(); };
-  }, [getCachedRole, setCachedRole]);
+  }, [getCachedRole, setCachedRole, resolveAdminRole]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
     if (isBlockedEmail(email)) {
       return { error: { code: 'auth/blocked', message: 'Account suspended' } };
     }
     try {
-      // Clear cached role before login to force fresh check
-      try { localStorage.removeItem('valnix_role_cache_v1'); } catch { /* */ }
+      try { localStorage.removeItem(ROLE_CACHE_KEY); } catch { /* */ }
       await signInWithEmailAndPassword(auth, email, password);
       return { error: null };
     } catch (error) {
@@ -259,8 +259,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const signInWithGoogle = useCallback(async (): Promise<{ error: any }> => {
     try {
-      // Clear cached role before login to force fresh check
-      try { localStorage.removeItem('valnix_role_cache_v1'); } catch { /* */ }
+      try { localStorage.removeItem(ROLE_CACHE_KEY); } catch { /* */ }
       const provider = new GoogleAuthProvider();
       provider.setCustomParameters({ prompt: 'select_account' });
       const result = await signInWithPopup(auth, provider);
@@ -284,7 +283,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, signIn, signUp, signOut, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, roleLoading, signIn, signUp, signOut, signInWithGoogle }}>
       {children}
     </AuthContext.Provider>
   );
