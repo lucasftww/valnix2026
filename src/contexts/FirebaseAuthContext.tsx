@@ -150,28 +150,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const cachedAdmin = getCachedRole(firebaseUser.uid);
 
-      if (cachedAdmin === true) {
-        // Use cached value for fast render, but validate in background
-        if (alive) setIsAdmin(true);
-        if (alive) setRoleLoading(false);
+      // Cache hint for non-admin UI (e.g. show admin link in header faster)
+      if (cachedAdmin === true && alive) setIsAdmin(true);
 
-        // Validate in background (non-blocking)
-        (async () => {
-          const serverAdmin = await resolveAdminRole(firebaseUser);
-          if (!alive) return;
-          if (serverAdmin !== cachedAdmin) {
-            setIsAdmin(serverAdmin);
-            setCachedRole(firebaseUser.uid, serverAdmin);
-          }
-        })();
-      } else {
-        // No cache or cached as false — must verify server-side before granting admin
-        const hasAdminRole = await resolveAdminRole(firebaseUser);
-        if (alive) {
-          setIsAdmin(hasAdminRole);
-          setRoleLoading(false);
-          setCachedRole(firebaseUser.uid, hasAdminRole);
-        }
+      // ALWAYS validate server-side before releasing roleLoading
+      const serverAdmin = await resolveAdminRole(firebaseUser);
+      if (alive) {
+        setIsAdmin(serverAdmin);
+        setRoleLoading(false);
+        setCachedRole(firebaseUser.uid, serverAdmin);
       }
 
       // Non-blocking: handle users/profile docs in background
