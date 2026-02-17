@@ -41,20 +41,16 @@ const ProductCardComponent = ({
     if (prefetchTriggered.current) return;
     // Respect saveData and slow connections
     const conn = (navigator as any).connection;
-    if (conn?.saveData || conn?.effectiveType === '2g') return;
+    const slow = ["slow-2g", "2g"].includes(conn?.effectiveType);
+    if (conn?.saveData || slow) return;
     prefetchTriggered.current = true;
-    // Prefetch JS chunk + data in parallel
+    // Prefetch JS chunk + data in parallel (uses shared fetchProduct with timeout)
     import("@/pages/ProductDetail");
     queryClient.prefetchQuery({
       queryKey: [QUERY_KEYS.PRODUCT, productId],
       queryFn: async () => {
-        const { doc, getDoc } = await import("firebase/firestore");
-        const { db } = await import("@/integrations/firebase/config");
-        const snap = await getDoc(doc(db, "products", productId));
-        if (!snap.exists()) return null;
-        const data = snap.data();
-        if (data?.is_active === false) return null;
-        return { id: snap.id, ...data };
+        const { fetchProduct } = await import("@/lib/fetchProduct");
+        return fetchProduct(productId);
       },
       ...CACHE_TIMES.MODERATE,
     });

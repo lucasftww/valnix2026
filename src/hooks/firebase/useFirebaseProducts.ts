@@ -121,27 +121,14 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
   });
 };
 
-// Hook para detalhes de um produto
+// Hook para detalhes de um produto — uses shared fetchProduct
 export const useProduct = (productId: string | undefined) => {
   return useQuery({
     queryKey: [QUERY_KEYS.PRODUCT, productId],
     queryFn: async () => {
       if (!productId) return null;
-      
-      const { doc: docRef, getDoc } = await import("firebase/firestore");
-
-      const TIMEOUT_MS = 8000;
-      const result = await Promise.race([
-        getDoc(docRef(db, "products", productId)).catch((e) => { throw e; }),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('PRODUCT_FETCH_TIMEOUT')), TIMEOUT_MS)
-        ),
-      ]);
-
-      if (!result.exists()) return null;
-      const data = result.data();
-      if (!data.is_active) return null;
-      return { id: result.id, ...data };
+      const { fetchProduct } = await import("@/lib/fetchProduct");
+      return fetchProduct(productId);
     },
     enabled: !!productId,
     staleTime: 30 * 60 * 1000,
@@ -149,8 +136,10 @@ export const useProduct = (productId: string | undefined) => {
     refetchOnWindowFocus: false,
     retry: (failureCount, error) => {
       if (failureCount >= 2) return false;
-      const msg = (error as Error)?.message || '';
-      return msg.includes('TIMEOUT') || msg.includes('unavailable') || msg.includes('network');
+      const msg = (error as Error)?.message ?? "";
+      const code = (error as any)?.code ?? "";
+      if (msg.includes("PRODUCT_FETCH_TIMEOUT")) return true;
+      return code.includes("unavailable") || code.includes("deadline-exceeded") || msg.toLowerCase().includes("network");
     },
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
   });

@@ -138,7 +138,8 @@ const ProductDetail = () => {
         <Navigation />
         <main className="flex-1 container px-4 md:px-8 py-12">
           <div className="text-center">
-            <h1 className="text-3xl font-bold mb-4">Produto não encontrado</h1>
+            <h1 className="text-3xl font-bold mb-4">Produto indisponível</h1>
+            <p className="text-muted-foreground mb-4">Este produto não está mais disponível ou foi removido.</p>
             <Button onClick={() => navigate(-1)}>Voltar</Button>
           </div>
         </main>
