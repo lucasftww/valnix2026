@@ -45,21 +45,33 @@ export const useCategories = () => {
   return useQuery({
     queryKey: [QUERY_KEYS.CATEGORIES],
     queryFn: async (): Promise<Category[]> => {
-      try {
+      // Race: Firestore vs API fallback
+      const firestoreFetch = (async () => {
         const snapshot = await resilientGetDocs(collection(db, "categories"));
         const raw = snapshot.docs
           .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
           .filter((c) => c?.is_active);
         return deduplicateCategories(raw);
-      } catch (err) {
-        console.warn("[Categories] Firestore failed, trying API fallback:", (err as Error)?.message || err);
-        if (isBlockedByAdBlocker(err)) markFirestorePossiblyBlocked(err);
+      })();
+
+      const apiFetch = new Promise<Category[]>((resolve, reject) => {
+        setTimeout(async () => {
+          try {
+            const raw = await fetchCategoriesFallback();
+            resolve(deduplicateCategories(raw.filter((c: any) => c?.is_active)));
+          } catch (e) {
+            reject(e);
+          }
+        }, 3000);
+      });
+
+      try {
+        return await Promise.race([firestoreFetch, apiFetch]);
+      } catch {
         try {
-          const raw = await fetchCategoriesFallback();
-          return deduplicateCategories(raw.filter((c: any) => c?.is_active));
-        } catch (fallbackErr) {
-          console.error("[Categories] API fallback also failed:", fallbackErr);
-          throw err;
+          return await apiFetch;
+        } catch {
+          return await firestoreFetch;
         }
       }
     },
