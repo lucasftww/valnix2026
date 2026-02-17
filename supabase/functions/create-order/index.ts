@@ -89,13 +89,26 @@ async function addFirestoreDoc(col: string, data: Record<string, unknown>): Prom
   return parts[parts.length - 1] || null;
 }
 
-async function getFirestoreDoc(col: string, docId: string) {
+async function getFirestoreDoc(col: string, docId: string, retries = 2): Promise<Record<string, any> | null> {
   const accessToken = await getFirebaseAccessToken();
   const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/${col}/${docId}`;
-  const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-  if (!res.ok) return null;
-  const data = await res.json();
-  return data.fields || null;
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    const res = await fetch(url, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+    if (res.ok) {
+      const data = await res.json();
+      return data.fields || null;
+    }
+    if (res.status === 429 && attempt < retries) {
+      console.warn(`⚠️ Firestore 429 for ${col}/${docId}, retrying in ${(attempt + 1) * 1000}ms...`);
+      await new Promise(r => setTimeout(r, (attempt + 1) * 1000));
+      continue;
+    }
+    if (res.status === 404) return null;
+    console.error(`❌ getFirestoreDoc ${col}/${docId} failed: ${res.status}`);
+    if (res.status === 429) throw new Error(`Firestore quota exceeded reading ${col}/${docId}`);
+    return null;
+  }
+  return null;
 }
 
 // ── Firebase ID Token Verification ─────────────────────────────────
@@ -512,10 +525,11 @@ Deno.serve(async (req) => {
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
 
-  } catch (err) {
+  } catch (err: any) {
     console.error('❌ create-order error:', err);
-    return new Response(JSON.stringify({ error: 'Internal server error' }), {
-      status: 500,
+    const isQuota = err?.message?.includes('quota') || err?.message?.includes('429');
+    return new Response(JSON.stringify({ error: isQuota ? 'Serviço temporariamente indisponível. Tente novamente em alguns segundos.' : 'Internal server error' }), {
+      status: isQuota ? 503 : 500,
       headers: { ...cors, 'Content-Type': 'application/json' },
     });
   }
