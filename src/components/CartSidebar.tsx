@@ -52,9 +52,9 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
       
        <SheetContent 
         side="right" 
-        className="w-full sm:w-[400px] p-0 flex flex-col bg-background/98 backdrop-saturate-150 border-l border-border/20"
+        className="w-full sm:w-[400px] p-0 flex flex-col bg-background border-l border-border/30"
       >
-        <SheetHeader className="px-5 py-4 border-b border-border/20 bg-secondary/30">
+        <SheetHeader className="px-5 py-4 border-b border-border/20 bg-secondary/50">
           <SheetTitle className="flex items-center gap-3 text-foreground">
             <div className="w-9 h-9 rounded-full bg-primary/10 flex items-center justify-center">
               <ShoppingBag className="w-4 h-4 text-primary" />
@@ -145,7 +145,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
               </div>
             </ScrollArea>
 
-            <div className="border-t border-border/20 bg-secondary/30 p-4 space-y-4">
+            <div className="border-t border-border/20 bg-secondary/50 p-4 space-y-4">
               <div className="space-y-2">
                 {discount > 0 && (
                   <div className="flex justify-between text-sm">
