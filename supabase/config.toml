@@ -48,5 +48,8 @@ verify_jwt = false
 [functions.guest-order]
 verify_jwt = false
 
+[functions.site-data]
+verify_jwt = false
+
 [functions.site-banners]
 verify_jwt = false

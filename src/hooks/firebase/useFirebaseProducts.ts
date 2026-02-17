@@ -3,6 +3,7 @@ import { collection, query, where, limit } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
+import { fetchFeaturedProductsFallback, fetchCategoryProductsFallback } from "@/lib/firestoreFallback";
 import type { ProductCardData, ProductWithReviews } from "@/types";
 
 const generateConsistentSalesAndReviews = (productId: string): { sold: number; reviewCount: number } => {
@@ -18,45 +19,72 @@ const generateConsistentSalesAndReviews = (productId: string): { sold: number; r
 
 export { generateConsistentSalesAndReviews };
 
+/** Check if error is likely caused by ad blocker blocking Firestore */
+function isBlockedByAdBlocker(err: unknown): boolean {
+  const msg = (err as Error)?.message?.toLowerCase() ?? "";
+  const code = (err as any)?.code ?? "";
+  return (
+    code === "unavailable" ||
+    msg.includes("failed to fetch") ||
+    msg.includes("network") ||
+    msg.includes("err_blocked") ||
+    msg.includes("could not reach")
+  );
+}
+
+function mapToProductCard(p: any): ProductCardData {
+  const stats = generateConsistentSalesAndReviews(p.id);
+  return {
+    id: p.id,
+    name: p.name,
+    image_url: p.image_url,
+    icon_url: p.icon_url,
+    price: p.price,
+    old_price: p.old_price,
+    discount: p.discount,
+    category: p.category,
+    sold: stats.sold,
+    reviewCount: stats.reviewCount,
+  };
+}
 
 // Hook para produtos em destaque (home)
 export const useFeaturedProducts = () => {
   return useQuery({
     queryKey: [QUERY_KEYS.BEST_SELLING],
     queryFn: async (): Promise<ProductCardData[]> => {
-      const productsQuery = query(
-        collection(db, "products"),
-        where("featured", "==", true),
-        limit(50)
-      );
+      try {
+        const productsQuery = query(
+          collection(db, "products"),
+          where("featured", "==", true),
+          limit(50)
+        );
 
-      const productsSnapshot = await resilientGetDocs(productsQuery);
-      
-      console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs, fromCache: ${productsSnapshot.metadata.fromCache}`);
+        const productsSnapshot = await resilientGetDocs(productsQuery);
+        
+        console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs, fromCache: ${productsSnapshot.metadata.fromCache}`);
 
-      const featuredActive = productsSnapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
-        .filter((p) => p?.is_active)
-        .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
-        .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT);
-      
-      console.log(`[Products] After is_active filter: ${featuredActive.length} products`);
+        const featuredActive = productsSnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
+          .filter((p) => p?.is_active)
+          .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
+          .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT);
+        
+        console.log(`[Products] After is_active filter: ${featuredActive.length} products`);
 
-      return featuredActive.map((p) => {
-        const stats = generateConsistentSalesAndReviews(p.id);
-        return {
-          id: p.id,
-          name: p.name,
-          image_url: p.image_url,
-          icon_url: p.icon_url,
-          price: p.price,
-          old_price: p.old_price,
-          discount: p.discount,
-          category: p.category,
-          sold: stats.sold,
-          reviewCount: stats.reviewCount,
-        };
-      });
+        return featuredActive.map(mapToProductCard);
+      } catch (err) {
+        // Fallback to API proxy when Firestore is blocked (ad blocker)
+        if (isBlockedByAdBlocker(err)) {
+          console.info("[Products] Firestore blocked, using API fallback");
+          const products = await fetchFeaturedProductsFallback();
+          return products
+            .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+            .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
+            .map(mapToProductCard);
+        }
+        throw err;
+      }
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -68,6 +96,40 @@ export const useFeaturedProducts = () => {
   });
 };
 
+// Helper to map raw product to ProductWithReviews
+function mapToProductWithReviews(p: any): ProductWithReviews {
+  const stats = generateConsistentSalesAndReviews(p.id);
+  return {
+    id: p.id,
+    name: p.name,
+    description: p.description,
+    image_url: p.image_url,
+    icon_url: p.icon_url,
+    price: p.price,
+    old_price: p.old_price,
+    discount: p.discount,
+    category: p.category,
+    is_active: p.is_active,
+    featured: p.featured,
+    display_order: p.display_order,
+    created_at: p.created_at,
+    updated_at: p.updated_at,
+    stock: p.stock,
+    sold: stats.sold,
+    delivery_info: p.delivery_info,
+    delivery_type: p.delivery_type,
+    auto_delivery_codes: null,
+    instructions: p.instructions,
+    terms_conditions: p.terms_conditions,
+    rich_description: p.rich_description,
+    video_url: p.video_url,
+    product_type: p.product_type,
+    is_featured_in_category: p.is_featured_in_category,
+    offer_hash: p.offer_hash,
+    reviewCount: stats.reviewCount,
+  } as ProductWithReviews;
+}
+
 // Hook para produtos de uma categoria
 export const useCategoryProducts = (categorySlug: string | undefined) => {
   return useQuery({
@@ -75,49 +137,30 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
     queryFn: async (): Promise<ProductWithReviews[]> => {
       if (!categorySlug) return [];
       
-      const productsQuery = query(
-        collection(db, "products"),
-        where("category", "==", categorySlug)
-      );
+      try {
+        const productsQuery = query(
+          collection(db, "products"),
+          where("category", "==", categorySlug)
+        );
 
-      const productsSnapshot = await resilientGetDocs(productsQuery);
+        const productsSnapshot = await resilientGetDocs(productsQuery);
 
-      return productsSnapshot.docs
-        .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
-        .filter((p) => p?.is_active)
-        .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
-        .map((p) => {
-          const stats = generateConsistentSalesAndReviews(p.id);
-          return {
-            id: p.id,
-            name: p.name,
-            description: p.description,
-            image_url: p.image_url,
-            icon_url: p.icon_url,
-            price: p.price,
-            old_price: p.old_price,
-            discount: p.discount,
-            category: p.category,
-            is_active: p.is_active,
-            featured: p.featured,
-            display_order: p.display_order,
-            created_at: p.created_at,
-            updated_at: p.updated_at,
-            stock: p.stock,
-            sold: stats.sold,
-            delivery_info: p.delivery_info,
-            delivery_type: p.delivery_type,
-            auto_delivery_codes: null,
-            instructions: p.instructions,
-            terms_conditions: p.terms_conditions,
-            rich_description: p.rich_description,
-            video_url: p.video_url,
-            product_type: p.product_type,
-            is_featured_in_category: p.is_featured_in_category,
-            offer_hash: p.offer_hash,
-            reviewCount: stats.reviewCount,
-          } as ProductWithReviews;
-        });
+        return productsSnapshot.docs
+          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
+          .filter((p) => p?.is_active)
+          .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
+          .map(mapToProductWithReviews);
+      } catch (err) {
+        if (isBlockedByAdBlocker(err)) {
+          console.info("[Products] Firestore blocked, using API fallback for category:", categorySlug);
+          const products = await fetchCategoryProductsFallback(categorySlug);
+          return products
+            .filter((p: any) => p?.is_active)
+            .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
+            .map(mapToProductWithReviews);
+        }
+        throw err;
+      }
     },
     enabled: !!categorySlug,
     staleTime: 30 * 60 * 1000,
@@ -126,14 +169,23 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
   });
 };
 
-// Hook para detalhes de um produto — uses shared fetchProduct
+// Hook para detalhes de um produto — uses shared fetchProduct with API fallback
 export const useProduct = (productId: string | undefined) => {
   return useQuery({
     queryKey: [QUERY_KEYS.PRODUCT, productId],
     queryFn: async () => {
       if (!productId) return null;
-      const { fetchProduct } = await import("@/lib/fetchProduct");
-      return fetchProduct(productId);
+      try {
+        const { fetchProduct } = await import("@/lib/fetchProduct");
+        return await fetchProduct(productId);
+      } catch (err) {
+        if (isBlockedByAdBlocker(err)) {
+          console.info("[Products] Firestore blocked, using API fallback for product:", productId);
+          const { fetchProductFallback } = await import("@/lib/firestoreFallback");
+          return fetchProductFallback(productId);
+        }
+        throw err;
+      }
     },
     enabled: !!productId,
     staleTime: 30 * 60 * 1000,
