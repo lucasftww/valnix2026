@@ -21,7 +21,7 @@
     <!-- Security Headers -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://connect.facebook.net https://cdn.utmify.com.br https://apis.google.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://media.discordapp.net https://cdn.discordapp.com https://pub-73a0e04cd31c43799c084ebb2f9dcb49.r2.dev https://storage.googleapis.com https://firebasestorage.googleapis.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://www.valnix.com.br https://www.google.com https://www.gstatic.com; font-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://*.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://oauth2.googleapis.com https://content-firebaseappcheck.googleapis.com https://*.firebaseio.com wss://firestore.googleapis.com https://*.supabase.co https://graph.facebook.com https://api.utmify.com.br https://cdn.utmify.com.br https://flowpayments.net https://media.discordapp.net https://www.google.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://cdn.utmify.com.br https://connect.facebook.net https://www.facebook.com https://www.google.com https://www.gstatic.com; worker-src 'self'; form-action 'self' https://www.facebook.com; base-uri 'self'; object-src 'none';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://connect.facebook.net https://cdn.utmify.com.br https://apis.google.com https://www.google.com https://www.gstatic.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://media.discordapp.net https://cdn.discordapp.com https://pub-73a0e04cd31c43799c084ebb2f9dcb49.r2.dev https://storage.googleapis.com https://firebasestorage.googleapis.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://www.valnix.com.br https://www.google.com https://www.gstatic.com; font-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://*.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://oauth2.googleapis.com https://content-firebaseappcheck.googleapis.com https://*.firebaseio.com wss://firestore.googleapis.com https://*.supabase.co https://graph.facebook.com https://api.utmify.com.br https://cdn.utmify.com.br https://flowpayments.net https://media.discordapp.net https://www.google.com; frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://cdn.utmify.com.br https://connect.facebook.net https://www.facebook.com https://www.google.com https://www.gstatic.com; worker-src 'self'; form-action 'self' https://www.facebook.com; base-uri 'self'; object-src 'none';" />
     
     <!-- Performance & Mobile Optimization -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -168,72 +168,6 @@
     <!-- Manifest -->
     <link rel="manifest" href="/manifest.json" />
 
-    <!-- Strip sensitive tokens from URL before any tracking scripts load -->
-    <script>
-      (function(){
-        var url = new URL(window.location.href);
-        var dirty = false;
-        ['__lovable_token', '__dev_token'].forEach(function(key) {
-          if (url.searchParams.has(key)) { url.searchParams.delete(key); dirty = true; }
-        });
-        if (dirty) window.history.replaceState(null, '', url.toString());
-      })();
-    </script>
-
-    <!-- Facebook Pixel Base — DEFERRED to avoid blocking render -->
-    <script>
-      // Defer FB pixel init to after page load for better LCP
-      window.addEventListener('load', function() {
-        !function(f,b,e,v,n,t,s)
-        {if(f.fbq)return;n=f.fbq=function(){n.callMethod?
-        n.callMethod.apply(n,arguments):n.queue.push(arguments)};
-        if(!f._fbq)f._fbq=n;n.push=n;n.loaded=!0;n.version='2.0';
-        n.queue=[];t=b.createElement(e);t.async=!0;
-        t.src=v;s=b.getElementsByTagName(e)[0];
-        s.parentNode.insertBefore(t,s)}(window, document,'script',
-        'https://connect.facebook.net/en_US/fbevents.js');
-        fbq('set', 'autoConfig', false, '1939179866693535');
-        fbq('init', '1939179866693535');
-      }, {once: true});
-    </script>
-    
-
-    <!-- Auto-detect referrer/click IDs and inject UTMs -->
-    <script>
-      (function(){
-        var params = new URLSearchParams(window.location.search);
-        if (params.get('utm_source')) {
-          try {
-            var existing = {};
-            ['utm_source','utm_medium','utm_campaign','utm_content','utm_term'].forEach(function(k){
-              var v = params.get(k); if(v) existing[k] = v;
-            });
-            sessionStorage.setItem('valnix_utm_params', JSON.stringify(existing));
-          } catch(e){}
-          return;
-        }
-        // If UTMs already captured in this session, don't overwrite with auto-detection
-        try { if (sessionStorage.getItem('valnix_utm_params')) return; } catch(e){}
-        var ref = (document.referrer || '').toLowerCase();
-        var utm = null;
-        // Only auto-detect PAID traffic (click IDs from ad platforms)
-        // Organic, direct, and social traffic should NOT be attributed as campaigns
-        if (params.get('gclid')) {
-          utm = { utm_source: 'google', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'google_ads' };
-        } else if (params.get('fbclid')) {
-          utm = { utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'facebook_ads' };
-        }
-        // All other traffic (organic, direct, social referrers) is intentionally NOT tagged
-        // so UTMify only tracks actual paid campaign conversions
-        if (utm) {
-          var url = new URL(window.location.href);
-          for (var key in utm) { url.searchParams.set(key, utm[key]); }
-          window.history.replaceState(null, '', url.toString());
-          try { sessionStorage.setItem('valnix_utm_params', JSON.stringify(utm)); } catch(e){}
-        }
-      })();
-    </script>
-
 
   </head>
 
@@ -325,28 +259,5 @@
     <!-- noscript pixel removed — no PageView event needed -->
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
-    <!-- UTMify: load once, skip admin/checkout, defer to idle -->
-    <script>
-    (function () {
-      var path = location.pathname;
-      if (/^\/(admin|checkout|card-callback)(\/|$)/.test(path)) return;
-
-      if (window.__utmify_loaded === true) return;
-      window.__utmify_loaded = true;
-
-      var load = function () {
-        if (!document.head) return setTimeout(load, 50);
-        var s = document.createElement("script");
-        s.src = "https://cdn.utmify.com.br/scripts/utms/latest.js";
-        s.async = true;
-        s.setAttribute("data-utmify-prevent-xcod-sck", "");
-        s.setAttribute("data-utmify-prevent-subids", "");
-        document.head.appendChild(s);
-      };
-
-      var ric = window.requestIdleCallback || function (cb) { setTimeout(cb, 200); };
-      ric(load);
-    })();
-    </script>
   </body>
 </html>
