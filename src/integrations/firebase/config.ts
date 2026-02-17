@@ -26,12 +26,16 @@ export const appCheckReady: Promise<void> = (async () => {
       provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
     });
-    // Wait for the first token to be generated before allowing queries
-    await getToken(appCheck, /* forceRefresh */ false);
-    console.log("[AppCheck] Token obtained successfully");
+    // Wait for token with a 5s timeout — don't block the app forever
+    await Promise.race([
+      getToken(appCheck, false).then(() => {
+        console.log("[AppCheck] Token obtained successfully");
+      }),
+      new Promise<void>((_, reject) =>
+        setTimeout(() => reject(new Error("APP_CHECK_TIMEOUT")), 5000)
+      ),
+    ]);
   } catch (err) {
-    // If App Check fails (e.g. domain not in reCAPTCHA allowlist), continue anyway
-    // Queries will still work if enforcement is not enabled, or fail gracefully
     console.warn("[AppCheck] Token failed, continuing without:", (err as Error).message);
   }
 })();
