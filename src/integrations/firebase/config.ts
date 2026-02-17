@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, memoryLocalCache, setLogLevel } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider, getToken } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -26,12 +26,22 @@ const isProduction = PRODUCTION_HOSTS.includes(window.location.hostname);
 if (isProduction) {
   try {
     const RECAPTCHA_SITE_KEY = "6Lfl7G4sAAAAADoi7eT1rgsOVSBIr9CMiqJ7JL-3";
-    initializeAppCheck(app, {
+    const appCheck = initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
     });
+
+    // Proactively get first token with timeout to catch & suppress reCAPTCHA timeouts
+    // This prevents "Uncaught (in promise) Timeout" from polluting the console
+    Promise.race([
+      getToken(appCheck, /* forceRefresh */ false),
+      new Promise((_, reject) => setTimeout(() => reject(new Error("AppCheck token timeout")), 8000)),
+    ]).catch(() => {
+      // Silent: App Check token failed (adblock/network/timeout)
+      // Firestore continues in monitoring mode without App Check
+    });
   } catch (err) {
-    console.warn("[AppCheck] Init failed, continuing without App Check:", (err as Error).message);
+    // Sync init failure — continue without App Check
   }
 }
 
