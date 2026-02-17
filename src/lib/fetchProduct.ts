@@ -1,5 +1,5 @@
 import { doc, getDocFromServer, type DocumentSnapshot } from "firebase/firestore";
-import { db, appCheckReady } from "@/integrations/firebase/config";
+import { db } from "@/integrations/firebase/config";
 import type { Product } from "@/types";
 import type { FirebaseError } from "firebase/app";
 
@@ -28,14 +28,8 @@ export const logFetchTimeout = (productId: string, error: unknown) => {
 
 /**
  * Shared product fetcher used by both useProductById hook and ProductCard prefetch.
- * - Single getDoc call (persistent cache checks local first, then network)
- * - Timeout throws error so caller can distinguish timeout vs not-found
- * - Returns null for genuinely non-existent or inactive products
- * - Catches losing promise to prevent "Uncaught (in promise)"
  */
 export async function fetchProduct(productId: string): Promise<Product | null> {
-  await appCheckReady;
-  
   const ref = doc(db, "products", productId);
 
   const firestorePromise = getDocFromServer(ref);
@@ -43,7 +37,6 @@ export async function fetchProduct(productId: string): Promise<Product | null> {
     setTimeout(() => reject(new Error("PRODUCT_FETCH_TIMEOUT")), TIMEOUT_MS)
   );
 
-  // Prevent "Uncaught (in promise)" for the loser of the race
   firestorePromise.catch(() => {});
   timeoutPromise.catch(() => {});
 

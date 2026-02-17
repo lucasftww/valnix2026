@@ -1,15 +1,10 @@
 import React, { createContext, useContext, useEffect, useState, useCallback } from "react";
 import type { User } from "firebase/auth";
-import { isBlockedEmail, isBlockedUid, isSpamEmailPattern } from "@/lib/blockedEmails";
 
 // ═══════════════════════════════════════════════════════════════════
-// PERFORMANCE: No static Firebase imports!
-// All Firebase modules are loaded dynamically (import()) to keep
-// ~300KB of JS out of the initial bundle. The homepage renders
-// instantly while Firebase loads in the background.
+// Admin-only auth context. No user signups, no Google login, no
+// blocked emails. Firebase Auth is used exclusively for admin access.
 // ═══════════════════════════════════════════════════════════════════
-
-// ── Security: admin role is determined ONLY by "user_roles" collection ──
 
 interface AuthContextType {
   user: User | null;
@@ -17,9 +12,7 @@ interface AuthContextType {
   isAdmin: boolean;
   roleLoading: boolean;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
-  signInWithGoogle: () => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -126,22 +119,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           return;
         }
 
-        if (isBlockedUid(firebaseUser.uid)) {
-          await authMod.signOut(config.auth);
-          setUser(null);
-          setLoading(false);
-          setRoleLoading(false);
-          return;
-        }
-
-        if (firebaseUser.email && (isBlockedEmail(firebaseUser.email) || isSpamEmailPattern(firebaseUser.email))) {
-          await authMod.signOut(config.auth);
-          setUser(null);
-          setLoading(false);
-          setRoleLoading(false);
-          return;
-        }
-
         setRoleLoading(true);
         setLoading(false);
 
@@ -153,45 +130,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setIsAdmin(serverAdmin);
           setRoleLoading(false);
           setCachedRole(firebaseUser.uid, serverAdmin);
-        }
-
-        // Background profile sync
-        const isPasswordProvider = firebaseUser.providerData?.some(p => p.providerId === 'password') ?? false;
-        const isUnverifiedPassword = isPasswordProvider && !firebaseUser.emailVerified;
-
-        if (!isUnverifiedPassword) {
-          setTimeout(async () => {
-            if (!alive) return;
-            try {
-              const fs = await import("firebase/firestore");
-              const [userDoc, profileDoc] = await Promise.all([
-                fs.getDoc(fs.doc(config.db, "users", firebaseUser.uid)),
-                fs.getDoc(fs.doc(config.db, "profiles", firebaseUser.uid)),
-              ]);
-
-              if (!alive) return;
-
-              if (!userDoc.exists()) {
-                await fs.setDoc(fs.doc(config.db, "users", firebaseUser.uid), {
-                  email: firebaseUser.email,
-                  role: "user",
-                  isAdmin: false,
-                  created_at: new Date().toISOString(),
-                });
-              }
-
-              if (!alive) return;
-
-              if (!profileDoc.exists()) {
-                await fs.setDoc(fs.doc(config.db, "profiles", firebaseUser.uid), {
-                  email: firebaseUser.email,
-                  full_name: firebaseUser.displayName || null,
-                  balance: 0,
-                  created_at: new Date().toISOString(),
-                });
-              }
-            } catch {}
-          }, 3000);
         }
       });
     };
@@ -207,7 +145,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, [getCachedRole, setCachedRole, resolveAdminRole]);
 
   const signIn = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
-    if (isBlockedEmail(email)) return { error: { code: 'auth/blocked', message: 'Account suspended' } };
     try {
       try { localStorage.removeItem(ROLE_CACHE_KEY); } catch {}
       const [config, authMod] = await Promise.all([
@@ -215,29 +152,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         import("firebase/auth"),
       ]);
       await authMod.signInWithEmailAndPassword(config.auth, email, password);
-      return { error: null };
-    } catch (error) { return { error }; }
-  }, []);
-
-  const signUp = useCallback(async (email: string, password: string): Promise<{ error: any }> => {
-    if (isBlockedEmail(email) || isSpamEmailPattern(email)) {
-      return { error: { code: 'auth/blocked', message: 'Account suspended' } };
-    }
-    try {
-      const [config, authMod, fs] = await Promise.all([
-        import("@/integrations/firebase/config"),
-        import("firebase/auth"),
-        import("firebase/firestore"),
-      ]);
-      const result = await authMod.createUserWithEmailAndPassword(config.auth, email, password);
-      if (!isSpamEmailPattern(email)) {
-        await fs.setDoc(fs.doc(config.db, "users", result.user.uid), {
-          email: result.user.email,
-          role: "user",
-          isAdmin: false,
-          created_at: new Date().toISOString(),
-        });
-      }
       return { error: null };
     } catch (error) { return { error }; }
   }, []);
@@ -252,36 +166,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try { localStorage.removeItem(ROLE_CACHE_KEY); } catch {}
   }, []);
 
-  const signInWithGoogle = useCallback(async (): Promise<{ error: any }> => {
-    try {
-      try { localStorage.removeItem(ROLE_CACHE_KEY); } catch {}
-      const [config, authMod, fs] = await Promise.all([
-        import("@/integrations/firebase/config"),
-        import("firebase/auth"),
-        import("firebase/firestore"),
-      ]);
-      const provider = new authMod.GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const result = await authMod.signInWithPopup(config.auth, provider);
-      if (result.user.email && isBlockedEmail(result.user.email)) {
-        await authMod.signOut(config.auth);
-        return { error: { code: 'auth/blocked', message: 'Account suspended' } };
-      }
-      const userDoc = await fs.getDoc(fs.doc(config.db, "users", result.user.uid));
-      if (!userDoc.exists()) {
-        await fs.setDoc(fs.doc(config.db, "users", result.user.uid), {
-          email: result.user.email,
-          role: "user",
-          isAdmin: false,
-          created_at: new Date().toISOString(),
-        });
-      }
-      return { error: null };
-    } catch (error) { return { error }; }
-  }, []);
-
   return (
-    <AuthContext.Provider value={{ user, loading, isAdmin, roleLoading, signIn, signUp, signOut, signInWithGoogle }}>
+    <AuthContext.Provider value={{ user, loading, isAdmin, roleLoading, signIn, signOut }}>
       {children}
     </AuthContext.Provider>
   );

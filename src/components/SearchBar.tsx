@@ -44,7 +44,6 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
       import("firebase/firestore"),
     ]);
 
-    await config.appCheckReady;
     const q = fs.query(fs.collection(config.db, "products"), fs.limit(500));
 
     const firestorePromise = fs.getDocsFromServer(q);
