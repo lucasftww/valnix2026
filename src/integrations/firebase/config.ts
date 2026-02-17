@@ -1,7 +1,7 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
 import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
-import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
+import { initializeAppCheck, ReCaptchaV3Provider, getToken } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
 const firebaseConfig = {
@@ -20,21 +20,21 @@ const app = initializeApp(firebaseConfig);
 // App Check with reCAPTCHA v3
 const RECAPTCHA_SITE_KEY = "6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J";
 
-let appCheckInstance: ReturnType<typeof initializeAppCheck> | null = null;
-
-export const appCheckReady: Promise<void> = new Promise((resolve) => {
+export const appCheckReady: Promise<void> = (async () => {
   try {
-    appCheckInstance = initializeAppCheck(app, {
+    const appCheck = initializeAppCheck(app, {
       provider: new ReCaptchaV3Provider(RECAPTCHA_SITE_KEY),
       isTokenAutoRefreshEnabled: true,
     });
-    console.log("[AppCheck] Initialized successfully");
-    resolve();
+    // Wait for the first token to be generated before allowing queries
+    await getToken(appCheck, /* forceRefresh */ false);
+    console.log("[AppCheck] Token obtained successfully");
   } catch (err) {
-    console.warn("[AppCheck] Init failed, continuing without:", (err as Error).message);
-    resolve(); // resolve anyway so queries aren't blocked
+    // If App Check fails (e.g. domain not in reCAPTCHA allowlist), continue anyway
+    // Queries will still work if enforcement is not enabled, or fail gracefully
+    console.warn("[AppCheck] Token failed, continuing without:", (err as Error).message);
   }
-});
+})();
 
 // Initialize services
 export const auth = getAuth(app);
