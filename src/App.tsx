@@ -8,26 +8,11 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense } from "react";
 
-// Componente interno para usar hooks dentro do BrowserRouter + prefetch rotas
+// Componente interno para usar hooks dentro do BrowserRouter
 const AppContent = () => {
   useBackRedirect("/");
-  
-  // Prefetch only the most critical route chunks after idle
-  useEffect(() => {
-    const prefetch = () => {
-      import("./pages/ProductDetail");
-      import("./pages/Category");
-    };
-    // Delay prefetch to avoid competing with initial render
-    if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(prefetch, { timeout: 4000 });
-    } else {
-      setTimeout(prefetch, 3000);
-    }
-  }, []);
-  
   return null;
 };
 
