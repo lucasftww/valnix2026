@@ -38,13 +38,12 @@ const ProductCardComponent = ({
   // Prefetch otimizado - triggers on hover (desktop) and touchstart (mobile)
   const prefetchTriggered = useRef(false);
   const triggerPrefetch = useCallback(() => {
-    if (prefetchTriggered.current) return;
+    if (!productId || prefetchTriggered.current) return;
     // Respect saveData and slow connections
     const conn = (navigator as any).connection;
     const slow = ["slow-2g", "2g"].includes(conn?.effectiveType);
     if (conn?.saveData || slow) return;
     prefetchTriggered.current = true;
-    if (!productId) return;
     // Prefetch JS chunk + data in parallel (uses shared fetchProduct with timeout)
     import("@/pages/ProductDetail");
     queryClient

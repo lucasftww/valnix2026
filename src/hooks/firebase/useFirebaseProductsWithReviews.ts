@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
-import { fetchProduct, shouldRetryProductFetch, logFetchTimeout } from "@/lib/fetchProduct";
+import { fetchProduct, shouldRetryProductFetch } from "@/lib/fetchProduct";
 import type { Category, Review, Product } from "@/types";
 
 import { generateConsistentSalesAndReviews } from "./useFirebaseProducts";
@@ -110,13 +110,15 @@ export const useProductById = (productId: string | undefined) => {
     refetchOnWindowFocus: false,
     refetchOnMount: false,
     refetchOnReconnect: true,
-    retry: (failureCount, error) => {
-      if (productId) logFetchTimeout(productId, error);
-      return failureCount < 2 && shouldRetryProductFetch(error);
-    },
+    retry: (failureCount, error) =>
+      failureCount < 2 && shouldRetryProductFetch(error),
     retryDelay: (attempt) => Math.min(1000 * 2 ** attempt, 5000),
+    meta: { productId },
   });
 };
+
+// Log timeout once on final failure (not on every retry)
+// Usage: set queryClient defaultOptions.mutations.onError or use in component via useEffect on isError
 
 // Hook para buscar reviews por categoria
 export const useProductReviews = (category: string | undefined) => {
