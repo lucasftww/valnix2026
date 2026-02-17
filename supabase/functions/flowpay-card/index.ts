@@ -416,7 +416,7 @@ Deno.serve(async (req) => {
       console.log(`💳 Card payment confirmed via webhook for charge: ${chargeId}`);
 
       // Find order by flowpay_charge_id
-      const queryResults = await queryFirestore('guest_orders', 'flowpay_charge_id', 'EQUAL', chargeId);
+      const queryResults = await queryFirestore('ordens', 'flowpay_charge_id', 'EQUAL', chargeId);
       if (!queryResults || !queryResults[0]?.document) {
         console.error(`❌ No order found for card chargeId: ${chargeId}`);
         return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: { 'Content-Type': 'application/json' } });
@@ -452,7 +452,7 @@ Deno.serve(async (req) => {
       const userId = orderFields?.user_id?.stringValue;
 
       // Mark as paid
-      await updateFirestoreDoc('guest_orders', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+      await updateFirestoreDoc('ordens', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
       console.log(`✅ Card order ${orderId} marked as paid via webhook`);
 
       // Process delivery
@@ -469,7 +469,7 @@ Deno.serve(async (req) => {
       let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
       try {
         const at2 = await getFirebaseAccessToken();
-        const iUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=50`;
+        const iUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=50`;
         const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at2}` } });
         if (iRes.ok) {
           const iData = await iRes.json();
@@ -543,7 +543,7 @@ Deno.serve(async (req) => {
       }
 
       // 🔒 CRITICAL: Recalculate total from REAL product prices (never trust client total_amount)
-      const orderFields = await getFirestoreDoc('guest_orders', orderId);
+      const orderFields = await getFirestoreDoc('ordens', orderId);
       if (!orderFields) {
         return new Response(
           JSON.stringify({ success: false, error: 'Order not found' }),
@@ -552,7 +552,7 @@ Deno.serve(async (req) => {
       }
 
       const at4 = await getFirebaseAccessToken();
-      const oiUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=100`;
+      const oiUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=100`;
       const oiRes = await fetch(oiUrl, { headers: { 'Authorization': `Bearer ${at4}` } });
       const oiData = oiRes.ok ? await oiRes.json() : { documents: [] };
       const orderItemsResults = (oiData.documents || []).map((doc: any) => ({ document: doc }));
@@ -668,7 +668,7 @@ Deno.serve(async (req) => {
       // 🔒 P0 FIX: Generate delivery_token SERVER-SIDE (never trust client-generated tokens)
       const deliveryToken = crypto.randomUUID();
       try {
-        await updateFirestoreDoc('guest_orders', orderId, {
+        await updateFirestoreDoc('ordens', orderId, {
           flowpay_charge_id: flowpayData.payment.id,
           delivery_token: deliveryToken,
           delivery_token_created_at: new Date().toISOString(),
@@ -719,7 +719,7 @@ Deno.serve(async (req) => {
       }
 
       // Ownership validation
-      const ownerResults = await queryFirestore('guest_orders', 'flowpay_charge_id', 'EQUAL', paymentId);
+      const ownerResults = await queryFirestore('ordens', 'flowpay_charge_id', 'EQUAL', paymentId);
       if (ownerResults?.[0]?.document) {
         const ownerFields = ownerResults[0].document.fields;
         const ownerUid = ownerFields?.user_id?.stringValue;
@@ -822,7 +822,7 @@ Deno.serve(async (req) => {
       }
 
       // 2. Fetch order and validate ownership
-      const orderFields = await getFirestoreDoc('guest_orders', orderId);
+      const orderFields = await getFirestoreDoc('ordens', orderId);
       if (!orderFields) {
         return new Response(
           JSON.stringify({ success: false, error: 'Order not found' }),
@@ -849,7 +849,7 @@ Deno.serve(async (req) => {
         }
         // 🔒 Consume delivery_token to prevent reuse (fail-closed)
         try {
-          await updateFirestoreDoc('guest_orders', orderId, {
+          await updateFirestoreDoc('ordens', orderId, {
             delivery_token: null,
             delivery_token_created_at: null,
             delivery_token_consumer: `card_confirm_${crypto.randomUUID()}`,
@@ -883,7 +883,7 @@ Deno.serve(async (req) => {
       }
 
       // 4. Mark as paid (server-side only)
-      await updateFirestoreDoc('guest_orders', orderId, {
+      await updateFirestoreDoc('ordens', orderId, {
         payment_status: 'paid',
         status: 'processing',
         updated_at: new Date().toISOString(),
@@ -907,7 +907,7 @@ Deno.serve(async (req) => {
       let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
       try {
         const at5 = await getFirebaseAccessToken();
-        const ciUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/guest_orders/${orderId}/items?pageSize=50`;
+        const ciUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${orderId}/items?pageSize=50`;
         const ciRes = await fetch(ciUrl, { headers: { 'Authorization': `Bearer ${at5}` } });
         if (ciRes.ok) {
           const ciData = await ciRes.json();

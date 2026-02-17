@@ -275,14 +275,14 @@ Deno.serve(async (req) => {
         { status: 429, headers: jsonHeaders });
     }
 
-    // Query guest_orders by hash field (orderId is now the doc ID)
+    // Query ordens by hash field (orderId is now the doc ID)
     const queryUrl = `${firestoreBase}:runQuery`;
     const queryRes = await fetch(queryUrl, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({
         structuredQuery: {
-          from: [{ collectionId: 'guest_orders' }],
+          from: [{ collectionId: 'ordens' }],
           where: { fieldFilter: { field: { fieldPath: 'hash' }, op: 'EQUAL', value: { stringValue: hash } } },
           limit: 1,
         },
@@ -314,7 +314,7 @@ Deno.serve(async (req) => {
     }
 
     // List subcollection items using orderId as parent
-    const listUrl = `${firestoreBase}/guest_orders/${orderId}/items?pageSize=50`;
+    const listUrl = `${firestoreBase}/ordens/${orderId}/items?pageSize=50`;
     const itemsRes = await fetch(listUrl, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
@@ -331,7 +331,7 @@ Deno.serve(async (req) => {
     if (itemsRes.ok) {
       const itemsData = await itemsRes.json();
       const docs = itemsData.documents || [];
-      console.log(`📦 Found ${docs.length} items in guest_orders/${orderId}/items`);
+      console.log(`📦 Found ${docs.length} items in ordens/${orderId}/items`);
       for (const itemDoc of docs) {
         const f = itemDoc.fields || {};
         items.push({

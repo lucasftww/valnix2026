@@ -160,7 +160,7 @@ Deno.serve(async (req: Request) => {
     let results: any[] = [];
     try {
       results = await runQuery(token, {
-        from: [{ collectionId: 'guest_orders' }],
+        from: [{ collectionId: 'ordens' }],
         where: {
           compositeFilter: {
             op: 'AND',
@@ -174,7 +174,7 @@ Deno.serve(async (req: Request) => {
       });
     } catch {
       results = await runQuery(token, {
-        from: [{ collectionId: 'guest_orders' }],
+        from: [{ collectionId: 'ordens' }],
         where: { fieldFilter: { field: { fieldPath: 'status' }, op: 'EQUAL', value: { stringValue: 'pending' } } },
         limit: 500,
       });
@@ -200,11 +200,11 @@ Deno.serve(async (req: Request) => {
       cancelled++;
     }
 
-    // ── Cleanup expired guest_orders (TTL based on expires_at) ──
+    // ── Cleanup expired ordens (TTL based on expires_at) ──
     let guestCleaned = 0;
     try {
       const guestResults = await runQuery(token, {
-        from: [{ collectionId: 'guest_orders' }],
+        from: [{ collectionId: 'ordens' }],
         limit: 100,
       });
       const nowISO = new Date().toISOString();
@@ -215,7 +215,7 @@ Deno.serve(async (req: Request) => {
           const guestHash = guestDocPath.split('/').pop()!;
           // Delete subcollection items first
           try {
-            const itemsUrl = `${BASE}/guest_orders/${guestHash}/items`;
+            const itemsUrl = `${BASE}/ordens/${guestHash}/items`;
             const itemsResp = await fetch(itemsUrl, { headers: { Authorization: `Bearer ${token}` } });
             if (itemsResp.ok) {
               const itemsData = await itemsResp.json();
@@ -233,13 +233,13 @@ Deno.serve(async (req: Request) => {
           guestCleaned++;
         }
       }
-      if (guestCleaned > 0) console.log(`[cleanup-orders] Cleaned ${guestCleaned} expired guest_orders`);
+      if (guestCleaned > 0) console.log(`[cleanup-orders] Cleaned ${guestCleaned} expired ordens`);
     } catch (e) {
-      console.warn('[cleanup-orders] guest_orders cleanup error:', e);
+      console.warn('[cleanup-orders] ordens cleanup error:', e);
     }
 
     const durationMs = Date.now() - startMs;
-    console.log(`[cleanup-orders] Cancelled ${cancelled} stale orders, cleaned ${guestCleaned} guest_orders in ${durationMs}ms`);
+    console.log(`[cleanup-orders] Cancelled ${cancelled} stale orders, cleaned ${guestCleaned} ordens in ${durationMs}ms`);
 
     // Write audit log to Firestore (fire-and-forget)
     try {
