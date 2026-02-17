@@ -10,7 +10,7 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { isTempEmail } from "@/lib/tempEmailDomains";
 import { isBlockedEmail } from "@/lib/blockedEmails";
-import { checkRateLimit, recordFailedAttempt, resetAttempts } from "@/lib/rateLimiter";
+import { checkRateLimit, recordFailedAttempt, resetAttempts, recordSignupAttempt, isSpamEmail, isWeakPassword } from "@/lib/rateLimiter";
 import vLogo from "@/assets/v-logo-login.png";
 
 
@@ -86,6 +86,8 @@ export default function Auth() {
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    const emailLower = signupEmail.toLowerCase().trim();
+
     if (isBlockedEmail(signupEmail)) {
       toast({ title: "Acesso negado", description: "Este email não é permitido.", variant: "destructive" });
       return;
@@ -100,13 +102,50 @@ export default function Auth() {
       return;
     }
 
+    if (isSpamEmail(emailLower)) {
+      toast({
+        title: "Email não permitido",
+        description: "Este formato de email não é aceito.",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Rate limit signup (stricter than login)
+    const signupRateKey = `signup_${emailLower}`;
+    const rateCheck = checkRateLimit(signupRateKey, 'signup');
+    if (!rateCheck.allowed) {
+      toast({
+        title: "Muitas tentativas",
+        description: `Aguarde ${Math.ceil((rateCheck.retryAfterSeconds || 900) / 60)} minutos antes de tentar novamente.`,
+        variant: "destructive",
+      });
+      return;
+    }
+
+    // Validate password strength
+    const passwordError = isWeakPassword(signupPassword);
+    if (passwordError) {
+      toast({ title: "Senha fraca", description: passwordError, variant: "destructive" });
+      return;
+    }
+
     setLoading(true);
+    recordSignupAttempt();
     
     const { error } = await signUp(signupEmail, signupPassword);
     
     if (!error) {
       setSignupEmail("");
       setSignupPassword("");
+      resetAttempts(signupRateKey);
+    } else {
+      recordFailedAttempt(signupRateKey, 'signup');
+      const code = (error as any)?.code || '';
+      const msg = code === 'auth/email-already-in-use'
+        ? 'Este email já está em uso. Tente fazer login.'
+        : 'Erro ao criar conta. Tente novamente.';
+      toast({ title: "Erro ao criar conta", description: msg, variant: "destructive" });
     }
     
     setLoading(false);
