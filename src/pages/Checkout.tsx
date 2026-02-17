@@ -141,6 +141,14 @@ export default function Checkout() {
     });
   }, [items, finalPrice, effectiveUserId, user?.email]);
 
+  // Clear IC flag when cart empties (allows re-fire on new checkout)
+  useEffect(() => {
+    if (items.length === 0) {
+      try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
+      icFiredRef.current = false;
+    }
+  }, [items.length]);
+
   // Load user profile
   useEffect(() => {
     if (!user) return;
