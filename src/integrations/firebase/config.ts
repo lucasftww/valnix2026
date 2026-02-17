@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
 import { getAuth } from "firebase/auth";
-import { initializeFirestore, memoryLocalCache } from "firebase/firestore";
+import { initializeFirestore, memoryLocalCache, setLogLevel } from "firebase/firestore";
 import { initializeAppCheck, ReCaptchaV3Provider } from "firebase/app-check";
 
 // Firebase configuration — these are publishable keys (security relies on Firebase Security Rules)
@@ -36,6 +36,11 @@ if (isProduction) {
 }
 
 export const appCheckReady = Promise.resolve();
+
+// Reduce Firestore SDK console noise in production (hides "unavailable" warnings from adblock/network)
+if (isProduction) {
+  setLogLevel("error");
+}
 
 // Initialize services
 export const auth = getAuth(app);
