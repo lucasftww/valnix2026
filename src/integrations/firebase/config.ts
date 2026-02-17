@@ -17,31 +17,32 @@ const firebaseConfig = {
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 
-// Initialize App Check with reCAPTCHA v3 only on authorized domains
-// Preview/dev domains are NOT registered in reCAPTCHA, causing 401 errors
-// that block ALL Firestore queries when enforcement is active.
-const RECAPTCHA_AUTHORIZED_DOMAINS = [
+// App Check: reCAPTCHA v3 for production, debug mode for dev/preview
+// Without a valid App Check token, Firestore enforcement rejects ALL queries.
+const PRODUCTION_DOMAINS = [
   "valnix.com.br",
   "www.valnix.com.br",
   "valnix2026.lovable.app",
 ];
 
 const currentHost = window.location.hostname;
-const isAuthorizedDomain = RECAPTCHA_AUTHORIZED_DOMAINS.some(
+const isProduction = PRODUCTION_DOMAINS.some(
   (d) => currentHost === d || currentHost.endsWith("." + d)
 );
 
-if (isAuthorizedDomain) {
-  try {
-    initializeAppCheck(app, {
-      provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
-      isTokenAutoRefreshEnabled: true,
-    });
-  } catch (e) {
-    console.warn("App Check initialization failed:", e);
-  }
-} else {
-  console.info("App Check skipped: domain not in authorized list");
+if (!isProduction) {
+  // Enable debug token for non-production environments
+  // This tells Firebase SDK to use a debug token instead of reCAPTCHA
+  (self as any).FIREBASE_APPCHECK_DEBUG_TOKEN = true;
+}
+
+try {
+  initializeAppCheck(app, {
+    provider: new ReCaptchaV3Provider("6Le-LW4sAAAAAAIVQezpJ2wv4h_s3nYrdb_-y28J"),
+    isTokenAutoRefreshEnabled: true,
+  });
+} catch (e) {
+  console.warn("App Check initialization failed:", e);
 }
 
 // Initialize services with persistent local cache (IndexedDB)
