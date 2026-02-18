@@ -20,23 +20,8 @@ const ExternalRedirect = ({ url }: { url: string }) => {
 const AppContent = () => {
   useBackRedirect("/");
   
-  // Prefetch key route chunks only when browser is truly idle
-  // (NOT at 500ms — that loads Firebase via ProductDetail/Category chunks,
-  //  adding ~1MB of unused JS and blocking the main thread for seconds)
-  useEffect(() => {
-    const prefetch = () => {
-      import("./pages/ProductDetail");
-      import("./pages/Category");
-      import("./pages/Cart");
-      import("./pages/Checkout");
-    };
-    // Use requestIdleCallback so prefetch only fires when main thread is free
-    const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 5000));
-    const id = ric(prefetch);
-    return () => {
-      if (window.cancelIdleCallback) window.cancelIdleCallback(id as number);
-    };
-  }, []);
+  // Prefetch removed from idle — chunks load on hover/touch via ProductCard.
+  // This saves ~1MB of unused JS (Firebase SDK pulled by ProductDetail/Category).
   
   return null;
 };

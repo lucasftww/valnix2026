@@ -10,13 +10,13 @@ fetchCategoriesFallback();
 
 import { createRoot } from "react-dom/client";
 
-// Defer ALL font weights — use system font until loaded
-// This eliminates render-blocking font CSS from the critical path
+// Load critical font weight synchronously (avoids CLS from FOUT)
+import "@fontsource/poppins/700.css";
+import "@fontsource/poppins/600.css";
+// Defer non-critical font weights
 requestAnimationFrame(() => {
   import("@fontsource/poppins/400.css");
-  import("@fontsource/poppins/600.css");
-  import("@fontsource/poppins/700.css");
-  setTimeout(() => import("@fontsource/poppins/500.css"), 200);
+  import("@fontsource/poppins/500.css");
 });
 
 import App from "./App.tsx";
