@@ -145,6 +145,16 @@ All colors MUST be HSL.
   .contain-layout {
     contain: layout style paint;
   }
+  
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+  
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* Mobile-specific fixes */
@@ -161,15 +171,6 @@ All colors MUST be HSL.
     height: auto;
   }
   
-  /* Hide scrollbar but keep functionality */
-  .scrollbar-hide {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
-  }
-  
-  .scrollbar-hide::-webkit-scrollbar {
-    display: none;
-  }
   
   /* GPU-accelerate fixed elements — use backface only to avoid breaking position:fixed */
   .fixed {

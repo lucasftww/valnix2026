@@ -111,7 +111,7 @@ const ProductGridComponent = () => {
       <div 
         ref={scrollRef}
         className="flex gap-2 md:gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0"
-        style={{ WebkitOverflowScrolling: 'touch' }}
+        style={{ touchAction: 'pan-x' }}
       >
         {products.map((product, index) => (
           <div 
