@@ -223,14 +223,17 @@ const ProductDetail = () => {
               <div className="space-y-4">
                 {/* Imagem */}
                 <div className="rounded-2xl overflow-hidden bg-muted/30">
-                  <div className="flex items-center justify-center px-6 py-6">
+                  <div className="flex items-center justify-center px-4 py-4">
                     {product.image_url && (
                       <img
                         src={product.image_url}
                         alt={product.name}
                         loading="eager"
                         decoding="async"
-                        className="w-full max-h-[360px] object-contain"
+                        fetchPriority="high"
+                        width={400}
+                        height={400}
+                        className="w-full max-h-[300px] object-contain"
                       />
                     )}
                   </div>
@@ -473,7 +476,7 @@ const ProductDetail = () => {
               <div className="border-b border-border/10">
                 <button
                   onClick={() => setMobileSection(mobileSection === 'description' ? null : 'description')}
-                  className="w-full flex items-center justify-between py-3.5"
+                  className="w-full flex items-center justify-between py-3.5 min-h-[48px]"
                 >
                   <span className="text-sm font-semibold">Descrição</span>
                   <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${mobileSection === 'description' ? 'rotate-180' : ''}`} />
@@ -555,8 +558,8 @@ const ProductDetail = () => {
       </main>
 
       {/* Sticky CTA Mobile */}
-      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-saturate-150 border-t border-border/10 pb-6">
-        <div className="px-4 py-3 safe-area-inset-bottom flex items-center justify-between gap-4">
+      <div className="fixed bottom-0 left-0 right-0 lg:hidden z-40 bg-background/95 backdrop-blur-md border-t border-border/10">
+        <div className="px-4 py-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] flex items-center justify-between gap-3">
           {/* Preço */}
           <div className="flex flex-col min-w-0">
             {product.old_price && product.old_price > product.price && (
@@ -574,7 +577,7 @@ const ProductDetail = () => {
           {/* Botão Comprar */}
           <Button 
             onClick={handleBuyNow} 
-            className="h-12 px-6 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl active:scale-[0.97] transition-transform shrink-0 animate-pulse"
+            className="h-13 px-7 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl active:scale-[0.97] transition-transform duration-150 shrink-0 animate-pulse"
           >
             Comprar Agora
           </Button>
