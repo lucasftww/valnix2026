@@ -268,8 +268,8 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   // Upsell offer view
   return (
     <div className="min-h-[100dvh] relative flex flex-col items-center justify-center p-4 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-red-950 via-red-900 to-black animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.3)_0%,transparent_70%)] animate-[pulse_3s_ease-in-out_infinite]" />
+      <div className="absolute inset-0 bg-gradient-to-b from-red-950 via-red-900 to-black" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.3)_0%,transparent_70%)]" />
       
       <div className="max-w-lg w-full space-y-3 sm:space-y-5 relative z-10">
         <div className="text-center space-y-2">

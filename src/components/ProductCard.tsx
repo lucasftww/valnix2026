@@ -1,4 +1,4 @@
-import { memo, useCallback, useRef, useEffect, useState } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router-dom";
@@ -32,8 +32,6 @@ const ProductCardComponent = ({
   const queryClient = useQueryClient();
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
-  const [isVisible, setIsVisible] = useState(priority);
-  const [imageLoaded, setImageLoaded] = useState(false);
 
   // Prefetch otimizado - triggers on hover (desktop) and touchstart (mobile)
   const prefetchTriggered = useRef(false);
@@ -60,11 +58,6 @@ const ProductCardComponent = ({
       });
   }, [queryClient, productId]);
 
-  // Priority cards are visible immediately; non-priority show after first paint
-  useEffect(() => {
-    if (!priority) setIsVisible(true);
-  }, [priority]);
-
   // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
 
   const hasDiscount = discount && discount > 0;
@@ -74,7 +67,7 @@ const ProductCardComponent = ({
     <Link 
       ref={cardRef}
       to={ROUTES.PRODUCT(productId)} 
-      className={`group block touch-manipulation transition-opacity duration-300 ease-out ${isVisible ? 'opacity-100' : 'opacity-0'}`}
+      className="group block touch-manipulation"
       onMouseEnter={triggerPrefetch}
       onTouchStart={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
@@ -89,21 +82,16 @@ const ProductCardComponent = ({
         
         {/* Imagem com lazy loading otimizado */}
         <div className="relative w-full aspect-[4/5] bg-background overflow-hidden">
-          {isVisible ? (
-            <img
-              src={image}
-              alt={title}
-              width={300}
-              height={375}
-              loading={priority ? "eager" : "lazy"}
-              decoding="async"
-              {...(priority ? { fetchPriority: "high" as const } : {})}
-              onLoad={() => setImageLoaded(true)}
-              className={`w-full h-full object-cover transition-opacity duration-200 ${imageLoaded ? 'opacity-100' : 'opacity-0'}`}
-            />
-          ) : (
-            <div className="w-full h-full bg-muted animate-pulse" />
-          )}
+          <img
+            src={image}
+            alt={title}
+            width={300}
+            height={375}
+            loading={priority ? "eager" : "lazy"}
+            decoding="async"
+            {...(priority ? { fetchPriority: "high" as const } : {})}
+            className="w-full h-full object-cover"
+          />
         </div>
 
         {/* Info area */}

@@ -159,6 +159,7 @@ export default function Checkout() {
 
   const isFormValid = validation.name && validation.document && validation.email;
 
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     let formattedValue = value;
     if (field === 'document') {
@@ -166,7 +167,11 @@ export default function Checkout() {
     }
     setFormData(prev => {
       const updated = { ...prev, [field]: formattedValue };
-      try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
+      // Debounce sessionStorage writes to avoid jank on fast typing
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
+      }, 500);
       return updated;
     });
   }, []);
