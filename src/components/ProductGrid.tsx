@@ -82,7 +82,7 @@ const ProductGridComponent = () => {
           align: "start",
           loop: true,
           dragFree: true,
-          duration: 18,
+          duration: 12,
           skipSnaps: true,
           containScroll: "trimSnaps",
         }}

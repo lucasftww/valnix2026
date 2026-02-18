@@ -33,7 +33,8 @@ All colors MUST be HSL.
   }
   
   /* GPU-accelerate embla carousel slides for smooth mobile swiping */
-  .embla__slide, [data-embla-slide] {
+  .embla__container, [class*="CarouselContent"] > div {
+    will-change: transform;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
