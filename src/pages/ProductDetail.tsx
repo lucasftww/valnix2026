@@ -429,7 +429,7 @@ const ProductDetail = () => {
                   <div className="space-y-2.5">
                     <Button 
                       onClick={handleBuyNow} 
-                      className="w-full h-13 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl animate-pulse"
+                      className="w-full h-13 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl"
                     >
                       Comprar agora
                     </Button>
@@ -504,7 +504,7 @@ const ProductDetail = () => {
                 <div className="border-b border-border/10">
                   <button
                     onClick={() => setMobileSection(mobileSection === 'instructions' ? null : 'instructions')}
-                    className="w-full flex items-center justify-between py-3.5"
+                    className="w-full flex items-center justify-between py-3.5 min-h-[48px]"
                   >
                     <span className="text-sm font-semibold">Instruções de Uso</span>
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${mobileSection === 'instructions' ? 'rotate-180' : ''}`} />
@@ -525,7 +525,7 @@ const ProductDetail = () => {
                 <div className="border-b border-border/10">
                   <button
                     onClick={() => setMobileSection(mobileSection === 'terms' ? null : 'terms')}
-                    className="w-full flex items-center justify-between py-3.5"
+                    className="w-full flex items-center justify-between py-3.5 min-h-[48px]"
                   >
                     <span className="text-sm font-semibold">Termos e Condições</span>
                     <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-200 ${mobileSection === 'terms' ? 'rotate-180' : ''}`} />
@@ -577,7 +577,7 @@ const ProductDetail = () => {
           {/* Botão Comprar */}
           <Button 
             onClick={handleBuyNow} 
-            className="h-13 px-7 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl active:scale-[0.97] transition-transform duration-150 shrink-0 animate-pulse"
+            className="h-13 px-7 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl active:scale-[0.97] transition-transform duration-150 shrink-0"
           >
             Comprar Agora
           </Button>

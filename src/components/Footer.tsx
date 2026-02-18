@@ -8,7 +8,7 @@ import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
 import { NewsletterForm } from "@/components/NewsletterForm";
-import { useCategories } from "@/hooks/firebase/useFirebaseCategories";
+import { useCategoriesApi } from "@/hooks/useApiData";
 import {
   Accordion,
   AccordionContent,
@@ -32,7 +32,7 @@ import { memo } from "react";
 
 const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
   const isMobile = useIsMobile();
-  const { data: categories = [] } = useCategories();
+  const { data: categories = [] } = useCategoriesApi();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });

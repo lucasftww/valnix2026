@@ -163,10 +163,8 @@ All colors MUST be HSL.
     display: none;
   }
   
-  /* GPU-accelerate fixed elements */
+  /* GPU-accelerate fixed elements — use backface only to avoid breaking position:fixed */
   .fixed {
-    will-change: transform;
-    transform: translateZ(0);
     -webkit-backface-visibility: hidden;
     backface-visibility: hidden;
   }
