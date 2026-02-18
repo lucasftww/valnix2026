@@ -74,8 +74,6 @@ function formatCurrency(value: number): string {
 export function AdminAnalytics() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('today');
-  const [cleanupFrom, setCleanupFrom] = useState('');
-  const [cleanupTo, setCleanupTo] = useState('');
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [previewData, setPreviewData] = useState<{ total: number; by_event: Record<string, number> } | null>(null);
 
@@ -104,7 +102,10 @@ export function AdminAnalytics() {
   });
 
   const handleCleanupPreview = async () => {
-    if (!cleanupFrom && !cleanupTo) { toast.error("Selecione pelo menos uma data"); return; }
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
     setCleanupLoading(true);
     try {
       const token = requireAdminToken();
@@ -113,19 +114,23 @@ export function AdminAnalytics() {
         queryParams: { resource: "cleanup-analytics" },
         headers: { "x-admin-token": token },
         body: {
-          after_date: cleanupFrom ? new Date(cleanupFrom).toISOString() : undefined,
-          before_date: cleanupTo ? new Date(cleanupTo + 'T23:59:59').toISOString() : undefined,
+          after_date: today.toISOString(),
+          before_date: endOfDay.toISOString(),
           dry_run: true,
         },
       });
       const data = await res.json();
       if (data.dry_run) setPreviewData(data);
-      else toast.error(data.error || "Erro ao previsar");
+      else toast.error(data.error || "Erro ao prever");
     } catch (e: any) { toast.error(e.message); }
     finally { setCleanupLoading(false); }
   };
 
   const handleCleanupConfirm = async () => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const endOfDay = new Date();
+    endOfDay.setHours(23, 59, 59, 999);
     setCleanupLoading(true);
     try {
       const token = requireAdminToken();
@@ -134,8 +139,8 @@ export function AdminAnalytics() {
         queryParams: { resource: "cleanup-analytics" },
         headers: { "x-admin-token": token },
         body: {
-          after_date: cleanupFrom ? new Date(cleanupFrom).toISOString() : undefined,
-          before_date: cleanupTo ? new Date(cleanupTo + 'T23:59:59').toISOString() : undefined,
+          after_date: today.toISOString(),
+          before_date: endOfDay.toISOString(),
           dry_run: false,
         },
       });
@@ -143,8 +148,6 @@ export function AdminAnalytics() {
       if (data.success) {
         toast.success(`${data.deleted} eventos removidos com sucesso`);
         setPreviewData(null);
-        setCleanupFrom('');
-        setCleanupTo('');
         refetch();
       } else toast.error(data.error || "Erro");
     } catch (e: any) { toast.error(e.message); }
@@ -358,31 +361,19 @@ export function AdminAnalytics() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Limpar Eventos de Analytics</AlertDialogTitle>
+                <AlertDialogTitle>Limpar Eventos de Hoje</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Remova eventos de spam/invasor por período. Esta ação é irreversível.
+                  Remove todos os eventos de analytics registrados hoje. Esta ação é irreversível.
                 </AlertDialogDescription>
               </AlertDialogHeader>
-              <div className="space-y-3 py-2">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <Label className="text-xs">De (início)</Label>
-                    <Input type="date" value={cleanupFrom} onChange={e => setCleanupFrom(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">Até (fim)</Label>
-                    <Input type="date" value={cleanupTo} onChange={e => setCleanupTo(e.target.value)} />
-                  </div>
+              {previewData && (
+                <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20 text-sm space-y-1">
+                  <p className="font-semibold text-destructive">{previewData.total} eventos serão deletados:</p>
+                  {Object.entries(previewData.by_event || {}).map(([name, count]) => (
+                    <p key={name} className="text-muted-foreground text-xs">• {name}: {String(count)}</p>
+                  ))}
                 </div>
-                {previewData && (
-                  <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20 text-sm space-y-1">
-                    <p className="font-semibold text-destructive">{previewData.total} eventos serão deletados:</p>
-                    {Object.entries(previewData.by_event || {}).map(([name, count]) => (
-                      <p key={name} className="text-muted-foreground text-xs">• {name}: {count}</p>
-                    ))}
-                  </div>
-                )}
-              </div>
+              )}
               <AlertDialogFooter>
                 <AlertDialogCancel onClick={() => setPreviewData(null)}>Cancelar</AlertDialogCancel>
                 {!previewData ? (
@@ -393,7 +384,7 @@ export function AdminAnalytics() {
                 ) : (
                   <Button variant="destructive" onClick={handleCleanupConfirm} disabled={cleanupLoading}>
                     {cleanupLoading ? <RefreshCw className="h-4 w-4 animate-spin mr-1" /> : null}
-                    Confirmar Exclusão ({previewData.total})
+                    Confirmar ({previewData.total})
                   </Button>
                 )}
               </AlertDialogFooter>
