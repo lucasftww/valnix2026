@@ -14,13 +14,29 @@
       img{pointer-events:none;-webkit-user-drag:none}
       a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
     </style>
-    <!-- Pre-warm API before JS bundle parses (saves ~500ms on LCP chain) -->
+    <!-- Pre-warm API + preload LCP image before JS bundle parses -->
     <script>
       (function(){
         var base='https://tiupdhnjdcmgbqifwkrd.supabase.co/functions/v1/site-data';
         var key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpdXBkaG5qZGNtZ2JxaWZ3a3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjEwODYsImV4cCI6MjA4NTk5NzA4Nn0.xgPpT3hWbTTo6DcFuf0pjD1jcPpyWIpLQGrdNHX4IkI';
         var h={'Content-Type':'application/json','apikey':key};
-        window.__API_PREFETCH_FEATURED=fetch(base+'?type=featured',{headers:h}).then(function(r){return r.json()}).catch(function(){return null});
+        var pf=fetch(base+'?type=featured',{headers:h}).then(function(r){return r.json()}).then(function(d){
+          // Preload first 2 product images immediately (breaks LCP chain)
+          if(d&&d.products){
+            var sorted=d.products.slice().sort(function(a,b){return(a.display_order||0)-(b.display_order||0)});
+            for(var i=0;i<Math.min(2,sorted.length);i++){
+              var img=sorted[i].image_url;
+              if(img){
+                var link=document.createElement('link');
+                link.rel='preload';link.as='image';link.href=img;
+                if(i===0)link.fetchPriority='high';
+                document.head.appendChild(link);
+              }
+            }
+          }
+          return d;
+        }).catch(function(){return null});
+        window.__API_PREFETCH_FEATURED=pf;
         window.__API_PREFETCH_CATEGORIES=fetch(base+'?type=categories',{headers:h}).then(function(r){return r.json()}).catch(function(){return null});
       })();
     </script>
