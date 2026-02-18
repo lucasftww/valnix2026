@@ -163,8 +163,8 @@ export function PixPayment({
     }
   };
 
-  const qrSize = isMobile ? 230 : 280;
-  const logoSize = isMobile ? 30 : 36;
+  const qrSize = isMobile ? 220 : 280;
+  const logoSize = isMobile ? 28 : 36;
 
   return (
     <div className="space-y-3 md:space-y-4">
@@ -273,7 +273,7 @@ export function PixPayment({
         </div>
         <Button
           size="lg"
-          className={`w-full h-12 font-semibold rounded-xl ${
+          className={`w-full h-13 font-semibold rounded-xl transition-all duration-150 active:scale-[0.98] ${
             copied 
               ? 'bg-green-600 hover:bg-green-700' 
               : 'bg-primary hover:bg-primary/90'
