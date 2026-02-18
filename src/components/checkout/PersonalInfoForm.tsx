@@ -82,9 +82,9 @@ const getEmailTLDError = (email: string): string | undefined => {
 function ValidationIcon({ isValid, show }: { isValid: boolean; show: boolean }) {
   if (!show) return null;
   return isValid ? (
-    <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-green-500" />
+    <Check className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-success" />
   ) : (
-    <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-red-500" />
+    <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-destructive" />
   );
 }
 export { formatCPF, isValidCPF, isValidEmail, getEmailTLDError };
@@ -123,12 +123,12 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
     [formData]
   );
 
-  const getInputClassName = useCallback(
+    const getInputClassName = useCallback(
     (field: "name" | "document" | "email", baseClass: string) => {
       if (!touched[field]) return baseClass;
       return validation[field]
-        ? `${baseClass} border-green-500/50 pr-10`
-        : `${baseClass} border-red-500/50 pr-10`;
+        ? `${baseClass} border-success/50 pr-10`
+        : `${baseClass} border-destructive/50 pr-10`;
     },
     [touched, validation]
   );
@@ -145,7 +145,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div>
             <label htmlFor="checkout-name" className="block text-[13px] text-muted-foreground mb-2">
-              Nome completo <span className="text-red-500">*</span>
+              Nome completo <span className="text-destructive">*</span>
             </label>
             <div className="relative">
               <Input
@@ -161,7 +161,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
               <ValidationIcon isValid={validation.name} show={touched.name || false} />
             </div>
             {touched.name && !validation.name && (
-              <p className="text-red-400 text-[11px] mt-1.5">
+              <p className="text-destructive text-[11px] mt-1.5">
                 {validation.nameError || "Nome inválido"}
               </p>
             )}
@@ -169,7 +169,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
 
           <div>
             <label htmlFor="checkout-cpf" className="block text-[13px] text-muted-foreground mb-2">
-              CPF <span className="text-red-500">*</span>
+              CPF <span className="text-destructive">*</span>
             </label>
             <div className="relative">
               <Input
@@ -186,7 +186,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
               <ValidationIcon isValid={validation.document} show={touched.document || false} />
             </div>
             {touched.document && !validation.document && (
-              <p className="text-red-400 text-[11px] mt-1.5">
+              <p className="text-destructive text-[11px] mt-1.5">
                 {validation.documentError || "CPF inválido"}
               </p>
             )}
@@ -200,7 +200,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
               htmlFor="checkout-email"
               className="block text-[13px] text-muted-foreground mb-2"
             >
-              E-mail <span className="text-red-500">*</span>
+              E-mail <span className="text-destructive">*</span>
             </label>
             <div className="relative">
               <Input
@@ -217,7 +217,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
               <ValidationIcon isValid={validation.email} show={touched.email || false} />
             </div>
             {touched.email && !validation.email && (
-              <p className="text-red-400 text-[11px] mt-1.5">
+              <p className="text-destructive text-[11px] mt-1.5">
                 {validation.emailError || "E-mail inválido"}
               </p>
             )}

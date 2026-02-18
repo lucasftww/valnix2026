@@ -77,7 +77,7 @@ export const OrderSummary = memo(function OrderSummary({
                   </div>
                   <button 
                     onClick={() => onRemoveItem(item.id)}
-                    className="w-6 h-6 rounded-lg bg-muted border border-border/10 flex items-center justify-center text-muted-foreground hover:text-red-500 hover:border-red-500/30 transition-colors"
+                    className="w-6 h-6 rounded-lg bg-muted border border-border/10 flex items-center justify-center text-muted-foreground hover:text-destructive hover:border-destructive/30 transition-colors"
                     aria-label={`Remover ${item.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />

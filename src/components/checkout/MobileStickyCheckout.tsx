@@ -74,7 +74,7 @@ const MobileStickyCheckoutComponent = ({
                 {onRemoveItem && items.length > 1 && (
                   <button
                     onClick={() => onRemoveItem(item.id)}
-                    className="relative w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 active:text-red-500 transition-colors shrink-0"
+                    className="relative w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-destructive active:text-destructive transition-colors shrink-0"
                     aria-label={`Remover ${item.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
