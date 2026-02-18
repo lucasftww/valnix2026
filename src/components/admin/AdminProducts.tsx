@@ -103,6 +103,7 @@ export const AdminProducts = () => {
       });
     },
     staleTime: 60000,
+    retry: false,
   });
 
   const { data: categories = [], refetch: refetchCategories } = useQuery({
@@ -121,6 +122,7 @@ export const AdminProducts = () => {
         .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
     },
     staleTime: 120000,
+    retry: false,
   });
 
   const loading = loadingProducts;

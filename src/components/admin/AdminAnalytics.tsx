@@ -96,6 +96,7 @@ export function AdminAnalytics() {
       return (data.events || []) as AnalyticsEvent[];
     },
     refetchInterval: 30000,
+    retry: false,
   });
 
   const handleCleanupPreview = async () => {

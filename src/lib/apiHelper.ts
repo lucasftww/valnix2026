@@ -2,6 +2,7 @@
  * API Helper — abstracts all backend function calls.
  * Edge functions are hosted via Lovable Cloud runtime.
  */
+import { clearAdminToken } from "@/lib/adminAuth";
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
   `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
@@ -35,11 +36,18 @@ export async function invokeFunction(
     ...headers,
   };
 
-  return fetch(url, {
+  const res = await fetch(url, {
     method,
     headers: fetchHeaders,
     body: body ? JSON.stringify(body) : undefined,
   });
+
+  // Auto-handle 401 on admin endpoints — clear token to prevent cascading calls
+  if (res.status === 401 && headers["x-admin-token"]) {
+    clearAdminToken();
+  }
+
+  return res;
 }
 
 /**
