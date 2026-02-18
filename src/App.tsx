@@ -20,17 +20,22 @@ const ExternalRedirect = ({ url }: { url: string }) => {
 const AppContent = () => {
   useBackRedirect("/");
   
-  // Prefetch key route chunks on idle so navigation is instant
+  // Prefetch key route chunks only when browser is truly idle
+  // (NOT at 500ms — that loads Firebase via ProductDetail/Category chunks,
+  //  adding ~1MB of unused JS and blocking the main thread for seconds)
   useEffect(() => {
-    // Prefetch critical route chunks immediately after first paint
     const prefetch = () => {
       import("./pages/ProductDetail");
       import("./pages/Category");
       import("./pages/Cart");
       import("./pages/Checkout");
     };
-    // Start prefetch after 500ms — aggressive to avoid black screen on nav
-    setTimeout(prefetch, 500);
+    // Use requestIdleCallback so prefetch only fires when main thread is free
+    const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 5000));
+    const id = ric(prefetch);
+    return () => {
+      if (window.cancelIdleCallback) window.cancelIdleCallback(id as number);
+    };
   }, []);
   
   return null;
