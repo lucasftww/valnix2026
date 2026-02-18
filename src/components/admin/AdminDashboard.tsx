@@ -62,12 +62,12 @@ export const AdminDashboard = () => {
       periodAvgTicket: p.avgTicket,
       periodFailed: p.failed,
       totalProducts: rawData.totalProducts || 0,
-      topProducts: rawData.topProducts || [],
-      recentOrders: rawData.recentOrders || [],
+      topProducts: Array.isArray(rawData.topProducts) ? rawData.topProducts : [],
+      recentOrders: Array.isArray(rawData.recentOrders) ? rawData.recentOrders : [],
       pendingDelivery: rawData.pendingDelivery || 0,
-      revenueByDay: rawData.revenueByDay || [],
-      paymentDistribution: rawData.paymentDistribution || [],
-      alerts: rawData.alerts || [],
+      revenueByDay: Array.isArray(rawData.revenueByDay) ? rawData.revenueByDay : [],
+      paymentDistribution: Array.isArray(rawData.paymentDistribution) ? rawData.paymentDistribution : [],
+      alerts: Array.isArray(rawData.alerts) ? rawData.alerts : [],
     };
   }, [rawData, period]);
 
