@@ -2,8 +2,9 @@
 // Must run before React to capture URL params early
 import "./bootstrap";
 
-// Pre-warm API data before React hydrates (saves ~500ms on LCP chain)
-// This starts network requests immediately so data is ready when useQuery fires
+// Pre-warm handled by inline <script> in index.html (starts before JS bundle parses).
+// These calls reuse the global __API_PREFETCH_* promises — zero extra network requests.
+// They also seed React Query cache so useQuery gets instant data.
 import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/firestoreFallback";
 fetchFeaturedProductsFallback();
 fetchCategoriesFallback();

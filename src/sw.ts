@@ -69,7 +69,19 @@ registerRoute(
   })
 );
 
-// ── 4. Supabase images ──
+// ── 4. R2 CDN product images (LCP critical) ──
+registerRoute(
+  ({ url }) => url.hostname.includes('r2.dev'),
+  new CacheFirst({
+    cacheName: 'r2-images-cache',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 90 }),
+      cacheableOk,
+    ],
+  })
+);
+
+// ── 5. Supabase images ──
 registerRoute(
   ({ url }) =>
     /\.supabase\.co$/.test(url.hostname) &&
@@ -111,7 +123,20 @@ registerRoute(
   })
 );
 
-// ── 7. Supabase API ──
+// ── 8. Supabase Edge Functions (site-data) — SWR for instant LCP on repeat visits ──
+registerRoute(
+  ({ url }) =>
+    /\.supabase\.co$/.test(url.hostname) && url.pathname.includes('/functions/v1/site-data'),
+  new StaleWhileRevalidate({
+    cacheName: 'site-data-cache',
+    plugins: [
+      new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 60 * 60 }),
+      cacheableOk,
+    ],
+  })
+);
+
+// ── 9. Supabase REST API ──
 registerRoute(
   ({ url }) =>
     /\.supabase\.co$/.test(url.hostname) && url.pathname.startsWith('/rest/v1/'),
