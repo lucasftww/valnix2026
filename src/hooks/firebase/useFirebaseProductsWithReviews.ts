@@ -2,14 +2,15 @@ import { useQuery } from "@tanstack/react-query";
 import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
-import { fetchProduct, shouldRetryProductFetch } from "@/lib/fetchProduct";
+import { fetchProduct } from "@/lib/fetchProduct";
 import { fetchCategoryProductsFallback, fetchProductFallback, fetchCategoryBySlugFallback } from "@/lib/firestoreFallback";
 import { markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import type { Category, Review, Product } from "@/types";
 
 import { generateConsistentSalesAndReviews } from "./useFirebaseProducts";
 
-interface ProductWithReviews {
+// Uses ProductWithReviews from types but only needs subset for category page
+interface CategoryProductData {
   id: string;
   name: string;
   price: number;
@@ -31,16 +32,16 @@ export const useProductsWithReviews = (category: string) => {
     queryFn: async () => {
       if (!category) return [];
 
-      let firestoreResult: ProductWithReviews[] | null = null;
-      let apiResult: ProductWithReviews[] | null = null;
+      let firestoreResult: CategoryProductData[] | null = null;
+      let apiResult: CategoryProductData[] | null = null;
 
-      const mapProducts = (products: any[]): ProductWithReviews[] =>
+      const mapProducts = (products: any[]): CategoryProductData[] =>
         products
           .filter((p: any) => p?.is_active)
           .sort((a: any, b: any) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
           .map((product: any) => {
             const stats = generateConsistentSalesAndReviews(product.id);
-            return { ...product, sold: stats.sold, reviewCount: stats.reviewCount } as ProductWithReviews;
+            return { ...product, sold: stats.sold, reviewCount: stats.reviewCount } as CategoryProductData;
           });
 
       const firestoreFetch = (async () => {
@@ -62,8 +63,8 @@ export const useProductsWithReviews = (category: string) => {
       if (first && first.length > 0) return first;
 
       await Promise.allSettled([firestoreFetch, apiFetch]);
-      if (firestoreResult && (firestoreResult as ProductWithReviews[]).length > 0) return firestoreResult;
-      if (apiResult && (apiResult as ProductWithReviews[]).length > 0) return apiResult;
+      if (firestoreResult && (firestoreResult as CategoryProductData[]).length > 0) return firestoreResult;
+      if (apiResult && (apiResult as CategoryProductData[]).length > 0) return apiResult;
       return [];
     },
     staleTime: 30 * 60 * 1000,

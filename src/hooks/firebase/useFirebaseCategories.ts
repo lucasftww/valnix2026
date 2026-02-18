@@ -3,7 +3,7 @@ import { collection } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { fetchCategoriesFallback } from "@/lib/firestoreFallback";
-import { isBlockedByAdBlocker, markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
+import { markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import { QUERY_KEYS, CACHE_TIMES } from "@/lib/constants";
 import type { Category } from "@/types";
 

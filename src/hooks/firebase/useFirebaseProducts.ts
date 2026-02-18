@@ -4,7 +4,7 @@ import { db } from "@/integrations/firebase/config";
 import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
 import { fetchFeaturedProductsFallback, fetchCategoryProductsFallback } from "@/lib/firestoreFallback";
-import { isBlockedByAdBlocker, markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
+import { markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import type { ProductCardData, ProductWithReviews } from "@/types";
 
 const generateConsistentSalesAndReviews = (productId: string): { sold: number; reviewCount: number } => {
@@ -20,7 +20,7 @@ const generateConsistentSalesAndReviews = (productId: string): { sold: number; r
 
 export { generateConsistentSalesAndReviews };
 
-// isBlockedByAdBlocker and markFirestorePossiblyBlocked are now imported from @/lib/firestoreBlockDetect
+
 
 function mapToProductCard(p: any): ProductCardData {
   const stats = generateConsistentSalesAndReviews(p.id);
