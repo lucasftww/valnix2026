@@ -65,6 +65,18 @@ export async function fetchFeaturedProductsFallback() {
     fetchFromApi({ type: "featured" }).catch(() => {});
     return lsData.products || [];
   }
+  // Use HTML-level prefetch if available (started before JS bundle parsed)
+  const prefetch = (window as any).__API_PREFETCH_FEATURED;
+  if (prefetch) {
+    try {
+      const data = await prefetch;
+      if (data?.products) {
+        API_CACHE.set('{"type":"featured"}', { data, expiresAt: Date.now() + CACHE_TTL });
+        setLsCache('{"type":"featured"}', data);
+        return data.products;
+      }
+    } catch { /* fall through to normal fetch */ }
+  }
   const data = await fetchFromApi({ type: "featured" });
   return data.products || [];
 }
@@ -74,6 +86,17 @@ export async function fetchCategoriesFallback() {
   if (lsData) {
     fetchFromApi({ type: "categories" }).catch(() => {});
     return lsData.categories || [];
+  }
+  const prefetch = (window as any).__API_PREFETCH_CATEGORIES;
+  if (prefetch) {
+    try {
+      const data = await prefetch;
+      if (data?.categories) {
+        API_CACHE.set('{"type":"categories"}', { data, expiresAt: Date.now() + CACHE_TTL });
+        setLsCache('{"type":"categories"}', data);
+        return data.categories;
+      }
+    } catch { /* fall through */ }
   }
   const data = await fetchFromApi({ type: "categories" });
   return data.categories || [];
