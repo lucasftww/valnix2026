@@ -399,8 +399,10 @@ export const AdminProducts = () => {
     setEditingProduct(null);
   };
 
+  const safeProducts = Array.isArray(products) ? products : [];
+
   const filteredProducts = useMemo(() => {
-    let result = products;
+    let result = safeProducts;
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       result = result.filter(p =>
@@ -413,7 +415,7 @@ export const AdminProducts = () => {
     if (filterActive === "active") result = result.filter(p => p.is_active);
     else if (filterActive === "inactive") result = result.filter(p => !p.is_active);
     return result;
-  }, [products, searchTerm, filterCategory, filterActive]);
+  }, [safeProducts, searchTerm, filterCategory, filterActive]);
 
   const totalPages = Math.max(1, Math.ceil(filteredProducts.length / ITEMS_PER_PAGE));
   const paginatedProducts = useMemo(() => {
