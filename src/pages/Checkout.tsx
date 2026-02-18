@@ -302,13 +302,13 @@ export default function Checkout() {
       const contentType = pixResponse.headers.get('content-type');
       if (!contentType?.includes('application/json')) {
         const textResponse = await pixResponse.text();
-        console.error('Gateway returned non-JSON:', textResponse.substring(0, 200));
+        if (import.meta.env.DEV) console.error('Gateway returned non-JSON:', textResponse.substring(0, 200));
         throw new Error('Erro no gateway de pagamento. Tente novamente.');
       }
 
       let pixData;
       try { pixData = await pixResponse.json(); } catch (parseError) {
-        console.error('Failed to parse PIX response:', parseError);
+        if (import.meta.env.DEV) console.error('Failed to parse PIX response:', parseError);
         throw new Error('Resposta inválida do gateway. Tente novamente.');
       }
 
@@ -322,7 +322,7 @@ export default function Checkout() {
       });
 
     } catch (error: unknown) {
-      console.error("❌ Checkout error:", error);
+      if (import.meta.env.DEV) console.error("❌ Checkout error:", error);
       const errorMessage = error instanceof Error ? error.message : "Tente novamente mais tarde.";
       toast({ title: "Erro ao criar pedido", description: errorMessage, variant: "destructive" });
     } finally {
