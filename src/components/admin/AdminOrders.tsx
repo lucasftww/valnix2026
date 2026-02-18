@@ -994,308 +994,342 @@ export const AdminOrders = () => {
 
         {/* ── Order Detail Dialog ──────────────────────────────────── */}
         <Dialog open={!!detailOrder} onOpenChange={(open) => { if (!open) { setDetailOrder(null); setDetailItems([]); setSelectedItemId(null); setDeliveryCode(""); } }}>
-          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto">
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0">
             {detailOrder && (() => {
               const statusCfg = getStatusConfig(detailOrder.status);
               const paymentCfg = getPaymentStatusConfig(detailOrder.payment_status);
 
               return (
-                <>
-                  <DialogHeader>
-                    <div className="flex items-center justify-between">
-                      <DialogTitle className="text-lg">
-                        Pedido #{detailOrder.id.slice(0, 8)}
-                      </DialogTitle>
-                      <div className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium border ${statusCfg.bg} ${statusCfg.color}`}>
-                        {statusCfg.icon}
-                        {statusCfg.label}
+                <div className="flex flex-col">
+                  {/* Header */}
+                  <div className="sticky top-0 z-10 bg-background border-b border-border/50 px-6 pt-6 pb-4">
+                    <DialogHeader className="space-y-1">
+                      <div className="flex items-center justify-between gap-3">
+                        <DialogTitle className="text-xl font-bold tracking-tight">
+                          Pedido <span className="text-primary">#{detailOrder.id.slice(0, 8)}</span>
+                        </DialogTitle>
+                        <div className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold border ${statusCfg.bg} ${statusCfg.color}`}>
+                          {statusCfg.icon}
+                          {statusCfg.label}
+                        </div>
                       </div>
-                    </div>
-                    <DialogDescription>Criado em {new Date(detailOrder.created_at).toLocaleString('pt-BR')}</DialogDescription>
-                  </DialogHeader>
+                      <DialogDescription className="flex items-center gap-1.5 text-xs">
+                        <Calendar className="w-3.5 h-3.5" />
+                        Criado em {new Date(detailOrder.created_at).toLocaleString('pt-BR')}
+                      </DialogDescription>
+                    </DialogHeader>
+                  </div>
 
-                  {/* Customer Info */}
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-xl bg-muted/30 border border-border/50">
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Cliente</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <User className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-medium select-text">{detailOrder.customer_name}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <Mail className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm select-all cursor-text">{detailOrder.customer_email}</span>
-                          <button onClick={() => copyToClipboard(detailOrder.customer_email, "E-mail")} className="text-muted-foreground hover:text-foreground transition-colors">
-                            <Copy className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                        {detailOrder.customer_phone && (
-                          <div className="flex items-center gap-2">
-                            <Phone className="w-4 h-4 text-muted-foreground" />
-                            <span className="text-sm select-all cursor-text">{detailOrder.customer_phone}</span>
-                            <button onClick={() => copyToClipboard(detailOrder.customer_phone!, "Telefone")} className="text-muted-foreground hover:text-foreground transition-colors">
+                  <div className="px-6 py-5 space-y-5">
+                    {/* Customer & Payment Grid */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Customer */}
+                      <div className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-3">
+                        <h4 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Cliente</h4>
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <User className="w-3.5 h-3.5 text-primary" />
+                            </div>
+                            <span className="text-sm font-semibold select-text">{detailOrder.customer_name}</span>
+                          </div>
+                          <div className="flex items-center gap-2.5 min-w-0">
+                            <div className="w-7 h-7 rounded-lg bg-blue-500/10 flex items-center justify-center flex-shrink-0">
+                              <Mail className="w-3.5 h-3.5 text-blue-500" />
+                            </div>
+                            <span className="text-sm select-all cursor-text break-all min-w-0">{detailOrder.customer_email}</span>
+                            <button onClick={() => copyToClipboard(detailOrder.customer_email, "E-mail")} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
                               <Copy className="w-3.5 h-3.5" />
                             </button>
                           </div>
-                        )}
+                          {detailOrder.customer_phone && (
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-7 h-7 rounded-lg bg-green-500/10 flex items-center justify-center flex-shrink-0">
+                                <Phone className="w-3.5 h-3.5 text-green-500" />
+                              </div>
+                              <span className="text-sm select-all cursor-text">{detailOrder.customer_phone}</span>
+                              <button onClick={() => copyToClipboard(detailOrder.customer_phone!, "Telefone")} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                                <Copy className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Payment */}
+                      <div className="p-4 rounded-xl bg-muted/30 border border-border/50 space-y-3">
+                        <h4 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">Pagamento</h4>
+                        <div className="space-y-2.5">
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-7 h-7 rounded-lg bg-primary/10 flex items-center justify-center flex-shrink-0">
+                              <DollarSign className="w-3.5 h-3.5 text-primary" />
+                            </div>
+                            <span className="text-lg font-bold text-primary">{formatCurrency(detailOrder.total_amount)}</span>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${
+                              (detailOrder.payment_method || (detailOrder.payment_status === 'paid' ? 'pix' : null)) === 'pix' ? 'bg-green-500/10 text-green-500' : 'bg-blue-500/10 text-blue-500'
+                            }`}>
+                              {getPaymentMethodIcon(detailOrder.payment_method, detailOrder.payment_status)}
+                            </div>
+                            <span className="text-sm font-semibold">{getPaymentMethodLabel(detailOrder.payment_method, detailOrder.payment_status)}</span>
+                          </div>
+                          <div className="flex items-center gap-2.5">
+                            <div className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-semibold border ${paymentCfg.bg} ${paymentCfg.color}`}>
+                              {paymentCfg.icon}
+                              {paymentCfg.label}
+                            </div>
+                          </div>
+                          {detailOrder.flowpay_charge_id && (
+                            <div className="flex items-start gap-2.5 min-w-0">
+                              <div className="w-7 h-7 rounded-lg bg-muted/50 flex items-center justify-center flex-shrink-0 mt-0.5">
+                                <Hash className="w-3.5 h-3.5 text-muted-foreground" />
+                              </div>
+                              <code className="text-[11px] font-mono text-muted-foreground select-all break-all min-w-0 leading-relaxed">{detailOrder.flowpay_charge_id}</code>
+                            </div>
+                          )}
+                        </div>
                       </div>
                     </div>
 
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Pagamento</h4>
-                      <div className="space-y-2">
-                        <div className="flex items-center gap-2">
-                          <DollarSign className="w-4 h-4 text-muted-foreground" />
-                          <span className="text-sm font-bold text-primary">{formatCurrency(detailOrder.total_amount)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getPaymentMethodIcon(detailOrder.payment_method, detailOrder.payment_status)}
-                          <span className="text-sm font-medium">{getPaymentMethodLabel(detailOrder.payment_method, detailOrder.payment_status)}</span>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium border ${paymentCfg.bg} ${paymentCfg.color}`}>
-                            {paymentCfg.icon}
-                            {paymentCfg.label}
-                          </div>
-                        </div>
-                        {detailOrder.flowpay_charge_id && (
-                          <div className="flex items-center gap-2">
-                            <Hash className="w-4 h-4 text-muted-foreground" />
-                            <code className="text-xs font-mono text-muted-foreground select-all">{detailOrder.flowpay_charge_id.slice(0, 20)}...</code>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Status Change */}
-                  <div className="flex items-center gap-3">
-                    <Label className="text-sm font-medium whitespace-nowrap">Alterar status:</Label>
-                    <Select value={detailOrder.status} onValueChange={(value) => { updateOrderStatus(detailOrder.id, value); setDetailOrder({ ...detailOrder, status: value }); }}>
-                      <SelectTrigger className="flex-1">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="pending">Pendente</SelectItem>
-                        <SelectItem value="processing">Processando</SelectItem>
-                        <SelectItem value="completed">Concluído</SelectItem>
-                        <SelectItem value="cancelled">Cancelado</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    {detailOrder.payment_status !== 'paid' && detailOrder.flowpay_charge_id && (
-                      <Button variant="secondary" size="sm" disabled={verifyingPayment === detailOrder.id} onClick={() => handleVerifyPayment(detailOrder)}>
-                        {verifyingPayment === detailOrder.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-1" />}
-                        Verificar
-                      </Button>
-                     )}
-                    {detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        disabled={
-                          detailOrder.status === 'cancelled' ||
-                          (detailItems.length > 0 && detailItems.every((it: any) => !!it.delivery_code)) ||
-                          reprocessingDelivery
-                        }
-                        onClick={async () => {
-                          setReprocessingDelivery(true);
-                          try {
-                            const token = requireAdminToken();
-                            if (!token) {
-                              toast({ title: "Sem autenticação", description: "Faça login como admin novamente.", variant: "destructive" });
-                              return;
-                            }
-                            const res = await invokeFunction("process-delivery", {
-                              method: "POST",
-                              headers: { "x-admin-token": token },
-                              body: { orderId: detailOrder.id },
-                            });
-                            const data = await res.json();
-                            if (!res.ok || data?.success === false) {
-                              toast({ title: "Erro ao reprocessar", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
-                              return;
-                            }
-                            const delivered = Number(data?.deliveredCount || 0);
-                            const failed = Number(data?.failedCount || 0);
-                            const skipped = Number(data?.skippedCount || 0);
-                            if (failed > 0) {
-                              toast({ title: "Entrega parcial", description: `${delivered} entregue(s), ${failed} falha(s). Verifique logs/estoque.`, variant: "destructive" });
-                            } else if (delivered > 0) {
-                              toast({ title: "Entrega reprocessada!", description: `${delivered} código(s) entregue(s).` });
-                            } else if (skipped > 0) {
-                              toast({ title: "Já entregue", description: "Os itens já possuíam código de entrega." });
-                            } else {
-                              toast({ title: "Sem códigos disponíveis", description: "Verifique o estoque (auto_real) ou tipo de entrega do produto.", variant: "destructive" });
-                            }
-                            await handleViewDetail(detailOrder);
-                            await fetchOrders();
-                          } catch (err: any) {
-                            toast({ title: "Erro ao reprocessar", description: err?.message || "Falha inesperada", variant: "destructive" });
-                          } finally {
-                            setReprocessingDelivery(false);
+                    {/* Status Change */}
+                    <div className="flex items-center gap-3 p-3 rounded-xl bg-muted/20 border border-border/30">
+                      <Label className="text-sm font-semibold whitespace-nowrap">Status:</Label>
+                      <Select value={detailOrder.status} onValueChange={(value) => { updateOrderStatus(detailOrder.id, value); setDetailOrder({ ...detailOrder, status: value }); }}>
+                        <SelectTrigger className="flex-1 bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="pending">Pendente</SelectItem>
+                          <SelectItem value="processing">Processando</SelectItem>
+                          <SelectItem value="completed">Concluído</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      {detailOrder.payment_status !== 'paid' && detailOrder.flowpay_charge_id && (
+                        <Button variant="secondary" size="sm" disabled={verifyingPayment === detailOrder.id} onClick={() => handleVerifyPayment(detailOrder)}>
+                          {verifyingPayment === detailOrder.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-1" />}
+                          Verificar
+                        </Button>
+                      )}
+                      {detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && (
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          disabled={
+                            detailOrder.status === 'cancelled' ||
+                            (detailItems.length > 0 && detailItems.every((it: any) => !!it.delivery_code)) ||
+                            reprocessingDelivery
                           }
-                        }}
-                      >
-                        {reprocessingDelivery ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
-                        {detailItems.length > 0 && detailItems.every((it: any) => !!it.delivery_code) ? "Já entregue" : "Reprocessar entrega"}
-                      </Button>
-                    )}
-                  </div>
-                  <div className="space-y-3">
-                    <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Itens do pedido ({detailItems.length})
-                    </h4>
+                          onClick={async () => {
+                            setReprocessingDelivery(true);
+                            try {
+                              const token = requireAdminToken();
+                              if (!token) {
+                                toast({ title: "Sem autenticação", description: "Faça login como admin novamente.", variant: "destructive" });
+                                return;
+                              }
+                              const res = await invokeFunction("process-delivery", {
+                                method: "POST",
+                                headers: { "x-admin-token": token },
+                                body: { orderId: detailOrder.id },
+                              });
+                              const data = await res.json();
+                              if (!res.ok || data?.success === false) {
+                                toast({ title: "Erro ao reprocessar", description: data?.error || `HTTP ${res.status}`, variant: "destructive" });
+                                return;
+                              }
+                              const delivered = Number(data?.deliveredCount || 0);
+                              const failed = Number(data?.failedCount || 0);
+                              const skipped = Number(data?.skippedCount || 0);
+                              if (failed > 0) {
+                                toast({ title: "Entrega parcial", description: `${delivered} entregue(s), ${failed} falha(s). Verifique logs/estoque.`, variant: "destructive" });
+                              } else if (delivered > 0) {
+                                toast({ title: "Entrega reprocessada!", description: `${delivered} código(s) entregue(s).` });
+                              } else if (skipped > 0) {
+                                toast({ title: "Já entregue", description: "Os itens já possuíam código de entrega." });
+                              } else {
+                                toast({ title: "Sem códigos disponíveis", description: "Verifique o estoque (auto_real) ou tipo de entrega do produto.", variant: "destructive" });
+                              }
+                              await handleViewDetail(detailOrder);
+                              await fetchOrders();
+                            } catch (err: any) {
+                              toast({ title: "Erro ao reprocessar", description: err?.message || "Falha inesperada", variant: "destructive" });
+                            } finally {
+                              setReprocessingDelivery(false);
+                            }
+                          }}
+                        >
+                          {reprocessingDelivery ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <RefreshCw className="w-4 h-4 mr-1" />}
+                          {detailItems.length > 0 && detailItems.every((it: any) => !!it.delivery_code) ? "Já entregue" : "Reprocessar"}
+                        </Button>
+                      )}
+                    </div>
 
-                    {loadingDetail ? (
-                      <div className="flex justify-center py-8">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                      </div>
-                    ) : detailItems.length === 0 ? (
-                      <p className="text-sm text-muted-foreground text-center py-4">Nenhum item encontrado</p>
-                    ) : (
-                      <div className="space-y-3">
-                        {detailItems.map((item) => (
-                          <div key={item.id} className="flex gap-3 p-3 rounded-lg border border-border/50 bg-card/50">
-                            {item.product_image && (
-                              <img src={item.product_image} alt={item.product_name} className="w-14 h-14 object-contain bg-muted/50 rounded-lg flex-shrink-0" />
-                            )}
-                            <div className="flex-1 min-w-0 space-y-2">
-                              <div className="flex items-start justify-between gap-2">
+                    {/* Order Items */}
+                    <div className="space-y-3">
+                      <h4 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                        Itens do pedido ({detailItems.length})
+                      </h4>
+
+                      {loadingDetail ? (
+                        <div className="flex justify-center py-8">
+                          <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                        </div>
+                      ) : detailItems.length === 0 ? (
+                        <p className="text-sm text-muted-foreground text-center py-4">Nenhum item encontrado</p>
+                      ) : (
+                        <div className="space-y-3">
+                          {detailItems.map((item) => (
+                            <div key={item.id} className="flex gap-3 p-3.5 rounded-xl border border-border/50 bg-card/50">
+                              {item.product_image && (
+                                <img src={item.product_image} alt={item.product_name} className="w-16 h-16 object-contain bg-muted/50 rounded-lg flex-shrink-0" />
+                              )}
+                              <div className="flex-1 min-w-0 space-y-2.5">
                                 <div>
-                                  <h5 className="font-semibold text-sm">{item.product_name}</h5>
-                                  <p className="text-xs text-muted-foreground">
-                                    {item.quantity}× {formatCurrency(item.unit_price)} = <span className="font-semibold text-foreground">{formatCurrency(item.total_price)}</span>
+                                  <h5 className="font-bold text-sm">{item.product_name}</h5>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {item.quantity}× {formatCurrency(item.unit_price)} = <span className="font-bold text-foreground">{formatCurrency(item.total_price)}</span>
                                   </p>
                                 </div>
-                              </div>
 
-                              {item.delivery_code && editingItemId !== item.id ? (
-                                <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-2.5">
-                                  <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-medium text-green-500 flex items-center gap-1">
-                                      <CheckCircle2 className="w-3 h-3" /> Código entregue
-                                    </span>
-                                    <div className="flex items-center gap-1.5">
-                                      <button 
-                                        onClick={() => { setEditingItemId(item.id); setEditDeliveryCode(item.delivery_code!); }}
-                                        className="text-muted-foreground hover:text-primary transition-colors" 
-                                        title="Editar código"
-                                      >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                      </button>
-                                      <button onClick={() => copyToClipboard(item.delivery_code!, "Código")} className="text-green-500/70 hover:text-green-500 transition-colors">
-                                        <Copy className="w-3.5 h-3.5" />
-                                      </button>
+                                {item.delivery_code && editingItemId !== item.id ? (
+                                  <div className="bg-green-500/5 border border-green-500/20 rounded-lg p-3">
+                                    <div className="flex items-center justify-between mb-1.5">
+                                      <span className="text-xs font-semibold text-green-500 flex items-center gap-1.5">
+                                        <CheckCircle2 className="w-3.5 h-3.5" /> Código entregue
+                                      </span>
+                                      <div className="flex items-center gap-2">
+                                        <button 
+                                          onClick={() => { setEditingItemId(item.id); setEditDeliveryCode(item.delivery_code!); }}
+                                          className="text-muted-foreground hover:text-primary transition-colors" 
+                                          title="Editar código"
+                                        >
+                                          <Pencil className="w-3.5 h-3.5" />
+                                        </button>
+                                        <button onClick={() => copyToClipboard(item.delivery_code!, "Código")} className="text-green-500/70 hover:text-green-500 transition-colors">
+                                          <Copy className="w-3.5 h-3.5" />
+                                        </button>
+                                      </div>
+                                    </div>
+                                    <code className="text-xs font-mono text-green-400 break-all select-all leading-relaxed block">{item.delivery_code}</code>
+                                  </div>
+                                ) : editingItemId === item.id ? (
+                                  <div className="space-y-2">
+                                    <div className="text-xs font-semibold text-primary flex items-center gap-1 mb-1">
+                                      <Pencil className="w-3 h-3" /> Editando código
+                                    </div>
+                                    <Textarea
+                                      placeholder="Novo código de entrega..."
+                                      value={editDeliveryCode}
+                                      onChange={(e) => setEditDeliveryCode(e.target.value)}
+                                      rows={3}
+                                      className="font-mono text-sm"
+                                      autoFocus
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => handleEditDeliveryCode(item.id)} disabled={sendingEmail} className="flex-1">
+                                        {sendingEmail ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
+                                        Salvar alteração
+                                      </Button>
+                                      <Button size="sm" variant="outline" onClick={() => { setEditingItemId(null); setEditDeliveryCode(""); }}>
+                                        Cancelar
+                                      </Button>
                                     </div>
                                   </div>
-                                  <code className="text-xs font-mono text-green-400 break-all select-all">{item.delivery_code}</code>
-                                </div>
-                              ) : editingItemId === item.id ? (
-                                <div className="space-y-2">
-                                  <div className="text-xs font-medium text-primary flex items-center gap-1 mb-1">
-                                    <Pencil className="w-3 h-3" /> Editando código
+                                ) : selectedItemId === item.id ? (
+                                  <div className="space-y-2">
+                                    <Textarea
+                                      placeholder="Cole os códigos aqui..."
+                                      value={deliveryCode}
+                                      onChange={(e) => setDeliveryCode(e.target.value)}
+                                      rows={3}
+                                      className="font-mono text-sm"
+                                    />
+                                    <div className="flex gap-2">
+                                      <Button size="sm" onClick={() => handleAddDeliveryCode(item.id)} disabled={sendingEmail} className="flex-1">
+                                        {sendingEmail ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
+                                        Salvar código
+                                      </Button>
+                                      <Button size="sm" variant="outline" onClick={() => { setSelectedItemId(null); setDeliveryCode(""); }}>
+                                        Cancelar
+                                      </Button>
+                                    </div>
                                   </div>
-                                  <Textarea
-                                    placeholder="Novo código de entrega..."
-                                    value={editDeliveryCode}
-                                    onChange={(e) => setEditDeliveryCode(e.target.value)}
-                                    rows={3}
-                                    className="font-mono text-sm"
-                                    autoFocus
-                                  />
-                                  <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => handleEditDeliveryCode(item.id)} disabled={sendingEmail} className="flex-1">
-                                      {sendingEmail ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
-                                      Salvar alteração
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={() => { setEditingItemId(null); setEditDeliveryCode(""); }}>
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : selectedItemId === item.id ? (
-                                <div className="space-y-2">
-                                  <Textarea
-                                    placeholder="Cole os códigos aqui..."
-                                    value={deliveryCode}
-                                    onChange={(e) => setDeliveryCode(e.target.value)}
-                                    rows={3}
-                                    className="font-mono text-sm"
-                                  />
-                                  <div className="flex gap-2">
-                                    <Button size="sm" onClick={() => handleAddDeliveryCode(item.id)} disabled={sendingEmail} className="flex-1">
-                                      {sendingEmail ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Send className="w-4 h-4 mr-1.5" />}
-                                      Salvar código
-                                    </Button>
-                                    <Button size="sm" variant="outline" onClick={() => { setSelectedItemId(null); setDeliveryCode(""); }}>
-                                      Cancelar
-                                    </Button>
-                                  </div>
-                                </div>
-                              ) : (
-                                <Button size="sm" variant="outline" onClick={() => setSelectedItemId(item.id)} className="w-full h-8 text-xs">
-                                  <Package className="w-3.5 h-3.5 mr-1.5" /> Adicionar código
-                                </Button>
-                              )}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Upsell Addons */}
-                  {detailAddons.length > 0 && (
-                    <div className="space-y-3">
-                      <h4 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                        Upsells ({detailAddons.length})
-                      </h4>
-                      <div className="space-y-2">
-                        {detailAddons.map((addon: any) => {
-                          const addonLabels: Record<string, string> = {
-                            premium_benefits: "🔥 Turbine Gift Card",
-                            delivery_priority: "⚡ Entrega Prioritária",
-                            data_swap_warranty: "🎁 Proteção Total",
-                          };
-                          const isPaid = addon.status === "paid";
-                          const isSkipped = addon.status === "skipped";
-                          return (
-                            <div key={addon.id} className={`flex items-center justify-between p-3 rounded-lg border ${
-                              isPaid ? "border-green-500/20 bg-green-500/5" : isSkipped ? "border-border/30 bg-muted/20" : "border-yellow-500/20 bg-yellow-500/5"
-                            }`}>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm">{addonLabels[addon.addon_type] || addon.addon_type}</span>
-                                <Badge variant={isPaid ? "default" : isSkipped ? "secondary" : "outline"} className={`text-[10px] ${isPaid ? "bg-green-600" : ""}`}>
-                                  {isPaid ? "Pago" : isSkipped ? "Recusado" : "Pendente"}
-                                </Badge>
+                                ) : (
+                                  <Button size="sm" variant="outline" onClick={() => setSelectedItemId(item.id)} className="w-full h-9 text-xs">
+                                    <Package className="w-3.5 h-3.5 mr-1.5" /> Adicionar código
+                                  </Button>
+                                )}
                               </div>
-                              <span className={`text-sm font-semibold ${isPaid ? "text-green-500" : "text-muted-foreground"}`}>
-                                {addon.amount > 0 ? formatCurrency(addon.amount) : "—"}
-                              </span>
                             </div>
-                          );
-                        })}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                  )}
 
-                  <div className="flex items-center justify-between pt-2 border-t border-border/50">
-                    <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-                      <Hash className="w-3 h-3" />
-                      <code className="font-mono select-all">{detailOrder.id}</code>
-                      <button onClick={() => copyToClipboard(detailOrder.id, "ID completo")} className="text-muted-foreground hover:text-foreground transition-colors">
-                        <Copy className="w-3 h-3" />
-                      </button>
-                    </div>
-                    {detailOrder.user_id && (
-                      <div className="flex items-center gap-1 text-xs text-muted-foreground">
-                        <User className="w-3 h-3" />
-                        <span>UID: {detailOrder.user_id.slice(0, 12)}...</span>
+                    {/* Upsell Addons */}
+                    {detailAddons.length > 0 && (
+                      <div className="space-y-3">
+                        <h4 className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+                          Upsells ({detailAddons.length})
+                        </h4>
+                        <div className="space-y-2">
+                          {detailAddons.map((addon: any) => {
+                            const addonLabels: Record<string, string> = {
+                              premium_benefits: "🔥 Turbine Gift Card",
+                              delivery_priority: "⚡ Entrega Prioritária",
+                              data_swap_warranty: "🎁 Proteção Total",
+                            };
+                            const isPaid = addon.status === "paid";
+                            const isSkipped = addon.status === "skipped";
+                            return (
+                              <div key={addon.id} className={`flex items-center justify-between p-3.5 rounded-xl border ${
+                                isPaid ? "border-green-500/20 bg-green-500/5" : isSkipped ? "border-border/30 bg-muted/20" : "border-yellow-500/20 bg-yellow-500/5"
+                              }`}>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-sm font-medium">{addonLabels[addon.addon_type] || addon.addon_type}</span>
+                                  <Badge variant={isPaid ? "default" : isSkipped ? "secondary" : "outline"} className={`text-[10px] ${isPaid ? "bg-green-600" : ""}`}>
+                                    {isPaid ? "Pago" : isSkipped ? "Recusado" : "Pendente"}
+                                  </Badge>
+                                </div>
+                                <span className={`text-sm font-bold ${isPaid ? "text-green-500" : "text-muted-foreground"}`}>
+                                  {addon.amount > 0 ? formatCurrency(addon.amount) : "—"}
+                                </span>
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
-                </>
+
+                  {/* Footer */}
+                  <div className="sticky bottom-0 bg-background border-t border-border/50 px-6 py-3">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="flex items-center gap-1.5 text-xs text-muted-foreground min-w-0">
+                        <Hash className="w-3 h-3 flex-shrink-0" />
+                        <code className="font-mono select-all break-all">{detailOrder.id}</code>
+                        <button onClick={() => copyToClipboard(detailOrder.id, "ID completo")} className="text-muted-foreground hover:text-foreground transition-colors flex-shrink-0">
+                          <Copy className="w-3 h-3" />
+                        </button>
+                      </div>
+                      {detailOrder.user_id && (
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <div className="flex items-center gap-1 text-xs text-muted-foreground flex-shrink-0 cursor-default">
+                              <User className="w-3 h-3" />
+                              <span className="font-mono">UID: {detailOrder.user_id.slice(0, 10)}…</span>
+                            </div>
+                          </TooltipTrigger>
+                          <TooltipContent side="top" className="max-w-xs">
+                            <code className="text-xs font-mono break-all">{detailOrder.user_id}</code>
+                          </TooltipContent>
+                        </Tooltip>
+                      )}
+                    </div>
+                  </div>
+                </div>
               );
             })()}
           </DialogContent>
