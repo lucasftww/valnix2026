@@ -165,19 +165,22 @@ async function sendToMeta(eventPayload: Record<string, unknown>, testEventCode?:
   }
 }
 
-// ── Log event to Firestore ─────────────────────────────────────────
+// ── Log event to Firestore (with source for dedup audit) ──────────
 async function logCapiEvent(
   eventName: string, eventId: string, orderId: string | null,
-  result: { success: boolean; error?: string; statusCode?: number }
+  result: { success: boolean; error?: string; statusCode?: number; data?: any }
 ) {
   try {
     const accessToken = await getFirebaseAccessToken();
     const url = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/capi_event_log`;
+    const fbtrace = result.data?.fbtrace_id || null;
     const fields: Record<string, unknown> = {
       event_name: toFirestoreValue(eventName),
       event_id: toFirestoreValue(eventId),
       order_id: toFirestoreValue(orderId),
+      source: toFirestoreValue('server'),
       status: toFirestoreValue(result.success ? 'sent' : 'failed'),
+      fbtrace_id: toFirestoreValue(fbtrace),
       error_message: toFirestoreValue(result.error || null),
       status_code: toFirestoreValue(result.statusCode || null),
       created_at: toFirestoreValue(new Date().toISOString()),

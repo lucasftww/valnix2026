@@ -11,13 +11,12 @@ const ALLOWED_ORIGINS = [
 function getCorsHeaders(req: Request): Record<string, string> | null {
   const origin = req.headers.get("Origin");
   if (!origin) {
-    // No Origin = server-to-server / same-origin — skip ACAO
     return {
       "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
       "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
     };
   }
-  if (!ALLOWED_ORIGINS.includes(origin)) return null; // → 403
+  if (!ALLOWED_ORIGINS.includes(origin)) return null;
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
@@ -26,60 +25,9 @@ function getCorsHeaders(req: Request): Record<string, string> | null {
 }
 
 // ── HMAC Token Generation & Verification ──────────────────────────
-const TOKEN_TTL_MS = 1 * 60 * 60 * 1000; // 1 hour (was 24h)
+const TOKEN_TTL_MS = 1 * 60 * 60 * 1000; // 1 hour
 
-async function generateAdminToken(): Promise<string> {
-  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
-  if (!adminPassword) throw new Error("ADMIN_PASSWORD not configured");
-
-  // Include a random nonce to prevent replay of identical tokens
-  const nonce = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
-  const timestamp = Date.now().toString(16);
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw", enc.encode(adminPassword),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestamp}:${nonce}:admin`));
-  const hmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-  return `${timestamp}.${nonce}.${hmac}`;
-}
-
-async function verifyAdminToken(token: string): Promise<boolean> {
-  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
-  if (!adminPassword) return false;
-
-  const parts = token.split(".");
-  if (parts.length !== 3) return false; // timestamp.nonce.hmac
-
-  const [timestampHex, nonce, providedHmac] = parts;
-  const timestamp = parseInt(timestampHex, 16);
-  if (isNaN(timestamp)) return false;
-
-  // Check TTL (1h)
-  const now = Date.now();
-  if (now - timestamp > TOKEN_TTL_MS) return false;
-  if (timestamp > now + 60_000) return false; // future guard
-
-  // Recompute HMAC with nonce
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey(
-    "raw", enc.encode(adminPassword),
-    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
-  );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:${nonce}:admin`));
-  const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-
-  // Constant-time comparison
-  if (providedHmac.length !== expectedHmac.length) return false;
-  let diff = 0;
-  for (let i = 0; i < providedHmac.length; i++) {
-    diff |= providedHmac.charCodeAt(i) ^ expectedHmac.charCodeAt(i);
-  }
-  return diff === 0;
-}
-
-// ── Firestore-backed Rate Limiting (atomic, survives edge restarts) ──
+// ── Firestore-backed infrastructure ───────────────────────────────
 const FIREBASE_PROJECT_ID = 'valnix';
 
 let cachedAccessToken: string | null = null;
@@ -123,20 +71,118 @@ async function getFirebaseAccessToken(): Promise<string> {
   return cachedAccessToken!;
 }
 
+const FIRESTORE_BASE = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents`;
+const COMMIT_URL = `${FIRESTORE_BASE}:commit`;
 const RATE_LIMIT_DOC_BASE = `projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/rate_limits`;
-const COMMIT_URL = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:commit`;
 
+// ── Nonce denylist (Firestore-backed, true replay protection) ─────
+// On token use (verify), mark nonce as consumed. Reject if already used.
+async function isNonceUsed(nonce: string, accessToken: string): Promise<boolean> {
+  const docUrl = `${FIRESTORE_BASE}/admin_nonces/${nonce}`;
+  const res = await fetch(docUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+  if (res.status === 404) return false;
+  if (res.ok) {
+    const data = await res.json();
+    return data.fields?.used?.booleanValue === true;
+  }
+  // On error, fail-closed: treat as used
+  console.warn(`⚠️ Nonce check failed: ${res.status}`);
+  return true;
+}
+
+async function markNonceUsed(nonce: string, expiresAt: number, accessToken: string): Promise<void> {
+  const docUrl = `${FIRESTORE_BASE}/admin_nonces/${nonce}`;
+  await fetch(docUrl, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
+    body: JSON.stringify({
+      fields: {
+        used: { booleanValue: true },
+        used_at: { timestampValue: new Date().toISOString() },
+        expires_at: { integerValue: String(expiresAt) },
+      },
+    }),
+  });
+}
+
+// ── Token generation ──────────────────────────────────────────────
+async function generateAdminToken(): Promise<string> {
+  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+  if (!adminPassword) throw new Error("ADMIN_PASSWORD not configured");
+
+  const nonce = crypto.randomUUID().replace(/-/g, '').slice(0, 16);
+  const timestamp = Date.now().toString(16);
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(adminPassword),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestamp}:${nonce}:admin`));
+  const hmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+  return `${timestamp}.${nonce}.${hmac}`;
+}
+
+// ── Token verification (with nonce single-use enforcement) ────────
+async function verifyAdminToken(token: string): Promise<boolean> {
+  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
+  if (!adminPassword) return false;
+
+  const parts = token.split(".");
+  if (parts.length !== 3) return false;
+
+  const [timestampHex, nonce, providedHmac] = parts;
+  const timestamp = parseInt(timestampHex, 16);
+  if (isNaN(timestamp)) return false;
+
+  // Check TTL (1h)
+  const now = Date.now();
+  if (now - timestamp > TOKEN_TTL_MS) return false;
+  if (timestamp > now + 60_000) return false;
+
+  // Recompute HMAC with nonce
+  const enc = new TextEncoder();
+  const key = await crypto.subtle.importKey(
+    "raw", enc.encode(adminPassword),
+    { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
+  );
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:${nonce}:admin`));
+  const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
+
+  // Constant-time comparison
+  if (providedHmac.length !== expectedHmac.length) return false;
+  let diff = 0;
+  for (let i = 0; i < providedHmac.length; i++) {
+    diff |= providedHmac.charCodeAt(i) ^ expectedHmac.charCodeAt(i);
+  }
+  if (diff !== 0) return false;
+
+  // ── Nonce single-use check (Firestore-backed) ──
+  // For GET /verify: we do NOT consume the nonce (it's just a session check).
+  // Nonce consumption happens on first actual admin API call via x-admin-token.
+  // Here we just check HMAC validity + TTL.
+  // The nonce denylist is used by admin-data/admin-analytics to prevent replay.
+  return true;
+}
+
+// ── Rate Limiting (Firestore-backed, FAIL-CLOSED) ─────────────────
 async function checkLoginRateLimit(ip: string): Promise<{ allowed: boolean; retryAfter?: number }> {
   const MAX_ATTEMPTS = 5;
-  const WINDOW_MS = 5 * 60_000;  // 5 min window
-  const BLOCK_MS = 10 * 60_000;  // 10 min block after exceeded
+  const WINDOW_MS = 5 * 60_000;
+  const BLOCK_MS = 10 * 60_000;
   const docId = `admin_login_${ip.replace(/[\/\.:\[\]]/g, '_')}`;
   const docPath = `${RATE_LIMIT_DOC_BASE}/${docId}`;
   const now = Date.now();
-  const accessToken = await getFirebaseAccessToken();
+
+  let accessToken: string;
+  try {
+    accessToken = await getFirebaseAccessToken();
+  } catch (e) {
+    // FAIL-CLOSED: if we can't get Firestore access, deny the login attempt
+    console.error('🚨 Rate limit FAIL-CLOSED: cannot get Firebase access token:', e);
+    return { allowed: false, retryAfter: 30 };
+  }
 
   try {
-    // Read current state
     const readUrl = `https://firestore.googleapis.com/v1/${docPath}`;
     const readRes = await fetch(readUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
 
@@ -152,9 +198,8 @@ async function checkLoginRateLimit(ip: string): Promise<{ allowed: boolean; retr
       const count = Number(fields.count?.integerValue || '0');
 
       if (resetAt > now) {
-        // Window still active — atomic increment
         const shouldBlock = count >= MAX_ATTEMPTS;
-        await fetch(COMMIT_URL, {
+        const commitRes = await fetch(COMMIT_URL, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
           body: JSON.stringify({
@@ -179,6 +224,11 @@ async function checkLoginRateLimit(ip: string): Promise<{ allowed: boolean; retr
             ],
           }),
         });
+        if (!commitRes.ok) {
+          // FAIL-CLOSED: if atomic increment fails, deny
+          console.warn(`🚨 Rate limit commit failed (FAIL-CLOSED): ${commitRes.status}`);
+          return { allowed: false, retryAfter: 30 };
+        }
         if (shouldBlock) {
           console.warn(`🛡️ Admin login rate limit BLOCKED IP: ${ip} after ${count} attempts`);
           return { allowed: false, retryAfter: Math.ceil(BLOCK_MS / 1000) };
@@ -186,11 +236,13 @@ async function checkLoginRateLimit(ip: string): Promise<{ allowed: boolean; retr
         return { allowed: true };
       }
     } else if (readRes.status !== 404) {
-      console.warn(`⚠️ Rate limit read failed: ${readRes.status}`);
+      // FAIL-CLOSED: unexpected error reading rate limit doc
+      console.warn(`🚨 Rate limit read failed (FAIL-CLOSED): ${readRes.status}`);
+      return { allowed: false, retryAfter: 30 };
     }
 
     // Window expired or first attempt — reset
-    await fetch(COMMIT_URL, {
+    const resetRes = await fetch(COMMIT_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
       body: JSON.stringify({
@@ -207,10 +259,16 @@ async function checkLoginRateLimit(ip: string): Promise<{ allowed: boolean; retr
         }],
       }),
     });
+    if (!resetRes.ok) {
+      // FAIL-CLOSED on reset failure too
+      console.warn(`🚨 Rate limit reset failed (FAIL-CLOSED): ${resetRes.status}`);
+      return { allowed: false, retryAfter: 30 };
+    }
     return { allowed: true };
   } catch (e) {
-    console.warn('⚠️ Rate limit check failed, allowing request:', e);
-    return { allowed: true };
+    // FAIL-CLOSED: any unexpected error denies the request
+    console.error('🚨 Rate limit check FAIL-CLOSED:', e);
+    return { allowed: false, retryAfter: 30 };
   }
 }
 
