@@ -1,6 +1,6 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
-import { addFirestoreDoc, toFirestoreValue } from '../_shared/firestore.ts';
+import { addFirestoreDoc, addFirestoreDocWithId, toFirestoreValue } from '../_shared/firestore.ts';
 
 const VALID_EVENTS = ['ViewContent', 'InitiateCheckout', 'Purchase'];
 
@@ -62,7 +62,7 @@ Deno.serve(async (req) => {
       });
     }
 
-    const docId = await addFirestoreDoc('analytics_events', {
+    const eventData = {
       event_name,
       event_time: new Date().toISOString(),
       user_id: typeof user_id === 'string' ? user_id.slice(0, 100) : null,
@@ -74,9 +74,25 @@ Deno.serve(async (req) => {
       order_id: order_id || null,
       content_name: typeof content_name === 'string' ? content_name.slice(0, 200) : null,
       content_category: typeof content_category === 'string' ? content_category.slice(0, 100) : null,
-    });
+    };
 
-    if (!docId) {
+    // Purchase events use order_id as doc ID to prevent duplicates
+    let success: boolean | string | null;
+    if (event_name === 'Purchase' && order_id) {
+      const dedupId = `purchase_${order_id}`;
+      success = await addFirestoreDocWithId('analytics_events', dedupId, eventData);
+      // 409 = already exists = dedup working correctly, return success
+      if (success === false) {
+        console.log(`⚡ Dedup: Purchase for order ${order_id} already tracked`);
+        return new Response(JSON.stringify({ success: true, deduped: true }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
+    } else {
+      success = await addFirestoreDoc('analytics_events', eventData);
+    }
+
+    if (!success) {
       return new Response(JSON.stringify({ error: 'Failed to track event' }), {
         status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
