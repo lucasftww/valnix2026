@@ -123,11 +123,3 @@ export const useCategoriesTreeApi = () => {
   return { data: buildCategoryTree(categories), ...rest };
 };
 
-// ── Home categories ──
-export const useHomeCategoriesApi = () => {
-  const { data: categories = [], ...rest } = useCategoriesApi();
-  return {
-    data: categories.filter((cat) => cat.show_on_homepage && !cat.parent_id),
-    ...rest,
-  };
-};

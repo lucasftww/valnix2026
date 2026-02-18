@@ -10,22 +10,13 @@ export const QUERY_KEYS = {
   // Categorias
   CATEGORIES: 'categories',
   CATEGORY: 'category',
-  SIDEBAR_CATEGORIES: 'sidebar-categories',
-  FOOTER_CATEGORIES: 'footer-categories',
   HOME_CATEGORIES: 'home-categories',
-  
-  // Reviews
-  REVIEWS: 'reviews',
-  PRODUCT_REVIEWS: 'product_reviews',
-  
-  // Outros
-  ORDERS: 'orders',
 } as const;
 
 export const CACHE_TIMES = {
   // Cache muito agressivo para dados que mudam pouco (categorias)
   STATIC: {
-    staleTime: 60 * 60 * 1000, // 1 hora - dados quase nunca mudam
+    staleTime: 60 * 60 * 1000, // 1 hora
     gcTime: 2 * 60 * 60 * 1000, // 2 horas
   },
   // Cache agressivo para produtos (raramente mudam durante sessão)
@@ -46,24 +37,13 @@ export const CACHE_TIMES = {
 } as const;
 
 export const ROUTES = {
-  HOME: '/',
-  CART: '/cart',
-  CHECKOUT: '/checkout',
-  ADMIN: '/admin',
-  ABOUT: '/about',
-  TERMS: '/terms',
-  
   PRODUCT: (id: string) => `/product/${id}`,
-  CATEGORY: (slug: string) => `/${slug}`,
 } as const;
 
 // Configurações de UI
 export const UI_CONFIG = {
   PRODUCTS_PER_PAGE: 12,
   FEATURED_PRODUCTS_LIMIT: 12,
-  SKELETON_COUNT: 6,
-  ANIMATION_DURATION: 300,
-  TOAST_DURATION: 5000,
 } as const;
 
 // Formatadores
