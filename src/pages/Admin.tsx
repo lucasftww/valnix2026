@@ -10,6 +10,7 @@ import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
+import { AdminTrackingMonitor } from "@/components/admin/AdminTrackingMonitor";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
@@ -37,6 +38,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   categories: { title: "Categorias", description: "Organize suas categorias" },
   orders: { title: "Pedidos", description: "Acompanhe e gerencie pedidos" },
   "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
+  tracking: { title: "Tracking Monitor", description: "Saúde do Meta CAPI e deduplicação" },
 };
 
 export default function Admin() {
@@ -177,6 +179,7 @@ export default function Admin() {
               {mountedTabs.has("categories") && <div style={{ display: activeTab === "categories" ? "block" : "none" }}><AdminCategories /></div>}
               {mountedTabs.has("orders") && <div style={{ display: activeTab === "orders" ? "block" : "none" }}><AdminOrders /></div>}
               {mountedTabs.has("post-payment") && <div style={{ display: activeTab === "post-payment" ? "block" : "none" }}><AdminPostPaymentPages /></div>}
+              {mountedTabs.has("tracking") && <div style={{ display: activeTab === "tracking" ? "block" : "none" }}><AdminTrackingMonitor /></div>}
             </div>
           </main>
 
