@@ -197,7 +197,7 @@ Deno.serve(async (req) => {
         const computePeriod = (periodOrders: any[]) => {
           const paid = periodOrders.filter((o: any) => o.payment_status === 'paid');
           const revenue = paid.reduce((s: number, o: any) => s + (Number(o.total_amount) || 0), 0);
-          return { orders: periodOrders.length, paidCount: paid.length, revenue, avgTicket: paid.length > 0 ? revenue / paid.length : 0, failed: periodOrders.filter((o: any) => o.payment_status === 'failed').length };
+          return { orders: paid.length, paidCount: paid.length, revenue, avgTicket: paid.length > 0 ? revenue / paid.length : 0, failed: periodOrders.filter((o: any) => o.payment_status === 'failed').length, pending: periodOrders.filter((o: any) => o.payment_status === 'pending').length, totalAttempts: periodOrders.length };
         };
         const periods = { today: computePeriod(filterByDate(orders, todayCutoff)), '7d': computePeriod(filterByDate(orders, d7Cutoff)), '30d': computePeriod(orders) };
         const allPaid = orders.filter((o: any) => o.payment_status === 'paid');
