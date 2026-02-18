@@ -144,7 +144,7 @@ export const AdminOrders = () => {
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  const { data: orders = [], isLoading: loading, refetch: refetchOrders } = useQuery({
+  const { data: rawOrders, isLoading: loading, refetch: refetchOrders } = useQuery({
     queryKey: ['admin-orders'],
     queryFn: async () => {
       const token = requireAdminToken();
@@ -156,7 +156,8 @@ export const AdminOrders = () => {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const ordersData: Order[] = (data.orders || []).map((o: any) => ({
+      const ordersArr = Array.isArray(data.orders) ? data.orders : Array.isArray(data) ? data : [];
+      const ordersData: Order[] = ordersArr.map((o: any) => ({
         id: o.id,
         customer_name: o.customer_name || '',
         customer_email: o.customer_email || '',
@@ -179,6 +180,8 @@ export const AdminOrders = () => {
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
+
+  const orders: Order[] = Array.isArray(rawOrders) ? rawOrders : [];
 
   const fetchOrders = useCallback(() => { refetchOrders(); }, [refetchOrders]);
 
