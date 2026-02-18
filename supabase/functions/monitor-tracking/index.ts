@@ -138,7 +138,7 @@ function detectDuplicates(events: any[]): Array<{ eventId: string; orderId: stri
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-admin-token", methods: "GET, OPTIONS" });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
