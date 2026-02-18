@@ -49,7 +49,7 @@ export const CategoryManager = () => {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      const allCats = (data.categories || []) as Category[];
+      const allCats = (Array.isArray(data.categories) ? data.categories : []) as Category[];
 
       // Build tree
       const map = new Map<string, CategoryNode>();
