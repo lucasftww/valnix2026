@@ -25,7 +25,7 @@ const MobileStickyCheckoutComponent = ({
   const [showSummary, setShowSummary] = useState(false);
 
   return (
-    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
+    <div className="lg:hidden fixed bottom-8 left-0 right-0 z-50">
       {/* Dropdown summary - slides up */}
       {showSummary && (
         <div
@@ -87,7 +87,7 @@ const MobileStickyCheckoutComponent = ({
       )}
 
       {/* Sticky bar — raised 2cm (~20px) via extra bottom padding */}
-      <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-[13rem] safe-area-inset-bottom max-w-lg mx-auto w-full">
+      <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-4 safe-area-inset-bottom max-w-lg mx-auto w-full">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button
