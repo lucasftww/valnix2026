@@ -50,9 +50,9 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
         <img src={creditCardIcon} alt="Cartão" className="w-7 lg:w-6 h-7 lg:h-6 object-contain shrink-0" />
         <span className="text-[13px] lg:text-[12px] text-muted-foreground">Cartão</span>
         <div className="flex items-center gap-1 ml-auto">
-          <img src={visaLogo} alt="Visa" className="h-5 lg:h-4 w-7 lg:w-6 object-contain rounded-[3px]" />
-          <img src={mastercardLogo} alt="Mastercard" className="h-5 lg:h-4 w-7 lg:w-6 object-contain rounded-[3px]" />
-          <img src={amexLogo} alt="Amex" className="h-5 lg:h-4 w-7 lg:w-6 object-contain rounded-[3px]" />
+          <img src={visaLogo} alt="Visa" className="h-6 lg:h-5 w-8 lg:w-7 object-contain rounded-[3px]" />
+          <img src={mastercardLogo} alt="Mastercard" className="h-6 lg:h-5 w-8 lg:w-7 object-contain rounded-[3px]" />
+          <img src={amexLogo} alt="Amex" className="h-6 lg:h-5 w-8 lg:w-7 object-contain rounded-[3px]" />
         </div>
       </button>
     </div>
