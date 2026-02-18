@@ -6,7 +6,18 @@ const ADMIN_TOKEN_KEY = "valnix_admin_token";
 
 export function getAdminToken(): string | null {
   try {
-    return sessionStorage.getItem(ADMIN_TOKEN_KEY);
+    const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
+    if (!token) return null;
+    // Token format: timestampHex.nonce.hmac — check TTL client-side (1h)
+    const parts = token.split(".");
+    if (parts.length >= 3) {
+      const ts = parseInt(parts[0], 16);
+      if (!isNaN(ts) && Date.now() - ts > 3600000) {
+        sessionStorage.removeItem(ADMIN_TOKEN_KEY);
+        return null;
+      }
+    }
+    return token;
   } catch {
     return null;
   }
