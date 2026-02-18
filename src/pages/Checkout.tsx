@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart, CartItem } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
@@ -6,7 +6,7 @@ import { db } from "@/integrations/firebase/config";
 import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 
 import { Loader2 } from "lucide-react";
-import { PixPayment } from "@/components/checkout/PixPayment";
+const PixPayment = lazy(() => import("@/components/checkout/PixPayment").then(m => ({ default: m.PixPayment })));
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
@@ -92,6 +92,12 @@ export default function Checkout() {
   }, []);
 
   const effectiveUserId = guestId || 'guest';
+
+  // Preload PixPayment chunk as soon as checkout mounts (before user submits)
+  useEffect(() => {
+    const timer = setTimeout(() => import("@/components/checkout/PixPayment"), 1000);
+    return () => clearTimeout(timer);
+  }, []);
 
   useEffect(() => {
     if (items.length === 0 && !paymentData) {
@@ -316,9 +322,11 @@ export default function Checkout() {
         throw new Error(pixData.error || 'Erro ao gerar cobrança PIX');
       }
 
-      setPaymentData({
-        qrCodeText: pixData.brCode, transactionId: pixData.chargeId,
-        amount: orderAmount, orderId, guestHash: pixGuestHash,
+      startTransition(() => {
+        setPaymentData({
+          qrCodeText: pixData.brCode, transactionId: pixData.chargeId,
+          amount: orderAmount, orderId, guestHash: pixGuestHash,
+        });
       });
 
     } catch (error: unknown) {
@@ -340,21 +348,28 @@ export default function Checkout() {
         </div>
         <main className="max-w-xl mx-auto px-4 py-8">
           <div className="bg-secondary/50 rounded-2xl border border-border/10 p-6">
-            <PixPayment
-              qrCodeText={paymentData.qrCodeText}
-              transactionId={paymentData.transactionId}
-              amount={paymentData.amount}
-              orderId={paymentData.orderId}
-              guestHash={paymentData.guestHash || undefined}
-              customerEmail={formData.email || undefined}
-              customerName={formData.name || undefined}
-              customerId={effectiveUserId}
-              productNames={items.map(item => item.name)}
-              productIds={items.map(item => item.id)}
-              quantities={items.map(item => item.quantity)}
-              prices={items.map(item => item.price)}
-              onPaymentConfirmed={clearCart}
-            />
+            <Suspense fallback={
+              <div className="flex flex-col items-center justify-center py-16 gap-4">
+                <Loader2 className="w-10 h-10 animate-spin text-primary" />
+                <p className="text-sm text-muted-foreground">Gerando QR Code...</p>
+              </div>
+            }>
+              <PixPayment
+                qrCodeText={paymentData.qrCodeText}
+                transactionId={paymentData.transactionId}
+                amount={paymentData.amount}
+                orderId={paymentData.orderId}
+                guestHash={paymentData.guestHash || undefined}
+                customerEmail={formData.email || undefined}
+                customerName={formData.name || undefined}
+                customerId={effectiveUserId}
+                productNames={items.map(item => item.name)}
+                productIds={items.map(item => item.id)}
+                quantities={items.map(item => item.quantity)}
+                prices={items.map(item => item.price)}
+                onPaymentConfirmed={clearCart}
+              />
+            </Suspense>
           </div>
         </main>
       </div>

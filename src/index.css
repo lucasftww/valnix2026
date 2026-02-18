@@ -32,6 +32,12 @@ All colors MUST be HSL.
     -webkit-user-drag: none;
   }
   
+  /* GPU-accelerate embla carousel slides for smooth mobile swiping */
+  .embla__slide, [data-embla-slide] {
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
+  }
+  
   /* Permitir seleção em elementos interativos */
   input, textarea, button, a, [role="button"] {
     -webkit-user-select: auto;
