@@ -22,16 +22,15 @@ const AppContent = () => {
   
   // Prefetch key route chunks on idle so navigation is instant
   useEffect(() => {
+    // Prefetch critical route chunks immediately after first paint
     const prefetch = () => {
       import("./pages/ProductDetail");
       import("./pages/Category");
       import("./pages/Cart");
+      import("./pages/Checkout");
     };
-    if ('requestIdleCallback' in window) {
-      (window as any).requestIdleCallback(prefetch, { timeout: 3000 });
-    } else {
-      setTimeout(prefetch, 2000);
-    }
+    // Start prefetch after 500ms — aggressive to avoid black screen on nav
+    setTimeout(prefetch, 500);
   }, []);
   
   return null;
@@ -88,7 +87,11 @@ const App = () => {
                   <AppContent />
                   <ScrollToTop />
                   
-                  <Suspense fallback={<div className="min-h-screen bg-background" />}>
+                  <Suspense fallback={
+                    <div className="min-h-screen bg-background flex items-center justify-center">
+                      <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                  }>
                     <Routes>
                         <Route path="/" element={<Index />} />
                         <Route path="/cart" element={<Cart />} />
