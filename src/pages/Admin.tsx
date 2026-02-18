@@ -93,6 +93,7 @@ export default function Admin() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoFocus
+            autoComplete="new-password"
             className="text-center"
           />
           {loginError && <p className="text-sm text-destructive text-center">{loginError}</p>}
