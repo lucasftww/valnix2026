@@ -27,6 +27,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AdminErrorState } from "./AdminErrorState";
 
 const DEVICE_COLORS: Record<string, string> = {
   mobile: '#f97316',
@@ -78,7 +79,7 @@ export function AdminAnalytics() {
   const [cleanupLoading, setCleanupLoading] = useState(false);
   const [previewData, setPreviewData] = useState<{ total: number; by_event: Record<string, number> } | null>(null);
 
-  const { data: events = [], isLoading, refetch, isFetching } = useQuery({
+  const { data: events = [], isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['analytics-events', dateRange],
     queryFn: async () => {
       const token = requireAdminToken();
@@ -318,6 +319,10 @@ export function AdminAnalytics() {
         <p className="text-sm text-muted-foreground">Carregando analytics...</p>
       </div>
     );
+  }
+
+  if (isError) {
+    return <AdminErrorState title="Erro ao carregar analytics" message="Não foi possível carregar os dados de analytics. Verifique sua conexão e tente novamente." onRetry={() => refetch()} retrying={isFetching} />;
   }
 
   return (

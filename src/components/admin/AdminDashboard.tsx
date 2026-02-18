@@ -14,6 +14,7 @@ import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useState, useMemo } from "react";
 import { cn } from "@/lib/utils";
+import { AdminErrorState } from "./AdminErrorState";
 import { 
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   PieChart, Pie, Cell
@@ -29,7 +30,7 @@ export const AdminDashboard = () => {
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState<Period>('today');
 
-  const { data: rawData, isLoading, refetch, isFetching } = useQuery({
+  const { data: rawData, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['admin-stats'],
     queryFn: async () => {
       const token = requireAdminToken();
@@ -86,6 +87,10 @@ export const AdminDashboard = () => {
         </div>
       </div>
     );
+  }
+
+  if (isError) {
+    return <AdminErrorState title="Erro ao carregar dashboard" message="Não foi possível carregar as estatísticas. Verifique sua conexão e tente novamente." onRetry={() => refetch()} retrying={isFetching} />;
   }
 
   return (
