@@ -1,10 +1,9 @@
 import { 
   Package, ShoppingCart, FolderTree, Home, 
-  BarChart3, ChevronLeft, ChevronRight, LogOut,
+  BarChart3, ChevronLeft, ChevronRight,
   Zap, TrendingUp
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
 import {
   Sidebar,
   SidebarContent,
@@ -18,9 +17,8 @@ import {
   useSidebar,
 } from "@/components/ui/sidebar";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
 import { cn } from "@/lib/utils";
 
 interface AdminSidebarProps {
@@ -43,15 +41,7 @@ const systemMenuItems = [
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   const { state, toggleSidebar } = useSidebar();
   const navigate = useNavigate();
-  const { signOut } = useAuth();
   const isCollapsed = state === "collapsed";
-
-  const handleSignOut = () => {
-    signOut();
-    navigate("/");
-  };
-
-  const userInitials = "AD";
 
   const renderMenuItem = (item: typeof mainMenuItems[0]) => (
     <SidebarMenuItem key={item.id}>
@@ -159,41 +149,13 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        {/* Footer - User Profile */}
         <SidebarFooter className="mt-auto border-t border-neutral-800 p-3">
-          <div className={cn(
-            "flex items-center gap-3 p-2 rounded-lg bg-neutral-900/80",
-            isCollapsed && "justify-center p-2"
-          )}>
-            <Avatar className="h-9 w-9 border-2 border-primary/30 flex-shrink-0">
-              <AvatarFallback className="bg-gradient-to-br from-primary/30 to-primary/10 text-primary text-sm font-medium">
-                {userInitials}
-              </AvatarFallback>
-            </Avatar>
-            {!isCollapsed && (
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-neutral-200 truncate">Admin</p>
-                <p className="text-[10px] text-neutral-500">Administrador</p>
-              </div>
-            )}
-            {!isCollapsed && (
-              <Button 
-                variant="ghost" 
-                size="icon" 
-                className="h-8 w-8 text-neutral-500 hover:text-red-400 hover:bg-red-500/10 flex-shrink-0"
-                onClick={handleSignOut}
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
-
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleSidebar}
             className={cn(
-              "w-full mt-2 text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800/60",
+              "w-full text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800/60",
               isCollapsed && "px-0"
             )}
           >

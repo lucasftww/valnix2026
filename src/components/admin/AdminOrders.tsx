@@ -97,7 +97,6 @@ const getPaymentMethodIcon = (method: string | null, paymentStatus?: string) => 
   switch (resolved) {
     case 'pix': return <QrCode className="w-4 h-4" />;
     case 'card': return <CreditCard className="w-4 h-4" />;
-    case 'balance': return <DollarSign className="w-4 h-4" />;
     default: return <DollarSign className="w-4 h-4" />;
   }
 };
@@ -107,7 +106,6 @@ const getPaymentMethodLabel = (method: string | null, paymentStatus?: string) =>
   switch (resolved) {
     case 'pix': return 'PIX';
     case 'card': return 'Cartão';
-    case 'balance': return 'Saldo';
     default: return 'N/A';
   }
 };
@@ -673,7 +671,6 @@ export const AdminOrders = () => {
                 <SelectItem value="all">Todos</SelectItem>
                 <SelectItem value="pix">PIX</SelectItem>
                 <SelectItem value="card">Cartão</SelectItem>
-                <SelectItem value="balance">Saldo</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -10,11 +10,11 @@ import {
   PieChart, Pie, Cell
 } from "recharts";
 import {
-  BarChart3, TrendingDown, TrendingUp, ShoppingCart,
-  CreditCard, RefreshCw, ArrowDown, AlertTriangle,
+  TrendingUp, ShoppingCart,
+  CreditCard, RefreshCw,
   Smartphone, Monitor, Globe, DollarSign,
-  Activity, Target, Zap, Tablet, Trash2,
-  Clock, Package, Users, ArrowUpRight, Percent, Eye
+  Activity, Target, Tablet, Trash2,
+  Clock, Package, Percent, Eye
 } from "lucide-react";
 import {
   AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
@@ -481,7 +481,7 @@ export function AdminAnalytics() {
         </Card>
         <Card className="bg-card/50">
           <CardContent className="p-3">
-            <span className="text-[10px] text-muted-foreground uppercase">Usuários Únicos</span>
+            <span className="text-[10px] text-muted-foreground uppercase">Visitantes Únicos</span>
             <p className="text-lg font-bold text-foreground">{metrics.uniqueUsers}</p>
           </CardContent>
         </Card>
