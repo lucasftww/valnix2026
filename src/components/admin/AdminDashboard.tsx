@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
+import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   DollarSign, ShoppingCart, Package, TrendingUp, RefreshCw, 
@@ -24,6 +25,7 @@ const formatCurrency = (value: number) =>
 type Period = 'today' | '7d' | '30d';
 
 export const AdminDashboard = () => {
+  const { isAdmin, loading: authLoading } = useAuth();
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState<Period>('today');
 
@@ -39,13 +41,11 @@ export const AdminDashboard = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     },
-    refetchInterval: 30000,
+    enabled: isAdmin && !authLoading,
+    refetchInterval: isAdmin ? 30000 : false,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
-    retry: (_, error) => {
-      if (error?.message?.includes("Not authenticated") || error?.message?.includes("401")) return false;
-      return false;
-    },
+    retry: false,
   });
 
   const stats = useMemo(() => {

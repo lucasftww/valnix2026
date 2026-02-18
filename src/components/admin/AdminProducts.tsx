@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
+import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { invokeFunction } from "@/lib/apiHelper";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -82,6 +83,7 @@ interface Product {
 }
 
 export const AdminProducts = () => {
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
@@ -102,6 +104,7 @@ export const AdminProducts = () => {
         return dateB - dateA;
       });
     },
+    enabled: isAdmin && !authLoading,
     staleTime: 60000,
     retry: false,
   });
@@ -121,6 +124,7 @@ export const AdminProducts = () => {
         .filter((c: any) => c.is_active !== false)
         .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
     },
+    enabled: isAdmin && !authLoading,
     staleTime: 120000,
     retry: false,
   });

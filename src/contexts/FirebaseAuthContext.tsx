@@ -30,6 +30,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setIsAdmin(false);
   }, []);
 
+  // Listen for global admin:unauthorized events (fired by clearAdminToken)
+  useEffect(() => {
+    const onUnauthorized = () => {
+      setTokenState(null);
+      setIsAdmin(false);
+    };
+    window.addEventListener("admin:unauthorized", onUnauthorized);
+    return () => window.removeEventListener("admin:unauthorized", onUnauthorized);
+  }, []);
+
   // On mount, check if there's a stored token and verify it
   useEffect(() => {
     const token = getAdminToken();
@@ -38,7 +48,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
-    // Verify token with server
+    // Verify token with server (single request, no retry)
     invokeFunction("admin-auth", {
       method: "GET",
       headers: { "x-admin-token": token },

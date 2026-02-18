@@ -41,9 +41,9 @@ export function setAdminToken(token: string): void {
 
 export function clearAdminToken(): void {
   adminSessionInvalid = true;
-  try {
-    sessionStorage.removeItem(ADMIN_TOKEN_KEY);
-  } catch {}
+  try { sessionStorage.removeItem(ADMIN_TOKEN_KEY); } catch {}
+  // Dispatch global event so AuthProvider can sync React state immediately
+  window.dispatchEvent(new Event("admin:unauthorized"));
 }
 
 /**

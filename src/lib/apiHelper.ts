@@ -42,8 +42,9 @@ export async function invokeFunction(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // Auto-handle 401 on admin endpoints — clear token to prevent cascading calls
-  if (res.status === 401 && headers["x-admin-token"]) {
+  // Auto-handle 401 on admin endpoints — detect by function name (deterministic)
+  const isAdminFn = functionName.startsWith("admin-");
+  if (res.status === 401 && isAdminFn) {
     clearAdminToken();
   }
 

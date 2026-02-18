@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invokeFunction } from "@/lib/apiHelper";
 import { requireAdminToken } from "@/lib/adminAuth";
+import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
 import { Button } from "@/components/ui/button";
@@ -142,6 +143,7 @@ const formatCurrency = (value: number) => {
 
 // ── Component ─────────────────────────────────────────────────────
 export const AdminOrders = () => {
+  const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
   const { data: orders = [], isLoading: loading, refetch: refetchOrders } = useQuery({
@@ -173,8 +175,9 @@ export const AdminOrders = () => {
       ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       return ordersData;
     },
+    enabled: isAdmin && !authLoading,
     retry: false,
-    refetchInterval: 60000,
+    refetchInterval: isAdmin ? 60000 : false,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
   });
