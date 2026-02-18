@@ -1,7 +1,6 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Loader2, Lock, Trash2, Plus, Minus } from "lucide-react";
 import { CartItem } from "@/contexts/CartContext";
 
@@ -9,15 +8,8 @@ interface OrderSummaryProps {
   items: CartItem[];
   totalPrice: number;
   finalPrice: number;
-  discount: number;
-  appliedCoupon: { code: string } | null;
-  couponCode: string;
-  onCouponChange: (code: string) => void;
-  onApplyCoupon: () => void;
-  onRemoveCoupon: () => void;
   onRemoveItem: (id: string) => void;
   onUpdateQuantity: (id: string, quantity: number) => void;
-  applyingCoupon: boolean;
   loading: boolean;
   isFormValid: boolean;
   onSubmit: () => void;
@@ -28,15 +20,8 @@ export const OrderSummary = memo(function OrderSummary({
   items,
   totalPrice,
   finalPrice,
-  discount,
-  appliedCoupon,
-  couponCode,
-  onCouponChange,
-  onApplyCoupon,
-  onRemoveCoupon,
   onRemoveItem,
   onUpdateQuantity,
-  applyingCoupon,
   loading,
   isFormValid,
   onSubmit,
@@ -45,53 +30,13 @@ export const OrderSummary = memo(function OrderSummary({
   
   const formattedPrices = useMemo(() => ({
     total: totalPrice.toFixed(2).replace('.', ','),
-    discount: discount.toFixed(2).replace('.', ','),
     final: finalPrice.toFixed(2).replace('.', ','),
-  }), [totalPrice, discount, finalPrice]);
+  }), [totalPrice, finalPrice]);
 
   const isSubmitDisabled = loading || finalPrice < 1 || !isFormValid;
 
   return (
     <div className="hidden lg:block w-full lg:w-[340px] space-y-5">
-      {/* Cupom de desconto */}
-      <div className="bg-secondary/50 rounded-2xl border border-border/10 p-5 shadow-lg shadow-black/5">
-        <h3 className="text-[15px] font-semibold text-foreground mb-4">Cupom de desconto</h3>
-        <div className="flex gap-2">
-          <Input
-            id="desktop-coupon-code"
-            name="desktop-coupon"
-            value={couponCode}
-            onChange={(e) => onCouponChange(e.target.value.toUpperCase())}
-            placeholder="Digite o código do cupom"
-            disabled={!!appliedCoupon}
-            className="h-10 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/50 rounded-xl text-[13px] flex-1"
-          />
-          {appliedCoupon ? (
-            <Button 
-              variant="outline" 
-              onClick={onRemoveCoupon}
-              className="h-10 border-border/20 text-muted-foreground hover:bg-muted rounded-xl px-4 text-[13px]"
-            >
-              Remover
-            </Button>
-          ) : (
-            <Button 
-              variant="outline" 
-              onClick={onApplyCoupon}
-              disabled={applyingCoupon || !couponCode.trim()}
-              className="h-10 border-primary/30 text-primary hover:bg-primary/10 rounded-xl px-5 text-[13px] font-medium"
-            >
-              {applyingCoupon ? <Loader2 className="w-4 h-4 animate-spin" /> : "Aplicar"}
-            </Button>
-          )}
-        </div>
-        {appliedCoupon && (
-          <p className="text-green-500 text-[12px] mt-2">
-            Cupom {appliedCoupon.code} aplicado!
-          </p>
-        )}
-      </div>
-
       {/* Resumo */}
       <div className="bg-secondary/50 rounded-2xl border border-border/10 p-5 shadow-lg shadow-black/5">
         <h3 className="text-[15px] font-semibold text-foreground mb-4">Resumo</h3>
@@ -112,7 +57,6 @@ export const OrderSummary = memo(function OrderSummary({
               <div className="flex-1 min-w-0">
                 <p className="text-foreground text-[13px] font-medium leading-tight line-clamp-2">{item.name}</p>
                 <div className="flex items-center gap-3 mt-2">
-                  {/* Quantity Controls */}
                   <div className="flex items-center gap-1">
                     <button 
                       onClick={() => onUpdateQuantity(item.id, item.quantity - 1)}
@@ -131,7 +75,6 @@ export const OrderSummary = memo(function OrderSummary({
                       <Plus className="w-3 h-3" />
                     </button>
                   </div>
-                  {/* Remove Button */}
                   <button 
                     onClick={() => onRemoveItem(item.id)}
                     className="w-6 h-6 rounded-lg bg-muted border border-border/10 flex items-center justify-center text-muted-foreground hover:text-red-500 hover:border-red-500/30 transition-colors"
@@ -156,12 +99,6 @@ export const OrderSummary = memo(function OrderSummary({
           <div className="flex justify-between text-[13px]">
             <span className="text-muted-foreground">Preço oficial</span>
             <span className="text-foreground">R$ {formattedPrices.total}</span>
-          </div>
-          <div className="flex justify-between text-[13px]">
-            <span className="text-muted-foreground">Desconto</span>
-            <span className={discount > 0 ? "text-green-500" : "text-foreground"}>
-              {discount > 0 ? `-R$ ${formattedPrices.discount}` : "R$ 0,00"}
-            </span>
           </div>
           <div className="flex justify-between items-center pt-2">
             <span className="text-[14px] text-foreground font-medium">Total</span>

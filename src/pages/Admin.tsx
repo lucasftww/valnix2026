@@ -4,13 +4,11 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAdminPrefetch } from "@/hooks/useAdminPrefetch";
 import { Search, Bell, Settings, ChevronRight } from "lucide-react";
 
-// Direct imports — no lazy loading for instant tab switching
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
 import { AdminProducts } from "@/components/admin/AdminProducts";
 import { AdminOrders } from "@/components/admin/AdminOrders";
 import { AdminCategories } from "@/components/admin/AdminCategories";
-import { AdminCoupons } from "@/components/admin/AdminCoupons";
 import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
@@ -39,7 +37,6 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   products: { title: "Produtos", description: "Gerencie seu catálogo de produtos" },
   categories: { title: "Categorias", description: "Organize suas categorias" },
   orders: { title: "Pedidos", description: "Acompanhe e gerencie pedidos" },
-  coupons: { title: "Cupons de Desconto", description: "Crie promoções e descontos" },
   "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
 };
 
@@ -177,10 +174,6 @@ export default function Admin() {
                   <DropdownMenuContent align="end" className="w-56">
                     <DropdownMenuLabel>Configurações</DropdownMenuLabel>
                     <DropdownMenuSeparator />
-                    <DropdownMenuItem onClick={() => setActiveTab("coupons")}>
-                      Cupons de Desconto
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => navigate("/")}>
                       Voltar ao Site
                     </DropdownMenuItem>
@@ -202,7 +195,6 @@ export default function Admin() {
               {mountedTabs.has("products") && <div style={{ display: activeTab === "products" ? "block" : "none" }}><AdminProducts /></div>}
               {mountedTabs.has("categories") && <div style={{ display: activeTab === "categories" ? "block" : "none" }}><AdminCategories /></div>}
               {mountedTabs.has("orders") && <div style={{ display: activeTab === "orders" ? "block" : "none" }}><AdminOrders /></div>}
-              {mountedTabs.has("coupons") && <div style={{ display: activeTab === "coupons" ? "block" : "none" }}><AdminCoupons /></div>}
               {mountedTabs.has("post-payment") && <div style={{ display: activeTab === "post-payment" ? "block" : "none" }}><AdminPostPaymentPages /></div>}
             </div>
           </main>

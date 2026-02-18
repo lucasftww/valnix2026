@@ -24,7 +24,6 @@ interface PixPaymentProps {
   productIds?: string[];
   quantities?: number[];
   prices?: number[];
-  couponId?: string;
   onPaymentConfirmed?: () => void;
 }
 
@@ -41,7 +40,6 @@ export function PixPayment({
   productIds,
   quantities,
   prices,
-  couponId,
   onPaymentConfirmed 
 }: PixPaymentProps) {
   const [copied, setCopied] = useState(false);

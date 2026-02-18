@@ -12,18 +12,15 @@ import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
 import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError } from "@/components/checkout/PersonalInfoForm";
-import { MobileCoupon } from "@/components/checkout/MobileCoupon";
 import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
 import { sendInitiateCheckout, sendPurchaseFromClient, clearCheckoutSessionId } from "@/lib/metaCapi";
 
-// Read Facebook cookies for CAPI match quality
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
   return match ? decodeURIComponent(match[2]) : null;
 }
 
-// Helper: create order + items via server-side edge function
 async function createOrderServerSide(
   orderData: Record<string, unknown>,
   items: Array<Record<string, unknown>>,
@@ -61,7 +58,7 @@ interface PaymentData {
 }
 
 export default function Checkout() {
-  const { items, totalPrice, finalPrice, discount, appliedCoupon, clearCart, applyCoupon, removeCoupon, removeItem, updateQuantity } = useCart();
+  const { items, totalPrice, finalPrice, clearCart, removeItem, updateQuantity } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -76,11 +73,8 @@ export default function Checkout() {
     } catch {}
     return { name: "", document: "", email: "", phone: "" };
   });
-  const [couponCode, setCouponCode] = useState("");
-  const [applyingCoupon, setApplyingCoupon] = useState(false);
   const [touched, setTouched] = useState<Record<string, boolean>>({});
 
-  // Generate a stable guest ID
   const guestId = useMemo(() => {
     const stored = sessionStorage.getItem('valnix_guest_id');
     if (stored) return stored;
@@ -89,7 +83,6 @@ export default function Checkout() {
     return id;
   }, []);
 
-  // Read UTM params from sessionStorage
   const utmParams = useMemo(() => {
     try {
       const raw = sessionStorage.getItem('valnix_utm_params');
@@ -100,15 +93,12 @@ export default function Checkout() {
 
   const effectiveUserId = guestId || 'guest';
 
-  // Redirect if cart is empty (and not on payment screen)
   useEffect(() => {
     if (items.length === 0 && !paymentData) {
       navigate("/");
     }
   }, [items.length, paymentData, navigate]);
 
-  // Track InitiateCheckout once per session (persisted via sessionStorage)
-  // NO form PII here — user hasn't typed yet. Only auth-known data.
   const icFiredRef = useRef(false);
   useEffect(() => {
     if (icFiredRef.current) return;
@@ -136,15 +126,12 @@ export default function Checkout() {
     });
   }, [items, finalPrice, effectiveUserId]);
 
-  // Clear IC flag when cart empties (allows re-fire on new checkout)
   useEffect(() => {
     if (items.length === 0) {
       try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
       icFiredRef.current = false;
     }
   }, [items.length]);
-
-
 
   const validation = useMemo(() => ({
     name: formData.name.trim().length >= 3 && formData.name.trim().split(' ').length >= 2,
@@ -179,14 +166,6 @@ export default function Checkout() {
     setTouched(prev => ({ ...prev, [field]: true }));
   }, []);
 
-  const handleApplyCoupon = useCallback(async () => {
-    if (!couponCode.trim()) return;
-    setApplyingCoupon(true);
-    await applyCoupon(couponCode);
-    setApplyingCoupon(false);
-  }, [couponCode, applyCoupon]);
-
-  // ─── SUBMIT HANDLER ───────────────────────────────────────────────────────
   const handleSubmit = useCallback(async () => {
     if (isSubmittingRef.current || loading) return;
     isSubmittingRef.current = true;
@@ -209,8 +188,6 @@ export default function Checkout() {
     }
     
     setLoading(true);
-
-    // InitiateCheckout already fired on mount — no duplicate here
     
     try {
       const orderAmount = finalPrice;
@@ -238,10 +215,8 @@ export default function Checkout() {
           customer_email: formData.email || "",
           customer_phone: formData.phone || "",
           total_amount: orderAmount,
-          notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)}) | Cartão` : "Cartão",
+          notes: "Cartão",
           payment_method: "card",
-          coupon_id: appliedCoupon?.id || null,
-          coupon_code: appliedCoupon?.code || null,
           fbc: getCookie('_fbc'), fbp: getCookie('_fbp'),
           event_source_url: window.location.href,
           utm_source: utmParams.utm_source || null, utm_medium: utmParams.utm_medium || null,
@@ -279,7 +254,6 @@ export default function Checkout() {
           eventSourceUrl: window.location.href,
         }));
 
-        // Profile save removed (guest-only checkout)
         try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
         clearCart();
         window.open(cardData.paymentUrl, '_blank');
@@ -302,10 +276,8 @@ export default function Checkout() {
         customer_email: formData.email || "",
         customer_phone: formData.phone || "",
         total_amount: orderAmount,
-        notes: appliedCoupon ? `Cupom: ${appliedCoupon.code} (-R$ ${discount.toFixed(2)})` : null,
+        notes: null,
         payment_method: "pix",
-        coupon_id: appliedCoupon?.id || null,
-        coupon_code: appliedCoupon?.code || null,
         fbc: getCookie('_fbc'), fbp: getCookie('_fbp'),
         event_source_url: window.location.href,
         utm_source: utmParams.utm_source || null, utm_medium: utmParams.utm_medium || null,
@@ -344,8 +316,6 @@ export default function Checkout() {
         throw new Error(pixData.error || 'Erro ao gerar cobrança PIX');
       }
 
-      // Profile save removed (guest-only checkout)
-      // IC flag cleared on actual payment confirmation (in PixPayment), not on QR generation
       setPaymentData({
         qrCodeText: pixData.brCode, transactionId: pixData.chargeId,
         amount: orderAmount, orderId, guestHash: pixGuestHash,
@@ -359,7 +329,7 @@ export default function Checkout() {
       setLoading(false);
       isSubmittingRef.current = false;
     }
-  }, [loading, isFormValid, formData, items, finalPrice, discount, appliedCoupon, toast, paymentMethod, clearCart, navigate, effectiveUserId]);
+  }, [loading, isFormValid, formData, items, finalPrice, toast, paymentMethod, clearCart, navigate, effectiveUserId]);
 
   // ─── PIX PAYMENT SCREEN ────────────────────────────────────────────────
   if (paymentData) {
@@ -383,7 +353,6 @@ export default function Checkout() {
               productIds={items.map(item => item.id)}
               quantities={items.map(item => item.quantity)}
               prices={items.map(item => item.price)}
-              couponId={appliedCoupon?.id || undefined}
               onPaymentConfirmed={clearCart}
             />
           </div>
@@ -424,16 +393,6 @@ export default function Checkout() {
               onInputChange={handleInputChange}
               onBlur={handleBlur}
             />
-
-            <MobileCoupon
-              couponCode={couponCode}
-              onCouponChange={setCouponCode}
-              onApplyCoupon={handleApplyCoupon}
-              onRemoveCoupon={removeCoupon}
-              appliedCoupon={appliedCoupon}
-              applyingCoupon={applyingCoupon}
-              discount={discount}
-            />
           </div>
 
           {/* Right Column - Sidebar */}
@@ -441,15 +400,8 @@ export default function Checkout() {
             items={items}
             totalPrice={totalPrice}
             finalPrice={finalPrice}
-            discount={discount}
-            appliedCoupon={appliedCoupon}
-            couponCode={couponCode}
-            onCouponChange={setCouponCode}
-            onApplyCoupon={handleApplyCoupon}
-            onRemoveCoupon={removeCoupon}
             onRemoveItem={removeItem}
             onUpdateQuantity={updateQuantity}
-            applyingCoupon={applyingCoupon}
             loading={loading}
             isFormValid={isFormValid}
             onSubmit={handleSubmit}
