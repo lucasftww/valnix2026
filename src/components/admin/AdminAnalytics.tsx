@@ -377,7 +377,7 @@ export function AdminAnalytics() {
                 {previewData && (
                   <div className="p-3 bg-destructive/10 rounded-lg border border-destructive/20 text-sm space-y-1">
                     <p className="font-semibold text-destructive">{previewData.total} eventos serão deletados:</p>
-                    {Object.entries(previewData.by_event).map(([name, count]) => (
+                    {Object.entries(previewData.by_event || {}).map(([name, count]) => (
                       <p key={name} className="text-muted-foreground text-xs">• {name}: {count}</p>
                     ))}
                   </div>

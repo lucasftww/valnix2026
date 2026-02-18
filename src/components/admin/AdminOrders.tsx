@@ -410,7 +410,7 @@ export const AdminOrders = () => {
       });
       if (!itemsRes.ok) throw new Error(`HTTP ${itemsRes.status}`);
       const itemsData = await itemsRes.json();
-      setDetailItems(itemsData.items || []);
+      setDetailItems(Array.isArray(itemsData.items) ? itemsData.items : []);
 
       // Fetch upsell addons via edge function (service_role) since RLS restricts anon reads
       try {
@@ -421,7 +421,7 @@ export const AdminOrders = () => {
         });
         if (res.ok) {
           const result = await res.json();
-          const orderAddons = (result.addons || []).filter((a: any) => a.order_id === order.id);
+          const orderAddons = (Array.isArray(result.addons) ? result.addons : []).filter((a: any) => a.order_id === order.id);
           setDetailAddons(orderAddons);
         } else {
           setDetailAddons([]);
