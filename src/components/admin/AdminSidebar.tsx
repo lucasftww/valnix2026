@@ -1,7 +1,7 @@
 import { 
   Package, ShoppingCart, FolderTree, Home, 
   BarChart3, ChevronLeft, ChevronRight,
-  Zap, TrendingUp
+  Zap, TrendingUp, Shield
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -36,6 +36,7 @@ const mainMenuItems = [
 
 const systemMenuItems = [
   { id: "post-payment", title: "Pós-Venda", icon: Zap, badge: null },
+  { id: "tracking", title: "Tracking", icon: Shield, badge: "new" as const },
 ];
 
 export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
