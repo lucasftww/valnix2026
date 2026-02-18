@@ -48,11 +48,11 @@
   }
 })();
 
-// ── 3. Facebook Pixel Base — deferred with requestIdleCallback after load ──
+// ── 3. Facebook Pixel Base — deferred 3s after load to avoid blocking LCP ──
+// FB SDK is 131 KiB (66% of total JS) — must load AFTER critical paint
 (function initFbPixel() {
   window.addEventListener('load', () => {
-    const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 2000));
-    ric(() => {
+    setTimeout(() => {
       const f = window as any;
       if (f.fbq) return;
       const n: any = f.fbq = function () {
@@ -67,7 +67,7 @@
       s.parentNode!.insertBefore(t, s);
       f.fbq('set', 'autoConfig', false, '1939179866693535');
       f.fbq('init', '1939179866693535');
-    });
+    }, 3000); // 3s delay after load — ensures LCP is complete
   }, { once: true });
 })();
 
