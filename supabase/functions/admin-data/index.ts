@@ -860,7 +860,7 @@ Deno.serve(async (req) => {
           }
         } catch { /* sale_addons may not exist */ }
 
-        console.log(`🧹 Cleanup orders for ${email}: ${orders.length} orders, ${deletedItems} items, ${deletedGuest} guest_orders, ${deletedAddons} sale_addons`);
+        console.log(`🧹 Cleanup orders for ${email}: ${orders.length} orders, ${deletedItems} items, ${deletedGuest} ordens, ${deletedAddons} sale_addons`);
 
         return new Response(JSON.stringify({
           success: true,
