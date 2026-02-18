@@ -60,7 +60,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         className={cn(
           "group relative transition-all duration-200 rounded-lg h-10",
           activeTab === item.id
-            ? "bg-primary/15 text-primary font-medium border-l-3 border-primary shadow-sm"
+            ? "bg-primary/15 text-primary font-medium border-l-2 border-primary shadow-sm"
             : "text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100"
         )}
       >

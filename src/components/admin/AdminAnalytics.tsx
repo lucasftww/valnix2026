@@ -432,9 +432,9 @@ export function AdminAnalytics() {
             label: 'Receita',
             value: formatCurrency(metrics.revenue),
             icon: DollarSign,
-            bgColor: 'bg-emerald-500/10',
-            textColor: 'text-emerald-500',
-            borderColor: 'border-emerald-500/20',
+            bgColor: 'bg-success/10',
+            textColor: 'text-success',
+            borderColor: 'border-success/20',
           },
           {
             label: 'Ticket Médio',

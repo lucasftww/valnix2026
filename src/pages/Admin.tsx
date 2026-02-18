@@ -73,8 +73,8 @@ export default function Admin() {
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <div className="w-10 h-10 border-3 border-primary/20 rounded-full relative">
-          <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
+        <div className="w-10 h-10 border-2 border-primary/20 rounded-full relative">
+          <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
         </div>
       </div>
     );
