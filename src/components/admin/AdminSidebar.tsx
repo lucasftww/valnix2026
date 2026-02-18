@@ -1,6 +1,6 @@
 import { 
   Package, ShoppingCart, FolderTree, Home, 
-  BarChart3, Tag, ChevronLeft, ChevronRight, LogOut,
+  BarChart3, ChevronLeft, ChevronRight, LogOut,
   Zap, TrendingUp
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -37,7 +37,6 @@ const mainMenuItems = [
 ];
 
 const systemMenuItems = [
-  { id: "coupons", title: "Cupons", icon: Tag, badge: null },
   { id: "post-payment", title: "Pós-Venda", icon: Zap, badge: null },
 ];
 

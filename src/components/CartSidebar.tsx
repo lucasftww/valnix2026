@@ -19,7 +19,7 @@ interface CartSidebarProps {
 }
 
 const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
-  const { items, totalItems, finalPrice, discount, updateQuantity, removeItem } = useCart();
+  const { items, totalItems, finalPrice, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
 
   const handleCheckout = useCallback(() => {
@@ -153,12 +153,6 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
 
             <div className="border-t border-border/20 bg-secondary/50 p-4 space-y-4">
               <div className="space-y-2">
-                {discount > 0 && (
-                  <div className="flex justify-between text-sm">
-                    <span className="text-muted-foreground">Desconto</span>
-                    <span className="text-green-500 font-medium">-R$ {discount.toFixed(2)}</span>
-                  </div>
-                )}
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Total</span>
                   <span className="text-xl font-bold text-primary">
