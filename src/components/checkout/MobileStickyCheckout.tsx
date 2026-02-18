@@ -49,7 +49,7 @@ const MobileStickyCheckoutComponent = ({
                   <p className="text-foreground text-[13px] font-medium truncate">
                     {item.name}
                   </p>
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-1.5 mt-1">
                     <button
                       onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
                       className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
