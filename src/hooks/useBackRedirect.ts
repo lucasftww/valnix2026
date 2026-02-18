@@ -1,4 +1,4 @@
-import { useEffect, useRef } from "react";
+import { useEffect } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 
 /**
@@ -9,7 +9,7 @@ import { useLocation, useNavigate } from "react-router-dom";
 export function useBackRedirect(redirectPath = "/") {
   const location = useLocation();
   const navigate = useNavigate();
-  const isBackNavigation = useRef(false);
+  
 
   useEffect(() => {
     // Skip if already on the redirect target
@@ -18,18 +18,11 @@ export function useBackRedirect(redirectPath = "/") {
     // Push a sentinel entry so "back" triggers popstate instead of leaving the app
     window.history.pushState({ __backRedirect: true }, "", window.location.href);
 
-    const handlePopState = (event: PopStateEvent) => {
-      // A popstate with our sentinel missing means the user pressed back
-      // F5/refresh does NOT fire popstate, so this only catches real back navigation
-      const currentParams = location.search.replace("?", "");
-      const separator = redirectPath.includes("?") ? "&" : "?";
-      const fullUrl =
-        redirectPath + (currentParams ? separator + currentParams : "");
-
-      navigate(fullUrl, { replace: true });
+    const handlePopState = () => {
+      navigate(redirectPath, { replace: true });
     };
 
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
-  }, [location.pathname]);
+  }, [location.pathname, navigate, redirectPath]);
 }
