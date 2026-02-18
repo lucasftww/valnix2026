@@ -36,9 +36,10 @@ export const useAdminPrefetch = () => {
               headers,
             });
             if (!res.ok) throw new Error(`HTTP ${res.status}`);
-            return res.json();
+            const data = await res.json();
+            return data;
           },
-          staleTime: 2 * 60 * 1000,
+          staleTime: 30_000,
         });
       });
     };
