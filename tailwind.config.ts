@@ -54,6 +54,10 @@ export default {
           DEFAULT: "hsl(var(--discount))",
           foreground: "hsl(var(--discount-foreground))",
         },
+        success: {
+          DEFAULT: "hsl(var(--success))",
+          foreground: "hsl(var(--success-foreground))",
+        },
         discord: "hsl(var(--discord))",
         
         sidebar: {
@@ -113,7 +117,6 @@ export default {
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
-        "fade-in": "fade-in 0.3s ease-out",
         "fade-in": "fade-in 0.3s ease-out",
         "scale-in": "scale-in 0.2s ease-out",
       },
