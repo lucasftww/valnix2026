@@ -1,6 +1,6 @@
 import { memo, useCallback, useState } from "react";
 import { ChevronDown } from "lucide-react";
-import { Link } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { useCategoriesTreeApi } from "@/hooks/useApiData";
 import { useQueryClient } from "@tanstack/react-query";
 
@@ -13,6 +13,7 @@ const NavigationComponent = () => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
   const { data: categories = [] } = useCategoriesTreeApi();
   const queryClient = useQueryClient();
+  const navigate = useNavigate();
 
   const prefetchCategoryProducts = useCallback((categorySlug: string) => {
     queryClient.prefetchQuery({
@@ -38,7 +39,7 @@ const NavigationComponent = () => {
     setOpenDropdown(null);
   }, []);
 
-  if (categories.length === 0) return null;
+  if (categories.length === 0) return <nav className="hidden md:block h-[42px] w-full border-b border-border/10 bg-background" aria-label="Categorias" />;
 
   return (
     <nav className="hidden md:block sticky top-16 w-full border-b border-border/10 bg-background z-40">
@@ -57,9 +58,10 @@ const NavigationComponent = () => {
               >
                 {hasChildren ? (
                   <>
-                    <Link 
-                      to={categoryLink} 
-                      className="inline-flex items-center h-9 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
+                    <button 
+                      onClick={() => navigate(categoryLink)}
+                      onMouseEnter={() => handleMouseEnter(category.id, category.slug, true)}
+                      className="inline-flex items-center h-12 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
                       aria-label={`Ver produtos de ${category.name}`}
                       aria-expanded={openDropdown === category.id}
                       aria-haspopup="true"
@@ -74,7 +76,7 @@ const NavigationComponent = () => {
                         }`}
                         aria-hidden="true"
                       />
-                    </Link>
+                    </button>
                     {openDropdown === category.id && (
                       <div className="absolute left-0 top-full pt-2 z-50">
                         <ul className="bg-card border border-border/20 rounded-xl shadow-2xl shadow-black/30 min-w-[200px] py-1" role="menu">
@@ -100,7 +102,7 @@ const NavigationComponent = () => {
                 ) : (
                   <Link 
                     to={categoryLink} 
-                    className="inline-flex items-center h-9 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
+                    className="inline-flex items-center h-12 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
                     aria-label={`Ver produtos de ${category.name}`}
                   >
                     {category.icon_url && (
