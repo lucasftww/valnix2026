@@ -21,15 +21,16 @@ const ProductGridComponent = () => {
   
   if (isLoading) {
     return (
-      <section className="container px-4 md:px-8 py-12">
-        <div className="mb-8">
-          <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
-            Mais vendidos
-          </h2>
+      <section className="container px-4 md:px-8 py-8 md:py-16">
+        <div className="mb-6 md:mb-10">
+          <div className="h-7 md:h-8 w-40 bg-muted/30 rounded" />
+          <div className="h-4 w-64 bg-muted/20 rounded mt-2" />
         </div>
-        <div className="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 md:gap-6">
+        <div className="flex gap-2 md:gap-4 overflow-hidden -mx-4 px-4 md:mx-0 md:px-0">
           {Array.from({ length: 4 }).map((_, i) => (
-            <ProductSkeleton key={i} />
+            <div key={i} className="shrink-0 w-[45%] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]">
+              <ProductSkeleton />
+            </div>
           ))}
         </div>
       </section>
@@ -110,6 +111,8 @@ const ProductGridComponent = () => {
       {/* CSS scroll-snap carousel — zero JS library needed */}
       <div 
         ref={scrollRef}
+        role="region"
+        aria-label="Produtos mais vendidos"
         className="flex gap-2 md:gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0"
         style={{ touchAction: 'pan-x' }}
       >

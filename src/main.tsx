@@ -10,14 +10,19 @@ fetchCategoriesFallback();
 
 import { createRoot } from "react-dom/client";
 
-// Load critical font weight synchronously (avoids CLS from FOUT)
-import "@fontsource/poppins/700.css";
-import "@fontsource/poppins/600.css";
-// Defer non-critical font weights
-requestAnimationFrame(() => {
+// Defer ALL fonts to prevent CLS (font-display:swap causes layout shift)
+// System font renders immediately; Poppins loads in background for next paint
+const loadFonts = () => {
   import("@fontsource/poppins/400.css");
   import("@fontsource/poppins/500.css");
-});
+  import("@fontsource/poppins/600.css");
+  import("@fontsource/poppins/700.css");
+};
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(loadFonts);
+} else {
+  setTimeout(loadFonts, 100);
+}
 
 import App from "./App.tsx";
 import "./index.css";
