@@ -99,7 +99,7 @@ export interface Review {
 // Enums tipados
 export type OrderStatus = 'pending' | 'processing' | 'completed' | 'cancelled';
 export type PaymentStatus = 'pending' | 'paid' | 'failed' | 'refunded';
-export type DeliveryType = 'manual' | 'automatic';
+
 
 // Cart types
 export interface CartItem {

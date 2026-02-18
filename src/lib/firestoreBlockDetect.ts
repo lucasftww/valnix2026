@@ -25,18 +25,3 @@ export function markFirestorePossiblyBlocked(err: unknown): void {
     (window as any).__valnix_firestore_blocked = true;
   }
 }
-
-/** Check if error looks like an ad-blocker blocking Firestore */
-export function isBlockedByAdBlocker(err: unknown): boolean {
-  const msg = (err as Error)?.message?.toLowerCase() ?? "";
-  const code = (err as any)?.code ?? "";
-  return (
-    code === "unavailable" ||
-    code === "deadline-exceeded" ||
-    msg.includes("failed to fetch") ||
-    msg.includes("network") ||
-    msg.includes("err_blocked") ||
-    msg.includes("could not reach") ||
-    (err instanceof TypeError && /fetch|network/i.test(msg))
-  );
-}
