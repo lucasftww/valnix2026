@@ -1,11 +1,14 @@
 import { memo, useMemo } from "react";
-import { ShieldCheck, Zap, CreditCard, HeadphonesIcon, HelpCircle } from "lucide-react";
+import { ShieldCheck, Zap, CreditCard, HeadphonesIcon, HelpCircle, Lock, Star, Users, BadgeCheck, Clock } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
+import googleSafe from "@/assets/google-safe.png";
+import nortonSecured from "@/assets/norton-secured.png";
+import reclameAqui from "@/assets/reclame-aqui.png";
 
 interface FAQProps {
   productName?: string;
@@ -39,7 +42,7 @@ function buildFaqs(label: string) {
     {
       icon: ShieldCheck,
       question: "É seguro comprar na VALNIX?",
-      answer: "100% seguro! A VALNIX é referência em segurança no mercado gamer brasileiro. Utilizamos criptografia SSL de 256 bits, certificação Google Safe Browsing e Norton Secured. Já são mais de 20 mil clientes satisfeitos, com avaliação média de 4.9 estrelas. Seus dados estão completamente protegidos em todas as etapas.",
+      answer: null, // Handled with custom rich content
     },
     {
       icon: Zap,
@@ -58,6 +61,67 @@ function buildFaqs(label: string) {
     },
   ];
 }
+
+const SecurityAnswer = () => (
+  <div className="space-y-4">
+    <p className="text-muted-foreground text-sm leading-relaxed">
+      A <span className="text-foreground font-semibold">VALNIX</span> é uma das lojas mais confiáveis do mercado gamer brasileiro. 
+      Levamos a segurança dos nossos clientes a sério em cada etapa da compra.
+    </p>
+    
+    {/* Trust indicators grid */}
+    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+        <div className="h-8 w-8 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0 mt-0.5">
+          <Lock className="w-4 h-4 text-emerald-500" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-foreground">Criptografia SSL 256-bit</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Seus dados são criptografados com a mesma tecnologia usada por bancos</p>
+        </div>
+      </div>
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+        <div className="h-8 w-8 rounded-lg bg-blue-500/10 flex items-center justify-center shrink-0 mt-0.5">
+          <BadgeCheck className="w-4 h-4 text-blue-500" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-foreground">Pagamento 100% Seguro</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Processado por gateways certificados PCI-DSS nível 1</p>
+        </div>
+      </div>
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+        <div className="h-8 w-8 rounded-lg bg-amber-500/10 flex items-center justify-center shrink-0 mt-0.5">
+          <Star className="w-4 h-4 text-amber-500" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-foreground">Avaliação 4.9 ★★★★★</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Mais de 20 mil clientes satisfeitos com nota máxima</p>
+        </div>
+      </div>
+      <div className="flex items-start gap-3 p-3 rounded-lg bg-primary/5 border border-primary/10">
+        <div className="h-8 w-8 rounded-lg bg-purple-500/10 flex items-center justify-center shrink-0 mt-0.5">
+          <Clock className="w-4 h-4 text-purple-500" />
+        </div>
+        <div>
+          <p className="text-xs font-semibold text-foreground">Entrega Instantânea</p>
+          <p className="text-xs text-muted-foreground mt-0.5">Código entregue automaticamente em segundos após o pagamento</p>
+        </div>
+      </div>
+    </div>
+
+    {/* Certification badges */}
+    <div className="flex items-center gap-4 pt-2 flex-wrap">
+      <img src={googleSafe} alt="Google Safe Browsing" className="h-8 opacity-70 hover:opacity-100 transition-opacity" />
+      <img src={nortonSecured} alt="Norton Secured" className="h-8 opacity-70 hover:opacity-100 transition-opacity" />
+      <img src={reclameAqui} alt="Reclame Aqui" className="h-8 opacity-70 hover:opacity-100 transition-opacity" />
+    </div>
+
+    <p className="text-xs text-muted-foreground/70 leading-relaxed">
+      Compre com total tranquilidade. Todos os seus dados pessoais e financeiros são protegidos em todas as etapas. 
+      Se tiver qualquer dúvida, nosso suporte está disponível para ajudar.
+    </p>
+  </div>
+);
 
 const FAQComponent = ({ productName, productCategory }: FAQProps) => {
   const label = useMemo(() => getProductLabel(productName, productCategory), [productName, productCategory]);
@@ -78,6 +142,7 @@ const FAQComponent = ({ productName, productCategory }: FAQProps) => {
         <Accordion type="single" collapsible className="space-y-3 md:space-y-4">
           {faqs.map((faq, index) => {
             const Icon = faq.icon;
+            const isSecurityFaq = faq.question === "É seguro comprar na VALNIX?";
             return (
               <AccordionItem 
                 key={index} 
@@ -94,8 +159,10 @@ const FAQComponent = ({ productName, productCategory }: FAQProps) => {
                     </span>
                   </div>
                 </AccordionTrigger>
-                <AccordionContent className="text-muted-foreground text-sm pb-4 md:pb-5 pl-11">
-                  {faq.answer}
+                <AccordionContent className="pb-4 md:pb-5 pl-11">
+                  {isSecurityFaq ? <SecurityAnswer /> : (
+                    <p className="text-muted-foreground text-sm">{faq.answer}</p>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             );
