@@ -543,7 +543,7 @@ const ProductDetail = () => {
           {/* Reviews - Lazy loaded */}
           {reviews.length > 0 && (
             <Suspense fallback={<div className="h-48 mt-6 animate-pulse bg-muted/10 rounded-2xl" />}>
-              <ReviewsCarousel reviews={reviews} />
+              <ReviewsCarousel reviews={reviews} targetCount={productStats.reviewCount} />
             </Suspense>
           )}
 
