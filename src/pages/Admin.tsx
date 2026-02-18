@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { AuthProvider, useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAdminPrefetch } from "@/hooks/useAdminPrefetch";
 import { Settings, ChevronRight } from "lucide-react";
 
@@ -42,7 +42,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   tracking: { title: "Tracking Monitor", description: "Saúde do Meta CAPI e deduplicação" },
 };
 
-export default function Admin() {
+function Admin() {
   const { isAdmin, loading, signIn } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -200,5 +200,14 @@ export default function Admin() {
         </div>
       </div>
     </SidebarProvider>
+  );
+}
+
+// Wrap with AuthProvider so useAuth works only when Admin is rendered
+export default function AdminWithAuth() {
+  return (
+    <AuthProvider>
+      <Admin />
+    </AuthProvider>
   );
 }

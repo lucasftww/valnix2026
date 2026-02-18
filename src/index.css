@@ -33,7 +33,6 @@ All colors MUST be HSL.
   
   /* GPU-accelerate embla carousel slides for smooth mobile swiping */
   .embla__container, [class*="CarouselContent"] > div {
-    will-change: transform;
     backface-visibility: hidden;
     -webkit-backface-visibility: hidden;
   }
@@ -250,4 +249,10 @@ html {
 
 .animate-pulse {
   animation: skeleton-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+/* Skip rendering for below-fold sections until they scroll into view */
+.content-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 400px;
 }
