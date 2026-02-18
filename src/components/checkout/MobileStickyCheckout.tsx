@@ -72,21 +72,8 @@ const MobileStickyCheckoutComponent = ({
 
       {/* Sticky bar — raised 2cm (~20px) via extra bottom padding */}
       <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-[7rem] safe-area-inset-bottom max-w-lg mx-auto w-full">
-        {/* Summary toggle + Total */}
-        <div className="flex items-center justify-between mb-3">
-          <button
-            onClick={() => setShowSummary(!showSummary)}
-            className="flex items-center gap-1.5 text-[13px] text-muted-foreground underline underline-offset-2 min-h-[48px]"
-            aria-expanded={showSummary}
-            aria-label="Resumo do Pedido"
-          >
-            Resumo do Pedido
-            <ChevronUp
-              className={`w-3.5 h-3.5 transition-transform duration-200 ${
-                showSummary ? "rotate-180" : ""
-              }`}
-            />
-          </button>
+        {/* Total */}
+        <div className="flex items-center justify-end mb-3">
           <div className="flex items-center gap-2">
             <span className="text-[13px] text-muted-foreground">Total</span>
             <span className="text-[18px] text-primary font-bold">
