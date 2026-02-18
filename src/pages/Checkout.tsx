@@ -1,9 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
-import { useCart, CartItem } from "@/contexts/CartContext";
+import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/integrations/firebase/config";
-import { doc, getDoc, collection, getDocs, query, where } from "firebase/firestore";
 
 import { Loader2 } from "lucide-react";
 const PixPayment = lazy(() => import("@/components/checkout/PixPayment").then(m => ({ default: m.PixPayment })));
@@ -12,9 +10,9 @@ import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
 import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError } from "@/components/checkout/PersonalInfoForm";
-import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
-import { trackInitiateCheckoutEvent, trackPurchaseEvent } from "@/lib/analytics";
-import { sendInitiateCheckout, sendPurchaseFromClient, clearCheckoutSessionId } from "@/lib/metaCapi";
+import { invokeFunction } from "@/lib/apiHelper";
+import { trackInitiateCheckoutEvent } from "@/lib/analytics";
+import { sendInitiateCheckout } from "@/lib/metaCapi";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));

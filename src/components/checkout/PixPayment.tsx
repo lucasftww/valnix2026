@@ -273,9 +273,9 @@ export function PixPayment({
         </div>
         <Button
           size="lg"
-          className={`w-full h-13 font-semibold rounded-xl transition-all duration-150 active:scale-[0.98] ${
+          className={`w-full h-12 font-semibold rounded-xl transition-all duration-150 active:scale-[0.98] ${
             copied 
-              ? 'bg-green-600 hover:bg-green-700' 
+              ? 'bg-success hover:bg-success/90' 
               : 'bg-primary hover:bg-primary/90'
           }`}
           onClick={handleCopy}
