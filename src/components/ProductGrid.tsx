@@ -1,12 +1,23 @@
-import { memo } from "react";
+import { memo, useRef, useCallback } from "react";
 import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
 import { useFeaturedProductsApi } from "@/hooks/useApiData";
 import { Button } from "./ui/button";
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext } from "./ui/carousel";
+import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const ProductGridComponent = () => {
   const { data: products = [], isLoading, error, refetch } = useFeaturedProductsApi();
+  const scrollRef = useRef<HTMLDivElement>(null);
+  
+  const scroll = useCallback((direction: 'left' | 'right') => {
+    const container = scrollRef.current;
+    if (!container) return;
+    const scrollAmount = container.clientWidth * 0.75;
+    container.scrollBy({ 
+      left: direction === 'left' ? -scrollAmount : scrollAmount, 
+      behavior: 'smooth' 
+    });
+  }, []);
   
   if (isLoading) {
     return (
@@ -68,54 +79,58 @@ const ProductGridComponent = () => {
   
   return (
     <section className="container px-4 md:px-8 py-8 md:py-16">
-      <div className="mb-6 md:mb-10">
-        <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
-          Mais vendidos
-        </h2>
-        <p className="text-muted-foreground mt-1 text-xs md:text-sm">
-          Os produtos mais populares da nossa loja
-        </p>
+      <div className="mb-6 md:mb-10 flex items-end justify-between">
+        <div>
+          <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
+            Mais vendidos
+          </h2>
+          <p className="text-muted-foreground mt-1 text-xs md:text-sm">
+            Os produtos mais populares da nossa loja
+          </p>
+        </div>
+        {/* Desktop-only nav arrows */}
+        <div className="hidden md:flex items-center gap-2">
+          <button
+            onClick={() => scroll('left')}
+            className="h-10 w-10 rounded-full border border-border/20 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border/40 transition-colors"
+            aria-label="Ver produto anterior"
+          >
+            <ChevronLeft className="h-5 w-5" />
+          </button>
+          <button
+            onClick={() => scroll('right')}
+            className="h-10 w-10 rounded-full border border-border/20 flex items-center justify-center text-muted-foreground hover:text-foreground hover:border-border/40 transition-colors"
+            aria-label="Ver próximo produto"
+          >
+            <ChevronRight className="h-5 w-5" />
+          </button>
+        </div>
       </div>
       
-      <Carousel
-        opts={{
-          align: "start",
-          loop: true,
-          dragFree: true,
-          duration: 12,
-          skipSnaps: true,
-          containScroll: "trimSnaps",
-        }}
-        className="w-full"
+      {/* CSS scroll-snap carousel — zero JS library needed */}
+      <div 
+        ref={scrollRef}
+        className="flex gap-2 md:gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4 md:mx-0 md:px-0"
+        style={{ WebkitOverflowScrolling: 'touch' }}
       >
-        <CarouselContent className="-ml-2 md:-ml-4">
-          {products.map((product, index) => (
-            <CarouselItem 
-              key={product.id} 
-              className="pl-2 md:pl-4 basis-1/2 md:basis-1/3 lg:basis-1/4"
-            >
-              <ProductCard 
-                id={product.id}
-                image={product.image_url || ""}
-                title={product.name}
-                reviewCount={product.reviewCount || 0}
-                price={product.price}
-                originalPrice={product.old_price || undefined}
-                discount={product.discount || undefined}
-                priority={index < 2}
-              />
-            </CarouselItem>
-          ))}
-        </CarouselContent>
-        <CarouselPrevious 
-          className="left-0 md:left-2 h-8 w-8 md:h-10 md:w-10" 
-          aria-label="Ver produto anterior" 
-        />
-        <CarouselNext 
-          className="right-0 md:right-2 h-8 w-8 md:h-10 md:w-10" 
-          aria-label="Ver próximo produto" 
-        />
-      </Carousel>
+        {products.map((product, index) => (
+          <div 
+            key={product.id} 
+            className="snap-start shrink-0 w-[45%] md:w-[calc(33.333%-11px)] lg:w-[calc(25%-12px)]"
+          >
+            <ProductCard 
+              id={product.id}
+              image={product.image_url || ""}
+              title={product.name}
+              reviewCount={product.reviewCount || 0}
+              price={product.price}
+              originalPrice={product.old_price || undefined}
+              discount={product.discount || undefined}
+              priority={index < 2}
+            />
+          </div>
+        ))}
+      </div>
     </section>
   );
 };

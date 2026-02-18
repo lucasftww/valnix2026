@@ -16,13 +16,6 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { useIsMobile } from "@/hooks/use-mobile";
-import {
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselNext,
-  CarouselPrevious,
-} from "@/components/ui/carousel";
 
 interface FooterProps {
   showFullVersion?: boolean;
@@ -68,26 +61,16 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
           <div className="bg-muted/30 py-8 border-b border-border/30">
             <div className="container px-4 md:px-8">
               {isMobile ? (
-                <div className="relative max-w-md mx-auto">
-                  <Carousel opts={{ align: "start", loop: true }} className="w-full">
-                    <CarouselContent>
-                      {trustBadges.map((badge) => (
-                        <CarouselItem key={badge.title}>
-                          <div className="flex items-start gap-3 px-4">
-                            <div className="flex-shrink-0">{badge.icon}</div>
-                            <div>
-                              <h4 className="text-sm font-semibold text-foreground mb-1">{badge.title}</h4>
-                              <p className="text-xs text-muted-foreground">{badge.desc}</p>
-                            </div>
-                          </div>
-                        </CarouselItem>
-                      ))}
-                    </CarouselContent>
-                    <div className="flex justify-center gap-3 mt-6">
-                      <CarouselPrevious className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-8 w-8 md:h-10 md:w-10" aria-label="Ver benefício anterior" />
-                      <CarouselNext className="static translate-y-0 bg-primary/10 hover:bg-primary/20 border-primary/30 text-foreground h-8 w-8 md:h-10 md:w-10" aria-label="Ver próximo benefício" />
+                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
+                  {trustBadges.map((badge) => (
+                    <div key={badge.title} className="snap-start shrink-0 w-[75%] flex items-start gap-3">
+                      <div className="flex-shrink-0">{badge.icon}</div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-foreground mb-1">{badge.title}</h4>
+                        <p className="text-xs text-muted-foreground">{badge.desc}</p>
+                      </div>
                     </div>
-                  </Carousel>
+                  ))}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
