@@ -49,18 +49,18 @@ const MobileStickyCheckoutComponent = ({
                   <p className="text-foreground text-[13px] font-medium truncate">
                     {item.name}
                   </p>
-                  <div className="flex items-center gap-2 mt-1">
+                  <div className="flex items-center gap-3 mt-1">
                     <button
                       onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                      className="w-7 h-7 rounded-md border border-border/20 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                       aria-label="Diminuir quantidade"
                     >
                       <Minus className="w-3 h-3" />
                     </button>
-                    <span className="text-muted-foreground text-[12px] min-w-[20px] text-center">{item.quantity}</span>
+                    <span className="text-foreground text-[12px] min-w-[16px] text-center font-medium">{item.quantity}</span>
                     <button
                       onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                      className="w-7 h-7 rounded-md border border-border/20 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
                       aria-label="Aumentar quantidade"
                     >
                       <Plus className="w-3 h-3" />
