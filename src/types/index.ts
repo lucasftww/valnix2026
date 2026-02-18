@@ -55,14 +55,6 @@ export interface ProductCardData {
   reviewCount?: number;
 }
 
-export interface Banner {
-  id: string;
-  image_url: string;
-  alt_text: string;
-  display_order: number;
-  is_active: boolean;
-}
-
 export interface Order {
   id: string;
   user_id: string;
@@ -102,27 +94,6 @@ export interface Review {
   comment: string;
   display_order: number;
   created_at: string;
-}
-
-export interface UserProfile {
-  id: string;
-  full_name: string | null;
-  phone: string | null;
-  created_at: string;
-  updated_at: string;
-}
-
-export interface Coupon {
-  id: string;
-  code: string;
-  description: string | null;
-  discount_type: 'percentage' | 'fixed';
-  discount_value: number;
-  min_purchase_amount: number | null;
-  max_uses: number | null;
-  current_uses: number;
-  expires_at: string | null;
-  is_active: boolean;
 }
 
 // Enums tipados

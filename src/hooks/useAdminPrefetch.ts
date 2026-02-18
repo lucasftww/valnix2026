@@ -21,7 +21,6 @@ export const useAdminPrefetch = () => {
         { key: "admin-orders", resource: "orders" },
         { key: "admin-products", resource: "products" },
         { key: "admin-categories", resource: "categories" },
-        { key: "admin-coupons", resource: "coupons" },
       ];
 
       resources.forEach(({ key, resource }) => {
