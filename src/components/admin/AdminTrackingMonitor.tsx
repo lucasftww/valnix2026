@@ -5,7 +5,7 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useState } from "react";
 import {
   CheckCircle2, AlertTriangle, AlertCircle, RefreshCw,
-  Activity, Shield, Zap, Radio, Server, Globe
+  Activity, Shield, Zap, Radio, Server, Globe, Flame, Copy as CopyIcon
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,20 @@ interface TrackingAlert {
   level: 'ok' | 'warning' | 'critical';
   message: string;
   detail?: string;
+}
+
+interface DuplicateEntry {
+  eventId: string;
+  orderId: string;
+  count: number;
+  sources: string[];
+}
+
+interface ConsecutiveErrors {
+  maxStreak: number;
+  currentStreak: number;
+  isOngoing: boolean;
+  streakEvents: Array<{ event_name: string; event_id: string; error: string; status_code: number; time: string }>;
 }
 
 interface TrackingReport {
@@ -35,7 +49,9 @@ interface TrackingReport {
     totalMetaPurchaseEvents: number;
     sourceDistribution: Record<string, number>;
     eventIdIssues: number;
+    duplicates: DuplicateEntry[];
   };
+  consecutiveErrors: ConsecutiveErrors;
   coverage: {
     paidOrders: number;
     withCapi: number;
@@ -69,7 +85,7 @@ export function AdminTrackingMonitor() {
       return await res.json();
     },
     enabled: isAdmin && !authLoading,
-    refetchInterval: 60000, // every minute
+    refetchInterval: 60000,
     retry: false,
   });
 
@@ -129,7 +145,7 @@ export function AdminTrackingMonitor() {
                     {alert.detail && <p className="text-xs text-muted-foreground mt-0.5">{alert.detail}</p>}
                   </div>
                   <Badge variant={alert.level === 'ok' ? 'default' : 'destructive'} className={cn(
-                    "text-[10px]",
+                    "text-[10px] shrink-0",
                     alert.level === 'ok' && "bg-green-600"
                   )}>
                     {alert.level.toUpperCase()}
@@ -142,7 +158,7 @@ export function AdminTrackingMonitor() {
       )}
 
       {/* KPI Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
         {/* CAPI Success Rate */}
         <Card className="border-border/50 bg-card/50">
           <CardContent className="p-4">
@@ -181,14 +197,36 @@ export function AdminTrackingMonitor() {
         <Card className="border-border/50 bg-card/50">
           <CardContent className="p-4">
             <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dedup Events</span>
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Dedup</span>
               <div className="w-8 h-8 rounded-lg bg-purple-500/10 flex items-center justify-center">
                 <Zap className="w-4 h-4 text-purple-500" />
               </div>
             </div>
             <p className="text-2xl font-bold">{report?.dedup.totalMetaPurchaseEvents ?? '—'}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {report?.dedup.eventIdIssues === 0 ? '✅ Sem inconsistências' : `⚠️ ${report?.dedup.eventIdIssues} issues`}
+              {(report?.dedup.duplicates?.length || 0) === 0 ? '✅ Sem duplicatas' : `🔴 ${report?.dedup.duplicates?.length} duplicata(s)`}
+            </p>
+          </CardContent>
+        </Card>
+
+        {/* Consecutive Errors */}
+        <Card className={cn("border-border/50 bg-card/50", report?.consecutiveErrors?.isOngoing && "border-red-500/30 bg-red-500/5")}>
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Streak Erros</span>
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center", report?.consecutiveErrors?.isOngoing ? "bg-red-500/10" : "bg-orange-500/10")}>
+                <Flame className={cn("w-4 h-4", report?.consecutiveErrors?.isOngoing ? "text-red-500" : "text-orange-500")} />
+              </div>
+            </div>
+            <p className={cn("text-2xl font-bold", report?.consecutiveErrors?.isOngoing && "text-red-500")}>
+              {report?.consecutiveErrors?.currentStreak ?? 0}
+            </p>
+            <p className="text-xs text-muted-foreground mt-1">
+              {report?.consecutiveErrors?.isOngoing 
+                ? '🔴 Em andamento' 
+                : report?.consecutiveErrors?.maxStreak 
+                  ? `Máx: ${report.consecutiveErrors.maxStreak}` 
+                  : '✅ Estável'}
             </p>
           </CardContent>
         </Card>
@@ -292,6 +330,84 @@ export function AdminTrackingMonitor() {
         </Card>
       </div>
 
+      {/* Duplicates Alert */}
+      {report?.dedup.duplicates && report.dedup.duplicates.length > 0 && (
+        <Card className="border-red-500/20 bg-red-500/5">
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className="h-8 w-8 rounded-lg bg-red-500/10 flex items-center justify-center">
+                <CopyIcon className="h-4 w-4 text-red-500" />
+              </div>
+              <div>
+                <CardTitle className="text-base text-red-400">⚠️ Eventos Duplicados</CardTitle>
+                <CardDescription className="text-xs">Falha de idempotência — meta_purchase_events com duplicatas</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {report.dedup.duplicates.map((dup, i) => (
+                <div key={i} className="flex items-center justify-between py-2.5 border-b border-red-500/10 last:border-0">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">
+                      Pedido <code className="font-mono text-xs bg-red-500/10 px-1.5 py-0.5 rounded">{dup.orderId.substring(0, 12)}</code>
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      event_id: <code className="font-mono">{dup.eventId.substring(0, 30)}</code>
+                    </p>
+                  </div>
+                  <div className="text-right shrink-0 ml-3">
+                    <Badge variant="destructive" className="text-[10px]">{dup.count}× duplicado</Badge>
+                    <p className="text-[10px] text-muted-foreground mt-1">
+                      Origens: {dup.sources.join(', ')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Consecutive Errors Detail */}
+      {report?.consecutiveErrors && report.consecutiveErrors.maxStreak >= 3 && (
+        <Card className={cn("border-border/50", report.consecutiveErrors.isOngoing ? "border-red-500/20 bg-red-500/5" : "border-orange-500/20 bg-orange-500/5")}>
+          <CardHeader className="pb-3">
+            <div className="flex items-center gap-2">
+              <div className={cn("h-8 w-8 rounded-lg flex items-center justify-center", report.consecutiveErrors.isOngoing ? "bg-red-500/10" : "bg-orange-500/10")}>
+                <Flame className={cn("h-4 w-4", report.consecutiveErrors.isOngoing ? "text-red-500" : "text-orange-500")} />
+              </div>
+              <div>
+                <CardTitle className={cn("text-base", report.consecutiveErrors.isOngoing ? "text-red-400" : "text-orange-400")}>
+                  {report.consecutiveErrors.isOngoing ? '🔴 Falha Sistêmica em Andamento' : 'Streak de Erros Detectado'}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  {report.consecutiveErrors.isOngoing
+                    ? `${report.consecutiveErrors.currentStreak} erros seguidos sem sucesso`
+                    : `Máximo de ${report.consecutiveErrors.maxStreak} erros seguidos (resolvido)`}
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {report.consecutiveErrors.streakEvents.map((evt, i) => (
+                <div key={i} className="flex items-start gap-3 py-2 border-b border-border/20 last:border-0">
+                  <Badge variant="destructive" className="text-[10px] mt-0.5 shrink-0">{evt.status_code || 'ERR'}</Badge>
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium">{evt.event_name}</p>
+                    <p className="text-xs text-muted-foreground break-all">{evt.error}</p>
+                    <p className="text-[10px] text-muted-foreground/60 mt-0.5">
+                      {new Date(evt.time).toLocaleString('pt-BR')}
+                    </p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Recent Errors */}
       {report?.capi.recentErrors && report.capi.recentErrors.length > 0 && (
         <Card className="border-red-500/20 bg-red-500/5">
@@ -312,8 +428,8 @@ export function AdminTrackingMonitor() {
                 <div key={i} className="flex items-start gap-3 py-2 border-b border-red-500/10 last:border-0">
                   <Badge variant="destructive" className="text-[10px] mt-0.5 shrink-0">{err.status_code || 'ERR'}</Badge>
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-foreground">{err.event_name} — {err.event_id?.substring(0, 30)}</p>
-                    <p className="text-xs text-muted-foreground truncate">{err.error}</p>
+                    <p className="text-sm font-medium text-foreground">{err.event_name} — <code className="text-xs font-mono">{err.event_id?.substring(0, 30)}</code></p>
+                    <p className="text-xs text-muted-foreground break-all">{err.error}</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">
                       {new Date(err.time).toLocaleString('pt-BR')}
                     </p>
