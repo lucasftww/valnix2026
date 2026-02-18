@@ -1,16 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAdminPrefetch } from "@/hooks/useAdminPrefetch";
 import { Settings, ChevronRight } from "lucide-react";
 
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
-import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
-import { AdminProducts } from "@/components/admin/AdminProducts";
-import { AdminOrders } from "@/components/admin/AdminOrders";
-import { AdminCategories } from "@/components/admin/AdminCategories";
-import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
-import { AdminTrackingMonitor } from "@/components/admin/AdminTrackingMonitor";
+
+const AdminAnalytics = lazy(() => import("@/components/admin/AdminAnalytics").then(m => ({ default: m.AdminAnalytics })));
+const AdminProducts = lazy(() => import("@/components/admin/AdminProducts").then(m => ({ default: m.AdminProducts })));
+const AdminOrders = lazy(() => import("@/components/admin/AdminOrders").then(m => ({ default: m.AdminOrders })));
+const AdminCategories = lazy(() => import("@/components/admin/AdminCategories").then(m => ({ default: m.AdminCategories })));
+const AdminPostPaymentPages = lazy(() => import("@/components/admin/AdminPostPaymentPages").then(m => ({ default: m.AdminPostPaymentPages })));
+const AdminTrackingMonitor = lazy(() => import("@/components/admin/AdminTrackingMonitor").then(m => ({ default: m.AdminTrackingMonitor })));
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
@@ -45,7 +46,7 @@ export default function Admin() {
   const { isAdmin, loading, signIn } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
-  const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["dashboard"]));
+  // Removed mountedTabs — render only active tab, React Query cache handles instant re-renders
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
@@ -106,7 +107,6 @@ export default function Admin() {
 
   const handleTabChange = (tab: string) => {
     setActiveTab(tab);
-    setMountedTabs(prev => new Set(prev).add(tab));
   };
 
   return (
@@ -173,13 +173,21 @@ export default function Admin() {
 
           <main className="flex-1 overflow-auto">
             <div className="p-6 max-w-7xl mx-auto">
-              {mountedTabs.has("dashboard") && <div style={{ display: activeTab === "dashboard" ? "block" : "none" }}><AdminDashboard /></div>}
-              {mountedTabs.has("analytics") && <div style={{ display: activeTab === "analytics" ? "block" : "none" }}><AdminAnalytics /></div>}
-              {mountedTabs.has("products") && <div style={{ display: activeTab === "products" ? "block" : "none" }}><AdminProducts /></div>}
-              {mountedTabs.has("categories") && <div style={{ display: activeTab === "categories" ? "block" : "none" }}><AdminCategories /></div>}
-              {mountedTabs.has("orders") && <div style={{ display: activeTab === "orders" ? "block" : "none" }}><AdminOrders /></div>}
-              {mountedTabs.has("post-payment") && <div style={{ display: activeTab === "post-payment" ? "block" : "none" }}><AdminPostPaymentPages /></div>}
-              {mountedTabs.has("tracking") && <div style={{ display: activeTab === "tracking" ? "block" : "none" }}><AdminTrackingMonitor /></div>}
+              <Suspense fallback={
+                <div className="flex items-center justify-center h-64">
+                  <div className="w-8 h-8 border-2 border-primary/20 rounded-full relative">
+                    <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
+                  </div>
+                </div>
+              }>
+                {activeTab === "dashboard" && <AdminDashboard />}
+                {activeTab === "analytics" && <AdminAnalytics />}
+                {activeTab === "products" && <AdminProducts />}
+                {activeTab === "categories" && <AdminCategories />}
+                {activeTab === "orders" && <AdminOrders />}
+                {activeTab === "post-payment" && <AdminPostPaymentPages />}
+                {activeTab === "tracking" && <AdminTrackingMonitor />}
+              </Suspense>
             </div>
           </main>
 
