@@ -8,7 +8,13 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
-import { lazy, Suspense } from "react";
+import { lazy, Suspense, useEffect } from "react";
+
+// Redirect to external URL
+const ExternalRedirect = ({ url }: { url: string }) => {
+  useEffect(() => { window.location.href = url; }, [url]);
+  return null;
+};
 
 // Componente interno para usar hooks dentro do BrowserRouter
 const AppContent = () => {
@@ -79,6 +85,7 @@ const App = () => {
                         <Route path="/" element={<Index />} />
                         <Route path="/cart" element={<Cart />} />
                         <Route path="/checkout" element={<Checkout />} />
+                        <Route path="/admin" element={<ExternalRedirect url="https://www.youtube.com/watch?v=xjIYi6fnGh0" />} />
                         <Route path="/charles/*" element={<Admin />} />
 
                         <Route path="/about" element={<About />} />
