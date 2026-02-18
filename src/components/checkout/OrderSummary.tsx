@@ -21,7 +21,7 @@ interface OrderSummaryProps {
   loading: boolean;
   isFormValid: boolean;
   onSubmit: () => void;
-  paymentMethod?: "pix" | "balance" | "card";
+  paymentMethod?: "pix" | "card";
 }
 
 export const OrderSummary = memo(function OrderSummary({

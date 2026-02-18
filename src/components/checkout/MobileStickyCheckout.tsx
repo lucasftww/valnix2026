@@ -7,7 +7,7 @@ interface MobileStickyCheckoutProps {
   items: CartItem[];
   finalPrice: number;
   loading: boolean;
-  paymentMethod: "pix" | "balance" | "card";
+  paymentMethod: "pix" | "card";
   onSubmit: () => void;
   onRemoveItem?: (id: string) => void;
 }

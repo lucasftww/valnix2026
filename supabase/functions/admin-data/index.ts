@@ -404,67 +404,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      if (resource === "users") {
-        const [profiles, users, orders] = await Promise.all([
-          queryCollection("profiles"),
-          queryCollection("users"),
-          queryCollection("ordens"),
-        ]);
-
-        // Build order stats per user
-        const orderStats = new Map<string, { total_orders: number; total_spent: number; last_order_date?: string }>();
-        for (const order of orders) {
-          if (order.user_id && order.payment_status === "paid") {
-            const s = orderStats.get(order.user_id) || { total_orders: 0, total_spent: 0 };
-            s.total_orders += 1;
-            s.total_spent += Number(order.total_amount) || 0;
-            const orderDate = order.created_at || '';
-            if (!s.last_order_date || orderDate > s.last_order_date) s.last_order_date = orderDate;
-            orderStats.set(order.user_id, s);
-          }
-        }
-
-        // Merge profiles + users
-        const userMap = new Map<string, any>();
-        for (const p of profiles) {
-          const stats = orderStats.get(p.id) || { total_orders: 0, total_spent: 0 };
-          userMap.set(p.id, {
-            id: p.id, email: p.email || '', created_at: p.created_at || '',
-            phone: p.phone, full_name: p.full_name, nickname: p.nickname,
-            avatar_url: p.avatar_url, balance: p.balance || 0,
-            ...stats,
-          });
-        }
-        for (const u of users) {
-          if (!userMap.has(u.id)) {
-            const stats = orderStats.get(u.id) || { total_orders: 0, total_spent: 0 };
-            userMap.set(u.id, {
-              id: u.id, email: u.email || '', created_at: u.created_at || '',
-              phone: u.phone, full_name: u.full_name || u.displayName,
-              nickname: u.nickname, avatar_url: u.avatar_url || u.photoURL,
-              balance: u.balance || 0, ...stats,
-            });
-          }
-        }
-
-        const allUsers = Array.from(userMap.values());
-        allUsers.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
-
-        return new Response(JSON.stringify({ users: allUsers }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
-
-      if (resource === "user-orders") {
-        const userId = url.searchParams.get("userId");
-        if (!userId) return new Response(JSON.stringify({ error: "userId required" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
-
-        const orders = await queryCollectionFiltered("ordens", "user_id", "EQUAL", { stringValue: userId });
-        orders.sort((a: any, b: any) => (b.created_at || '').localeCompare(a.created_at || ''));
-
-        return new Response(JSON.stringify({ orders: orders.slice(0, 10) }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      // "users" and "user-orders" endpoints removed — legacy profiles/users collections no longer used
 
       if (resource === "products") {
         const [products, allCodes] = await Promise.all([
@@ -555,16 +495,14 @@ Deno.serve(async (req) => {
         const d7Cutoff = new Date(now); d7Cutoff.setDate(now.getDate() - 7);
         const d30Cutoff = new Date(now); d30Cutoff.setDate(now.getDate() - 30);
 
-        // Fetch only what we need: orders from last 30d, products, profiles (small), product_codes
-        // order_items are fetched only for paid orders
-        const [orders, products, profiles, productCodes] = await Promise.all([
+        // Fetch only what we need: orders from last 30d, products, product_codes
+        const [orders, products, productCodes] = await Promise.all([
           queryOrdersSince(d30Cutoff.toISOString()),
           queryCollection("products"),
-          queryCollection("profiles"),
           queryCollection("product_codes"),
         ]);
 
-        console.log(`📊 dashboard-stats: ${orders.length} orders (last 30d), ${products.length} products, ${profiles.length} profiles`);
+        console.log(`📊 dashboard-stats: ${orders.length} orders (last 30d), ${products.length} products`);
 
         // Convert timestamps
         for (const o of orders) {
@@ -650,15 +588,8 @@ Deno.serve(async (req) => {
           { name: 'Falhou', value: orders.filter((o: any) => o.payment_status === 'failed').length, color: '#ef4444' },
         ].filter(i => i.value > 0);
 
-        // Alerts (only check recent orders for stuck/refund issues)
+        // Alerts
         const alerts: { type: string; title: string; description: string }[] = [];
-        const stuckProcessing = orders.filter((o: any) => {
-          if (o.payment_status !== 'processing_balance') return false;
-          const ref = o.updated_at || o.created_at;
-          if (!ref) return true;
-          return Date.now() - new Date(ref).getTime() > 5 * 60 * 1000;
-        });
-        if (stuckProcessing.length > 0) alerts.push({ type: 'error', title: `${stuckProcessing.length} pedido(s) travado(s) em processing_balance`, description: 'Possível falha no checkout-balance. Verificar manualmente.' });
         const needsRefund = orders.filter((o: any) => o.payment_status === 'error_needs_refund');
         if (needsRefund.length > 0) alerts.push({ type: 'error', title: `${needsRefund.length} pedido(s) com erro de reembolso`, description: 'Reembolso automático falhou. Ação manual necessária.' });
         // Build product_codes map for stock check
@@ -680,7 +611,6 @@ Deno.serve(async (req) => {
           periods, topProducts, revenueByDay, paymentDistribution,
           alerts, recentOrders, pendingDelivery,
           totalProducts: products.filter((p: any) => p.is_active !== false).length,
-          totalUsers: profiles.length,
         }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
@@ -749,89 +679,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      // ── Cleanup: remove blocked emails + orphan profiles ──────
-      if (resource === "cleanup-users") {
-        const BLOCKED_EMAILS = [
-          "rodrigofaro@gmail.com",
-          "test_redteam@gmail.com",
-          "silvacarolinem7@gmail.com",
-          "lucky_pentester@example.com",
-        ];
-
-        const accessToken = await getFirebaseAccessToken();
-        const FIREBASE_API_KEY = Deno.env.get('FIREBASE_WEB_API_KEY') || '';
-
-        // Get all profiles and users from Firestore
-        const [profiles, users] = await Promise.all([
-          queryCollection("profiles"),
-          queryCollection("users"),
-        ]);
-
-        const allDocIds = new Set<string>();
-        for (const p of profiles) allDocIds.add(p.id);
-        for (const u of users) allDocIds.add(u.id);
-
-        const removed: string[] = [];
-        const errors: string[] = [];
-
-        for (const docId of allDocIds) {
-          // Get email from profile or user doc
-          const profile = profiles.find((p: any) => p.id === docId);
-          const userDoc = users.find((u: any) => u.id === docId);
-          const email = (profile?.email || userDoc?.email || '').toLowerCase().trim();
-
-          // 1. Remove blocked emails
-          if (BLOCKED_EMAILS.includes(email)) {
-            try {
-              await Promise.allSettled([
-                deleteFirestoreDoc("profiles", docId),
-                deleteFirestoreDoc("users", docId),
-                deleteFirestoreDoc("user_roles", docId),
-              ]);
-              removed.push(`blocked:${email}`);
-              console.log(`🗑️ Removed blocked user: ${email} (${docId})`);
-            } catch (err) {
-              errors.push(`Failed to remove blocked ${email}: ${err}`);
-            }
-            continue;
-          }
-
-          // 2. Check if user exists in Firebase Auth
-          try {
-            const authRes = await fetch(
-              `https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${FIREBASE_API_KEY}`,
-              {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-                body: JSON.stringify({ localId: [docId] }),
-              }
-            );
-            const authData = await authRes.json();
-            const authUser = authData.users?.[0];
-
-            if (!authUser) {
-              // Orphan — no matching Firebase Auth user
-              await Promise.allSettled([
-                deleteFirestoreDoc("profiles", docId),
-                deleteFirestoreDoc("users", docId),
-                deleteFirestoreDoc("user_roles", docId),
-              ]);
-              removed.push(`orphan:${email || docId}`);
-              console.log(`🗑️ Removed orphan profile: ${email || docId} (${docId})`);
-            }
-          } catch (err) {
-            errors.push(`Auth check failed for ${docId}: ${err}`);
-          }
-        }
-
-        return new Response(JSON.stringify({ 
-          success: true, 
-          removed, 
-          removedCount: removed.length,
-          totalChecked: allDocIds.size,
-          errors: errors.length > 0 ? errors : undefined,
-        }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      // "cleanup-users" endpoint removed — legacy profiles/users/user_roles collections no longer used
 
       // ── Cleanup analytics events ──────────────────────────────────
       if (resource === "cleanup-analytics") {
@@ -1068,53 +916,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      if (resource === "users") {
-        const USER_ALLOWED_FIELDS = ['full_name', 'nickname', 'phone', 'avatar_url', 'balance', 'updated_at'];
-        const safeBody: Record<string, unknown> = {};
-        for (const key of Object.keys(body)) {
-          if (USER_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
-        }
-        safeBody['updated_at'] = new Date().toISOString();
-
-        // 🔒 P1 FIX: Audit log for balance changes
-        if (body.balance !== undefined) {
-          try {
-            // Read current balance before update
-            const accessToken = await getFirebaseAccessToken();
-            const profileUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/profiles/${docId}`;
-            const profileRes = await fetch(profileUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            const profileData = profileRes.ok ? await profileRes.json() : null;
-            const previousBalance = profileData?.fields?.balance?.doubleValue ?? profileData?.fields?.balance?.integerValue ?? 0;
-
-            // Write audit log
-            const auditId = crypto.randomUUID();
-            const auditUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/admin_audit_logs/${auditId}`;
-            await fetch(auditUrl, {
-              method: 'PATCH',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-              body: JSON.stringify({
-                fields: {
-                  action: { stringValue: 'balance_update' },
-                  target_user_id: { stringValue: docId },
-                  admin_uid: { stringValue: 'hmac_admin' },
-                  admin_email: { stringValue: 'admin@hmac' },
-                  previous_balance: { doubleValue: Number(previousBalance) },
-                  new_balance: { doubleValue: Number(body.balance) },
-                  ip: { stringValue: clientIp },
-                  created_at: { stringValue: new Date().toISOString() },
-                },
-              }),
-            });
-            console.log(`📝 AUDIT: Balance update by hmac_admin for user ${docId}: ${previousBalance} → ${body.balance}`);
-          } catch (auditErr) {
-            console.error('⚠️ Audit log failed (non-blocking):', auditErr);
-          }
-        }
-
-        const success = await updateFirestoreDoc("profiles", docId, safeBody);
-        return new Response(JSON.stringify({ success }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      // "users" PUT endpoint removed — legacy profiles/balance no longer used
 
       if (resource === "orders") {
         // WHITELIST: only allow safe fields — financial/payment fields are immutable
@@ -1256,66 +1058,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
-      if (resource === "users") {
-        // 1. Delete Firestore docs (profiles, users, user_roles)
-        const firestoreResults = await Promise.allSettled([
-          deleteFirestoreDoc("profiles", docId),
-          deleteFirestoreDoc("users", docId),
-          deleteFirestoreDoc("user_roles", docId),
-        ]);
-        const firestoreErrors = firestoreResults.filter(r => r.status === 'rejected');
-        if (firestoreErrors.length > 0) {
-          console.warn(`⚠️ Some Firestore docs failed to delete for ${docId}:`, firestoreErrors);
-        }
-
-        // 2. Delete Firebase Auth account (prevents user from logging in again and re-creating docs)
-        let authDeleted = false;
-        try {
-          const accessToken = await getFirebaseAccessToken();
-          const deleteAuthRes = await fetch(
-            `https://identitytoolkit.googleapis.com/v1/accounts:delete?key=${Deno.env.get('FIREBASE_WEB_API_KEY')}`,
-            {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
-              body: JSON.stringify({ localId: docId }),
-            }
-          );
-          authDeleted = deleteAuthRes.ok;
-          if (!authDeleted) {
-            const errBody = await deleteAuthRes.text();
-            console.warn(`⚠️ Firebase Auth delete failed for ${docId}: ${deleteAuthRes.status} ${errBody}`);
-          } else {
-            console.log(`✅ Firebase Auth user deleted: ${docId}`);
-          }
-        } catch (authErr) {
-          console.error(`❌ Firebase Auth delete error for ${docId}:`, authErr);
-        }
-
-        // 3. Also delete user's orders and order_items
-        try {
-          const userOrders = await queryCollectionFiltered("ordens", "user_id", "EQUAL", { stringValue: docId });
-          for (const order of userOrders) {
-            // Delete subcollection items
-            const accessToken = await getFirebaseAccessToken();
-            const itemsUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents/ordens/${order.id}/items`;
-            const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
-            if (itemsRes.ok) {
-              const itemsData = await itemsRes.json();
-              await Promise.allSettled((itemsData.documents || []).map((item: any) => {
-                const itemId = item.name.split('/').pop()!;
-                return deleteFirestoreDoc(`ordens/${order.id}/items`, itemId);
-              }));
-            }
-            await deleteFirestoreDoc("ordens", order.id);
-          }
-          console.log(`🗑️ Deleted ${userOrders.length} orders for user ${docId}`);
-        } catch (orderErr) {
-          console.warn(`⚠️ Failed to delete user orders for ${docId}:`, orderErr);
-        }
-
-        return new Response(JSON.stringify({ success: true, authDeleted }),
-          { headers: { ...corsHeaders, "Content-Type": "application/json" } });
-      }
+      // "users" DELETE endpoint removed — legacy profiles/users/user_roles/Firebase Auth no longer used
 
       if (resource === "orders") {
         // Delete order subcollection items first, then the order
