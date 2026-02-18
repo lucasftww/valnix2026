@@ -134,7 +134,7 @@ export function AdminTrackingMonitor() {
       </div>
 
       {/* Alerts */}
-      {report?.alerts && (
+      {Array.isArray(report?.alerts) && report.alerts.length > 0 && (
         <div className="space-y-2">
           {report.alerts.map((alert, i) => {
             const config = alertConfig[alert.level];
@@ -209,7 +209,7 @@ export function AdminTrackingMonitor() {
             </div>
             <p className="text-2xl font-bold">{report?.dedup?.totalMetaPurchaseEvents ?? '—'}</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {(report?.dedup.duplicates?.length || 0) === 0 ? '✅ Sem duplicatas' : `🔴 ${report?.dedup.duplicates?.length} duplicata(s)`}
+              {(report?.dedup?.duplicates?.length || 0) === 0 ? '✅ Sem duplicatas' : `🔴 ${report?.dedup?.duplicates?.length} duplicata(s)`}
             </p>
           </CardContent>
         </Card>
@@ -336,7 +336,7 @@ export function AdminTrackingMonitor() {
       </div>
 
       {/* Duplicates Alert */}
-      {report?.dedup.duplicates && report.dedup.duplicates.length > 0 && (
+      {Array.isArray(report?.dedup?.duplicates) && report.dedup.duplicates.length > 0 && (
         <Card className="border-red-500/20 bg-red-500/5">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -396,7 +396,7 @@ export function AdminTrackingMonitor() {
           </CardHeader>
           <CardContent>
             <div className="space-y-2">
-              {report.consecutiveErrors.streakEvents.map((evt, i) => (
+              {(Array.isArray(report.consecutiveErrors.streakEvents) ? report.consecutiveErrors.streakEvents : []).map((evt, i) => (
                 <div key={i} className="flex items-start gap-3 py-2 border-b border-border/20 last:border-0">
                   <Badge variant="destructive" className="text-[10px] mt-0.5 shrink-0">{evt.status_code || 'ERR'}</Badge>
                   <div className="min-w-0">
@@ -414,7 +414,7 @@ export function AdminTrackingMonitor() {
       )}
 
       {/* Recent Errors */}
-      {report?.capi.recentErrors && report.capi.recentErrors.length > 0 && (
+      {Array.isArray(report?.capi?.recentErrors) && report.capi.recentErrors.length > 0 && (
         <Card className="border-red-500/20 bg-red-500/5">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
@@ -447,7 +447,7 @@ export function AdminTrackingMonitor() {
       )}
 
       {/* Missing CAPI Coverage */}
-      {report?.coverage.missingDetails && report.coverage.missingDetails.length > 0 && (
+      {Array.isArray(report?.coverage?.missingDetails) && report.coverage.missingDetails.length > 0 && (
         <Card className="border-orange-500/20 bg-orange-500/5">
           <CardHeader className="pb-3">
             <div className="flex items-center gap-2">
