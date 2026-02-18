@@ -14,6 +14,16 @@
       img{pointer-events:none;-webkit-user-drag:none}
       a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
     </style>
+    <!-- Pre-warm API before JS bundle parses (saves ~500ms on LCP chain) -->
+    <script>
+      (function(){
+        var base='https://tiupdhnjdcmgbqifwkrd.supabase.co/functions/v1/site-data';
+        var key='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpdXBkaG5qZGNtZ2JxaWZ3a3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjEwODYsImV4cCI6MjA4NTk5NzA4Nn0.xgPpT3hWbTTo6DcFuf0pjD1jcPpyWIpLQGrdNHX4IkI';
+        var h={'Content-Type':'application/json','apikey':key};
+        window.__API_PREFETCH_FEATURED=fetch(base+'?type=featured',{headers:h}).then(function(r){return r.json()}).catch(function(){return null});
+        window.__API_PREFETCH_CATEGORIES=fetch(base+'?type=categories',{headers:h}).then(function(r){return r.json()}).catch(function(){return null});
+      })();
+    </script>
     <meta name="theme-color" content="#EE4444" />
     
     <!-- Security Headers -->
