@@ -170,9 +170,9 @@ export function PixPayment({
     <div className="space-y-3 md:space-y-4">
       {/* Payment Confirmed */}
       {paymentConfirmed && (
-        <div className="bg-green-500/10 border border-green-500/20 rounded-2xl p-4 text-center space-y-2">
-          <CheckCircle className="w-10 h-10 text-green-500 mx-auto" />
-          <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
+        <div className="bg-success/10 border border-success/20 rounded-2xl p-4 text-center space-y-2">
+          <CheckCircle className="w-10 h-10 text-success mx-auto" />
+          <h2 className="text-xl font-bold text-success">Pagamento Confirmado!</h2>
           <p className="text-sm text-muted-foreground">
             Seu pagamento foi aprovado. Redirecionando em instantes...
           </p>

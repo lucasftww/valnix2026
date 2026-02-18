@@ -169,8 +169,8 @@ export default function CardPaymentCallback() {
           </>
         ) : status === "paid" ? (
           <>
-            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-green-500/10 flex items-center justify-center">
-              <CheckCircle className="w-8 h-8 text-green-500" />
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-success/10 flex items-center justify-center">
+              <CheckCircle className="w-8 h-8 text-success" />
             </div>
             <h1 className="text-xl font-bold text-foreground mb-2">Pagamento confirmado!</h1>
             <p className="text-muted-foreground text-sm">
