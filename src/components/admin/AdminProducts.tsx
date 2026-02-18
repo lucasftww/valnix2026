@@ -463,7 +463,7 @@ export const AdminProducts = () => {
             </DialogHeader>
             <form onSubmit={handleSubmit} className="space-y-6">
               <Tabs defaultValue="basic" className="w-full">
-                <TabsList className="grid w-full grid-cols-5 bg-neutral-900 border border-border/30">
+                <TabsList className="grid w-full grid-cols-5 bg-muted border border-border/30">
                   <TabsTrigger value="basic" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Básico</TabsTrigger>
                   <TabsTrigger value="delivery" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Entrega</TabsTrigger>
                   <TabsTrigger value="description" className="data-[state=active]:bg-primary data-[state=active]:text-primary-foreground">Descrição</TabsTrigger>
