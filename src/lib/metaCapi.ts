@@ -51,6 +51,11 @@ interface MetaCapiEventData {
   event_source_url?: string;
 }
 
+// ── Events that the SERVER already sends via CAPI ──────────────────
+// For these, the client only fires the browser pixel (fbq) for dedup.
+// The server (webhook/polling) handles the CAPI call to avoid duplicates.
+const SERVER_HANDLED_CAPI_EVENTS = ['Purchase'] as const;
+
 // ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {
   try {
@@ -63,22 +68,27 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
         ? `${data.event_name.trim().toLowerCase()}_${data.order_id}`
         : `${data.event_name.trim().toLowerCase()}_${Date.now()}`;
 
-    const payload = {
-      ...data,
-      event_id: eventId,
-      currency: 'BRL',
-      event_source_url: data.event_source_url || window.location.href,
-      user_agent: navigator.userAgent,
-      phone: data.phone || undefined,
-      fbc: fbc || undefined,
-      fbp: fbp || undefined,
-    };
+    const isServerHandled = (SERVER_HANDLED_CAPI_EVENTS as readonly string[]).includes(data.event_name);
 
-    invokeFunctionFireAndForget('meta-capi', payload).then(() => {
-      if (import.meta.env.DEV) console.log(`📡 Meta CAPI ${data.event_name} sent`);
-    });
+    // Only call the CAPI edge function if the server doesn't already handle it
+    if (!isServerHandled) {
+      const payload = {
+        ...data,
+        event_id: eventId,
+        currency: 'BRL',
+        event_source_url: data.event_source_url || window.location.href,
+        user_agent: navigator.userAgent,
+        phone: data.phone || undefined,
+        fbc: fbc || undefined,
+        fbp: fbp || undefined,
+      };
 
-    // Browser-side Pixel dedup: only fire for whitelisted standard events
+      invokeFunctionFireAndForget('meta-capi', payload).then(() => {
+        if (import.meta.env.DEV) console.log(`📡 Meta CAPI ${data.event_name} sent`);
+      });
+    }
+
+    // Browser-side Pixel: fire for whitelisted standard events (dedup via eventID)
     try {
       const PIXEL_WHITELIST = ['InitiateCheckout', 'Purchase'] as const;
       const pixelEvent = PIXEL_WHITELIST.find(e => e === data.event_name);
