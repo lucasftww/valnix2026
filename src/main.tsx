@@ -2,6 +2,12 @@
 // Must run before React to capture URL params early
 import "./bootstrap";
 
+// Pre-warm API data before React hydrates (saves ~500ms on LCP chain)
+// This starts network requests immediately so data is ready when useQuery fires
+import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/firestoreFallback";
+fetchFeaturedProductsFallback();
+fetchCategoriesFallback();
+
 import { createRoot } from "react-dom/client";
 
 // Critical font weight only — others loaded after paint
