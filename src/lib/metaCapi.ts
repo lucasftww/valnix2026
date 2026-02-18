@@ -69,6 +69,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       currency: 'BRL',
       event_source_url: data.event_source_url || window.location.href,
       user_agent: navigator.userAgent,
+      phone: data.phone || undefined,
       fbc: fbc || undefined,
       fbp: fbp || undefined,
     };
@@ -170,6 +171,7 @@ export function sendPurchaseFromClient(params: {
   value: number;
   userId?: string;
   email?: string;
+  phone?: string;
   name?: string;
   productNames?: string[];
   productIds?: string[];
@@ -193,6 +195,7 @@ export function sendPurchaseFromClient(params: {
     contents,
     num_items: numItems,
     email: params.email,
+    phone: params.phone,
     first_name: nameParts[0],
     last_name: nameParts.slice(1).join(' ') || undefined,
     external_id: params.userId,

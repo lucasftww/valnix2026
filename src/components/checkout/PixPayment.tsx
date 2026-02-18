@@ -19,6 +19,7 @@ interface PixPaymentProps {
   guestHash?: string;
   customerEmail?: string;
   customerName?: string;
+  customerPhone?: string;
   customerId?: string;
   productNames?: string[];
   productIds?: string[];
@@ -35,6 +36,7 @@ export function PixPayment({
   guestHash,
   customerEmail,
   customerName,
+  customerPhone,
   customerId,
   productNames,
   productIds,
@@ -66,6 +68,7 @@ export function PixPayment({
       value: amount,
       userId: customerId,
       email: customerEmail,
+      phone: customerPhone,
       name: customerName,
       productNames,
       productIds,

@@ -360,6 +360,7 @@ export default function Checkout() {
                 guestHash={paymentData.guestHash || undefined}
                 customerEmail={formData.email || undefined}
                 customerName={formData.name || undefined}
+                customerPhone={formData.phone || undefined}
                 customerId={effectiveUserId}
                 productNames={items.map(item => item.name)}
                 productIds={items.map(item => item.id)}
