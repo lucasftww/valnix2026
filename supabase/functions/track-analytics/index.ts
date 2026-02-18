@@ -109,7 +109,14 @@ function checkRateLimit(ip: string): boolean {
   if (entry.count > 30) { entry.blockedUntil = now + 300_000; return false; }
   return true;
 }
-setInterval(() => { const now = Date.now(); for (const [k, v] of rateLimitMap) { if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k); } }, 300_000);
+// Lazy cleanup: evict expired entries when map grows too large (avoids setInterval in edge isolates)
+function maybeCleanupRateLimit() {
+  if (rateLimitMap.size < 200) return;
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap) {
+    if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
+  }
+}
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -120,6 +127,7 @@ Deno.serve(async (req) => {
 
   // Rate limit
   const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+  maybeCleanupRateLimit();
   if (!checkRateLimit(clientIp)) {
     return new Response(JSON.stringify({ error: 'Too many requests' }),
       { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
