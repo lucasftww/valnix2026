@@ -376,6 +376,7 @@ export default function Checkout() {
           paymentMethod={paymentMethod}
           onSubmit={handleSubmit}
           onRemoveItem={removeItem}
+          onUpdateQuantity={updateQuantity}
         />
 
         <div className="flex flex-col lg:flex-row gap-6">

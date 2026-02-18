@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Loader2, ChevronUp, Trash2 } from "lucide-react";
+import { Loader2, ChevronUp, Trash2, Minus, Plus } from "lucide-react";
 import { CartItem } from "@/contexts/CartContext";
 
 interface MobileStickyCheckoutProps {
@@ -10,6 +10,7 @@ interface MobileStickyCheckoutProps {
   paymentMethod: "pix" | "card";
   onSubmit: () => void;
   onRemoveItem?: (id: string) => void;
+  onUpdateQuantity?: (id: string, quantity: number) => void;
 }
 
 const MobileStickyCheckoutComponent = ({
@@ -19,6 +20,7 @@ const MobileStickyCheckoutComponent = ({
   paymentMethod,
   onSubmit,
   onRemoveItem,
+  onUpdateQuantity,
 }: MobileStickyCheckoutProps) => {
   const [showSummary, setShowSummary] = useState(false);
 
@@ -47,9 +49,23 @@ const MobileStickyCheckoutComponent = ({
                   <p className="text-foreground text-[13px] font-medium truncate">
                     {item.name}
                   </p>
-                  <p className="text-muted-foreground text-[11px]">
-                    Qtd: {item.quantity}
-                  </p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <button
+                      onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
+                      className="w-7 h-7 rounded-md border border-border/20 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Diminuir quantidade"
+                    >
+                      <Minus className="w-3 h-3" />
+                    </button>
+                    <span className="text-muted-foreground text-[12px] min-w-[20px] text-center">{item.quantity}</span>
+                    <button
+                      onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
+                      className="w-7 h-7 rounded-md border border-border/20 flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Aumentar quantidade"
+                    >
+                      <Plus className="w-3 h-3" />
+                    </button>
+                  </div>
                 </div>
                 <p className="text-foreground text-[13px] font-medium shrink-0">
                   R${" "}
