@@ -71,7 +71,7 @@ const MobileStickyCheckoutComponent = ({
       )}
 
       {/* Sticky bar — raised 2cm (~20px) via extra bottom padding */}
-      <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-24 safe-area-inset-bottom max-w-lg mx-auto w-full">
+      <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-[7rem] safe-area-inset-bottom max-w-lg mx-auto w-full">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button
