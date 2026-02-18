@@ -169,12 +169,14 @@ function checkServerRateLimit(ip: string): { allowed: boolean; retryAfter?: numb
   return { allowed: true };
 }
 
-setInterval(() => {
+// Lazy cleanup: evict expired entries when map grows too large (avoids setInterval in edge isolates)
+function maybeCleanupRateLimit() {
+  if (rateLimitMap.size < 200) return;
   const now = Date.now();
   for (const [k, v] of rateLimitMap) {
     if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
   }
-}, 300_000);
+}
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
@@ -183,6 +185,7 @@ Deno.serve(async (req) => {
 
   // ── Rate limiting ──
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  maybeCleanupRateLimit();
   const rl = checkServerRateLimit(clientIp);
   if (!rl.allowed) {
     console.warn(`🚫 Rate limited admin-analytics: ip=${clientIp}`);
