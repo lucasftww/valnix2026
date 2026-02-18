@@ -312,7 +312,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
         <Button
           size="lg"
-          className="w-full h-13 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-red-400/30 uppercase tracking-wider transition-transform duration-150"
+          className="w-full h-12 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-red-400/30 uppercase tracking-wider transition-transform duration-150"
           onClick={handleAccept}
           disabled={purchasing}
         >
