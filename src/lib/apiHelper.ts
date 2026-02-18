@@ -62,10 +62,10 @@ export async function invokeFunctionFireAndForget(
 ): Promise<void> {
   try {
     const response = await invokeFunction(functionName, { body });
-    if (!response.ok) {
+    if (!response.ok && import.meta.env.DEV) {
       console.warn(`⚠️ ${functionName} failed:`, response.status);
     }
   } catch (e) {
-    console.warn(`⚠️ ${functionName} error:`, e);
+    if (import.meta.env.DEV) console.warn(`⚠️ ${functionName} error:`, e);
   }
 }
