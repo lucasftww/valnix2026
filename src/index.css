@@ -14,7 +14,6 @@ All colors MUST be HSL.
   
   html {
     -webkit-touch-callout: none;
-    touch-action: manipulation;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeSpeed;
@@ -27,7 +26,6 @@ All colors MUST be HSL.
   
   img {
     image-rendering: auto;
-    pointer-events: none;
     -webkit-user-drag: none;
   }
   
@@ -39,7 +37,7 @@ All colors MUST be HSL.
   }
   
   /* Permitir seleção em elementos interativos */
-  input, textarea, button, a, [role="button"] {
+  input, textarea, button, [role="button"] {
     -webkit-user-select: auto;
     user-select: auto;
     touch-action: manipulation;
