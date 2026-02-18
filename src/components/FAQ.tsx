@@ -47,7 +47,7 @@ function buildFaqs(label: string) {
     {
       icon: Zap,
       question: `Como recebo o ${label}?`,
-      answer: `Entrega instantânea! Após a confirmação do pagamento via PIX ou Cartão de Crédito, você receberá o código automaticamente na tela e por e-mail. Sem espera, sem complicação — é na hora.`,
+      answer: `Entrega instantânea! Após a confirmação do pagamento via PIX ou Cartão de Crédito, você receberá o código automaticamente na tela. Sem espera, sem complicação — é na hora.`,
     },
     {
       icon: CreditCard,
