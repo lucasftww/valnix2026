@@ -104,7 +104,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
 
 const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
   const autoplayRef = useRef(
-    Autoplay({ delay: 3000, stopOnInteraction: false, stopOnMouseEnter: true })
+    Autoplay({ delay: 2500, stopOnInteraction: false, stopOnMouseEnter: true })
   );
 
   const allReviews = useMemo(() => {
@@ -130,7 +130,7 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             loop: true,
             dragFree: true,
             skipSnaps: true,
-            duration: 18,
+            duration: 12,
             slidesToScroll: 1,
             containScroll: "trimSnaps",
           }}
