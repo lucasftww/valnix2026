@@ -1,5 +1,12 @@
 import { useEffect, useRef } from 'react';
-import type { Order } from './useFirebaseOrders';
+
+interface Order {
+  id: string;
+  payment_status: string;
+  status: string;
+  payment_method: string | null;
+  flowpay_charge_id?: string | null;
+}
 
 /**
  * Auto-verifies pending Card payments by calling the server-side confirm endpoint.

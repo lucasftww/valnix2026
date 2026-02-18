@@ -10,13 +10,3 @@ export {
   useProductById, 
   useProductReviews
 } from "./useFirebaseProductsWithReviews";
-export {
-  useUserOrders,
-  useOrderItems,
-  useAllOrders,
-  createOrder,
-  createOrderItems,
-  updateOrderStatus,
-  generateFakeDeliveryCode
-} from "./useFirebaseOrders";
-export type { Order, OrderItem, CreateOrderData, CreateOrderItemData } from "./useFirebaseOrders";

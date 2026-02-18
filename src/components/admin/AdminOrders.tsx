@@ -27,7 +27,7 @@ import {
 } from "@/components/ui/select";
 import {
   Package, Send, Loader2, RefreshCw, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight,
-  CreditCard, QrCode, Wallet, Clock, CheckCircle2, XCircle, AlertCircle,
+  CreditCard, QrCode, Clock, CheckCircle2, XCircle, AlertCircle,
   Eye, Copy, Hash, Mail, Phone, User, Calendar, DollarSign,
   ShoppingBag, ArrowUpDown, Filter, MoreHorizontal, ExternalLink, Pencil
 } from "lucide-react";
@@ -96,7 +96,7 @@ const getPaymentMethodIcon = (method: string | null, paymentStatus?: string) => 
   switch (resolved) {
     case 'pix': return <QrCode className="w-4 h-4" />;
     case 'card': return <CreditCard className="w-4 h-4" />;
-    case 'balance': return <Wallet className="w-4 h-4" />;
+    case 'balance': return <DollarSign className="w-4 h-4" />;
     default: return <DollarSign className="w-4 h-4" />;
   }
 };
@@ -200,7 +200,7 @@ export const AdminOrders = () => {
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
   const [detailAddons, setDetailAddons] = useState<any[]>([]);
-  const [restoringOrders, setRestoringOrders] = useState(false);
+  
   const [reprocessingDelivery, setReprocessingDelivery] = useState(false);
   const [cleanupEmail, setCleanupEmail] = useState("");
   const [cleanupEmailDialogOpen, setCleanupEmailDialogOpen] = useState(false);
@@ -280,31 +280,11 @@ export const AdminOrders = () => {
       paidCount: paidOrders.length,
       pixCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'pix' && o.payment_status === 'paid').length,
       cardCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'card' && o.payment_status === 'paid').length,
-      balanceCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'balance' && o.payment_status === 'paid').length,
+      
     };
   }, [orders]);
 
   // ── Handlers ────────────────────────────────────────────────────
-  const handleRestoreOrders = async () => {
-    setRestoringOrders(true);
-    try {
-      const token = requireAdminToken();
-      const response = await invokeFunction('restore-orders', {
-        method: 'GET',
-        headers: { 'x-admin-token': token },
-      });
-      const data = await response.json();
-      if (data.success) {
-        if (data.restored > 0) fetchOrders();
-      } else {
-        toast({ title: "Erro na restauração", description: data.error, variant: "destructive" });
-      }
-    } catch (error: any) {
-      toast({ title: "Erro ao restaurar", description: error.message, variant: "destructive" });
-    } finally {
-      setRestoringOrders(false);
-    }
-  };
 
   const handleRefresh = async () => {
     setRefreshing(true);
@@ -637,15 +617,6 @@ export const AdminOrders = () => {
                   </TooltipTrigger>
                   <TooltipContent>Cartão</TooltipContent>
                 </Tooltip>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <div className="flex items-center gap-1 text-sm">
-                      <Wallet className="w-3.5 h-3.5 text-purple-500" />
-                      <span className="font-semibold">{stats.balanceCount}</span>
-                    </div>
-                  </TooltipTrigger>
-                  <TooltipContent>Saldo</TooltipContent>
-                </Tooltip>
               </div>
             </CardContent>
           </Card>
@@ -713,10 +684,6 @@ export const AdminOrders = () => {
               Atualizar
             </Button>
 
-            <Button variant="outline" size="sm" onClick={handleRestoreOrders} disabled={restoringOrders} className="h-9">
-              {restoringOrders ? <Loader2 className="w-4 h-4 mr-1.5 animate-spin" /> : <Package className="w-4 h-4 mr-1.5" />}
-              Restaurar Pagos
-            </Button>
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
