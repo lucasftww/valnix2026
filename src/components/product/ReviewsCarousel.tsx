@@ -52,7 +52,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
 
 const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
   const autoplayRef = useRef(
-    Autoplay({ delay: 4000, stopOnInteraction: true, stopOnMouseEnter: true })
+    Autoplay({ delay: 3000, stopOnInteraction: false, stopOnMouseEnter: true })
   );
 
   if (reviews.length === 0) return null;
