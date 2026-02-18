@@ -21,9 +21,7 @@ export const QUERY_KEYS = {
   // Outros
   BANNERS: 'banners',
   ORDERS: 'orders',
-  USER_ORDERS: 'user-orders',
   COUPONS: 'coupons',
-  PROFILES: 'profiles',
 } as const;
 
 export const CACHE_TIMES = {
@@ -54,7 +52,6 @@ export const ROUTES = {
   AUTH: '/auth',
   CART: '/cart',
   CHECKOUT: '/checkout',
-  MY_ORDERS: '/my-orders',
   ADMIN: '/admin',
   ABOUT: '/about',
   TERMS: '/terms',
