@@ -42,9 +42,10 @@ export async function invokeFunction(
     body: body ? JSON.stringify(body) : undefined,
   });
 
-  // Auto-handle 401 on admin endpoints — detect by function name (deterministic)
-  const isAdminFn = functionName.startsWith("admin-");
-  if (res.status === 401 && isAdminFn) {
+  // Auto-handle 401 on authenticated admin calls only (not login attempts).
+  // Login POST to admin-auth doesn't send x-admin-token, so it's excluded.
+  const hasAdminToken = Object.keys(headers).some(k => k.toLowerCase() === "x-admin-token");
+  if (res.status === 401 && hasAdminToken) {
     clearAdminToken();
   }
 
