@@ -285,6 +285,27 @@ Deno.serve(async (req) => {
         return new Response(JSON.stringify({ success: true, deleted, total: toDelete.length, errors: errors.length > 0 ? errors.slice(0, 10) : undefined }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
 
+      if (resource === "cleanup-capi-logs") {
+        const collections = ["capi_event_log", "meta_purchase_events"];
+        const accessToken = await getFirebaseAccessToken(ADMIN_SCOPE);
+        const queryUrl = `${FIRESTORE_BASE}:runQuery`;
+        let totalDeleted = 0;
+        const details: Record<string, number> = {};
+        for (const col of collections) {
+          const res = await fetch(queryUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: col }], limit: 10000 } }) });
+          if (!res.ok) { details[col] = 0; continue; }
+          const results = await res.json();
+          const docs = Array.isArray(results) ? results.filter((r: any) => r.document) : [];
+          let deleted = 0;
+          for (const r of docs) { const docPath = r.document.name; try { const delRes = await fetch(`https://firestore.googleapis.com/v1/${docPath}`, { method: 'DELETE', headers: { 'Authorization': `Bearer ${accessToken}` } }); if (delRes.ok || delRes.status === 404) deleted++; } catch {} }
+          details[col] = deleted;
+          totalDeleted += deleted;
+        }
+        console.log(`🧹 CAPI logs cleanup: deleted ${totalDeleted} docs`);
+        await createFirestoreDoc("admin_audit_logs", crypto.randomUUID(), { admin_uid: "hmac_admin", admin_email: "admin@hmac", action: "cleanup_capi_logs", details: `Deleted ${totalDeleted} CAPI logs`, ip: clientIp, created_at: new Date().toISOString() });
+        return new Response(JSON.stringify({ success: true, deleted: totalDeleted, details }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+
       if (resource === "cleanup-orders") {
         const rawEmail = (body.email || '').trim(); const email = rawEmail.toLowerCase();
         if (!email) return new Response(JSON.stringify({ error: "email required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });

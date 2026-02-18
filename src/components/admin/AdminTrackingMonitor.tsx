@@ -5,12 +5,13 @@ import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useState } from "react";
 import {
   CheckCircle2, AlertTriangle, AlertCircle, RefreshCw,
-  Activity, Shield, Zap, Radio, Server, Globe, Flame, Copy as CopyIcon
+  Activity, Shield, Zap, Radio, Server, Globe, Flame, Copy as CopyIcon, Trash2
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
 import { AdminErrorState } from "./AdminErrorState";
@@ -72,6 +73,27 @@ const alertConfig = {
 export function AdminTrackingMonitor() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [hours, setHours] = useState<'24' | '48' | '168'>('24');
+  const [cleaning, setCleaning] = useState(false);
+
+  const handleCleanupCapiLogs = async () => {
+    setCleaning(true);
+    try {
+      const token = requireAdminToken();
+      const res = await invokeFunction('admin-data', {
+        method: 'POST',
+        body: { resource: 'cleanup-capi-logs' },
+        headers: { 'x-admin-token': token },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      alert(`✅ ${data.deleted} logs CAPI removidos com sucesso!`);
+      refetch();
+    } catch (e: any) {
+      alert(`❌ Erro ao limpar logs: ${e.message}`);
+    } finally {
+      setCleaning(false);
+    }
+  };
 
   const { data: report, isLoading, isError, refetch, isFetching } = useQuery<TrackingReport>({
     queryKey: ['tracking-monitor', hours],
@@ -128,6 +150,28 @@ export function AdminTrackingMonitor() {
               <TabsTrigger value="168" className="text-xs">7 dias</TabsTrigger>
             </TabsList>
           </Tabs>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs text-destructive hover:text-destructive" disabled={cleaning}>
+                <Trash2 className="h-3.5 w-3.5" />
+                Limpar Logs
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Limpar Logs CAPI</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Isso vai remover todos os registros de <strong>capi_event_log</strong> e <strong>meta_purchase_events</strong>. Os contadores serão zerados. Esta ação não pode ser desfeita.
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <AlertDialogAction onClick={handleCleanupCapiLogs} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                  {cleaning ? 'Limpando...' : 'Confirmar Limpeza'}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
           <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => refetch()} disabled={isFetching}>
             <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
           </Button>
