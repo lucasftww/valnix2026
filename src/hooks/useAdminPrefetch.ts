@@ -54,7 +54,7 @@ export const useAdminPrefetch = () => {
             const data = await res.json();
             return extract(data);
           },
-          staleTime: 30_000,
+          staleTime: 5 * 60_000,
         });
       });
     };

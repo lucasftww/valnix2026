@@ -43,9 +43,9 @@ export const AdminDashboard = () => {
       return await res.json();
     },
     enabled: isAdmin && !authLoading,
-    refetchInterval: isAdmin ? 30000 : false,
-    staleTime: 2 * 60 * 1000,
-    gcTime: 10 * 60 * 1000,
+    refetchInterval: isAdmin ? 120_000 : false,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
     retry: false,
   });
 

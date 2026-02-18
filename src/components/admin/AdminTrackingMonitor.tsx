@@ -86,7 +86,8 @@ export function AdminTrackingMonitor() {
       return await res.json();
     },
     enabled: isAdmin && !authLoading,
-    refetchInterval: 60000,
+    refetchInterval: 120_000,
+    staleTime: 5 * 60_000,
     retry: false,
   });
 

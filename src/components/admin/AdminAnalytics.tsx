@@ -97,7 +97,8 @@ export function AdminAnalytics() {
       return (Array.isArray(data.events) ? data.events : Array.isArray(data) ? data : []) as AnalyticsEvent[];
     },
     enabled: isAdmin && !authLoading,
-    refetchInterval: isAdmin ? 30000 : false,
+    refetchInterval: isAdmin ? 120_000 : false,
+    staleTime: 5 * 60_000,
     retry: false,
   });
 
