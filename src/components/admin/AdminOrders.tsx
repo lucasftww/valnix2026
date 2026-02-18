@@ -173,7 +173,7 @@ export const AdminOrders = () => {
       ordersData.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       return ordersData;
     },
-    enabled: true,
+    retry: false,
     refetchInterval: 60000,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
