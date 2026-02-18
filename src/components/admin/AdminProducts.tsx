@@ -522,24 +522,29 @@ export const AdminProducts = () => {
                 <TabsContent value="delivery" className="space-y-4">
                   <div className="space-y-2">
                     <Label>Tipo de Entrega</Label>
-                    <Select value={formData.delivery_type} onValueChange={(v) => setFormData({ ...formData, delivery_type: v })}>
+                    <Select value={formData.delivery_type} onValueChange={(v) => setFormData({ ...formData, delivery_type: v, auto_delivery_codes: [] })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manual">Manual</SelectItem>
-                        <SelectItem value="automatic">Automática</SelectItem>
+                        <SelectItem value="manual">Manual (inserir códigos reais)</SelectItem>
+                        <SelectItem value="automatic">Automática (códigos gerados)</SelectItem>
                       </SelectContent>
                     </Select>
+                    <p className="text-xs text-muted-foreground">
+                      {formData.delivery_type === 'manual'
+                        ? 'Insira os códigos reais que serão enviados aos clientes.'
+                        : 'Os códigos serão gerados automaticamente pelo sistema.'}
+                    </p>
                   </div>
-                  {formData.delivery_type === 'automatic' && (
+                  {formData.delivery_type === 'manual' && (
                     <div className="space-y-2">
                       <Label>Códigos de Entrega (um por linha)</Label>
                       <Textarea
                         value={formData.auto_delivery_codes.join('\n')}
                         onChange={(e) => setFormData({ ...formData, auto_delivery_codes: e.target.value.split('\n').filter(Boolean) })}
-                        placeholder="Insira os códigos, um por linha"
+                        placeholder="Cole os códigos reais aqui, um por linha"
                         className="min-h-[120px]"
                       />
-                      <p className="text-xs text-muted-foreground">{formData.auto_delivery_codes.length} código(s) cadastrado(s)</p>
+                      <p className="text-xs text-muted-foreground">{formData.auto_delivery_codes.length} código(s) em estoque</p>
                     </div>
                   )}
                 </TabsContent>
