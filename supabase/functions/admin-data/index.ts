@@ -674,7 +674,7 @@ Deno.serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (resource === "coupons") {
-        const COUPON_ALLOWED_FIELDS = ['code', 'discount_type', 'discount_value', 'is_active', 'max_uses', 'current_uses', 'min_order_value', 'expires_at', 'created_at', 'updated_at'];
+        const COUPON_ALLOWED_FIELDS = ['code', 'description', 'discount_type', 'discount_value', 'is_active', 'max_uses', 'current_uses', 'min_order_value', 'min_purchase_amount', 'expires_at', 'created_at', 'updated_at'];
         const docId = body.id || crypto.randomUUID();
         delete body.id;
         const safeBody: Record<string, unknown> = {};
@@ -761,12 +761,12 @@ Deno.serve(async (req) => {
           }
         }
 
-        console.log(`🧹 Analytics cleanup by ${userData.email}: deleted ${deleted}/${toDelete.length} events (range: ${after_date || '*'} to ${before_date || '*'})`);
+        console.log(`🧹 Analytics cleanup by hmac_admin: deleted ${deleted}/${toDelete.length} events (range: ${after_date || '*'} to ${before_date || '*'})`);
 
         // Audit log
         await createFirestoreDoc("admin_audit_logs", crypto.randomUUID(), {
-          admin_uid: userData.uid,
-          admin_email: userData.email,
+          admin_uid: "hmac_admin",
+          admin_email: "admin@hmac",
           action: "cleanup_analytics",
           details: `Deleted ${deleted} analytics events (${after_date || '*'} to ${before_date || '*'})`,
           ip: clientIp,
@@ -977,7 +977,7 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "coupons") {
-        const COUPON_ALLOWED_FIELDS = ['code', 'discount_type', 'discount_value', 'is_active', 'max_uses', 'current_uses', 'min_order_value', 'expires_at', 'updated_at'];
+        const COUPON_ALLOWED_FIELDS = ['code', 'description', 'discount_type', 'discount_value', 'is_active', 'max_uses', 'current_uses', 'min_order_value', 'min_purchase_amount', 'expires_at', 'updated_at'];
         const safeBody: Record<string, unknown> = {};
         for (const key of Object.keys(body)) {
           if (COUPON_ALLOWED_FIELDS.includes(key)) safeBody[key] = body[key];
