@@ -169,10 +169,10 @@ export function AdminTrackingMonitor() {
               </div>
             </div>
             <p className="text-2xl font-bold">
-              {report?.capi.total ? (100 - (report.capi.errorRate || 0)).toFixed(1) : '—'}%
+              {report?.capi?.total ? (100 - (report.capi.errorRate || 0)).toFixed(1) : '—'}%
             </p>
             <p className="text-xs text-muted-foreground mt-1">
-              {report?.capi.sent || 0} enviados / {report?.capi.failed || 0} falhas
+              {report?.capi?.sent || 0} enviados / {report?.capi?.failed || 0} falhas
             </p>
           </CardContent>
         </Card>
@@ -186,9 +186,9 @@ export function AdminTrackingMonitor() {
                 <Radio className="w-4 h-4 text-blue-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">{report?.coverage.coverageRate ?? '—'}%</p>
+            <p className="text-2xl font-bold">{report?.coverage?.coverageRate ?? '—'}%</p>
             <p className="text-xs text-muted-foreground mt-1">
-              {report?.coverage.withCapi || 0} de {report?.coverage.paidOrders || 0} pedidos
+              {report?.coverage?.withCapi || 0} de {report?.coverage?.paidOrders || 0} pedidos
             </p>
           </CardContent>
         </Card>
@@ -202,7 +202,7 @@ export function AdminTrackingMonitor() {
                 <Zap className="w-4 h-4 text-purple-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">{report?.dedup.totalMetaPurchaseEvents ?? '—'}</p>
+            <p className="text-2xl font-bold">{report?.dedup?.totalMetaPurchaseEvents ?? '—'}</p>
             <p className="text-xs text-muted-foreground mt-1">
               {(report?.dedup.duplicates?.length || 0) === 0 ? '✅ Sem duplicatas' : `🔴 ${report?.dedup.duplicates?.length} duplicata(s)`}
             </p>
@@ -240,7 +240,7 @@ export function AdminTrackingMonitor() {
                 <Globe className="w-4 h-4 text-orange-500" />
               </div>
             </div>
-            <p className="text-2xl font-bold">{report?.capi.total ?? '—'}</p>
+            <p className="text-2xl font-bold">{report?.capi?.total ?? '—'}</p>
             <p className="text-xs text-muted-foreground mt-1">últimas {hoursLabel}</p>
           </CardContent>
         </Card>
@@ -262,9 +262,9 @@ export function AdminTrackingMonitor() {
             </div>
           </CardHeader>
           <CardContent>
-            {report?.capi.byEvent && Object.keys(report.capi.byEvent).length > 0 ? (
+            {report?.capi?.byEvent && Object.keys(report.capi.byEvent || {}).length > 0 ? (
               <div className="space-y-3">
-                {Object.entries(report.capi.byEvent).map(([name, stats]) => {
+                {Object.entries(report.capi.byEvent || {}).map(([name, stats]) => {
                   const total = stats.sent + stats.failed;
                   const successRate = total > 0 ? (stats.sent / total) * 100 : 0;
                   return (
@@ -301,10 +301,10 @@ export function AdminTrackingMonitor() {
             </div>
           </CardHeader>
           <CardContent>
-            {report?.dedup.sourceDistribution && Object.keys(report.dedup.sourceDistribution).length > 0 ? (
+            {report?.dedup?.sourceDistribution && Object.keys(report.dedup.sourceDistribution || {}).length > 0 ? (
               <div className="space-y-3">
-                {Object.entries(report.dedup.sourceDistribution).sort((a, b) => b[1] - a[1]).map(([source, count]) => {
-                  const total = report.dedup.totalMetaPurchaseEvents || 1;
+                {Object.entries(report.dedup.sourceDistribution || {}).sort((a, b) => b[1] - a[1]).map(([source, count]) => {
+                  const total = report.dedup?.totalMetaPurchaseEvents || 1;
                   const pct = (count / total) * 100;
                   const sourceLabel: Record<string, string> = {
                     webhook: '🔔 Webhook',
