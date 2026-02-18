@@ -20,24 +20,10 @@ interface CartContextType {
   clearCart: () => void;
 }
 
-const CART_STORAGE_KEY = "valnix_cart_items";
-
-function loadFromStorage<T>(key: string, fallback: T): T {
-  try {
-    const raw = localStorage.getItem(key);
-    if (raw) return JSON.parse(raw);
-  } catch {}
-  return fallback;
-}
-
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [items, setItems] = useState<CartItem[]>(() => loadFromStorage(CART_STORAGE_KEY, []));
-
-  useEffect(() => {
-    try { localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(items)); } catch {}
-  }, [items]);
+  const [items, setItems] = useState<CartItem[]>([]);
 
   const totalItems = useMemo(() => items.reduce((sum, item) => sum + item.quantity, 0), [items]);
   const totalPrice = useMemo(() => items.reduce((sum, item) => sum + item.price * item.quantity, 0), [items]);
