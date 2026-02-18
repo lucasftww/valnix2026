@@ -103,10 +103,6 @@ export function AdminAnalytics() {
   });
 
   const handleCleanupPreview = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
     setCleanupLoading(true);
     try {
       const token = requireAdminToken();
@@ -115,8 +111,8 @@ export function AdminAnalytics() {
         queryParams: { resource: "cleanup-analytics" },
         headers: { "x-admin-token": token },
         body: {
-          after_date: today.toISOString(),
-          before_date: endOfDay.toISOString(),
+          after_date: "2000-01-01T00:00:00Z",
+          before_date: new Date(Date.now() + 86400_000).toISOString(),
           dry_run: true,
         },
       });
@@ -128,10 +124,6 @@ export function AdminAnalytics() {
   };
 
   const handleCleanupConfirm = async () => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const endOfDay = new Date();
-    endOfDay.setHours(23, 59, 59, 999);
     setCleanupLoading(true);
     try {
       const token = requireAdminToken();
@@ -140,8 +132,8 @@ export function AdminAnalytics() {
         queryParams: { resource: "cleanup-analytics" },
         headers: { "x-admin-token": token },
         body: {
-          after_date: today.toISOString(),
-          before_date: endOfDay.toISOString(),
+          after_date: "2000-01-01T00:00:00Z",
+          before_date: new Date(Date.now() + 86400_000).toISOString(),
           dry_run: false,
         },
       });
@@ -362,9 +354,9 @@ export function AdminAnalytics() {
             </AlertDialogTrigger>
             <AlertDialogContent>
               <AlertDialogHeader>
-                <AlertDialogTitle>Limpar Eventos de Hoje</AlertDialogTitle>
+                <AlertDialogTitle>Limpar Todos os Eventos</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Remove todos os eventos de analytics registrados hoje. Esta ação é irreversível.
+                  Remove todos os eventos de analytics. Esta ação é irreversível.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               {previewData && (
