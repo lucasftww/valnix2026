@@ -14,15 +14,16 @@ All colors MUST be HSL.
   
   html {
     -webkit-touch-callout: none;
-    touch-action: pan-x pan-y;
+    touch-action: manipulation;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
+    text-rendering: optimizeSpeed;
+    scroll-behavior: smooth;
   }
   
   body {
     overscroll-behavior-x: none;
-    touch-action: pan-x pan-y;
+    overscroll-behavior-y: none;
   }
   
   img {
@@ -35,6 +36,7 @@ All colors MUST be HSL.
   input, textarea, button, a, [role="button"] {
     -webkit-user-select: auto;
     user-select: auto;
+    touch-action: manipulation;
   }
   
   /* Prevent zoom on mobile inputs — only scoped to form elements */
@@ -159,6 +161,14 @@ All colors MUST be HSL.
   
   .scrollbar-hide::-webkit-scrollbar {
     display: none;
+  }
+  
+  /* GPU-accelerate fixed elements */
+  .fixed {
+    will-change: transform;
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 }
 
