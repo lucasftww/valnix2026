@@ -21,7 +21,7 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
 
       {/* PIX - always selected */}
       <div
-        className="flex items-center gap-3 lg:gap-2.5 p-3 sm:p-4 lg:p-2.5 rounded-xl border border-border/10 bg-background cursor-default"
+        className="flex items-center gap-3 lg:gap-2.5 p-3 sm:p-4 lg:p-2.5 rounded-xl border border-border/5 bg-background cursor-default"
         onClick={() => onMethodChange("pix")}
       >
         <div className="w-5 lg:w-4 h-5 lg:h-4 rounded-full border-2 border-border/50 flex items-center justify-center shrink-0">
