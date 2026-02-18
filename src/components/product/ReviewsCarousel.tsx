@@ -1,4 +1,4 @@
-import { memo, useRef } from "react";
+import { memo, useRef, useMemo } from "react";
 import { Star } from "lucide-react";
 import {
   Carousel,
@@ -18,6 +18,58 @@ interface Review {
 
 interface ReviewsCarouselProps {
   reviews: Review[];
+  targetCount?: number;
+}
+
+const FAKE_NAMES = [
+  "matheus_gamer", "joao_clutch", "pedrin", "lucas_pro", "biel", "gustavinho",
+  "rafael_sniper", "davi_plays", "kaio_fps", "nick_valorant", "bruno_ace",
+  "arthur_rush", "leo_tk", "gabriel_aim", "igor_flash", "thiago_mvp",
+  "vini_carry", "henrique_gg", "felipe_rank", "caio_win", "pedro_kills",
+  "enzo_top", "murilo_fps", "ryan_play", "luan_rank", "diego_pro",
+  "samuel_vp", "daniel_rush", "gustavo_ace", "renan_aim", "yuri_clutch",
+  "andre_gg", "julio_carry", "marcos_mvp", "alex_top", "thomas_win",
+  "bernardo_fps", "nicolas_play", "otavio_rank", "lorenzo_pro", "heitor_vp",
+  "miguel_rush", "eduardo_ace", "victor_aim", "carlos_flash", "ramon_gg",
+  "rodrigo_carry", "leandro_mvp", "fabio_top", "sergio_win", "patrick_kills",
+];
+
+const FAKE_COMMENTS = [
+  "veio certinho, muito rápido", "caiu na hora, recomendo demais",
+  "melhor site que já comprei, confiável", "os vp caiu em 2 min, sensacional",
+  "comprei e ja recebi, top demais", "entrega super rapida, amei",
+  "site confiavel, ja é a terceira vez que compro", "veio tudo certo mano",
+  "comprei pra pegar a skin, chegou rapidao", "muito bom, vou comprar de novo",
+  "salvou minha vida, comprei vp e caiu na hora", "rapido e seguro, recomendo",
+  "os vp caiu na conta instantaneo", "otimo atendimento e entrega rapida",
+  "ja indiquei pros meus amigos, muito bom", "perfeito, sem problema nenhum",
+  "primeira vez comprando aqui, surpreendeu", "entregou antes do esperado",
+  "preço bom e entrega imediata", "confiavel demais, ja comprei varias vezes",
+  "show de bola, caiu rapidinho", "muito satisfeito com a compra",
+  "excelente, voltarei a comprar com certeza", "surreal a velocidade da entrega",
+  "melhor custo beneficio que achei", "nota 10, entrega instantanea",
+  "recomendo pra todo mundo", "nunca tive problema, sempre entrega",
+  "mto bom vei os vp caiu em 2 min", "mlk os vp veio certinho ja to radiante",
+  "comprei e nao me arrependi", "site seguro e rapido, aprovado",
+  "ja fiz 5 compras aqui, sempre certo", "os vp cai muito rapido confia",
+  "preco justo e entrega na hora", "confia que é bom demais",
+  "veio tudo certo como prometido", "muito rapido, menos de 5 min",
+  "sensacional a entrega", "top tier site de vp",
+];
+
+function generateFakeReviews(count: number, seed: number): Review[] {
+  const fakes: Review[] = [];
+  for (let i = 0; i < count; i++) {
+    const idx = (seed + i * 7 + i * i) % FAKE_NAMES.length;
+    const cidx = (seed + i * 13 + i) % FAKE_COMMENTS.length;
+    fakes.push({
+      id: `fake_${seed}_${i}`,
+      customer_name: FAKE_NAMES[idx],
+      rating: 5,
+      comment: FAKE_COMMENTS[cidx],
+    });
+  }
+  return fakes;
 }
 
 const ReviewCard = ({ review }: { review: Review }) => (
@@ -50,12 +102,19 @@ const ReviewCard = ({ review }: { review: Review }) => (
   </div>
 );
 
-const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
+const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
   const autoplayRef = useRef(
     Autoplay({ delay: 3000, stopOnInteraction: false, stopOnMouseEnter: true })
   );
 
-  if (reviews.length === 0) return null;
+  const allReviews = useMemo(() => {
+    if (targetCount <= reviews.length || targetCount === 0) return reviews;
+    const needed = targetCount - reviews.length;
+    const seed = reviews.length > 0 ? reviews[0].customer_name.charCodeAt(0) * 17 : 42;
+    return [...reviews, ...generateFakeReviews(needed, seed)];
+  }, [reviews, targetCount]);
+
+  if (allReviews.length === 0) return null;
 
   return (
     <div className="mt-10 max-w-7xl mx-auto">
@@ -79,7 +138,7 @@ const ReviewsCarousel = ({ reviews }: ReviewsCarouselProps) => {
           className="w-full"
         >
           <CarouselContent className="-ml-3">
-            {reviews.map((review) => (
+            {allReviews.map((review) => (
               <CarouselItem
                 key={review.id}
                 className="pl-3 basis-[85%] sm:basis-[48%] lg:basis-[33.333%]"
