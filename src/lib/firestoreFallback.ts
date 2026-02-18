@@ -6,6 +6,7 @@
 import { invokeFunction } from "@/lib/apiHelper";
 
 const API_CACHE = new Map<string, { data: any; expiresAt: number }>();
+const INFLIGHT = new Map<string, Promise<any>>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 min in-memory
 const LS_PREFIX = "valnix_cache_v1_";
 const LS_TTL = 30 * 60 * 1000; // 30 min localStorage
@@ -34,17 +35,27 @@ async function fetchFromApi(params: Record<string, string>): Promise<any> {
   const cached = API_CACHE.get(cacheKey);
   if (cached && Date.now() < cached.expiresAt) return cached.data;
 
-  const response = await invokeFunction("site-data", {
-    method: "GET",
-    queryParams: params,
-  });
+  // Deduplicate in-flight requests — prevents double fetch on initial load
+  const existing = INFLIGHT.get(cacheKey);
+  if (existing) return existing;
 
-  if (!response.ok) throw new Error(`API error: ${response.status}`);
-  const data = await response.json();
+  const promise = (async () => {
+    const response = await invokeFunction("site-data", {
+      method: "GET",
+      queryParams: params,
+    });
 
-  API_CACHE.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL });
-  setLsCache(cacheKey, data);
-  return data;
+    if (!response.ok) throw new Error(`API error: ${response.status}`);
+    const data = await response.json();
+
+    API_CACHE.set(cacheKey, { data, expiresAt: Date.now() + CACHE_TTL });
+    setLsCache(cacheKey, data);
+    return data;
+  })();
+
+  INFLIGHT.set(cacheKey, promise);
+  promise.finally(() => INFLIGHT.delete(cacheKey));
+  return promise;
 }
 
 export async function fetchFeaturedProductsFallback() {
