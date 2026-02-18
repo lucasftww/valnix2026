@@ -125,7 +125,7 @@ const ProductCardComponent = ({
                 {formatPrice(originalPrice)}
               </span>
             )}
-            <span className="text-base sm:text-lg md:text-lg font-bold text-primary">
+            <span className="text-base sm:text-lg md:text-lg font-bold text-foreground">
               {formatPrice(price)}
             </span>
           </div>
