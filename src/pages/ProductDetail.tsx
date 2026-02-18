@@ -19,7 +19,7 @@ const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.
 const FloatingContactButtons = lazy(() => import("@/components/FloatingContactButtons").then(m => ({ default: m.FloatingContactButtons })));
 const CategoryCards = lazy(() => import("@/components/CategoryCards").then(m => ({ default: m.CategoryCards })));
 const FAQ = lazy(() => import("@/components/FAQ").then(m => ({ default: m.FAQ })));
-const ReviewsCarousel = lazy(() => import("@/components/product/ReviewsCarousel"));
+import ReviewsCarousel from "@/components/product/ReviewsCarousel";
 const RelatedProducts = lazy(() => import("@/components/product/RelatedProducts"));
 
 // Skeleton de loading mais leve
@@ -543,12 +543,8 @@ const ProductDetail = () => {
             </div>
           </div>
 
-          {/* Reviews - Lazy loaded */}
-          {reviews.length > 0 && (
-            <Suspense fallback={<div className="h-48 mt-6 animate-pulse bg-muted/10 rounded-2xl" />}>
-              <ReviewsCarousel reviews={reviews} targetCount={productStats.reviewCount} />
-            </Suspense>
-          )}
+          {/* Reviews */}
+          <ReviewsCarousel reviews={reviews} targetCount={productStats.reviewCount} />
 
           {/* Produtos Relacionados */}
           <Suspense fallback={<div className="h-48 mt-6 animate-pulse bg-muted/10 rounded-2xl" />}>

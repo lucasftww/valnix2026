@@ -108,8 +108,10 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
   );
 
   const allReviews = useMemo(() => {
-    if (targetCount <= reviews.length || targetCount === 0) return reviews;
-    const needed = targetCount - reviews.length;
+    const target = targetCount || reviews.length;
+    if (target === 0) return reviews;
+    if (target <= reviews.length) return reviews;
+    const needed = target - reviews.length;
     const seed = reviews.length > 0 ? reviews[0].customer_name.charCodeAt(0) * 17 : 42;
     return [...reviews, ...generateFakeReviews(needed, seed)];
   }, [reviews, targetCount]);
