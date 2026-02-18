@@ -7,6 +7,9 @@ const CLEANUP_CONFIG = [
   { collection: 'cron_audit_logs', retentionDays: 30 },
   { collection: 'rate_limits', retentionDays: 7 },
   { collection: 'rate_limit_logs', retentionDays: 30 },
+  { collection: 'delivery_locks', retentionDays: 14 },
+  { collection: 'coupon_use_events', retentionDays: 30 },
+  { collection: 'meta_purchase_events', retentionDays: 30 },
 ];
 
 const BATCH_SIZE = 500;
