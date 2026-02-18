@@ -112,7 +112,7 @@ export const OrderSummary = memo(function OrderSummary({
         <Button 
           onClick={onSubmit}
           disabled={isSubmitDisabled}
-          className="w-full h-14 bg-foreground hover:bg-foreground/90 text-background font-bold rounded-xl text-base hidden lg:flex transition-all duration-200"
+          className="w-full h-14 bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-base hidden lg:flex transition-all duration-200 animate-pulse"
         >
           {loading ? (
             <span className="flex items-center gap-2.5">
