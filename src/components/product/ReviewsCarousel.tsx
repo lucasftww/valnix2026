@@ -22,16 +22,16 @@ interface ReviewsCarouselProps {
 }
 
 const FAKE_NAMES = [
-  "matheus_gamer", "joao_clutch", "pedrin", "lucas_pro", "biel", "gustavinho",
-  "rafael_sniper", "davi_plays", "kaio_fps", "nick_valorant", "bruno_ace",
-  "arthur_rush", "leo_tk", "gabriel_aim", "igor_flash", "thiago_mvp",
-  "vini_carry", "henrique_gg", "felipe_rank", "caio_win", "pedro_kills",
-  "enzo_top", "murilo_fps", "ryan_play", "luan_rank", "diego_pro",
-  "samuel_vp", "daniel_rush", "gustavo_ace", "renan_aim", "yuri_clutch",
-  "andre_gg", "julio_carry", "marcos_mvp", "alex_top", "thomas_win",
-  "bernardo_fps", "nicolas_play", "otavio_rank", "lorenzo_pro", "heitor_vp",
-  "miguel_rush", "eduardo_ace", "victor_aim", "carlos_flash", "ramon_gg",
-  "rodrigo_carry", "leandro_mvp", "fabio_top", "sergio_win", "patrick_kills",
+  "Matheus", "João Pedro", "Pedrin", "Lucas", "Biel", "Gustavinho",
+  "Rafael", "Davi", "Kaio", "Nicolas", "Bruno",
+  "Arthur", "Leonardo", "Gabriel", "Igor", "Thiago",
+  "Vinicius", "Henrique", "Felipe", "Caio", "Pedro",
+  "Enzo", "Murilo", "Ryan", "Luan", "Diego",
+  "Samuel", "Daniel", "Gustavo", "Renan", "Yuri",
+  "André", "Julio", "Marcos", "Alex", "Thomas",
+  "Bernardo", "Nicolas P.", "Otávio", "Lorenzo", "Heitor",
+  "Miguel", "Eduardo", "Victor", "Carlos", "Ramon",
+  "Rodrigo", "Leandro", "Fábio", "Sérgio", "Patrick",
 ];
 
 const FAKE_COMMENTS = [
