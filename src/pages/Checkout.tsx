@@ -118,7 +118,8 @@ export default function Checkout() {
     })(),
   }), [formData]);
 
-  // ── InitiateCheckout: fires ONCE after email or phone is validated ──
+  // ── InitiateCheckout: fires ONCE after name AND email are both validated ──
+  // This ensures maximum PII coverage (email, first_name, last_name always present).
   const icFiredRef = useRef(false);
   useEffect(() => {
     if (icFiredRef.current) return;
@@ -128,10 +129,10 @@ export default function Checkout() {
     try { alreadyFired = sessionStorage.getItem('valnix_ic_fired') === '1'; } catch {}
     if (alreadyFired) { icFiredRef.current = true; return; }
 
-    // Wait until at least email OR phone is filled with valid-looking data
-    const hasEmail = validation.email;
+    // Wait until name AND email are BOTH valid — maximizes match quality
+    if (!validation.name || !validation.email) return;
+
     const hasPhone = formData.phone.replace(/\D/g, '').length >= 10;
-    if (!hasEmail && !hasPhone) return;
 
     icFiredRef.current = true;
     try { sessionStorage.setItem('valnix_ic_fired', '1'); } catch {}
@@ -139,16 +140,16 @@ export default function Checkout() {
     trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
     sendInitiateCheckout({
       userId: effectiveUserId,
-      userEmail: hasEmail ? formData.email.trim() : undefined,
+      userEmail: formData.email.trim(),
       userPhone: hasPhone ? formData.phone : undefined,
-      userName: formData.name.trim() || undefined,
+      userName: formData.name.trim(),
       value: finalPrice,
       productNames: items.map(i => i.name),
       productIds: items.map(i => i.id),
       quantities: items.map(i => i.quantity),
       prices: items.map(i => i.price),
     });
-  }, [items, finalPrice, effectiveUserId, validation.email, formData.phone, formData.email, formData.name]);
+  }, [items, finalPrice, effectiveUserId, validation.name, validation.email, formData.phone, formData.email, formData.name]);
 
   useEffect(() => {
     if (items.length === 0) {
