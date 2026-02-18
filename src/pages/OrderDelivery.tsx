@@ -3,7 +3,7 @@ import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom"
 import { db } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
 import { collection, query, where, onSnapshot, getDocs, doc, getDoc, addDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
-import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2, ShoppingBag, ArrowRight, Star, Shield, Zap, Clock } from "lucide-react";
+import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -226,10 +226,10 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
         <CardContent className="p-5 space-y-4">
           {paymentConfirmed ? (
             <div className="text-center space-y-3 py-6">
-              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
-                <Check className="w-8 h-8 text-green-500" />
+              <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-8 h-8 text-success" />
               </div>
-              <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
+              <h2 className="text-xl font-bold text-success">Pagamento Confirmado!</h2>
               <p className="text-sm text-muted-foreground">Benefício ativado com sucesso. 🎉</p>
             </div>
           ) : (
@@ -296,8 +296,8 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
         <div className="space-y-2">
           {config.benefits.map((benefit, i) => (
             <div key={i} className="flex items-start gap-2">
-              <div className="w-4 h-4 rounded-full bg-green-500/20 flex items-center justify-center mt-0.5 shrink-0">
-                <Check className="w-2.5 h-2.5 text-green-500" />
+              <div className="w-4 h-4 rounded-full bg-success/20 flex items-center justify-center mt-0.5 shrink-0">
+                <Check className="w-2.5 h-2.5 text-success" />
               </div>
               <span className="text-xs text-muted-foreground">{benefit}</span>
             </div>
@@ -521,7 +521,7 @@ export default function OrderDelivery() {
           <Link to="/">
             <img src={vLogo} alt="Valnix" className="h-8" />
           </Link>
-          <Badge variant="outline" className="text-green-500 border-green-500/30">
+          <Badge variant="outline" className="text-success border-success/30">
             <CheckCircle2 className="w-3 h-3 mr-1" />
             Pagamento Confirmado
           </Badge>
@@ -531,8 +531,8 @@ export default function OrderDelivery() {
       <main className="max-w-3xl mx-auto px-4 py-6 md:py-10 space-y-6">
         {/* Success Header */}
         <div className="text-center space-y-3">
-          <div className="w-20 h-20 bg-green-500/10 rounded-full flex items-center justify-center mx-auto">
-            <CheckCircle2 className="w-10 h-10 text-green-500" />
+          <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto">
+            <CheckCircle2 className="w-10 h-10 text-success" />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Pedido Confirmado! 🎉
@@ -578,9 +578,9 @@ export default function OrderDelivery() {
                     </div>
 
                     {codes.length > 0 ? (
-                      <div className="border-t border-border bg-green-500/5 p-4">
+                      <div className="border-t border-border bg-success/5 p-4">
                         <div className="flex items-center justify-between mb-3">
-                          <p className="text-xs font-medium text-green-500 flex items-center gap-1.5">
+                          <p className="text-xs font-medium text-success flex items-center gap-1.5">
                             <CheckCircle2 className="w-3.5 h-3.5" />
                             {codes.length} código(s) entregue(s)
                           </p>
@@ -588,7 +588,7 @@ export default function OrderDelivery() {
                             <Button
                               size="sm"
                               variant="outline"
-                              className="h-7 text-xs border-green-500/30 text-green-500 hover:bg-green-500/10"
+                              className="h-7 text-xs border-success/30 text-success hover:bg-success/10"
                               onClick={() => copyAllCodes(codes)}
                             >
                               <Copy className="w-3 h-3 mr-1" /> Copiar Todos
@@ -683,23 +683,7 @@ export default function OrderDelivery() {
         </Card>
 
         {/* CTA: Create account */}
-        {!order.linked && (
-          <Card className="bg-gradient-to-br from-primary/10 to-transparent border-primary/20">
-            <CardContent className="p-5 text-center space-y-3">
-              <ShoppingBag className="w-8 h-8 text-primary mx-auto" />
-              <h3 className="font-bold text-foreground">Quer acompanhar seus pedidos?</h3>
-              <p className="text-xs text-muted-foreground">
-                Crie uma conta grátis e vincule este pedido. Assim você pode acessar de qualquer lugar.
-              </p>
-              <Link to={`/auth?redirect=/order/${hash}`}>
-                <Button className="w-full h-11 bg-primary hover:bg-primary/90">
-                  Criar Conta Grátis
-                  <ArrowRight className="w-4 h-4 ml-2" />
-                </Button>
-              </Link>
-            </CardContent>
-          </Card>
-        )}
+        {/* CTA: Back to store */}
 
         {/* Back to store */}
         <div className="text-center pb-8">
