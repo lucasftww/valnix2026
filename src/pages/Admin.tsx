@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAdminPrefetch } from "@/hooks/useAdminPrefetch";
-import { Search, Bell, Settings, ChevronRight } from "lucide-react";
+import { Settings, ChevronRight } from "lucide-react";
 
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 import { AdminAnalytics } from "@/components/admin/AdminAnalytics";
@@ -12,7 +12,6 @@ import { AdminCategories } from "@/components/admin/AdminCategories";
 import { AdminPostPaymentPages } from "@/components/admin/AdminPostPaymentPages";
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   Breadcrumb,
@@ -45,7 +44,6 @@ export default function Admin() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   const [mountedTabs, setMountedTabs] = useState<Set<string>>(new Set(["dashboard"]));
-  const [searchQuery, setSearchQuery] = useState("");
   const [password, setPassword] = useState("");
   const [loginError, setLoginError] = useState("");
   const [loggingIn, setLoggingIn] = useState(false);
@@ -84,14 +82,14 @@ export default function Admin() {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
-          <Input
+          <input
             type="password"
             placeholder="Senha"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoFocus
             autoComplete="new-password"
-            className="text-center"
+            className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-center ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
           {loginError && <p className="text-sm text-destructive text-center">{loginError}</p>}
           <Button type="submit" className="w-full" disabled={loggingIn || !password}>
@@ -145,26 +143,9 @@ export default function Admin() {
                 </BreadcrumbList>
               </Breadcrumb>
 
-              <div className="flex-1 flex justify-center max-w-md mx-auto">
-                <div className="relative w-full">
-                  <label htmlFor="admin-search" className="sr-only">Buscar</label>
-                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    id="admin-search"
-                    name="admin-search"
-                    placeholder="Buscar..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-9 bg-muted/50 border-border/50 focus:bg-background w-full"
-                  />
-                </div>
-              </div>
+              <div className="flex-1" />
 
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon">
-                  <Bell className="h-5 w-5 text-muted-foreground" />
-                </Button>
-
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button variant="ghost" size="icon">

@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { 
   DollarSign, ShoppingCart, Package, TrendingUp, RefreshCw, 
   CheckCircle2, AlertTriangle, AlertCircle,
-  BarChart2, Users, Zap, Activity
+  BarChart2, Zap, Activity
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -61,7 +61,6 @@ export const AdminDashboard = () => {
       periodAvgTicket: p.avgTicket,
       periodFailed: p.failed,
       totalProducts: rawData.totalProducts || 0,
-      totalUsers: rawData.totalUsers || 0,
       topProducts: rawData.topProducts || [],
       recentOrders: rawData.recentOrders || [],
       pendingDelivery: rawData.pendingDelivery || 0,
@@ -195,7 +194,7 @@ export const AdminDashboard = () => {
               </div>
             </div>
             <p className="text-2xl font-bold">{stats?.totalProducts || 0}</p>
-            <p className="text-xs text-muted-foreground mt-1">{stats?.totalUsers || 0} usuários</p>
+            <p className="text-xs text-muted-foreground mt-1">produtos ativos</p>
           </CardContent>
         </Card>
       </div>
