@@ -94,7 +94,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                 {items.map((item) => (
                   <div 
                     key={item.id} 
-                    className="flex gap-3 p-3 rounded-xl bg-secondary/50 border border-border/10 hover:border-border/20 transition-colors"
+                    className="flex gap-3 p-3 rounded-xl bg-secondary/50 border border-border/10"
                   >
                     <div className="w-16 h-16 rounded-lg bg-muted overflow-hidden flex-shrink-0">
                       <img 

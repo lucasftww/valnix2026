@@ -59,7 +59,7 @@ const HeaderComponent = () => {
                     key={category.id}
                     to={`/${category.slug}`}
                     onClick={handleCloseMobileMenu}
-                    className="flex items-center gap-3 px-5 py-3.5 text-sm font-medium text-foreground hover:bg-primary/10 hover:text-primary transition-all group"
+                    className="flex items-center gap-3 px-5 py-3.5 text-sm font-medium text-foreground active:bg-primary/10 active:text-primary md:hover:bg-primary/10 md:hover:text-primary"
                   >
                     {category.icon_url && (
                       <img src={category.icon_url} alt="" className="h-5 w-5 opacity-70 group-hover:opacity-100" loading="lazy" />
