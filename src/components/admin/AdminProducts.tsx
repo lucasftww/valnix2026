@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react
 import { useQuery } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { AdminErrorState } from "./AdminErrorState";
 import { invokeFunction } from "@/lib/apiHelper";
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -87,7 +88,7 @@ export const AdminProducts = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
-  const { data: products = [], isLoading: loadingProducts, refetch: refetchProducts } = useQuery({
+  const { data: products = [], isLoading: loadingProducts, isError: productsError, refetch: refetchProducts, isFetching: productsFetching } = useQuery({
     queryKey: ['admin-products'],
     queryFn: async () => {
       const token = requireAdminToken();
@@ -441,6 +442,10 @@ export const AdminProducts = () => {
         </div>
       </div>
     );
+  }
+
+  if (productsError) {
+    return <AdminErrorState title="Erro ao carregar produtos" message="Não foi possível carregar os produtos. Verifique sua conexão e tente novamente." onRetry={() => refetchProducts()} retrying={productsFetching} />;
   }
 
   return (

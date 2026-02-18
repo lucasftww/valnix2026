@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { invokeFunction } from "@/lib/apiHelper";
 import { requireAdminToken } from "@/lib/adminAuth";
+import { AdminErrorState } from "./AdminErrorState";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
@@ -144,7 +145,7 @@ export const AdminOrders = () => {
   const { isAdmin, loading: authLoading } = useAuth();
   const { toast } = useToast();
 
-  const { data: rawOrders, isLoading: loading, refetch: refetchOrders } = useQuery({
+  const { data: rawOrders, isLoading: loading, isError: ordersError, refetch: refetchOrders, isFetching: ordersFetching } = useQuery({
     queryKey: ['admin-orders'],
     queryFn: async () => {
       const token = requireAdminToken();
@@ -540,6 +541,10 @@ export const AdminOrders = () => {
       </div>
     </div>
   );
+
+  if (ordersError) {
+    return <AdminErrorState title="Erro ao carregar pedidos" message="Não foi possível carregar os pedidos. Verifique sua conexão e tente novamente." onRetry={() => refetchOrders()} retrying={ordersFetching} />;
+  }
 
   const safetyThresholdForCounts = new Date(Date.now() - 5 * 60 * 1000).getTime();
   const isSafeForCount = (o: Order) => new Date(o.created_at).getTime() < safetyThresholdForCounts;
