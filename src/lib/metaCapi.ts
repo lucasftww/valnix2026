@@ -3,6 +3,7 @@
  * Captures fbc/fbp cookies and sends events via backend function
  */
 import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
+import { generateEventId } from "@/lib/eventId";
 
 // Read cookie by name
 function getCookie(name: string): string | undefined {
@@ -62,16 +63,15 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
     const fbc = getCookie('_fbc');
     const fbp = getCookie('_fbp');
 
-    const eventId = data.event_id
-      ? data.event_id
-      : data.order_id 
-        ? `${data.event_name.trim().toLowerCase()}_${data.order_id}`
-        : `${data.event_name.trim().toLowerCase()}_${Date.now()}`;
+    const eventId = data.event_id || generateEventId(data.event_name, data.order_id);
 
     const isServerHandled = (SERVER_HANDLED_CAPI_EVENTS as readonly string[]).includes(data.event_name);
 
-    // Only call the CAPI edge function if the server doesn't already handle it
-    if (!isServerHandled) {
+    // 🔒 DEFENSIVE: Purchase CAPI is ALWAYS server-only — never call from client
+    if (isServerHandled) {
+      console.log(`🔒 [Meta] CAPI blocked client-side for ${data.event_name} — server handles it`);
+    } else {
+      // Only call the CAPI edge function if the server doesn't already handle it
       const payload = {
         ...data,
         event_id: eventId,
@@ -84,7 +84,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       };
 
       invokeFunctionFireAndForget('meta-capi', payload).then(() => {
-        if (import.meta.env.DEV) console.log(`📡 Meta CAPI ${data.event_name} sent`);
+        console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
       });
     }
 
@@ -103,6 +103,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
             contents: data.contents,
             num_items: data.num_items,
           }, { eventID: eventId });
+          console.log(`🌐 [Meta] Pixel ${pixelEvent} fired — event_id=${eventId}`);
         }
       }
     } catch { /* best-effort pixel */ }
@@ -125,13 +126,11 @@ function buildContents(
   const contents: ContentItem[] = ids.map((id, i) => {
     const qty = quantities?.[i] ?? 1;
     const price = prices?.[i];
-    // Only include item_price if we have a real value — never guess/fabricate
     return price !== undefined && price > 0
       ? { id, quantity: qty, item_price: price }
-      : { id, quantity: qty, item_price: 0 }; // Meta requires the field but 0 signals "unknown"
+      : { id, quantity: qty, item_price: 0 };
   });
 
-  // If ALL prices are 0 (no real data), keep item_price: 0 (Meta requires the field; 0 signals "unknown")
   const hasAnyPrice = contents.some(c => c.item_price > 0);
   const cleanContents = hasAnyPrice
     ? contents
@@ -142,12 +141,12 @@ function buildContents(
 }
 
 // ── InitiateCheckout ───────────────────────────────────────────────
-// Called on checkout mount — NO form PII (user hasn't typed yet).
-// Only sends data already available: userId, user email (if logged in),
-// cart items, fbp/fbc (captured automatically in sendMetaCapiEvent).
+// Now called AFTER user validates email/phone — includes PII for better match quality.
 export function sendInitiateCheckout(params: {
   userId?: string;
-  userEmail?: string;       // from auth, NOT from form
+  userEmail?: string;
+  userPhone?: string;
+  userName?: string;
   value?: number;
   productNames?: string[];
   productIds?: string[];
@@ -159,22 +158,26 @@ export function sendInitiateCheckout(params: {
     params.productIds, params.quantities, params.prices,
   );
 
+  const nameParts = (params.userName || '').split(' ');
+
   sendMetaCapiEvent({
     event_name: 'InitiateCheckout',
-    event_id: `initiatecheckout_${checkoutSessionId}`,
+    event_id: generateEventId('InitiateCheckout', checkoutSessionId),
     value: params.value,
     content_name: params.productNames?.join(', '),
     content_ids: params.productIds || params.productNames,
     contents,
     num_items: numItems,
-    // Only auth-known PII — no form data at mount
-    email: params.userEmail,
+    email: params.userEmail || undefined,
+    phone: params.userPhone || undefined,
+    first_name: nameParts[0] || undefined,
+    last_name: nameParts.slice(1).join(' ') || undefined,
     external_id: params.userId,
   });
 }
 
-// ── Purchase (client-side) ─────────────────────────────────────────
-// Called after payment confirmed — full PII available.
+// ── Purchase (client-side pixel only) ──────────────────────────────
+// Fires browser pixel fbq only — CAPI is handled exclusively by server.
 // event_id = purchase_{orderId} — MUST match server-side for dedup.
 export function sendPurchaseFromClient(params: {
   orderId: string;
@@ -198,15 +201,16 @@ export function sendPurchaseFromClient(params: {
 
   sendMetaCapiEvent({
     event_name: 'Purchase',
+    event_id: generateEventId('Purchase', params.orderId),
     order_id: params.orderId,
     value: params.value,
     content_name: params.productNames?.join(', '),
     content_ids: params.productIds || params.productNames,
     contents,
     num_items: numItems,
-    email: params.email,
-    phone: params.phone,
-    first_name: nameParts[0],
+    email: params.email || undefined,
+    phone: params.phone || undefined,
+    first_name: nameParts[0] || undefined,
     last_name: nameParts.slice(1).join(' ') || undefined,
     external_id: params.userId,
     event_source_url: params.eventSourceUrl,

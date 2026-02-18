@@ -103,40 +103,6 @@ export default function Checkout() {
     }
   }, [items.length, paymentData, navigate]);
 
-  const icFiredRef = useRef(false);
-  useEffect(() => {
-    if (icFiredRef.current) return;
-    if (items.length === 0) return;
-
-    let alreadyFired = false;
-    try { alreadyFired = sessionStorage.getItem('valnix_ic_fired') === '1'; } catch {}
-
-    if (alreadyFired) {
-      icFiredRef.current = true;
-      return;
-    }
-
-    icFiredRef.current = true;
-    try { sessionStorage.setItem('valnix_ic_fired', '1'); } catch {}
-
-    trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
-    sendInitiateCheckout({
-      userId: effectiveUserId,
-      value: finalPrice,
-      productNames: items.map(i => i.name),
-      productIds: items.map(i => i.id),
-      quantities: items.map(i => i.quantity),
-      prices: items.map(i => i.price),
-    });
-  }, [items, finalPrice, effectiveUserId]);
-
-  useEffect(() => {
-    if (items.length === 0) {
-      try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
-      icFiredRef.current = false;
-    }
-  }, [items.length]);
-
   const validation = useMemo(() => ({
     name: formData.name.trim().length >= 3 && formData.name.trim().split(' ').length >= 2,
     nameError: formData.name.trim().length < 3 ? 'Nome deve ter pelo menos 3 caracteres' : formData.name.trim().split(' ').length < 2 ? 'Digite nome e sobrenome' : undefined,
@@ -151,6 +117,45 @@ export default function Checkout() {
       return undefined;
     })(),
   }), [formData]);
+
+  // ── InitiateCheckout: fires ONCE after email or phone is validated ──
+  const icFiredRef = useRef(false);
+  useEffect(() => {
+    if (icFiredRef.current) return;
+    if (items.length === 0) return;
+
+    let alreadyFired = false;
+    try { alreadyFired = sessionStorage.getItem('valnix_ic_fired') === '1'; } catch {}
+    if (alreadyFired) { icFiredRef.current = true; return; }
+
+    // Wait until at least email OR phone is filled with valid-looking data
+    const hasEmail = validation.email;
+    const hasPhone = formData.phone.replace(/\D/g, '').length >= 10;
+    if (!hasEmail && !hasPhone) return;
+
+    icFiredRef.current = true;
+    try { sessionStorage.setItem('valnix_ic_fired', '1'); } catch {}
+
+    trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
+    sendInitiateCheckout({
+      userId: effectiveUserId,
+      userEmail: hasEmail ? formData.email.trim() : undefined,
+      userPhone: hasPhone ? formData.phone : undefined,
+      userName: formData.name.trim() || undefined,
+      value: finalPrice,
+      productNames: items.map(i => i.name),
+      productIds: items.map(i => i.id),
+      quantities: items.map(i => i.quantity),
+      prices: items.map(i => i.price),
+    });
+  }, [items, finalPrice, effectiveUserId, validation.email, formData.phone, formData.email, formData.name]);
+
+  useEffect(() => {
+    if (items.length === 0) {
+      try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
+      icFiredRef.current = false;
+    }
+  }, [items.length]);
 
   const isFormValid = validation.name && validation.document && validation.email;
 
