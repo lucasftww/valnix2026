@@ -38,6 +38,8 @@ const MobileStickyCheckoutComponent = ({
                     src={item.image}
                     alt={item.name}
                     className="w-full h-full object-cover"
+                    width={48}
+                    height={48}
                     loading="lazy"
                   />
                 </div>
@@ -56,7 +58,7 @@ const MobileStickyCheckoutComponent = ({
                 {onRemoveItem && items.length > 1 && (
                   <button
                     onClick={() => onRemoveItem(item.id)}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors shrink-0"
+                    className="relative w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors shrink-0 before:content-[''] before:absolute before:inset-[-4px] before:rounded-lg"
                     aria-label={`Remover ${item.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -74,7 +76,9 @@ const MobileStickyCheckoutComponent = ({
         <div className="flex items-center justify-between mb-3">
           <button
             onClick={() => setShowSummary(!showSummary)}
-            className="flex items-center gap-1.5 text-[13px] text-muted-foreground underline underline-offset-2"
+            className="flex items-center gap-1.5 text-[13px] text-muted-foreground underline underline-offset-2 min-h-[48px]"
+            aria-expanded={showSummary}
+            aria-label="Resumo do Pedido"
           >
             Resumo do Pedido
             <ChevronUp
