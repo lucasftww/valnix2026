@@ -13,6 +13,8 @@ interface AuthContextType {
   adminToken: string | null;
   signIn: (password: string) => Promise<{ error: any }>;
   signOut: () => void;
+  /** Call on any 401 from admin endpoints to force logout */
+  handleAdminUnauthorized: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -21,6 +23,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isAdmin, setIsAdmin] = useState(false);
   const [loading, setLoading] = useState(true);
   const [adminToken, setTokenState] = useState<string | null>(null);
+
+  const handleAdminUnauthorized = useCallback(() => {
+    clearAdminToken();
+    setTokenState(null);
+    setIsAdmin(false);
+  }, []);
 
   // On mount, check if there's a stored token and verify it
   useEffect(() => {
@@ -42,19 +50,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             setTokenState(token);
             setIsAdmin(true);
           } else {
-            clearAdminToken();
+            handleAdminUnauthorized();
           }
         } else {
-          clearAdminToken();
+          handleAdminUnauthorized();
         }
       })
       .catch(() => {
-        clearAdminToken();
+        handleAdminUnauthorized();
       })
       .finally(() => {
         setLoading(false);
       });
-  }, []);
+  }, [handleAdminUnauthorized]);
 
   const signIn = useCallback(async (password: string): Promise<{ error: any }> => {
     try {
@@ -89,7 +97,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   }, []);
 
   return (
-    <AuthContext.Provider value={{ isAdmin, loading, adminToken, signIn, signOut }}>
+    <AuthContext.Provider value={{ isAdmin, loading, adminToken, signIn, signOut, handleAdminUnauthorized }}>
       {children}
     </AuthContext.Provider>
   );

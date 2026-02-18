@@ -36,12 +36,23 @@ export const AdminDashboard = () => {
         queryParams: { resource: "dashboard-stats" },
         headers: { "x-admin-token": token },
       });
+      if (res.status === 401) {
+        // Server rejected — clear session to prevent cascade
+        const { clearAdminToken } = await import("@/lib/adminAuth");
+        clearAdminToken();
+        throw new Error("Admin session expired");
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       return await res.json();
     },
     refetchInterval: 30000,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
+    retry: (failureCount, error) => {
+      // Don't retry auth errors
+      if (error?.message?.includes("Not authenticated") || error?.message?.includes("session expired")) return false;
+      return failureCount < 2;
+    },
   });
 
   const stats = useMemo(() => {
