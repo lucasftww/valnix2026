@@ -147,6 +147,7 @@ Deno.serve(async (req) => {
 
       if (resource === "orders") {
         const orders = await queryCollectionSimple("ordens");
+        console.log(`📦 orders resource: ${orders.length} orders found`);
         for (const o of orders) {
           if (o.created_at && typeof o.created_at === 'object' && o.created_at.seconds) o.created_at = new Date(o.created_at.seconds * 1000).toISOString();
           if (o.updated_at && typeof o.updated_at === 'object' && o.updated_at.seconds) o.updated_at = new Date(o.updated_at.seconds * 1000).toISOString();

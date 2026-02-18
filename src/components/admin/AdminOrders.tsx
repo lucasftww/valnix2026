@@ -158,6 +158,7 @@ export const AdminOrders = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const ordersArr = Array.isArray(data.orders) ? data.orders : Array.isArray(data) ? data : [];
+      console.log(`[AdminOrders] fetched ${ordersArr.length} orders from API`);
       const ordersData: Order[] = ordersArr.map((o: any) => ({
         id: o.id,
         customer_name: o.customer_name || '',
@@ -176,9 +177,9 @@ export const AdminOrders = () => {
       return ordersData;
     },
     enabled: isAdmin && !authLoading,
-    retry: false,
+    retry: 1,
     refetchInterval: isAdmin ? 60000 : false,
-    staleTime: 2 * 60 * 1000,
+    staleTime: 30_000,
     gcTime: 10 * 60 * 1000,
   });
 
