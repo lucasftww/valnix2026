@@ -69,7 +69,7 @@ async function getFirebaseAccessToken(): Promise<string> {
 }
 
 // ── HMAC Admin Token Verification ──────────────────────────────────
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = 1 * 60 * 60 * 1000; // 1 hour (must match admin-auth generation TTL)
 
 async function verifyAdminToken(token: string): Promise<boolean> {
   const adminPassword = Deno.env.get("ADMIN_PASSWORD");
@@ -145,10 +145,50 @@ async function queryAnalyticsEvents(dateFilter: Date) {
     });
 }
 
+// ── Server-side rate limiting (per-IP, in-memory) ──────────────────
+const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
+const RL_MAX = 20;
+const RL_WINDOW_MS = 60_000;
+const RL_BLOCK_MS = 120_000;
+
+function checkServerRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
+  const now = Date.now();
+  const entry = rateLimitMap.get(ip);
+  if (entry && entry.blockedUntil > now) {
+    return { allowed: false, retryAfter: Math.ceil((entry.blockedUntil - now) / 1000) };
+  }
+  if (!entry || entry.resetAt <= now) {
+    rateLimitMap.set(ip, { count: 1, resetAt: now + RL_WINDOW_MS, blockedUntil: 0 });
+    return { allowed: true };
+  }
+  entry.count++;
+  if (entry.count > RL_MAX) {
+    entry.blockedUntil = now + RL_BLOCK_MS;
+    return { allowed: false, retryAfter: Math.ceil(RL_BLOCK_MS / 1000) };
+  }
+  return { allowed: true };
+}
+
+setInterval(() => {
+  const now = Date.now();
+  for (const [k, v] of rateLimitMap) {
+    if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
+  }
+}, 300_000);
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
+
+  // ── Rate limiting ──
+  const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
+  const rl = checkServerRateLimit(clientIp);
+  if (!rl.allowed) {
+    console.warn(`🚫 Rate limited admin-analytics: ip=${clientIp}`);
+    return new Response(JSON.stringify({ error: "Too many requests" }),
+      { status: 429, headers: { ...corsHeaders, "Content-Type": "application/json", "Retry-After": String(rl.retryAfter || 120) } });
+  }
 
   try {
     const adminToken = req.headers.get("x-admin-token");

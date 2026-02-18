@@ -315,7 +315,22 @@ Deno.serve(async (req) => {
       }
 
       const adminPassword = Deno.env.get("ADMIN_PASSWORD");
-      if (!adminPassword || password !== adminPassword) {
+      if (!adminPassword) {
+        console.warn(`🚫 Failed admin login attempt from ip=${clientIp} (no ADMIN_PASSWORD configured)`);
+        return new Response(JSON.stringify({ error: "Invalid password" }), {
+          status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },
+        });
+      }
+      // Timing-safe comparison to prevent password length/value leaks
+      const enc = new TextEncoder();
+      const pwBytes = enc.encode(password);
+      const apBytes = enc.encode(adminPassword);
+      const maxLen = Math.max(pwBytes.length, apBytes.length);
+      let diff = pwBytes.length ^ apBytes.length;
+      for (let i = 0; i < maxLen; i++) {
+        diff |= (pwBytes[i] ?? 0) ^ (apBytes[i] ?? 0);
+      }
+      if (diff !== 0) {
         console.warn(`🚫 Failed admin login attempt from ip=${clientIp}`);
         return new Response(JSON.stringify({ error: "Invalid password" }), {
           status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" },

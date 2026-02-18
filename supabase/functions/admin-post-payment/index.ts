@@ -69,7 +69,7 @@ async function getFirebaseAccessToken(): Promise<string> {
 }
 
 // ── HMAC Admin Token Verification ──────────────────────────────────
-const TOKEN_TTL_MS = 24 * 60 * 60 * 1000;
+const TOKEN_TTL_MS = 1 * 60 * 60 * 1000; // 1 hour (must match admin-auth generation TTL)
 
 async function verifyAdminToken(token: string): Promise<boolean> {
   const adminPassword = Deno.env.get("ADMIN_PASSWORD");
