@@ -76,8 +76,8 @@ const App = () => {
                   <Suspense fallback={
                     <div className="min-h-screen bg-background flex items-center justify-center">
                       <div className="relative">
-                        <div className="w-10 h-10 border-3 border-primary/20 rounded-full" />
-                        <div className="w-10 h-10 border-3 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
+                        <div className="w-10 h-10 border-2 border-primary/20 rounded-full" />
+                        <div className="w-10 h-10 border-2 border-primary border-t-transparent rounded-full animate-spin absolute top-0" />
                       </div>
                     </div>
                   }>

@@ -429,7 +429,7 @@ const ProductDetail = () => {
                   <div className="space-y-2.5">
                     <Button 
                       onClick={handleBuyNow} 
-                      className="w-full h-13 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl"
+                      className="w-full h-13 text-[15px] font-bold bg-success hover:bg-success/90 text-success-foreground rounded-xl"
                     >
                       Comprar agora
                     </Button>
@@ -577,7 +577,7 @@ const ProductDetail = () => {
           {/* Botão Comprar */}
           <Button 
             onClick={handleBuyNow} 
-            className="h-13 px-7 text-[15px] font-bold bg-emerald-500 hover:bg-emerald-600 text-white rounded-xl active:scale-[0.97] transition-transform duration-150 shrink-0"
+            className="h-13 px-7 text-[15px] font-bold bg-success hover:bg-success/90 text-success-foreground rounded-xl active:scale-[0.97] transition-transform duration-150 shrink-0"
           >
             Comprar Agora
           </Button>

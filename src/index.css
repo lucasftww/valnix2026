@@ -80,6 +80,8 @@ All colors MUST be HSL.
     --discount: 142 76% 36%;
     --discount-foreground: 0 0% 100%;
     
+    --success: 160 84% 39%;
+    --success-foreground: 0 0% 100%;
     
     /* Social colors - HSL approximations */
     --discord: 235 86% 65%;
