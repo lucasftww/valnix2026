@@ -4,6 +4,7 @@ import { Loader2, CheckCircle, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invokeFunction } from "@/lib/apiHelper";
 import { sendPurchaseFromClient } from "@/lib/metaCapi";
+import { trackPurchaseEvent } from "@/lib/analytics";
 
 type PaymentStatus = "checking" | "paid" | "pending" | "failed";
 
@@ -76,7 +77,8 @@ export default function CardPaymentCallback() {
 
           sessionStorage.removeItem('valnix_card_payment');
 
-          // Send Purchase to Meta CAPI (card payments)
+          // Track Purchase events for card payments
+          trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
           sendPurchaseFromClient({
             orderId,
             value: stored?.amount,
