@@ -77,20 +77,23 @@ export default function CardPaymentCallback() {
 
           sessionStorage.removeItem('valnix_card_payment');
 
-          // Track Purchase events for card payments
-          trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
-          sendPurchaseFromClient({
-            orderId,
-            value: stored?.amount,
-            userId: stored?.userId,
-            email: stored?.customerEmail,
-            name: stored?.customerName,
-            productNames: stored?.productNames,
-            productIds: stored?.productIds,
-            quantities: stored?.quantities,
-            prices: stored?.prices,
-            eventSourceUrl: stored?.eventSourceUrl,
-          });
+          // Track Purchase events for card payments (only once)
+          if (stored?.amount && stored?.orderId) {
+            trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
+            sendPurchaseFromClient({
+              orderId,
+              value: stored?.amount,
+              userId: stored?.userId,
+              email: stored?.customerEmail,
+              phone: stored?.customerPhone,
+              name: stored?.customerName,
+              productNames: stored?.productNames,
+              productIds: stored?.productIds,
+              quantities: stored?.quantities,
+              prices: stored?.prices,
+              eventSourceUrl: stored?.eventSourceUrl,
+            });
+          }
 
           // 🔒 FIX: Guest order is already created server-side by create-order edge function.
           // Do NOT call saveGuestOrder() here — it creates duplicates.
