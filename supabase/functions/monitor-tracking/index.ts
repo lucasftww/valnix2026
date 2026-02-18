@@ -8,10 +8,11 @@ import { verifyAdminToken } from '../_shared/auth.ts';
  * Monitor-tracking: health check for Meta CAPI tracking integrity
  * 
  * Checks:
- * 1. CAPI errors in capi_event_log (last 24h)
+ * 1. CAPI errors in capi_event_log
  * 2. Paid orders missing meta_purchase_events (missed CAPI)
- * 3. Duplicate meta_purchase_events (should never happen)
- * 4. Error rate trends
+ * 3. Duplicate meta_purchase_events (idempotency failures)
+ * 4. Consecutive CAPI errors (systemic failure detection)
+ * 5. Event ID format consistency
  */
 
 async function runQuery(body: any): Promise<any[]> {
@@ -48,13 +49,100 @@ async function queryByTimeRange(col: string, field: string, since: string, limit
   });
 }
 
+// ── Detect consecutive errors (systemic failure) ──────────────────
+function detectConsecutiveErrors(logs: any[]): { maxStreak: number; currentStreak: number; isOngoing: boolean; streakEvents: any[] } {
+  // Sort by created_at ascending
+  const sorted = [...logs].sort((a, b) => (a.created_at || '').localeCompare(b.created_at || ''));
+  
+  let maxStreak = 0;
+  let currentStreak = 0;
+  let streakStart = -1;
+  let maxStreakStart = -1;
+  let maxStreakEnd = -1;
+
+  for (let i = 0; i < sorted.length; i++) {
+    if (sorted[i].status === 'failed') {
+      if (currentStreak === 0) streakStart = i;
+      currentStreak++;
+      if (currentStreak > maxStreak) {
+        maxStreak = currentStreak;
+        maxStreakStart = streakStart;
+        maxStreakEnd = i;
+      }
+    } else {
+      currentStreak = 0;
+    }
+  }
+
+  // Check if the streak is ongoing (last N events are all failures)
+  const lastStreak = currentStreak;
+  const isOngoing = lastStreak >= 3;
+  
+  const streakEvents = maxStreakStart >= 0
+    ? sorted.slice(maxStreakStart, maxStreakEnd + 1).map(e => ({
+        event_name: e.event_name,
+        event_id: e.event_id,
+        error: e.error_message,
+        status_code: e.status_code,
+        time: e.created_at,
+      }))
+    : [];
+
+  return { maxStreak, currentStreak: lastStreak, isOngoing, streakEvents };
+}
+
+// ── Detect duplicate event IDs in meta_purchase_events ────────────
+function detectDuplicates(events: any[]): Array<{ eventId: string; orderId: string; count: number; sources: string[] }> {
+  // Group by event_id to find duplicates
+  const byEventId = new Map<string, any[]>();
+  events.forEach(e => {
+    const eid = e.event_id || 'unknown';
+    if (!byEventId.has(eid)) byEventId.set(eid, []);
+    byEventId.get(eid)!.push(e);
+  });
+
+  const duplicates: Array<{ eventId: string; orderId: string; count: number; sources: string[] }> = [];
+  byEventId.forEach((entries, eventId) => {
+    if (entries.length > 1) {
+      duplicates.push({
+        eventId,
+        orderId: entries[0].id || 'unknown',
+        count: entries.length,
+        sources: entries.map(e => e.source || 'unknown'),
+      });
+    }
+  });
+
+  // Also check if multiple docs exist for same order (doc ID = orderId)
+  // Since addFirestoreDocWithId prevents this, duplicates here mean idempotency failure
+  const byDocId = new Map<string, any[]>();
+  events.forEach(e => {
+    const docId = e.id || 'unknown';
+    if (!byDocId.has(docId)) byDocId.set(docId, []);
+    byDocId.get(docId)!.push(e);
+  });
+
+  // This shouldn't happen with addFirestoreDocWithId, but check anyway
+  byDocId.forEach((entries, docId) => {
+    if (entries.length > 1 && !duplicates.some(d => d.orderId === docId)) {
+      duplicates.push({
+        eventId: entries[0].event_id || 'unknown',
+        orderId: docId,
+        count: entries.length,
+        sources: entries.map(e => e.source || 'unknown'),
+      });
+    }
+  });
+
+  return duplicates;
+}
+
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   try {
-    // Auth check
     const adminToken = req.headers.get('x-admin-token');
     if (!adminToken || !verifyAdminToken(adminToken)) {
       return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
@@ -92,18 +180,23 @@ Deno.serve(async (req) => {
       else capiStats.byEvent[name].failed++;
     });
 
-    // ── 2. Meta Purchase Events — dedup integrity ──────────────────
+    // ── 2. Consecutive error detection ─────────────────────────────
+    const consecutiveErrors = detectConsecutiveErrors(capiLogs);
+
+    // ── 3. Meta Purchase Events — dedup integrity ──────────────────
     const metaPurchaseEvents = await listCollection('meta_purchase_events', 500);
     const recentMetaEvents = metaPurchaseEvents.filter(e => e.created_at >= since);
 
-    // Check for any event_id inconsistencies
+    // Check for event_id format issues
     const eventIdIssues: string[] = [];
     recentMetaEvents.forEach(e => {
-      const expectedPrefix = 'purchase_';
-      if (e.event_id && !e.event_id.startsWith(expectedPrefix)) {
-        eventIdIssues.push(`Event ${e.id}: event_id="${e.event_id}" doesn't start with "${expectedPrefix}"`);
+      if (e.event_id && !e.event_id.startsWith('purchase_')) {
+        eventIdIssues.push(`Event ${e.id}: event_id="${e.event_id}" doesn't start with "purchase_"`);
       }
     });
+
+    // Duplicate detection
+    const duplicates = detectDuplicates(recentMetaEvents);
 
     // Source distribution
     const sourceDist: Record<string, number> = {};
@@ -112,7 +205,7 @@ Deno.serve(async (req) => {
       sourceDist[src] = (sourceDist[src] || 0) + 1;
     });
 
-    // ── 3. Paid orders missing CAPI ────────────────────────────────
+    // ── 4. Paid orders missing CAPI ────────────────────────────────
     const recentOrders = await queryByTimeRange('ordens', 'updated_at', since, 200);
     const paidOrders = recentOrders.filter(o => o.payment_status === 'paid');
     const metaEventIds = new Set(metaPurchaseEvents.map(e => e.id));
@@ -126,11 +219,36 @@ Deno.serve(async (req) => {
         paidAt: o.updated_at,
       }));
 
-    // ── 4. Build health report ─────────────────────────────────────
+    // ── 5. Build health report ─────────────────────────────────────
     const errorRate = capiStats.total > 0 ? (capiStats.failed / capiStats.total * 100) : 0;
     
     type AlertLevel = 'ok' | 'warning' | 'critical';
     const alerts: Array<{ level: AlertLevel; message: string; detail?: string }> = [];
+
+    // Consecutive errors alert (HIGHEST PRIORITY)
+    if (consecutiveErrors.isOngoing) {
+      alerts.push({
+        level: 'critical',
+        message: `🔴 ${consecutiveErrors.currentStreak} erros CAPI consecutivos — falha sistêmica em andamento`,
+        detail: `O sistema falhou nos últimos ${consecutiveErrors.currentStreak} envios. Verifique token Meta, Pixel ID ou conectividade.`,
+      });
+    } else if (consecutiveErrors.maxStreak >= 5) {
+      alerts.push({
+        level: 'warning',
+        message: `Streak de ${consecutiveErrors.maxStreak} erros consecutivos detectado (já resolvido)`,
+        detail: `Houve uma sequência de falhas, mas o sistema se recuperou.`,
+      });
+    }
+
+    // Duplicate events alert
+    if (duplicates.length > 0) {
+      const totalDups = duplicates.reduce((sum, d) => sum + d.count - 1, 0);
+      alerts.push({
+        level: 'critical',
+        message: `🔴 ${totalDups} evento(s) Purchase duplicado(s) — falha de idempotência`,
+        detail: `Pedidos afetados: ${duplicates.map(d => d.orderId.substring(0, 8)).join(', ')}. addFirestoreDocWithId pode não estar bloqueando corretamente.`,
+      });
+    }
 
     // Error rate alert
     if (errorRate > 20) {
@@ -156,7 +274,7 @@ Deno.serve(async (req) => {
 
     // All good
     if (alerts.length === 0) {
-      alerts.push({ level: 'ok', message: 'Tracking saudável — sem problemas detectados' });
+      alerts.push({ level: 'ok', message: '✅ Tracking saudável — sem problemas detectados' });
     }
 
     const report = {
@@ -174,6 +292,13 @@ Deno.serve(async (req) => {
         totalMetaPurchaseEvents: recentMetaEvents.length,
         sourceDistribution: sourceDist,
         eventIdIssues: eventIdIssues.length,
+        duplicates,
+      },
+      consecutiveErrors: {
+        maxStreak: consecutiveErrors.maxStreak,
+        currentStreak: consecutiveErrors.currentStreak,
+        isOngoing: consecutiveErrors.isOngoing,
+        streakEvents: consecutiveErrors.streakEvents.slice(0, 5),
       },
       coverage: {
         paidOrders: paidOrders.length,
