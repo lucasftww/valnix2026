@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
+import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { format, subDays, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useState, useMemo } from "react";
@@ -70,6 +71,7 @@ function formatCurrency(value: number): string {
 }
 
 export function AdminAnalytics() {
+  const { isAdmin, loading: authLoading } = useAuth();
   const [dateRange, setDateRange] = useState<'today' | '7d' | '30d' | 'all'>('today');
   const [cleanupFrom, setCleanupFrom] = useState('');
   const [cleanupTo, setCleanupTo] = useState('');
@@ -95,7 +97,8 @@ export function AdminAnalytics() {
       const data = await response.json();
       return (data.events || []) as AnalyticsEvent[];
     },
-    refetchInterval: 30000,
+    enabled: isAdmin && !authLoading,
+    refetchInterval: isAdmin ? 30000 : false,
     retry: false,
   });
 
