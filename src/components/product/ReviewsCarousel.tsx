@@ -161,11 +161,11 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
           {/* Mobile: setas abaixo */}
           <div className="flex items-center justify-center gap-8 mt-4 md:hidden">
             <CarouselPrevious
-              className="static translate-y-0 h-9 w-9 rounded-full bg-card border-border/10 text-foreground/40 hover:bg-muted hover:text-foreground"
+              className="static translate-y-0 h-8 w-8 rounded-full bg-card border-border/10 text-foreground/40 hover:bg-muted hover:text-foreground"
               aria-label="Ver avaliação anterior"
             />
             <CarouselNext
-              className="static translate-y-0 h-9 w-9 rounded-full bg-card border-border/10 text-foreground/40 hover:bg-muted hover:text-foreground"
+              className="static translate-y-0 h-8 w-8 rounded-full bg-card border-border/10 text-foreground/40 hover:bg-muted hover:text-foreground"
               aria-label="Ver próxima avaliação"
             />
           </div>
