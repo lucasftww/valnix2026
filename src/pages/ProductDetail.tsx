@@ -381,7 +381,7 @@ const ProductDetail = () => {
                         <span className="text-sm text-muted-foreground line-through">
                           R$ {(product.old_price * quantity).toFixed(2).replace('.', ',')}
                         </span>
-                        <span className="text-[11px] font-bold bg-green-500/10 text-green-400 px-2 py-0.5 rounded-full">
+                        <span className="text-[11px] font-bold bg-success/10 text-success px-2 py-0.5 rounded-full">
                           -{product.discount || Math.round((1 - product.price / product.old_price) * 100)}%
                         </span>
                       </div>
@@ -446,11 +446,11 @@ const ProductDetail = () => {
                 {/* Trust signals */}
                 <div className="rounded-2xl border border-border/10 bg-card p-5 space-y-3">
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-success">✓</span>
                     <span className="text-muted-foreground">Entrega automática e instantânea</span>
                   </div>
                   <div className="flex items-center gap-3 text-sm">
-                    <span className="text-green-400">✓</span>
+                    <span className="text-success">✓</span>
                     <span className="text-muted-foreground">Ativável apenas no Brasil</span>
                   </div>
                   <div className="border-t border-border/10 pt-3 mt-3">
@@ -567,7 +567,7 @@ const ProductDetail = () => {
                 <span className="text-xs text-muted-foreground line-through">
                   R${(product.old_price * quantity).toFixed(2).replace('.', ',')}
                 </span>
-                <span className="text-[10px] font-bold bg-green-500/10 text-green-400 px-1.5 py-0.5 rounded-full">
+                <span className="text-[10px] font-bold bg-success/10 text-success px-1.5 py-0.5 rounded-full">
                   -{product.discount || Math.round((1 - product.price / product.old_price) * 100)}%
                 </span>
               </div>
