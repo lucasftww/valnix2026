@@ -33,9 +33,8 @@ const ProductGridComponent = () => {
   }
   
   if (error) {
-    const isBlocked = error.message?.toLowerCase().includes("network") || 
-                      error.message?.includes("FIRESTORE_QUERY_TIMEOUT") ||
-                      (error as any)?.code === "unavailable";
+    const msg = error.message || "";
+    const isBlocked = msg.includes("network") || msg.includes("FIRESTORE_QUERY_TIMEOUT") || (error as any)?.code === "unavailable";
     return (
       <section className="container px-4 md:px-8 py-12">
         <div className="text-center py-12">
