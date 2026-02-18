@@ -76,9 +76,9 @@ async function verifyAdminToken(token: string): Promise<boolean> {
   if (!adminPassword) return false;
 
   const parts = token.split(".");
-  if (parts.length !== 2) return false;
+  if (parts.length !== 3) return false;
 
-  const [timestampHex, providedHmac] = parts;
+  const [timestampHex, nonce, providedHmac] = parts;
   const timestamp = parseInt(timestampHex, 16);
   if (isNaN(timestamp)) return false;
 
@@ -91,7 +91,7 @@ async function verifyAdminToken(token: string): Promise<boolean> {
     "raw", enc.encode(adminPassword),
     { name: "HMAC", hash: "SHA-256" }, false, ["sign"]
   );
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:admin`));
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:${nonce}:admin`));
   const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
 
   if (providedHmac.length !== expectedHmac.length) return false;
