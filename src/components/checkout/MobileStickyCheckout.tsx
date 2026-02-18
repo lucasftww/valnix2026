@@ -30,7 +30,7 @@ const MobileStickyCheckoutComponent = ({
           className="bg-secondary/95 border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in max-w-lg mx-auto"
           style={{ animationDuration: "150ms" }}
         >
-          <div className="space-y-3 max-h-[40vh] overflow-y-auto">
+          <div className="space-y-3 max-h-[40vh] overflow-y-auto overflow-x-hidden scrollbar-none" style={{ scrollbarWidth: 'none' }}>
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3">
                 <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden flex-shrink-0 border border-border/10">
@@ -72,8 +72,21 @@ const MobileStickyCheckoutComponent = ({
 
       {/* Sticky bar — raised 2cm (~20px) via extra bottom padding */}
       <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-[7rem] safe-area-inset-bottom max-w-lg mx-auto w-full">
-        {/* Total */}
-        <div className="flex items-center justify-end mb-3">
+        {/* Summary toggle + Total */}
+        <div className="flex items-center justify-between mb-3">
+          <button
+            onClick={() => setShowSummary(!showSummary)}
+            className="flex items-center gap-1.5 text-[13px] text-muted-foreground underline underline-offset-2 min-h-[48px]"
+            aria-expanded={showSummary}
+            aria-label="Resumo do Pedido"
+          >
+            Resumo do Pedido
+            <ChevronUp
+              className={`w-3.5 h-3.5 transition-transform duration-200 ${
+                showSummary ? "rotate-180" : ""
+              }`}
+            />
+          </button>
           <div className="flex items-center gap-2">
             <span className="text-[13px] text-muted-foreground">Total</span>
             <span className="text-[18px] text-primary font-bold">
