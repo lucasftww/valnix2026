@@ -77,9 +77,13 @@ Deno.serve(async (req) => {
     const userData = await buildUserData({ email, phone, firstName: first_name, lastName: last_name, clientIp: resolvedIp, userAgent: resolvedUa, fbc, fbp, externalId: external_id });
 
     const eventPayload: Record<string, unknown> = { event_name, event_time: Math.floor(Date.now() / 1000), event_id: resolvedEventId, action_source: 'website', user_data: userData };
+    // event_source_url is required for action_source=website per Meta docs
     if (event_source_url) eventPayload.event_source_url = event_source_url;
-    if (value !== undefined) {
-      const customData: Record<string, unknown> = { value: Number(value), currency, ...(content_name ? { content_name } : {}), ...(content_ids ? { content_ids } : {}), ...(contents && Array.isArray(contents) && contents.length > 0 ? { contents } : {}), content_type, ...(num_items ? { num_items: Number(num_items) } : {}) };
+
+    // Build custom_data if ANY custom field is present (not just value)
+    const hasCustomData = value !== undefined || content_name || content_ids || (contents && Array.isArray(contents) && contents.length > 0) || num_items;
+    if (hasCustomData) {
+      const customData: Record<string, unknown> = { ...(value !== undefined ? { value: Number(value) } : {}), currency, ...(content_name ? { content_name } : {}), ...(content_ids ? { content_ids } : {}), ...(contents && Array.isArray(contents) && contents.length > 0 ? { contents } : {}), content_type, ...(num_items ? { num_items: Number(num_items) } : {}) };
       eventPayload.custom_data = customData;
     }
 
