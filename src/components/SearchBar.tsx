@@ -92,7 +92,7 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
       setIsOpen(true);
       setSelectedIndex(-1);
     } catch (error) {
-      console.error("Erro ao buscar produtos:", error);
+      if (import.meta.env.DEV) console.error("Erro ao buscar produtos:", error);
       setResults([]);
       setIsOpen(false);
     } finally {
