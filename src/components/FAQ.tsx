@@ -111,9 +111,9 @@ const SecurityAnswer = () => (
 
     {/* Certification badges */}
     <div className="flex items-center gap-4 pt-2 flex-wrap">
-      <img src={googleSafe} alt="Google Safe Browsing" className="h-8 opacity-70 hover:opacity-100 transition-opacity" />
-      <img src={nortonSecured} alt="Norton Secured" className="h-8 opacity-70 hover:opacity-100 transition-opacity" />
-      <img src={reclameAqui} alt="Reclame Aqui" className="h-8 opacity-70 hover:opacity-100 transition-opacity" />
+      <img src={googleSafe} alt="Google Safe Browsing" className="h-8 opacity-70 hover:opacity-100 transition-opacity" width={60} height={32} loading="lazy" />
+      <img src={nortonSecured} alt="Norton Secured" className="h-8 opacity-70 hover:opacity-100 transition-opacity" width={60} height={32} loading="lazy" />
+      <img src={reclameAqui} alt="Reclame Aqui" className="h-8 opacity-70 hover:opacity-100 transition-opacity" width={60} height={32} loading="lazy" />
     </div>
 
     <p className="text-xs text-muted-foreground/70 leading-relaxed">
