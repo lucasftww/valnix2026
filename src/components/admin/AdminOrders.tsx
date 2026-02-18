@@ -444,7 +444,7 @@ export const AdminOrders = () => {
         method: "PUT",
         queryParams: { resource: "order-items" },
         headers: { "x-admin-token": token },
-        body: { id: itemId, delivery_code: deliveryCode.trim() },
+        body: { id: itemId, orderId: detailOrder!.id, delivery_code: deliveryCode.trim() },
       });
       const targetOrder = detailOrder;
       if (targetOrder) {
@@ -479,7 +479,7 @@ export const AdminOrders = () => {
         method: "PUT",
         queryParams: { resource: "order-items" },
         headers: { "x-admin-token": token },
-        body: { id: itemId, delivery_code: editDeliveryCode.trim() },
+        body: { id: itemId, orderId: detailOrder!.id, delivery_code: editDeliveryCode.trim() },
       });
       
       toast({ title: "Código atualizado", description: "O código foi alterado e sincronizado em tempo real" });
