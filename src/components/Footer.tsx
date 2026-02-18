@@ -203,7 +203,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
           {/* Copyright - Mobile */}
           <div className="px-6 py-6 text-center">
             <p className="text-xs text-muted-foreground">
-              © 2021-2026 VALNIX - Todos os direitos reservados
+              © 2025-2026 VALNIX - Todos os direitos reservados
             </p>
           </div>
         </div>
@@ -311,7 +311,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
             {/* Copyright */}
             <div className="text-center">
               <p className="text-xs text-muted-foreground">
-                © 2021-2026 VALNIX - Todos os direitos reservados
+                © 2025-2026 VALNIX - Todos os direitos reservados
               </p>
             </div>
           </div>
@@ -323,7 +323,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
         <div className="container px-4 md:px-8 py-6 border-t border-border/30">
           <div className="text-center">
             <p className="text-xs text-muted-foreground">
-              © 2021-2026 VALNIX - Todos os direitos reservados
+              © 2025-2026 VALNIX - Todos os direitos reservados
             </p>
           </div>
         </div>
