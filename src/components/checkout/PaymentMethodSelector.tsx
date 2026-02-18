@@ -16,19 +16,19 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
   const [showCard, setShowCard] = useState(false);
 
   return (
-    <div className="bg-secondary/50 rounded-2xl border border-border/10 p-4 sm:p-6 mx-auto w-full max-w-lg lg:max-w-none shadow-lg shadow-black/5">
-      <h2 className="text-[15px] font-semibold text-foreground mb-4">Pagamento</h2>
+    <div className="bg-secondary/50 rounded-2xl border border-border/10 p-3 sm:p-4 mx-auto w-full max-w-lg lg:max-w-none shadow-lg shadow-black/5">
+      <h2 className="text-[13px] font-semibold text-foreground mb-3">Pagamento</h2>
 
       {/* PIX - always selected */}
       <div
-        className="flex items-center gap-3 p-3 sm:p-4 rounded-xl border border-border/30 bg-background cursor-default"
+        className="flex items-center gap-2.5 p-2.5 sm:p-3 rounded-xl border border-border/30 bg-background cursor-default"
         onClick={() => onMethodChange("pix")}
       >
-        <div className="w-5 h-5 rounded-full border-2 border-primary flex items-center justify-center shrink-0">
-          {paymentMethod === "pix" && <div className="w-2.5 h-2.5 rounded-full bg-primary" />}
+        <div className="w-4 h-4 rounded-full border-2 border-primary flex items-center justify-center shrink-0">
+          {paymentMethod === "pix" && <div className="w-2 h-2 rounded-full bg-primary" />}
         </div>
-        <img src={pixLogo} alt="PIX" className="w-7 h-7 object-contain shrink-0" />
-        <p className="text-[14px] font-medium text-foreground">PIX</p>
+        <img src={pixLogo} alt="PIX" className="w-6 h-6 object-contain shrink-0" />
+        <p className="text-[13px] font-medium text-foreground">PIX</p>
       </div>
 
       {/* Card - collapsible, minimal */}
@@ -39,13 +39,13 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
           if (!showCard) onMethodChange("card");
           else onMethodChange("pix");
         }}
-        className="flex items-center gap-3 w-full p-3 mt-2 rounded-xl border border-border/10 bg-background hover:border-border/20 transition-all text-left"
+        className="flex items-center gap-2.5 w-full p-2.5 mt-1.5 rounded-xl border border-border/10 bg-background hover:border-border/20 transition-all text-left"
       >
-        <div className="w-5 h-5 rounded-full border-2 border-border/30 flex items-center justify-center shrink-0">
-          {paymentMethod === "card" && <div className="w-2.5 h-2.5 rounded-full bg-foreground" />}
+        <div className="w-4 h-4 rounded-full border-2 border-border/30 flex items-center justify-center shrink-0">
+          {paymentMethod === "card" && <div className="w-2 h-2 rounded-full bg-foreground" />}
         </div>
-        <CreditCard className="w-4 h-4 text-muted-foreground shrink-0" />
-        <span className="text-[13px] text-muted-foreground flex-1">Cartão</span>
+        <CreditCard className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
+        <span className="text-[12px] text-muted-foreground flex-1">Cartão</span>
         <ChevronDown className={`w-3.5 h-3.5 text-muted-foreground transition-transform ${showCard ? "rotate-180" : ""}`} />
       </button>
     </div>
