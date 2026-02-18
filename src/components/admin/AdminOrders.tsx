@@ -443,25 +443,26 @@ export const AdminOrders = () => {
     setSendingEmail(true);
     try {
       const token = requireAdminToken();
-      await invokeFunction("admin-data", {
+      const targetOrder = detailOrder;
+      // Run both writes in parallel
+      const saveCode = invokeFunction("admin-data", {
         method: "PUT",
         queryParams: { resource: "order-items" },
         headers: { "x-admin-token": token },
-        body: { id: itemId, orderId: detailOrder!.id, delivery_code: deliveryCode.trim() },
+        body: { id: itemId, orderId: targetOrder!.id, delivery_code: deliveryCode.trim() },
       });
-      const targetOrder = detailOrder;
-      if (targetOrder) {
-        await invokeFunction("admin-data", {
-          method: "PUT",
-          queryParams: { resource: "orders" },
-          headers: { "x-admin-token": token },
-          body: { id: targetOrder.id, status: "completed" },
-        });
-      }
+      const updateStatus = targetOrder ? invokeFunction("admin-data", {
+        method: "PUT",
+        queryParams: { resource: "orders" },
+        headers: { "x-admin-token": token },
+        body: { id: targetOrder.id, status: "completed" },
+      }) : Promise.resolve();
+      await Promise.all([saveCode, updateStatus]);
       
       setDeliveryCode("");
       setSelectedItemId(null);
-      if (detailOrder) handleViewDetail(detailOrder);
+      // Refresh detail and orders in parallel
+      if (targetOrder) handleViewDetail(targetOrder);
       fetchOrders();
     } catch (error: any) {
       toast({ title: "Erro ao adicionar código", description: error.message, variant: "destructive" });
@@ -485,9 +486,9 @@ export const AdminOrders = () => {
         body: { id: itemId, orderId: detailOrder!.id, delivery_code: editDeliveryCode.trim() },
       });
       
-      toast({ title: "Código atualizado", description: "O código foi alterado e sincronizado em tempo real" });
       setEditingItemId(null);
       setEditDeliveryCode("");
+      // Refresh in background without blocking UI
       if (detailOrder) handleViewDetail(detailOrder);
     } catch (error: any) {
       toast({ title: "Erro ao editar código", description: error.message, variant: "destructive" });
