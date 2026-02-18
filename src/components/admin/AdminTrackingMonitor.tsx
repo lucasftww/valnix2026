@@ -13,6 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Progress } from "@/components/ui/progress";
 import { cn } from "@/lib/utils";
+import { AdminErrorState } from "./AdminErrorState";
 
 interface TrackingAlert {
   level: 'ok' | 'warning' | 'critical';
@@ -72,7 +73,7 @@ export function AdminTrackingMonitor() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [hours, setHours] = useState<'24' | '48' | '168'>('24');
 
-  const { data: report, isLoading, refetch, isFetching } = useQuery<TrackingReport>({
+  const { data: report, isLoading, isError, refetch, isFetching } = useQuery<TrackingReport>({
     queryKey: ['tracking-monitor', hours],
     queryFn: async () => {
       const token = requireAdminToken();
@@ -96,6 +97,10 @@ export function AdminTrackingMonitor() {
         <p className="text-sm text-muted-foreground">Verificando saúde do tracking...</p>
       </div>
     );
+  }
+
+  if (isError) {
+    return <AdminErrorState title="Erro ao carregar tracking" message="Não foi possível carregar os dados de tracking. Verifique sua conexão e tente novamente." onRetry={() => refetch()} retrying={isFetching} />;
   }
 
   const hoursLabel = hours === '24' ? '24h' : hours === '48' ? '48h' : '7 dias';

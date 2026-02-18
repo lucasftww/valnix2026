@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { AdminErrorState } from "./AdminErrorState";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -68,6 +69,7 @@ export function AdminPostPaymentPages() {
   const [pages, setPages] = useState<PageConfig[]>([]);
   const [stats, setStats] = useState<Record<string, AddonStats>>({});
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(false);
   const [seeding, setSeeding] = useState(false);
   const [saving, setSaving] = useState<string | null>(null);
   const [utmParams, setUtmParams] = useState<Record<string, { source: string; medium: string; campaign: string }>>({});
@@ -94,6 +96,8 @@ export function AdminPostPaymentPages() {
   }, []);
 
   const fetchData = async () => {
+    setFetchError(false);
+    setLoading(true);
     try {
       const result = await callAdminPostPayment("GET");
       if (result.pages) {
@@ -116,6 +120,7 @@ export function AdminPostPaymentPages() {
       }
     } catch (err) {
       console.error("Error loading post-payment data:", err);
+      setFetchError(true);
     }
     setLoading(false);
   };
@@ -171,6 +176,10 @@ export function AdminPostPaymentPages() {
 
   if (loading) {
     return <div className="flex justify-center py-12"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>;
+  }
+
+  if (fetchError) {
+    return <AdminErrorState title="Erro ao carregar pós-venda" message="Não foi possível carregar as páginas de pós-venda." onRetry={fetchData} />;
   }
 
   const totalRevenue = Object.values(stats).reduce((sum, s) => sum + s.revenue, 0);
