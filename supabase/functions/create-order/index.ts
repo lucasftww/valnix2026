@@ -135,13 +135,7 @@ async function getFirestoreDoc(col: string, docId: string, retries = 3): Promise
   return null;
 }
 
-// Periodic cleanup of product cache
-setInterval(() => {
-  const now = Date.now();
-  for (const [k, v] of productMemCache) {
-    if (v.expiresAt <= now) productMemCache.delete(k);
-  }
-}, 300_000);
+// Cache cleanup is handled lazily via TTL check in getFirestoreDoc — no setInterval needed in Edge isolates
 
 // ── Firebase ID Token Verification ─────────────────────────────────
 async function verifyFirebaseIdToken(idToken: string): Promise<{ uid: string; email?: string } | null> {

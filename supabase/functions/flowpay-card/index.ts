@@ -570,33 +570,44 @@ Deno.serve(async (req) => {
         );
       }
 
-      // 🔒 Server-side price recalculation with product cache
+      // 🔒 Server-side price recalculation — ALL product reads in PARALLEL
+      const parsedItems = orderItemsResults
+        .filter((r: any) => r.document)
+        .map((r: any) => {
+          const f = r.document.fields;
+          return { productId: f?.product_id?.stringValue || '', quantity: parseInt(f?.quantity?.integerValue || '1') };
+        });
+
+      const invalidItem = parsedItems.find((i: any) => !i.productId);
+      if (invalidItem) {
+        return new Response(
+          JSON.stringify({ success: false, error: 'Invalid order item' }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
+
+      // Deduplicate product IDs and fetch all in parallel
+      const uniqueProductIds = [...new Set(parsedItems.map((i: any) => i.productId))];
+      const productResults = await Promise.all(
+        uniqueProductIds.map(pid => getFirestoreDoc('products', pid).then(fields => ({ pid, fields })))
+      );
+
       const productCache = new Map<string, any>();
-      let recalculatedTotal = 0;
-      for (const result of orderItemsResults) {
-        if (!result.document) continue;
-        const itemFields = result.document.fields;
-        const productId = itemFields?.product_id?.stringValue;
-        const quantity = parseInt(itemFields?.quantity?.integerValue || '1');
-        if (!productId) {
+      for (const { pid, fields } of productResults) {
+        if (!fields) {
           return new Response(
-            JSON.stringify({ success: false, error: 'Invalid order item' }),
+            JSON.stringify({ success: false, error: `Product ${pid} not found` }),
             { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
           );
         }
-        let productFields = productCache.get(productId);
-        if (!productFields) {
-          productFields = await getFirestoreDoc('products', productId);
-          if (!productFields) {
-            return new Response(
-              JSON.stringify({ success: false, error: `Product ${productId} not found` }),
-              { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-            );
-          }
-          productCache.set(productId, productFields);
-        }
-        const realPrice = Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0);
-        recalculatedTotal += realPrice * quantity;
+        productCache.set(pid, fields);
+      }
+
+      let recalculatedTotal = 0;
+      for (const item of parsedItems) {
+        const pf = productCache.get(item.productId)!;
+        const realPrice = Number(pf.price?.doubleValue || pf.price?.integerValue || 0);
+        recalculatedTotal += realPrice * item.quantity;
       }
 
       // Apply coupon discount (server-side validation)
