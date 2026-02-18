@@ -1,9 +1,9 @@
 import { memo, useState, useCallback } from "react";
-import { Shield, Menu } from "lucide-react";
+import { Menu } from "lucide-react";
 import { Button } from "./ui/button";
 import logo from "@/assets/valnix-logo.png";
 import { Link, useNavigate } from "react-router-dom";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
+
 import { SearchBar } from "./SearchBar";
 import { CartSidebar } from "./CartSidebar";
 import { useCategoriesApi } from "@/hooks/useApiData";
@@ -16,7 +16,6 @@ import {
 } from "@/components/ui/sheet";
 
 const HeaderComponent = () => {
-  const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
@@ -94,20 +93,6 @@ const HeaderComponent = () => {
         
         {/* Right Section - Actions */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Admin Link (only visible for admins) */}
-          {isAdmin && (
-            <Link to="/admin" aria-label="Painel Admin">
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="gap-2 h-10 px-3 rounded-full hover:bg-secondary"
-              >
-                <Shield className="h-4 w-4" />
-                <span className="hidden sm:inline text-sm font-medium">Admin</span>
-              </Button>
-            </Link>
-          )}
-          
           {/* Cart Sidebar */}
           <CartSidebar open={cartOpen} onOpenChange={setCartOpen} />
         </div>
