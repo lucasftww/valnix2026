@@ -9,7 +9,7 @@ import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
 import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
-import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError } from "@/components/checkout/PersonalInfoForm";
+import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError, formatPhone, isValidPhone } from "@/components/checkout/PersonalInfoForm";
 import { invokeFunction } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent } from "@/lib/analytics";
 import { sendInitiateCheckout } from "@/lib/metaCapi";
@@ -116,6 +116,13 @@ export default function Checkout() {
       if (tldErr) return tldErr;
       return undefined;
     })(),
+    phone: isValidPhone(formData.phone),
+    phoneError: (() => {
+      const digits = formData.phone.replace(/\D/g, '');
+      if (digits.length === 0) return 'Telefone é obrigatório';
+      if (digits.length < 10) return 'Telefone incompleto';
+      return undefined;
+    })(),
   }), [formData]);
 
   // ── InitiateCheckout: fires ONCE after name AND email are both validated ──
@@ -158,17 +165,18 @@ export default function Checkout() {
     }
   }, [items.length]);
 
-  const isFormValid = validation.name && validation.document && validation.email;
+  const isFormValid = validation.name && validation.document && validation.email && validation.phone;
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     let formattedValue = value;
     if (field === 'document') {
       formattedValue = formatCPF(value);
+    } else if (field === 'phone') {
+      formattedValue = formatPhone(value);
     }
     setFormData(prev => {
       const updated = { ...prev, [field]: formattedValue };
-      // Debounce sessionStorage writes to avoid jank on fast typing
       clearTimeout(saveTimerRef.current);
       saveTimerRef.current = setTimeout(() => {
         try { sessionStorage.setItem('valnix_checkout_form', JSON.stringify(updated)); } catch {}
@@ -185,13 +193,14 @@ export default function Checkout() {
     if (isSubmittingRef.current || loading) return;
     isSubmittingRef.current = true;
     
-    setTouched({ name: true, document: true, email: true });
+    setTouched({ name: true, document: true, email: true, phone: true });
     
     if (!isFormValid) {
       const errors: string[] = [];
       if (!validation.name) errors.push(validation.nameError || 'Nome inválido');
       if (!validation.email) errors.push(validation.emailError || 'E-mail inválido');
       if (!validation.document) errors.push(validation.documentError || 'CPF inválido');
+      if (!validation.phone) errors.push(validation.phoneError || 'Telefone inválido');
       
       toast({
         title: "Verifique os campos",

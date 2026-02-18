@@ -43,6 +43,20 @@ const isValidCPF = (cpf: string): boolean => {
   return true;
 };
 
+// Phone mask helper — (XX) XXXXX-XXXX or (XX) XXXX-XXXX
+const formatPhone = (value: string): string => {
+  const digits = value.replace(/\D/g, "").slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 10) return `(${digits.slice(0, 2)}) ${digits.slice(2, 6)}-${digits.slice(6)}`;
+  return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+};
+
+const isValidPhone = (phone: string): boolean => {
+  const digits = phone.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 11;
+};
+
 // Valid TLDs — common typos and gibberish are rejected
 const VALID_TLDS = new Set([
   "com","net","org","edu","gov","mil","int",
@@ -87,7 +101,7 @@ function ValidationIcon({ isValid, show }: { isValid: boolean; show: boolean }) 
     <AlertCircle className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-destructive" />
   );
 }
-export { formatCPF, isValidCPF, isValidEmail, getEmailTLDError };
+export { formatCPF, isValidCPF, isValidEmail, getEmailTLDError, formatPhone, isValidPhone };
 
 export const PersonalInfoForm = memo(function PersonalInfoForm({
   formData,
@@ -119,12 +133,19 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
         if (tldErr) return tldErr;
         return undefined;
       })(),
+      phone: isValidPhone(formData.phone),
+      phoneError: (() => {
+        const digits = formData.phone.replace(/\D/g, "");
+        if (digits.length === 0) return "Telefone é obrigatório";
+        if (digits.length < 10) return "Telefone incompleto";
+        return undefined;
+      })(),
     }),
     [formData]
   );
 
     const getInputClassName = useCallback(
-    (field: "name" | "document" | "email", baseClass: string) => {
+    (field: "name" | "document" | "email" | "phone", baseClass: string) => {
       if (!touched[field]) return baseClass;
       return validation[field]
         ? `${baseClass} border-success/50 pr-10`
@@ -228,18 +249,28 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
               htmlFor="checkout-phone"
               className="block text-[13px] text-muted-foreground mb-2"
             >
-              Telefone
+              Telefone <span className="text-destructive">*</span>
             </label>
-            <Input
-              id="checkout-phone"
-              name="phone"
-              value={formData.phone}
-              onChange={(e) => onInputChange("phone", e.target.value)}
-              placeholder="(DDD) 99999-9999"
-              type="tel"
-              autoComplete="tel"
-              className={inputBase}
-            />
+            <div className="relative">
+              <Input
+                id="checkout-phone"
+                name="phone"
+                value={formData.phone}
+                onChange={(e) => onInputChange("phone", e.target.value)}
+                onBlur={() => onBlur("phone")}
+                placeholder="(DDD) 99999-9999"
+                type="tel"
+                inputMode="numeric"
+                autoComplete="tel"
+                className={getInputClassName("phone", inputBase)}
+              />
+              <ValidationIcon isValid={validation.phone} show={touched.phone || false} />
+            </div>
+            {touched.phone && !validation.phone && (
+              <p className="text-destructive text-[11px] mt-1.5">
+                {validation.phoneError || "Telefone inválido"}
+              </p>
+            )}
           </div>
         </div>
 
