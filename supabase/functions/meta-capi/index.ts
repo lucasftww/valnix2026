@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getFirebaseAccessToken, FIREBASE_PROJECT_ID, FIRESTORE_BASE } from '../_shared/firebase.ts';
 import { toFirestoreValue } from '../_shared/firestore.ts';
-import { parsePublicIp, sha256 } from '../_shared/utils.ts';
+import { parsePublicIp, sha256, generateEventId } from '../_shared/utils.ts';
 
 const META_API_VERSION = 'v22.0';
 
@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
 
     const resolvedIp = client_ip ? parsePublicIp(client_ip) : parsePublicIp(req.headers.get('x-forwarded-for') || undefined) || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || undefined;
     const resolvedUa = user_agent || req.headers.get('user-agent') || undefined;
-    const resolvedEventId = event_id || `${order_id || 'evt'}_${Date.now()}`;
+    const resolvedEventId = event_id || generateEventId(event_name, order_id);
     const userData = await buildUserData({ email, phone, firstName: first_name, lastName: last_name, clientIp: resolvedIp, userAgent: resolvedUa, fbc, fbp, externalId: external_id });
 
     const eventPayload: Record<string, unknown> = { event_name, event_time: Math.floor(Date.now() / 1000), event_id: resolvedEventId, action_source: 'website', user_data: userData };
@@ -83,8 +83,11 @@ Deno.serve(async (req) => {
       eventPayload.custom_data = customData;
     }
 
-    console.log(`📡 Sending ${event_name} to Meta CAPI (event_id: ${resolvedEventId})`);
+    console.log(`📡 [Meta] Sending ${event_name} to CAPI — event_id=${resolvedEventId}`);
     const result = await sendToMeta(eventPayload, test_event_code);
+    if (result.success) {
+      console.log(`✅ [Meta] CAPI ${event_name} delivered — event_id=${resolvedEventId}`);
+    }
     await logCapiEvent(event_name, resolvedEventId, order_id || null, result);
 
     return new Response(JSON.stringify({ success: result.success, event_id: resolvedEventId, ...(result.error ? { error: result.error } : {}) }), {

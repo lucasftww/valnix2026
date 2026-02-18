@@ -69,6 +69,15 @@ export async function idempotentCouponIncrement(orderId: string, couponId: strin
   await incrementCouponUsage(couponId);
 }
 
+// ── Event ID generator (consistent format for Meta CAPI dedup) ────
+export function generateEventId(eventName: string, identifier?: string): string {
+  const sanitized = eventName.trim().toLowerCase().replace(/\s+/g, '_');
+  const id = identifier
+    ? identifier.trim().replace(/\s+/g, '_')
+    : String(Date.now());
+  return `${sanitized}_${id}`;
+}
+
 // ── SHA-256 helpers ───────────────────────────────────────────────
 export async function sha256(value: string): Promise<string> {
   const data = new TextEncoder().encode(value.trim().toLowerCase());
