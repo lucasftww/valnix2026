@@ -25,23 +25,23 @@ const MobileStickyCheckoutComponent = ({
   const [showSummary, setShowSummary] = useState(false);
 
   return (
-    <div className="lg:hidden fixed bottom-8 left-0 right-0 z-50">
+    <div className="lg:hidden fixed bottom-0 left-0 right-0 z-50">
       {/* Dropdown summary - slides up */}
       {showSummary && (
         <div
-          className="bg-secondary/95 border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in max-w-lg mx-auto"
+          className="bg-secondary/95 backdrop-blur-md border-t border-border/10 px-4 pt-4 pb-2 animate-fade-in max-w-lg mx-auto w-full"
           style={{ animationDuration: "150ms" }}
         >
-          <div className="space-y-3 max-h-[40vh] overflow-y-auto overflow-x-hidden scrollbar-none" style={{ scrollbarWidth: 'none' }}>
+          <div className="space-y-3 max-h-[35vh] overflow-y-auto overflow-x-hidden scrollbar-none" style={{ scrollbarWidth: 'none' }}>
             {items.map((item) => (
               <div key={item.id} className="flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-muted overflow-hidden flex-shrink-0 border border-border/10">
+                <div className="w-11 h-11 rounded-lg bg-muted overflow-hidden flex-shrink-0 border border-border/10">
                   <img
                     src={item.image}
                     alt={item.name}
                     className="w-full h-full object-cover"
-                    width={48}
-                    height={48}
+                    width={44}
+                    height={44}
                     loading="lazy"
                   />
                 </div>
@@ -52,18 +52,18 @@ const MobileStickyCheckoutComponent = ({
                   <div className="flex items-center gap-1.5 mt-1">
                     <button
                       onClick={() => onUpdateQuantity?.(item.id, Math.max(1, item.quantity - 1))}
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground active:bg-muted transition-colors"
                       aria-label="Diminuir quantidade"
                     >
-                      <Minus className="w-3 h-3" />
+                      <Minus className="w-3.5 h-3.5" />
                     </button>
                     <span className="text-foreground text-[12px] min-w-[16px] text-center font-medium">{item.quantity}</span>
                     <button
                       onClick={() => onUpdateQuantity?.(item.id, item.quantity + 1)}
-                      className="w-6 h-6 rounded-full flex items-center justify-center text-muted-foreground hover:text-foreground transition-colors"
+                      className="w-7 h-7 rounded-full flex items-center justify-center text-muted-foreground active:bg-muted transition-colors"
                       aria-label="Aumentar quantidade"
                     >
-                      <Plus className="w-3 h-3" />
+                      <Plus className="w-3.5 h-3.5" />
                     </button>
                   </div>
                 </div>
@@ -74,7 +74,7 @@ const MobileStickyCheckoutComponent = ({
                 {onRemoveItem && items.length > 1 && (
                   <button
                     onClick={() => onRemoveItem(item.id)}
-                    className="relative w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 transition-colors shrink-0 before:content-[''] before:absolute before:inset-[-4px] before:rounded-lg"
+                    className="relative w-10 h-10 rounded-lg flex items-center justify-center text-muted-foreground hover:text-red-500 active:text-red-500 transition-colors shrink-0"
                     aria-label={`Remover ${item.name}`}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
@@ -86,8 +86,8 @@ const MobileStickyCheckoutComponent = ({
         </div>
       )}
 
-      {/* Sticky bar — raised 2cm (~20px) via extra bottom padding */}
-      <div className="bg-background/95 border-t border-border/10 px-4 pt-3 pb-4 safe-area-inset-bottom max-w-lg mx-auto w-full">
+      {/* Sticky bar */}
+      <div className="bg-background/95 backdrop-blur-md border-t border-border/10 px-4 pt-3 pb-[env(safe-area-inset-bottom,12px)] max-w-lg mx-auto w-full">
         {/* Summary toggle + Total */}
         <div className="flex items-center justify-between mb-3">
           <button
@@ -115,7 +115,7 @@ const MobileStickyCheckoutComponent = ({
         <Button
           onClick={onSubmit}
           disabled={loading || finalPrice < 1}
-          className="w-full h-[52px] bg-emerald-500 hover:bg-emerald-600 text-white font-bold rounded-xl text-[15px] transition-all duration-200 animate-pulse"
+          className="w-full h-[52px] bg-emerald-500 hover:bg-emerald-600 active:scale-[0.98] text-white font-bold rounded-xl text-[15px] transition-all duration-150 animate-pulse"
         >
           {loading ? (
             <span className="flex items-center gap-2.5">

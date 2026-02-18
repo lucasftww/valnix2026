@@ -200,7 +200,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
   if (configLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#0a0a0a]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-[#0a0a0a]">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -216,7 +216,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   // PIX Payment view
   if (pixData) {
     return (
-      <div className="min-h-screen bg-[#0a0a0a] flex items-center justify-center p-4">
+      <div className="min-h-[100dvh] bg-[#0a0a0a] flex items-center justify-center p-4">
         <div className="bg-[#111] border border-[#1f1f1f] rounded-2xl p-6 max-w-md w-full space-y-4">
           {paymentConfirmed ? (
             <div className="text-center space-y-3 py-8">
@@ -267,52 +267,52 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
   // Upsell offer view
   return (
-    <div className="min-h-screen relative flex flex-col items-center justify-center p-4 overflow-hidden">
+    <div className="min-h-[100dvh] relative flex flex-col items-center justify-center p-4 overflow-hidden">
       <div className="absolute inset-0 bg-gradient-to-b from-red-950 via-red-900 to-black animate-[pulse_2s_cubic-bezier(0.4,0,0.6,1)_infinite]" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.3)_0%,transparent_70%)] animate-[pulse_3s_ease-in-out_infinite]" />
       
-      <div className="max-w-lg w-full space-y-4 md:space-y-6 relative z-10">
-        <div className="text-center space-y-2 md:space-y-3">
+      <div className="max-w-lg w-full space-y-3 sm:space-y-5 relative z-10">
+        <div className="text-center space-y-2">
           {config.badge_text && (
-            <span className={`inline-block px-5 py-2 rounded-full text-xs font-black uppercase tracking-widest ${badgeClass} shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-[pulse_1.5s_ease-in-out_infinite]`}>
+            <span className={`inline-block px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest ${badgeClass} shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-[pulse_1.5s_ease-in-out_infinite]`}>
               {config.badge_text}
             </span>
           )}
-          <div className="w-16 h-16 md:w-20 md:h-20 bg-red-600/30 border-2 border-red-500/50 rounded-2xl flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(220,38,38,0.4)]">
-            <Icon className="w-8 h-8 md:w-10 md:h-10 text-red-400" />
+          <div className="w-14 h-14 sm:w-20 sm:h-20 bg-red-600/30 border-2 border-red-500/50 rounded-2xl flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(220,38,38,0.4)]">
+            <Icon className="w-7 h-7 sm:w-10 sm:h-10 text-red-400" />
           </div>
-          <h1 className="text-2xl md:text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(220,38,38,0.3)]">{config.title}</h1>
+          <h1 className="text-xl sm:text-3xl md:text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(220,38,38,0.3)]">{config.title}</h1>
           {config.subtitle && (
-            <p className="text-red-200/70 text-xs md:text-base font-medium">{config.subtitle}</p>
+            <p className="text-red-200/70 text-[11px] sm:text-sm md:text-base font-medium">{config.subtitle}</p>
           )}
         </div>
 
-        <div className="bg-black/60 backdrop-blur-sm border border-red-900/50 rounded-2xl p-4 md:p-5 space-y-2.5 md:space-y-3 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
+        <div className="bg-black/60 backdrop-blur-sm border border-red-900/50 rounded-2xl p-3.5 sm:p-5 space-y-2 sm:space-y-3 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
           {config.benefits.map((benefit, i) => (
-            <div key={i} className="flex items-start gap-3">
-              <div className="w-5 h-5 md:w-6 md:h-6 rounded-full bg-red-500/30 border border-red-500/50 flex items-center justify-center mt-0.5 shrink-0">
-                <Check className="w-3 h-3 md:w-3.5 md:h-3.5 text-red-400" />
+            <div key={i} className="flex items-start gap-2.5">
+              <div className="w-5 h-5 rounded-full bg-red-500/30 border border-red-500/50 flex items-center justify-center mt-0.5 shrink-0">
+                <Check className="w-3 h-3 text-red-400" />
               </div>
-              <span className="text-xs md:text-sm text-white font-medium">{benefit}</span>
+              <span className="text-[12px] sm:text-sm text-white font-medium">{benefit}</span>
             </div>
           ))}
         </div>
 
-        <div className="text-center space-y-1">
+        <div className="text-center space-y-0.5">
           {config.original_price && (
-            <p className="text-red-300/50 line-through text-sm">
+            <p className="text-red-300/50 line-through text-xs sm:text-sm">
               De R$ {config.original_price.toFixed(2).replace(".", ",")}
             </p>
           )}
-          <p className="text-3xl md:text-4xl font-black text-red-400 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+          <p className="text-2xl sm:text-4xl font-black text-red-400 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
             R$ {config.price.toFixed(2).replace(".", ",")}
           </p>
-          <p className="text-xs text-red-300/60 font-medium">Pagamento único via PIX</p>
+          <p className="text-[10px] sm:text-xs text-red-300/60 font-medium">Pagamento único via PIX</p>
         </div>
 
         <Button
           size="lg"
-          className="w-full h-14 md:h-16 text-base md:text-lg font-black rounded-xl bg-red-600 hover:bg-red-500 text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-red-400/30 uppercase tracking-wider"
+          className="w-full h-13 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-red-400/30 uppercase tracking-wider transition-transform duration-150"
           onClick={handleAccept}
           disabled={purchasing}
         >
@@ -322,7 +322,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
         <button
           onClick={handleSkip}
-          className="w-full text-center text-red-300/50 hover:text-red-300/80 text-sm py-3 transition-colors underline underline-offset-4"
+          className="w-full text-center text-red-300/50 hover:text-red-300/80 active:text-red-300/80 text-xs sm:text-sm py-3 transition-colors underline underline-offset-4 min-h-[48px]"
         >
           {config.button_skip_text}
         </button>

@@ -368,7 +368,7 @@ export default function Checkout() {
         <CheckoutHeader currentStep={1} />
       </div>
 
-      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-4 sm:py-6 lg:py-10 pb-36 lg:pb-10">
+      <main className="max-w-7xl mx-auto px-3 sm:px-6 py-3 sm:py-6 lg:py-10 pb-40 lg:pb-10">
         <MobileStickyCheckout
           items={items}
           finalPrice={finalPrice}

@@ -134,7 +134,7 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
   );
 
   const inputBase =
-    "h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[14px]";
+    "h-12 bg-background border-border/10 text-foreground placeholder:text-muted-foreground/40 rounded-xl text-[15px] sm:text-[14px]";
 
   return (
     <div className="bg-secondary/50 rounded-2xl border border-border/10 p-5 sm:p-6 mx-auto w-full max-w-lg lg:max-w-none shadow-lg shadow-black/5">
