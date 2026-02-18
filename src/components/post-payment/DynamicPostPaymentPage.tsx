@@ -200,7 +200,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
   if (configLoading) {
     return (
-      <div className="min-h-[100dvh] flex items-center justify-center bg-[#0a0a0a]">
+      <div className="min-h-[100dvh] flex items-center justify-center bg-background">
         <Loader2 className="w-8 h-8 animate-spin text-primary" />
       </div>
     );
@@ -216,26 +216,26 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   // PIX Payment view
   if (pixData) {
     return (
-      <div className="min-h-[100dvh] bg-[#0a0a0a] flex items-center justify-center p-4">
-        <div className="bg-[#111] border border-[#1f1f1f] rounded-2xl p-6 max-w-md w-full space-y-4">
+      <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4">
+        <div className="bg-secondary border border-border/20 rounded-2xl p-6 max-w-md w-full space-y-4">
           {paymentConfirmed ? (
             <div className="text-center space-y-3 py-8">
-              <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
-                <Check className="w-8 h-8 text-green-500" />
+              <div className="w-16 h-16 bg-success/20 rounded-full flex items-center justify-center mx-auto">
+                <Check className="w-8 h-8 text-success" />
               </div>
-              <h2 className="text-xl font-bold text-green-500">Pagamento Confirmado!</h2>
-              <p className="text-sm text-gray-400">Benefício ativado. Redirecionando...</p>
+              <h2 className="text-xl font-bold text-success">Pagamento Confirmado!</h2>
+              <p className="text-sm text-muted-foreground">Benefício ativado. Redirecionando...</p>
             </div>
           ) : (
             <>
               <div className="text-center">
-                <h2 className="text-lg font-bold text-white">Pague via PIX</h2>
+                <h2 className="text-lg font-bold text-foreground">Pague via PIX</h2>
                 <p className="text-2xl font-bold text-primary mt-1">
                   R$ {config.price.toFixed(2).replace(".", ",")}
                 </p>
               </div>
 
-              <div className="flex items-center justify-between text-sm text-gray-400">
+              <div className="flex items-center justify-between text-sm text-muted-foreground">
                 <span><Clock className="w-4 h-4 inline mr-1" />Expira em</span>
                 <span className="font-mono text-primary font-bold">{formatTime(timeLeft)}</span>
               </div>
