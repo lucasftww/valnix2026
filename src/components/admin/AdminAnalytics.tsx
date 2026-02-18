@@ -95,7 +95,7 @@ export function AdminAnalytics() {
       }
 
       const data = await response.json();
-      return (data.events || []) as AnalyticsEvent[];
+      return (Array.isArray(data.events) ? data.events : Array.isArray(data) ? data : []) as AnalyticsEvent[];
     },
     enabled: isAdmin && !authLoading,
     refetchInterval: isAdmin ? 30000 : false,

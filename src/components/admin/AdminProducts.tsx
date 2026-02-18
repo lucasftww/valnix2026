@@ -98,7 +98,8 @@ export const AdminProducts = () => {
       });
       if (!response.ok) throw new Error('Failed to fetch products');
       const data = await response.json();
-      return (data.products || []).sort((a: any, b: any) => {
+      const arr = Array.isArray(data.products) ? data.products : Array.isArray(data) ? data : [];
+      return arr.sort((a: any, b: any) => {
         const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
         const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
         return dateB - dateA;
@@ -120,7 +121,8 @@ export const AdminProducts = () => {
       });
       if (!response.ok) throw new Error('Failed to fetch categories');
       const data = await response.json();
-      return (data.categories || [])
+      const arr = Array.isArray(data.categories) ? data.categories : Array.isArray(data) ? data : [];
+      return arr
         .filter((c: any) => c.is_active !== false)
         .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
     },
