@@ -24,21 +24,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [loading, setLoading] = useState(true);
   const [adminToken, setTokenState] = useState<string | null>(null);
 
-  const handleAdminUnauthorized = useCallback(() => {
-    clearAdminToken();
+  // Core logout: only syncs React state (storage+flag already handled by clearAdminToken)
+  const syncLogoutState = useCallback(() => {
     setTokenState(null);
     setIsAdmin(false);
   }, []);
 
-  // Listen for global admin:unauthorized events (fired by clearAdminToken)
+  // Full logout: clears storage + flag + dispatches event + syncs React state
+  const handleAdminUnauthorized = useCallback(() => {
+    clearAdminToken(); // sets flag + removes storage + dispatches admin:unauthorized
+    syncLogoutState();
+  }, [syncLogoutState]);
+
+  // Listen for global admin:unauthorized events (fired by clearAdminToken from anywhere)
   useEffect(() => {
-    const onUnauthorized = () => {
-      setTokenState(null);
-      setIsAdmin(false);
-    };
-    window.addEventListener("admin:unauthorized", onUnauthorized);
-    return () => window.removeEventListener("admin:unauthorized", onUnauthorized);
-  }, []);
+    window.addEventListener("admin:unauthorized", syncLogoutState);
+    return () => window.removeEventListener("admin:unauthorized", syncLogoutState);
+  }, [syncLogoutState]);
 
   // On mount, check if there's a stored token and verify it
   useEffect(() => {
