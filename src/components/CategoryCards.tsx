@@ -1,7 +1,7 @@
-import { memo, useMemo } from "react";
+import { memo } from "react";
 import { Link } from "react-router-dom";
 import { Skeleton } from "./ui/skeleton";
-import { useHomeCategories } from "@/hooks/firebase/useFirebaseCategories";
+import { useCategoriesApi } from "@/hooks/useApiData";
 import type { Category } from "@/types";
 
 const CategoryCardItem = memo(({ category }: { category: Category }) => {
@@ -47,7 +47,10 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
 CategoryCardItem.displayName = 'CategoryCardItem';
 
 const CategoryCardsComponent = () => {
-  const { data: categories = [], isLoading } = useHomeCategories();
+  const { data: allCategories = [], isLoading } = useCategoriesApi();
+  const categories = allCategories.filter(
+    (cat) => cat.show_on_homepage && !cat.parent_id
+  );
 
   if (isLoading) {
     return (
