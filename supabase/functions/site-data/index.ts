@@ -8,12 +8,17 @@ const ALLOWED_ORIGINS = [
   "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
 ];
 
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("Origin") || "";
-  const allowedOrigin = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
+function getCorsHeaders(req: Request): Record<string, string> | null {
+  const origin = req.headers.get("Origin");
+  if (!origin) {
+    return {
+      "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info",
+      "Access-Control-Allow-Methods": "GET, OPTIONS",
+    };
+  }
+  if (!ALLOWED_ORIGINS.includes(origin)) return null;
   return {
-    "Access-Control-Allow-Origin": allowedOrigin,
-    "Access-Control-Allow-Headers": "content-type",
+    "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "content-type, apikey, authorization, x-client-info",
     "Access-Control-Allow-Methods": "GET, OPTIONS",
   };
@@ -128,6 +133,7 @@ async function queryCollection(collectionId: string, filters?: any[]) {
 // ── Handler ──────────────────────────────────────────────────────
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+  if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {

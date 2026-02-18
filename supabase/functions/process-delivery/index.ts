@@ -23,12 +23,17 @@ const ALLOWED_ORIGINS = [
   "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
 ];
 
-function getCorsHeaders(req: Request) {
-  const origin = req.headers.get("Origin") || "";
-  // Allow internal calls (no Origin header) from other edge functions
-  const allowedOrigin = !origin || ALLOWED_ORIGINS.includes(origin) ? (origin || "*") : ALLOWED_ORIGINS[0];
+function getCorsHeaders(req: Request): Record<string, string> | null {
+  const origin = req.headers.get("Origin");
+  if (!origin) {
+    // No Origin = internal/server-to-server call
+    return {
+      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+    };
+  }
+  if (!ALLOWED_ORIGINS.includes(origin)) return null;
   return {
-    "Access-Control-Allow-Origin": allowedOrigin,
+    "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   };
 }
@@ -246,6 +251,7 @@ async function isAdmin(uid: string): Promise<boolean> {
 // ════════════════════════════════════════════════════════════════════
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req);
+  if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
