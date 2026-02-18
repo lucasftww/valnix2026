@@ -75,8 +75,8 @@ async function verifyAdminToken(token: string): Promise<boolean> {
   const adminPassword = Deno.env.get("ADMIN_PASSWORD");
   if (!adminPassword) return false;
   const parts = token.split(".");
-  if (parts.length !== 2) return false;
-  const [timestampHex, providedHmac] = parts;
+  if (parts.length !== 3) return false;
+  const [timestampHex, nonce, providedHmac] = parts;
   const timestamp = parseInt(timestampHex, 16);
   if (isNaN(timestamp)) return false;
   const now = Date.now();
@@ -84,7 +84,7 @@ async function verifyAdminToken(token: string): Promise<boolean> {
   if (timestamp > now + 60_000) return false;
   const enc = new TextEncoder();
   const key = await crypto.subtle.importKey("raw", enc.encode(adminPassword), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:admin`));
+  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:${nonce}:admin`));
   const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
   if (providedHmac.length !== expectedHmac.length) return false;
   let diff = 0;
