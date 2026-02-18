@@ -1,6 +1,6 @@
 import { memo, useState } from "react";
-import { CreditCard } from "lucide-react";
 import pixLogo from "@/assets/pix-logo.png";
+import creditCardIcon from "@/assets/credit-card-icon.webp";
 import visaLogo from "@/assets/visa-logo.png";
 import mastercardLogo from "@/assets/mastercard-logo.png";
 import amexLogo from "@/assets/amex-logo.png";
@@ -47,7 +47,7 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
         <div className="w-5 lg:w-4 h-5 lg:h-4 rounded-full border-2 border-border/30 flex items-center justify-center shrink-0">
           {paymentMethod === "card" && <div className="w-2.5 lg:w-2 h-2.5 lg:h-2 rounded-full bg-foreground" />}
         </div>
-        <CreditCard className="w-4 lg:w-3.5 h-4 lg:h-3.5 text-muted-foreground shrink-0" />
+        <img src={creditCardIcon} alt="Cartão" className="w-5 lg:w-4 h-5 lg:h-4 object-contain shrink-0" />
         <span className="text-[13px] lg:text-[12px] text-muted-foreground">Cartão</span>
         <div className="flex items-center gap-1.5 ml-auto">
           <img src={visaLogo} alt="Visa" className="h-4 lg:h-3.5 object-contain" />
