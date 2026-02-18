@@ -8,6 +8,7 @@ const CLEANUP_CONFIG = [
   { collection: 'delivery_locks', retentionDays: 14 },
   { collection: 'coupon_use_events', retentionDays: 30 },
   { collection: 'meta_purchase_events', retentionDays: 30 },
+  { collection: 'capi_event_log', retentionDays: 7 },
 ];
 
 const BATCH_SIZE = 500;
