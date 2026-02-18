@@ -178,9 +178,9 @@ export const AdminOrders = () => {
     },
     enabled: isAdmin && !authLoading,
     retry: 1,
-    refetchInterval: isAdmin ? 60000 : false,
-    staleTime: 30_000,
-    gcTime: 10 * 60 * 1000,
+    refetchInterval: isAdmin ? 120_000 : false,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
   });
 
   const orders: Order[] = Array.isArray(rawOrders) ? rawOrders : [];

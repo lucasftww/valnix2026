@@ -106,9 +106,9 @@ export const AdminProducts = () => {
         return dateB - dateA;
       });
     },
-    enabled: isAdmin && !authLoading,
-    staleTime: 60000,
+    staleTime: 5 * 60_000,
     retry: false,
+    gcTime: 15 * 60_000,
   });
 
   const { data: categories = [], refetch: refetchCategories } = useQuery({
@@ -128,8 +128,9 @@ export const AdminProducts = () => {
         .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0));
     },
     enabled: isAdmin && !authLoading,
-    staleTime: 120000,
+    staleTime: 5 * 60_000,
     retry: false,
+    gcTime: 15 * 60_000,
   });
 
   const loading = loadingProducts;
