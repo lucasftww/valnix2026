@@ -6,7 +6,7 @@ import imageCompression from "browser-image-compression";
 import { invokeFunction } from "@/lib/apiHelper";
 import { requireAdminToken } from "@/lib/adminAuth";
 
-type ImagePreset = 'product' | 'banner' | 'icon';
+type ImagePreset = 'product' | 'icon';
 
 interface ImageUploaderProps {
   currentImageUrl?: string;
@@ -17,7 +17,6 @@ interface ImageUploaderProps {
 
 const presetConfig = {
   product: { maxSizeMB: 0.5, maxWidthOrHeight: 800 },
-  banner: { maxSizeMB: 1, maxWidthOrHeight: 1400 },
   icon: { maxSizeMB: 0.2, maxWidthOrHeight: 400 },
 };
 

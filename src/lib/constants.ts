@@ -19,13 +19,11 @@ export const QUERY_KEYS = {
   PRODUCT_REVIEWS: 'product_reviews',
   
   // Outros
-  BANNERS: 'banners',
   ORDERS: 'orders',
-  COUPONS: 'coupons',
 } as const;
 
 export const CACHE_TIMES = {
-  // Cache muito agressivo para dados que mudam pouco (categorias, banners)
+  // Cache muito agressivo para dados que mudam pouco (categorias)
   STATIC: {
     staleTime: 60 * 60 * 1000, // 1 hora - dados quase nunca mudam
     gcTime: 2 * 60 * 60 * 1000, // 2 horas
@@ -49,7 +47,6 @@ export const CACHE_TIMES = {
 
 export const ROUTES = {
   HOME: '/',
-  AUTH: '/auth',
   CART: '/cart',
   CHECKOUT: '/checkout',
   ADMIN: '/admin',
