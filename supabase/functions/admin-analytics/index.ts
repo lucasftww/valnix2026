@@ -1,96 +1,10 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
+import { getCorsHeaders } from '../_shared/cors.ts';
+import { getFirebaseAccessToken, FIREBASE_PROJECT_ID } from '../_shared/firebase.ts';
+import { verifyAdminToken } from '../_shared/auth.ts';
+import { createInMemoryRateLimiter } from '../_shared/rate-limit.ts';
 
-const ALLOWED_ORIGINS = [
-  "https://www.valnix.com.br",
-  "https://valnix.com.br",
-  "https://valnix2026.lovable.app",
-  "https://id-preview--819e052b-89b4-40a7-8d34-1a89d59aa702.lovable.app",
-  "https://819e052b-89b4-40a7-8d34-1a89d59aa702.lovableproject.com",
-];
-
-function getCorsHeaders(req: Request): Record<string, string> | null {
-  const origin = req.headers.get("Origin");
-  if (!origin) {
-    return {
-      "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
-      "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-    };
-  }
-  if (!ALLOWED_ORIGINS.includes(origin)) return null;
-  return {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type, x-admin-token",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  };
-}
-
-const FIREBASE_PROJECT_ID = "valnix";
-
-// ── Firebase Auth ──────────────────────────────────────────────────
-let cachedAccessToken: string | null = null;
-let tokenExpiresAt = 0;
-
-function base64url(data: Uint8Array): string {
-  let binary = '';
-  for (const byte of data) binary += String.fromCharCode(byte);
-  return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
-}
-
-async function getFirebaseAccessToken(): Promise<string> {
-  if (cachedAccessToken && Date.now() < tokenExpiresAt - 60_000) return cachedAccessToken;
-  const saKeyRaw = Deno.env.get('FIREBASE_SERVICE_ACCOUNT_KEY');
-  if (!saKeyRaw) throw new Error('FIREBASE_SERVICE_ACCOUNT_KEY not configured');
-  const saKey = JSON.parse(saKeyRaw);
-  const now = Math.floor(Date.now() / 1000);
-  const header = { alg: 'RS256', typ: 'JWT' };
-  const payload = {
-    iss: saKey.client_email, sub: saKey.client_email,
-    aud: 'https://oauth2.googleapis.com/token', iat: now, exp: now + 3600,
-    scope: 'https://www.googleapis.com/auth/datastore',
-  };
-  const enc = new TextEncoder();
-  const headerB64 = base64url(enc.encode(JSON.stringify(header)));
-  const payloadB64 = base64url(enc.encode(JSON.stringify(payload)));
-  const unsignedToken = `${headerB64}.${payloadB64}`;
-  const pemBody = saKey.private_key.replace(/-----BEGIN PRIVATE KEY-----/, '').replace(/-----END PRIVATE KEY-----/, '').replace(/\n/g, '');
-  const keyBytes = Uint8Array.from(atob(pemBody), (c) => c.charCodeAt(0));
-  const cryptoKey = await crypto.subtle.importKey('pkcs8', keyBytes, { name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256' }, false, ['sign']);
-  const signature = await crypto.subtle.sign('RSASSA-PKCS1-v1_5', cryptoKey, enc.encode(unsignedToken));
-  const jwt = `${unsignedToken}.${base64url(new Uint8Array(signature))}`;
-  const tokenRes = await fetch('https://oauth2.googleapis.com/token', {
-    method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-    body: `grant_type=urn:ietf:params:oauth:grant-type:jwt-bearer&assertion=${jwt}`,
-  });
-  if (!tokenRes.ok) throw new Error(`Firebase auth failed: ${tokenRes.status}`);
-  const tokenData = await tokenRes.json();
-  cachedAccessToken = tokenData.access_token;
-  tokenExpiresAt = Date.now() + (tokenData.expires_in * 1000);
-  return cachedAccessToken!;
-}
-
-// ── HMAC Admin Token Verification ──────────────────────────────────
-const TOKEN_TTL_MS = 1 * 60 * 60 * 1000; // 1 hour (must match admin-auth generation TTL)
-
-async function verifyAdminToken(token: string): Promise<boolean> {
-  const adminPassword = Deno.env.get("ADMIN_PASSWORD");
-  if (!adminPassword) return false;
-  const parts = token.split(".");
-  if (parts.length !== 3) return false;
-  const [timestampHex, nonce, providedHmac] = parts;
-  const timestamp = parseInt(timestampHex, 16);
-  if (isNaN(timestamp)) return false;
-  const now = Date.now();
-  if (now - timestamp > TOKEN_TTL_MS) return false;
-  if (timestamp > now + 60_000) return false;
-  const enc = new TextEncoder();
-  const key = await crypto.subtle.importKey("raw", enc.encode(adminPassword), { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
-  const sig = await crypto.subtle.sign("HMAC", key, enc.encode(`${timestampHex}:${nonce}:admin`));
-  const expectedHmac = Array.from(new Uint8Array(sig)).map(b => b.toString(16).padStart(2, "0")).join("");
-  if (providedHmac.length !== expectedHmac.length) return false;
-  let diff = 0;
-  for (let i = 0; i < providedHmac.length; i++) { diff |= providedHmac.charCodeAt(i) ^ expectedHmac.charCodeAt(i); }
-  return diff === 0;
-}
+const rateLimiter = createInMemoryRateLimiter({ max: 20, windowMs: 60_000, blockMs: 120_000 });
 
 // ── Firestore query with date filter ───────────────────────────────
 async function queryAnalyticsEvents(dateFilter: Date) {
@@ -145,48 +59,14 @@ async function queryAnalyticsEvents(dateFilter: Date) {
     });
 }
 
-// ── Server-side rate limiting (per-IP, in-memory) ──────────────────
-const rateLimitMap = new Map<string, { count: number; resetAt: number; blockedUntil: number }>();
-const RL_MAX = 20;
-const RL_WINDOW_MS = 60_000;
-const RL_BLOCK_MS = 120_000;
-
-function checkServerRateLimit(ip: string): { allowed: boolean; retryAfter?: number } {
-  const now = Date.now();
-  const entry = rateLimitMap.get(ip);
-  if (entry && entry.blockedUntil > now) {
-    return { allowed: false, retryAfter: Math.ceil((entry.blockedUntil - now) / 1000) };
-  }
-  if (!entry || entry.resetAt <= now) {
-    rateLimitMap.set(ip, { count: 1, resetAt: now + RL_WINDOW_MS, blockedUntil: 0 });
-    return { allowed: true };
-  }
-  entry.count++;
-  if (entry.count > RL_MAX) {
-    entry.blockedUntil = now + RL_BLOCK_MS;
-    return { allowed: false, retryAfter: Math.ceil(RL_BLOCK_MS / 1000) };
-  }
-  return { allowed: true };
-}
-
-// Lazy cleanup: evict expired entries when map grows too large (avoids setInterval in edge isolates)
-function maybeCleanupRateLimit() {
-  if (rateLimitMap.size < 200) return;
-  const now = Date.now();
-  for (const [k, v] of rateLimitMap) {
-    if (v.resetAt <= now && v.blockedUntil <= now) rateLimitMap.delete(k);
-  }
-}
-
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-admin-token" });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
-  // ── Rate limiting ──
   const clientIp = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
-  maybeCleanupRateLimit();
-  const rl = checkServerRateLimit(clientIp);
+  rateLimiter.maybeCleanup();
+  const rl = rateLimiter.check(clientIp);
   if (!rl.allowed) {
     console.warn(`🚫 Rate limited admin-analytics: ip=${clientIp}`);
     return new Response(JSON.stringify({ error: "Too many requests" }),
@@ -222,6 +102,6 @@ Deno.serve(async (req) => {
   } catch (error) {
     console.error("Error:", error);
     return new Response(JSON.stringify({ error: "Internal server error" }),
-      { status: 500, headers: { ...getCorsHeaders(req), "Content-Type": "application/json" } });
+      { status: 500, headers: { ...getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-admin-token" }), "Content-Type": "application/json" } });
   }
 });
