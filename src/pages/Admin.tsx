@@ -84,14 +84,15 @@ function Admin() {
   if (!isAdmin) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
-        <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4">
+        <form onSubmit={handleLogin} className="w-full max-w-xs space-y-4" autoComplete="off">
+          <input type="text" name="username" autoComplete="username" className="sr-only" tabIndex={-1} aria-hidden="true" defaultValue="admin" />
           <input
             type="password"
             placeholder="Senha"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             autoFocus
-            autoComplete="new-password"
+            autoComplete="current-password"
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-center ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
           />
           {loginError && <p className="text-sm text-destructive text-center">{loginError}</p>}
