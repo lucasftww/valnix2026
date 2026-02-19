@@ -21,11 +21,16 @@ async function getDocFields(col: string, docId: string): Promise<any> {
   return doc?.fields || null;
 }
 
-// ── Analytics → Firestore ──
+// ── Analytics → Firestore (idempotent by order_id) ──
 async function registerAnalyticsEvent(orderId: string, value: number, userId?: string, customerEmail?: string, contentName?: string) {
   try {
-    await addFirestoreDoc('analytics_events', { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value, currency: 'BRL', order_id: orderId, page_url: 'https://www.valnix.com.br/checkout', content_name: contentName || `Pedido #${orderId.substring(0, 8)}` });
-    console.log(`📊 Analytics Purchase event registered for order ${orderId}`);
+    // Use addFirestoreDocWithId to prevent duplicate analytics entries
+    const created = await addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value, currency: 'BRL', order_id: orderId, page_url: 'https://www.valnix.com.br/checkout', content_name: contentName || `Pedido #${orderId.substring(0, 8)}` });
+    if (created) {
+      console.log(`📊 Analytics Purchase event registered for order ${orderId}`);
+    } else {
+      console.log(`⏭️ Analytics Purchase event already exists for order ${orderId}`);
+    }
   } catch (error) { console.warn('⚠️ Analytics event registration failed:', error); }
 }
 
