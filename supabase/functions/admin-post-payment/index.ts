@@ -56,7 +56,7 @@ Deno.serve(async (req) => {
       const addonResults = addonRes.ok ? await addonRes.json() : [];
       const addons = (Array.isArray(addonResults) ? addonResults : []).filter((r: any) => r.document).map((r: any) => {
         const f = r.document?.fields || {};
-        return { addon_type: f?.addon_type?.stringValue || '', status: f?.status?.stringValue || '', amount: f?.amount?.doubleValue ?? f?.amount?.integerValue ?? 0 };
+        return { id: r.document.name.split('/').pop(), order_id: f?.order_id?.stringValue || '', addon_type: f?.addon_type?.stringValue || '', status: f?.status?.stringValue || '', amount: f?.amount?.doubleValue ?? f?.amount?.integerValue ?? 0, paid_at: f?.paid_at?.stringValue || null, created_at: f?.created_at?.timestampValue || f?.created_at?.stringValue || null };
       });
       return new Response(JSON.stringify({ pages, addons }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
