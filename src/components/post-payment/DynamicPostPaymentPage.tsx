@@ -74,6 +74,23 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10 * 60);
 
+  // Track page view on mount (fire-and-forget)
+  const viewTracked = useRef(false);
+  useEffect(() => {
+    if (configLoading || !config || viewTracked.current) return;
+    viewTracked.current = true;
+    insertSaleAddonAsync({
+      order_id: orderId,
+      addon_type: addonType,
+      status: "viewed",
+      amount: 0,
+      user_id: null,
+      utm_source: utmSource,
+      utm_medium: utmMedium,
+      utm_campaign: utmCampaign,
+    });
+  }, [configLoading, config]);
+
   // Build next-route URL helper
   const buildNextUrl = useCallback((nextRoute: string) => {
     if (nextRoute === "/order" && hashParam) return `/order/${hashParam}`;
