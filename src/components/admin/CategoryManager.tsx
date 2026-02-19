@@ -70,7 +70,7 @@ export const CategoryManager = () => {
 
       setCategories(roots);
     } catch (err) {
-      console.error("Error loading categories:", err);
+      if (import.meta.env.DEV) console.error("Error loading categories:", err);
       toast({ title: "Erro", description: "Falha ao carregar categorias", variant: "destructive" });
     } finally {
       setIsLoading(false);
@@ -178,7 +178,7 @@ export const CategoryManager = () => {
       closeDialog();
       invalidate();
     } catch (err: any) {
-      console.error("Error saving category:", err);
+      if (import.meta.env.DEV) console.error("Error saving category:", err);
       toast({ title: "Erro", description: err.message || "Falha ao salvar", variant: "destructive" });
     } finally {
       setIsSaving(false);
@@ -222,7 +222,7 @@ export const CategoryManager = () => {
       
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
     } catch (err) {
-      console.error("Error reordering:", err);
+      if (import.meta.env.DEV) console.error("Error reordering:", err);
       toast({ title: "Erro", description: "Falha ao reordenar", variant: "destructive" });
     }
   };
