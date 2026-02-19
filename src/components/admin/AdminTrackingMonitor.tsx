@@ -81,8 +81,9 @@ export function AdminTrackingMonitor() {
       const token = requireAdminToken();
       const res = await invokeFunction('admin-data', {
         method: 'POST',
-        body: { resource: 'cleanup-capi-logs' },
+        body: {},
         headers: { 'x-admin-token': token },
+        queryParams: { resource: 'cleanup-capi-logs' },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
