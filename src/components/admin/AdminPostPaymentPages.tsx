@@ -119,7 +119,7 @@ export function AdminPostPaymentPages() {
         setStats(s);
       }
     } catch (err) {
-      console.error("Error loading post-payment data:", err);
+      if (import.meta.env.DEV) console.error("Error loading post-payment data:", err);
       setFetchError(true);
     }
     setLoading(false);

@@ -52,12 +52,12 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           "group relative transition-all duration-200 rounded-lg h-10",
           activeTab === item.id
             ? "bg-primary/15 text-primary font-medium border-l-2 border-primary shadow-sm"
-            : "text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100"
+            : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
         )}
       >
         <item.icon className={cn(
           "h-5 w-5 transition-colors flex-shrink-0",
-          activeTab === item.id ? "text-primary" : "text-neutral-500 group-hover:text-neutral-300"
+          activeTab === item.id ? "text-primary" : "text-muted-foreground group-hover:text-foreground"
         )} />
         {!isCollapsed && (
           <span className="flex-1 truncate">{item.title}</span>
@@ -79,28 +79,28 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
   return (
     <Sidebar 
       className={cn(
-        "border-r border-neutral-800 bg-neutral-950 transition-all duration-300",
+        "border-r border-border bg-sidebar transition-all duration-300",
         isCollapsed ? "w-16" : "w-64"
       )}
     >
-      <SidebarContent className="flex flex-col h-full bg-neutral-950">
+      <SidebarContent className="flex flex-col h-full bg-sidebar">
         {/* Logo/Header */}
         <div className={cn(
-          "flex items-center gap-3 px-4 py-5 border-b border-neutral-800",
+          "flex items-center gap-3 px-4 py-5 border-b border-border",
           isCollapsed && "justify-center px-2"
         )}>
           <div className="relative flex-shrink-0">
             <div className="h-10 w-10 rounded-xl bg-gradient-to-br from-primary to-primary/60 flex items-center justify-center shadow-lg shadow-primary/25">
               <Zap className="h-5 w-5 text-white" />
             </div>
-            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-neutral-950" />
+            <div className="absolute -bottom-1 -right-1 h-3 w-3 rounded-full bg-green-500 border-2 border-sidebar" />
           </div>
           {!isCollapsed && (
             <div className="flex flex-col min-w-0">
-              <span className="font-bold text-lg text-white truncate">
+              <span className="font-bold text-lg text-sidebar-foreground truncate">
                 Admin Panel
               </span>
-              <span className="text-[10px] text-neutral-500 uppercase tracking-wider">
+              <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                 Gerenciamento
               </span>
             </div>
@@ -110,7 +110,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         {/* Main Navigation */}
         <SidebarGroup className="py-4 px-2">
           <SidebarGroupLabel className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider text-neutral-600 mb-2 px-2",
+            "text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-2",
             isCollapsed && "sr-only"
           )}>
             Principal
@@ -121,14 +121,14 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
               <SidebarMenuItem>
                 <SidebarMenuButton 
                   onClick={() => navigate("/")}
-                  className="text-neutral-400 hover:bg-neutral-800/60 hover:text-neutral-100 transition-colors rounded-lg h-10"
+                  className="text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors rounded-lg h-10"
                 >
                   <Home className="h-5 w-5 flex-shrink-0" />
                   {!isCollapsed && <span>Voltar ao Site</span>}
                 </SidebarMenuButton>
               </SidebarMenuItem>
               
-              <Separator className="my-3 bg-neutral-800" />
+              <Separator className="my-3 bg-border" />
               
               {mainMenuItems.map(renderMenuItem)}
             </SidebarMenu>
@@ -138,7 +138,7 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
         {/* System Section */}
         <SidebarGroup className="py-2 px-2">
           <SidebarGroupLabel className={cn(
-            "text-[10px] font-semibold uppercase tracking-wider text-neutral-600 mb-2 px-2",
+            "text-[10px] font-semibold uppercase tracking-wider text-muted-foreground mb-2 px-2",
             isCollapsed && "sr-only"
           )}>
             Sistema
@@ -150,13 +150,13 @@ export function AdminSidebar({ activeTab, onTabChange }: AdminSidebarProps) {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarFooter className="mt-auto border-t border-neutral-800 p-3">
+        <SidebarFooter className="mt-auto border-t border-border p-3">
           <Button
             variant="ghost"
             size="sm"
             onClick={toggleSidebar}
             className={cn(
-              "w-full text-neutral-500 hover:text-neutral-200 hover:bg-neutral-800/60",
+              "w-full text-muted-foreground hover:text-foreground hover:bg-accent",
               isCollapsed && "px-0"
             )}
           >

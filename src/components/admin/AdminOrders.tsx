@@ -368,15 +368,15 @@ export const AdminOrders = () => {
       }
 
       const token = requireAdminToken();
-      for (const order of toDelete) {
-        await invokeFunction("admin-data", {
+      await Promise.all(toDelete.map(order =>
+        invokeFunction("admin-data", {
           method: "DELETE",
           queryParams: { resource: "orders", id: order.id },
           headers: { "x-admin-token": token },
-        });
-      }
+        })
+      ));
 
-      
+      toast({ title: "Limpeza concluída", description: `${toDelete.length} pedido(s) removidos.` });
       fetchOrders();
     } catch (error: any) {
       toast({ title: "Erro ao limpar pedidos", description: error.message, variant: "destructive" });
