@@ -120,7 +120,7 @@ export default function CardPaymentCallback() {
                   if (import.meta.env.DEV) console.log(`ℹ️ No auth — card payment will be handled by admin auto-verify`);
                 }
               } catch (confirmErr) {
-                console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
+                if (import.meta.env.DEV) console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
               }
 
               // Store payment_method=card so upsell pages know
@@ -165,7 +165,7 @@ export default function CardPaymentCallback() {
           }
         }
       } catch (err) {
-        console.error("Card status check error:", err);
+        if (import.meta.env.DEV) console.error("Card status check error:", err);
         setStatus("pending");
       }
     };

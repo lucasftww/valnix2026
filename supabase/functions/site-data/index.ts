@@ -70,7 +70,6 @@ Deno.serve(async (req) => {
         .slice(0, 20)
         .map((p: any) => ({ id: p.id, name: p.name, image_url: p.image_url, icon_url: p.icon_url, price: p.price, old_price: p.old_price, discount: p.discount, category: p.category, display_order: p.display_order }));
       data = { products: slim };
-      data = { products: slim };
     } else if (type === "categories") {
       const categories = await queryCollection("categories", [{ field: { fieldPath: "is_active" }, op: "EQUAL", value: { booleanValue: true } }]);
       data = { categories: categories.sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0)) };
@@ -83,7 +82,6 @@ Deno.serve(async (req) => {
       const slim = products
         .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
         .map(({ instructions, rich_description, description, auto_delivery_codes, terms_conditions, ...p }: any) => p);
-      data = { products: slim };
       data = { products: slim };
     } else if (type === "product") {
       if (!id) return new Response(JSON.stringify({ error: "id required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
