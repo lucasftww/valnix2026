@@ -37,15 +37,16 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ pages }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, s-maxage=120" } });
     }
 
-    // Public POST: track-view (no auth needed)
+    // Public POST: track-view / track-skip (no auth needed)
     if (req.method === "POST" && !adminToken) {
       const body = await req.json();
-      if (body.action === "track-view" && body.addon_type) {
+      if ((body.action === "track-view" || body.action === "track-skip") && body.addon_type) {
         const docId = crypto.randomUUID();
+        const status = body.action === "track-skip" ? "skipped" : "viewed";
         await createFirestoreDoc('sale_addons', docId, {
           order_id: body.order_id || `lead-${Date.now()}`,
           addon_type: body.addon_type,
-          status: "viewed",
+          status,
           amount: 0,
           user_id: null,
           utm_source: body.utm_source || null,

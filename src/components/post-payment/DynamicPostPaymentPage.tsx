@@ -197,16 +197,17 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   };
 
   const handleSkip = () => {
-    insertSaleAddonAsync({
-      order_id: orderId,
-      addon_type: addonType,
-      status: "skipped",
-      amount: 0,
-      user_id: null,
-      utm_source: utmSource,
-      utm_medium: utmMedium,
-      utm_campaign: utmCampaign,
-    });
+    invokeFunction("admin-post-payment", {
+      method: "POST",
+      body: {
+        action: "track-skip",
+        order_id: orderId,
+        addon_type: addonType,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+      },
+    }).catch(() => {});
 
     const nextRoute = config?.next_route || "/";
     if (isStandalone) {
