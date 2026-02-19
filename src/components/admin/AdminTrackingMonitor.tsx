@@ -306,8 +306,8 @@ export function AdminTrackingMonitor() {
                 <Activity className="h-4 w-4 text-primary" />
               </div>
               <div>
-                <CardTitle className="text-base">Eventos por Tipo</CardTitle>
-                <CardDescription className="text-xs">Distribuição CAPI ({hoursLabel})</CardDescription>
+                <CardTitle className="text-base">Chamadas CAPI por Tipo</CardTitle>
+                <CardDescription className="text-xs">Total de envios ao Meta ({hoursLabel}) — inclui retentativas</CardDescription>
               </div>
             </div>
           </CardHeader>
