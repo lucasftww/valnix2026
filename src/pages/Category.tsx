@@ -1,8 +1,9 @@
 import { useParams, Link } from "react-router-dom";
+import { lazy, Suspense } from "react";
 import { Header } from "@/components/Header";
 import { Navigation } from "@/components/Navigation";
-import { Footer } from "@/components/Footer";
-import { FloatingContactButtons } from "@/components/FloatingContactButtons";
+const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
+const FloatingContactButtons = lazy(() => import("@/components/FloatingContactButtons").then(m => ({ default: m.FloatingContactButtons })));
 import { ProductCard } from "@/components/ProductCard";
 import { ProductSkeleton } from "@/components/ProductSkeleton";
 import { CategorySidebar } from "@/components/CategorySidebar";
@@ -154,8 +155,12 @@ export default function Category() {
           </div>
         </div>
       </main>
-      <Footer />
-      <FloatingContactButtons />
+      <Suspense fallback={null}>
+        <Footer />
+      </Suspense>
+      <Suspense fallback={null}>
+        <FloatingContactButtons />
+      </Suspense>
     </div>
   );
 }
