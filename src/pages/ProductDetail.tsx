@@ -161,7 +161,7 @@ const ProductDetail = () => {
   const totalPrice = (product.price * quantity).toFixed(2).replace('.', ',');
 
   return (
-    <div className="min-h-screen min-h-[100dvh] bg-background flex flex-col pb-[88px] lg:pb-0">
+    <div className="min-h-[100dvh] bg-background flex flex-col pb-[88px] lg:pb-0">
       <Helmet>
         <title>{`Comprar ${product.name} Barato | VALNIX`}</title>
         <meta name="description" content={`Compre ${product.name} com entrega automática via PIX. Melhor preço: R$ ${product.price.toFixed(2).replace('.', ',')}. Entrega instantânea e segura na VALNIX.`} />
