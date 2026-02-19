@@ -87,7 +87,7 @@ export function PixPayment({
       } else {
         navigate(`/entrega-prioritaria?order_id=${orderId}`);
       }
-    }, 3000);
+    }, 1500);
   };
 
   // Track expiry via ref so polling effect doesn't re-run every second

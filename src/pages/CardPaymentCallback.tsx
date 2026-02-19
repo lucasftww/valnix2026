@@ -73,36 +73,33 @@ export default function CardPaymentCallback() {
             } catch (confirmErr) {
               console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
             }
-          }
 
-          sessionStorage.removeItem('valnix_card_payment');
+            sessionStorage.removeItem('valnix_card_payment');
 
-          // Track Purchase events for card payments (only once)
-          if (stored?.amount && stored?.orderId) {
-            trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
-            sendPurchaseFromClient({
-              orderId,
-              value: stored?.amount,
-              userId: stored?.userId,
-              email: stored?.customerEmail,
-              phone: stored?.customerPhone,
-              name: stored?.customerName,
-              productNames: stored?.productNames,
-              productIds: stored?.productIds,
-              quantities: stored?.quantities,
-              prices: stored?.prices,
-              eventSourceUrl: stored?.eventSourceUrl,
-            });
-          }
+            // Track Purchase events for card payments (inside guard to prevent duplicates)
+            if (stored?.amount && stored?.orderId) {
+              trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
+              sendPurchaseFromClient({
+                orderId,
+                value: stored?.amount,
+                userId: stored?.userId,
+                email: stored?.customerEmail,
+                phone: stored?.customerPhone,
+                name: stored?.customerName,
+                productNames: stored?.productNames,
+                productIds: stored?.productIds,
+                quantities: stored?.quantities,
+                prices: stored?.prices,
+                eventSourceUrl: stored?.eventSourceUrl,
+              });
+            }
 
-          // 🔒 FIX: Guest order is already created server-side by create-order edge function.
-          // Do NOT call saveGuestOrder() here — it creates duplicates.
-          // Use the guestHash from stored session data or from create-order response.
-          const guestHash = stored?.guestHash;
-          if (guestHash) {
-            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 1500);
-          } else {
-            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 1500);
+            const guestHash = stored?.guestHash;
+            if (guestHash) {
+              setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 1500);
+            } else {
+              setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 1500);
+            }
           }
 
         } else if (result.status === "FAILED" || result.status === "CANCELLED") {
