@@ -86,6 +86,11 @@ export default function Checkout() {
       const raw = sessionStorage.getItem('valnix_utm_params');
       if (raw) return JSON.parse(raw) as Record<string, string>;
     } catch {}
+    // Fallback: localStorage (persists across tab closes / in-app browser switches)
+    try {
+      const stored = localStorage.getItem('valnix_utm_params');
+      if (stored) return JSON.parse(stored) as Record<string, string>;
+    } catch {}
     return {} as Record<string, string>;
   }, []);
 
