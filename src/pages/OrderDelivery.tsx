@@ -113,7 +113,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
           clearInterval(poll);
           setPaymentConfirmed(true);
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
-          setTimeout(() => onSkip(), 2500);
+          setTimeout(() => onSkip(), 1500);
         }
       } catch (err) {
         console.warn("Poll error:", err);
