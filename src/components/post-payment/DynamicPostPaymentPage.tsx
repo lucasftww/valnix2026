@@ -5,7 +5,7 @@ import { db } from "@/integrations/firebase/config";
 import { collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Loader2, Check, Zap, Star, Clock, Shield } from "lucide-react";
+import { Loader2, Check, Zap, Star, Clock, Shield, CreditCard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import { Progress } from "@/components/ui/progress";
@@ -69,6 +69,12 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const { toast } = useToast();
   const isMobile = useIsMobile();
 
+  // Detect if original payment was via card
+  const paymentMethod = (() => {
+    try { return sessionStorage.getItem('valnix_payment_method') || 'pix'; } catch { return 'pix'; }
+  })();
+  const isCardPayment = paymentMethod === 'card';
+
   const [purchasing, setPurchasing] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
@@ -119,7 +125,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     return () => clearInterval(timer);
   }, [pixData, paymentConfirmed]);
 
-  // Poll payment status
+  // Poll payment status (PIX only — card uses redirect)
   const pollingRef = useRef(false);
   useEffect(() => {
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
@@ -148,7 +154,45 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     return () => clearInterval(poll);
   }, [pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, orderId, addonType]);
 
-  const handleAccept = async () => {
+  const handleAcceptCard = async () => {
+    if (!config || purchasing) return;
+    setPurchasing(true);
+    try {
+      const amountInCents = Math.round(config.price * 100);
+      const cardResponse = await invokeFunction("flowpay-card", {
+        method: "POST",
+        queryParams: { action: "create-upsell" },
+        body: {
+          amount: amountInCents,
+          orderId,
+          addonType,
+          description: `Upsell ${config.title}`,
+        },
+      });
+      const data = await cardResponse.json();
+      if (!cardResponse.ok || !data.success) throw new Error(data.error || "Erro ao criar cobrança");
+
+      // Store upsell context for CardPaymentCallback
+      sessionStorage.setItem('valnix_card_upsell', JSON.stringify({
+        orderId,
+        paymentId: data.paymentId,
+        addonType,
+        hash: hashParam,
+        nextRoute: config.next_route || "/",
+      }));
+
+      // Open FlowPay in new tab and navigate to card-callback
+      window.open(data.paymentUrl, '_blank');
+      navigate(`/card-callback?order_id=${orderId}&payment_id=${data.paymentId}`);
+    } catch (err: any) {
+      console.error("Card upsell payment error:", err);
+      toast({ title: "Erro", description: err.message, variant: "destructive" });
+    } finally {
+      setPurchasing(false);
+    }
+  };
+
+  const handleAcceptPix = async () => {
     if (!config || purchasing) return;
     setPurchasing(true);
     try {
@@ -196,6 +240,8 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }
   };
 
+  const handleAccept = isCardPayment ? handleAcceptCard : handleAcceptPix;
+
   const handleSkip = () => {
     invokeFunction("admin-post-payment", {
       method: "POST",
@@ -232,7 +278,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
 
-  // PIX Payment view
+  // PIX Payment view (only for PIX flow)
   if (pixData) {
     return (
       <div className="min-h-[100dvh] bg-background flex items-center justify-center p-4">
@@ -326,7 +372,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           <p className="text-2xl sm:text-4xl font-black text-red-400 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
             R$ {config.price.toFixed(2).replace(".", ",")}
           </p>
-          <p className="text-[10px] sm:text-xs text-red-300/60 font-medium">Pagamento único via PIX</p>
+          <p className="text-[10px] sm:text-xs text-red-300/60 font-medium">
+            {isCardPayment ? "Pagamento único via Cartão" : "Pagamento único via PIX"}
+          </p>
         </div>
 
         <Button
@@ -335,7 +383,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           onClick={handleAccept}
           disabled={purchasing}
         >
-          {purchasing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
+          {purchasing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : isCardPayment ? <CreditCard className="w-5 h-5 mr-2" /> : null}
           {config.button_accept_text}
         </Button>
 
