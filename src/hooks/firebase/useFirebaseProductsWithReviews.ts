@@ -7,7 +7,7 @@ import { fetchCategoryProductsFallback, fetchProductFallback, fetchCategoryBySlu
 import { markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
 import type { Category, Review, Product } from "@/types";
 
-import { generateConsistentSalesAndReviews } from "./useFirebaseProducts";
+import { generateConsistentSalesAndReviews } from "@/lib/productUtils";
 
 // Uses ProductWithReviews from types but only needs subset for category page
 interface CategoryProductData {

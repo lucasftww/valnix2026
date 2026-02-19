@@ -1,26 +1,15 @@
 import { useQuery } from "@tanstack/react-query";
-import { collection, query, where, limit } from "firebase/firestore";
+import { collection, query, where } from "firebase/firestore";
 import { db } from "@/integrations/firebase/config";
-import { QUERY_KEYS, CACHE_TIMES, UI_CONFIG } from "@/lib/constants";
+import { QUERY_KEYS } from "@/lib/constants";
 import { resilientGetDocs } from "@/lib/firebaseHelpers";
-import { fetchFeaturedProductsFallback, fetchCategoryProductsFallback } from "@/lib/firestoreFallback";
+import { fetchCategoryProductsFallback } from "@/lib/firestoreFallback";
 import { markFirestorePossiblyBlocked } from "@/lib/firestoreBlockDetect";
+import { generateConsistentSalesAndReviews } from "@/lib/productUtils";
 import type { ProductCardData, ProductWithReviews } from "@/types";
 
-const generateConsistentSalesAndReviews = (productId: string): { sold: number; reviewCount: number } => {
-  const hash = productId.split('').reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 1), 0);
-  const hash2 = productId.split('').reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 3) * 7, 0);
-  const baseSold = 800 + (hash % 7200);
-  const soldVariation = hash2 % 100;
-  const sold = baseSold + soldVariation;
-  const reviewRate = 0.05 + ((hash2 % 13) / 100);
-  const reviewCount = Math.floor(sold * reviewRate);
-  return { sold, reviewCount };
-};
-
-export { generateConsistentSalesAndReviews };
-
-
+// Re-export for consumers that still import from here
+export { generateConsistentSalesAndReviews } from "@/lib/productUtils";
 
 function mapToProductCard(p: any): ProductCardData {
   const stats = generateConsistentSalesAndReviews(p.id);
@@ -38,61 +27,6 @@ function mapToProductCard(p: any): ProductCardData {
   };
 }
 
-// Hook para produtos em destaque (home)
-export const useFeaturedProducts = () => {
-  return useQuery({
-    queryKey: [QUERY_KEYS.BEST_SELLING],
-    queryFn: async (): Promise<ProductCardData[]> => {
-      // Race: Firestore vs API fallback — both start immediately
-      // .catch(() => null) on each prevents "Uncaught (in promise)" for the loser
-      let firestoreResult: ProductCardData[] | null = null;
-      let apiResult: ProductCardData[] | null = null;
-
-      const firestoreFetch = (async () => {
-        const productsQuery = query(
-          collection(db, "products"),
-          where("featured", "==", true),
-          limit(50)
-        );
-        const productsSnapshot = await resilientGetDocs(productsQuery);
-        if (import.meta.env.DEV) console.log(`[Products] Firestore returned ${productsSnapshot.size} featured docs`);
-        return productsSnapshot.docs
-          .map((docSnap) => ({ id: docSnap.id, ...(docSnap.data() as any) }))
-          .filter((p) => p?.is_active)
-          .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0))
-          .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
-          .map(mapToProductCard);
-      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
-
-      const apiFetch = (async () => {
-        const products = await fetchFeaturedProductsFallback();
-        return products
-          .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-          .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
-          .map(mapToProductCard);
-      })().then(r => { apiResult = r; return r; }).catch(() => null);
-
-      // Wait for the first non-null result
-      const first = await Promise.race([firestoreFetch, apiFetch]);
-      if (first && first.length > 0) return first;
-
-      // If winner returned null/empty, wait for the other
-      await Promise.allSettled([firestoreFetch, apiFetch]);
-      if (firestoreResult && firestoreResult.length > 0) return firestoreResult;
-      if (apiResult && apiResult.length > 0) return apiResult;
-      return [];
-    },
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    refetchOnMount: false,
-    refetchOnReconnect: true,
-    retry: 1,
-    retryDelay: 2000,
-  });
-};
-
-// Helper to map raw product to ProductWithReviews
 function mapToProductWithReviews(p: any): ProductWithReviews {
   const stats = generateConsistentSalesAndReviews(p.id);
   return {
@@ -169,42 +103,5 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
     refetchOnWindowFocus: false,
-  });
-};
-
-// Hook para detalhes de um produto — uses shared fetchProduct with API fallback
-export const useProduct = (productId: string | undefined) => {
-  return useQuery({
-    queryKey: [QUERY_KEYS.PRODUCT, productId],
-    queryFn: async () => {
-      if (!productId) return null;
-
-      let firestoreResult: any = undefined;
-      let apiResult: any = undefined;
-
-      const firestoreFetch = (async () => {
-        const { fetchProduct } = await import("@/lib/fetchProduct");
-        return await fetchProduct(productId);
-      })().then(r => { firestoreResult = r; return r; }).catch((err) => { markFirestorePossiblyBlocked(err); return null; });
-
-      const apiFetch = (async () => {
-        const { fetchProductFallback } = await import("@/lib/firestoreFallback");
-        return await fetchProductFallback(productId);
-      })().then(r => { apiResult = r; return r; }).catch(() => null);
-
-      const first = await Promise.race([firestoreFetch, apiFetch]);
-      if (first) return first;
-
-      await Promise.allSettled([firestoreFetch, apiFetch]);
-      if (firestoreResult) return firestoreResult;
-      if (apiResult) return apiResult;
-      return null;
-    },
-    enabled: !!productId,
-    staleTime: 30 * 60 * 1000,
-    gcTime: 60 * 60 * 1000,
-    refetchOnWindowFocus: false,
-    retry: 1,
-    retryDelay: 2000,
   });
 };
