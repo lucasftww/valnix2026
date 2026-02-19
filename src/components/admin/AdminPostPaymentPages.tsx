@@ -112,7 +112,7 @@ export function AdminPostPaymentPages() {
         const s: Record<string, AddonStats> = {};
         for (const row of result.addons) {
           if (!s[row.addon_type]) s[row.addon_type] = { total: 0, paid: 0, skipped: 0, revenue: 0 };
-          s[row.addon_type].total++;
+          if (row.status === "viewed") s[row.addon_type].total++;
           if (row.status === "paid") { s[row.addon_type].paid++; s[row.addon_type].revenue += Number(row.amount); }
           if (row.status === "skipped") s[row.addon_type].skipped++;
         }
