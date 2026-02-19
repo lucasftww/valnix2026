@@ -284,11 +284,48 @@ export function AdminAnalytics() {
   // ── Top Pages ─────────────────────────────────────────────────────
   const topPages = useMemo(() => {
     const pages: Record<string, number> = {};
-    events.filter(e => e.page_url).forEach(e => {
-      const path = getPathname(e.page_url);
-      pages[path] = (pages[path] || 0) + 1;
+    // Build product ID → name map from events that have content_name
+    const productNames: Record<string, string> = {};
+    events.forEach(e => {
+      if (e.page_url) {
+        const path = getPathname(e.page_url);
+        pages[path] = (pages[path] || 0) + 1;
+        // Extract product ID and map to content_name
+        const productMatch = path.match(/^\/product\/([a-f0-9-]+)/i);
+        if (productMatch && e.content_name) {
+          productNames[productMatch[1]] = e.content_name;
+        }
+      }
     });
-    return Object.entries(pages).sort((a, b) => b[1] - a[1]).slice(0, 8).map(([page, count]) => ({ page, count }));
+
+    return Object.entries(pages)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 8)
+      .map(([page, count]) => {
+        const productMatch = page.match(/^\/product\/([a-f0-9-]+)/i);
+        let label = page;
+        let type: 'home' | 'product' | 'checkout' | 'category' | 'other' = 'other';
+
+        if (page === '/' || page === '') {
+          label = 'Página Inicial';
+          type = 'home';
+        } else if (page === '/checkout') {
+          label = 'Checkout';
+          type = 'checkout';
+        } else if (page === '/cart') {
+          label = 'Carrinho';
+          type = 'checkout';
+        } else if (page.startsWith('/category/')) {
+          label = page.replace('/category/', '').replace(/-/g, ' ');
+          label = label.charAt(0).toUpperCase() + label.slice(1);
+          type = 'category';
+        } else if (productMatch) {
+          label = productNames[productMatch[1]] || `Produto ${productMatch[1].slice(0, 6)}…`;
+          type = 'product';
+        }
+
+        return { page, label, count, type };
+      });
   }, [events]);
 
   // ── Conversion by Device ──────────────────────────────────────────
@@ -635,13 +672,23 @@ export function AdminAnalytics() {
           <CardContent>
             {topPages.length > 0 ? (
               <div className="space-y-2">
-                {topPages.map((p, i) => (
-                  <div key={p.page} className="flex items-center gap-2 text-sm">
-                    <span className="w-5 text-muted-foreground text-xs font-mono">{i + 1}.</span>
-                    <span className="flex-1 truncate font-mono text-xs">{p.page}</span>
-                    <span className="text-muted-foreground font-medium">{p.count}</span>
-                  </div>
-                ))}
+                {topPages.map((p, i) => {
+                  const iconMap = {
+                    home: '🏠',
+                    product: '📦',
+                    checkout: '💳',
+                    category: '📁',
+                    other: '📄',
+                  };
+                  return (
+                    <div key={p.page} className="flex items-center gap-2 text-sm">
+                      <span className="w-5 text-muted-foreground text-xs font-mono">{i + 1}.</span>
+                      <span className="text-xs">{iconMap[p.type]}</span>
+                      <span className="flex-1 truncate text-xs font-medium">{p.label}</span>
+                      <Badge variant="secondary" className="text-[10px] h-5 px-1.5">{p.count}</Badge>
+                    </div>
+                  );
+                })}
               </div>
             ) : (
               <p className="text-sm text-muted-foreground text-center py-4">Sem dados</p>
