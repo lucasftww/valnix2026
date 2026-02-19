@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef, lazy, Suspense, startTransition } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 
 import { Loader2 } from "lucide-react";
-const PixPayment = lazy(() => import("@/components/checkout/PixPayment").then(m => ({ default: m.PixPayment })));
+import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
@@ -96,11 +96,7 @@ export default function Checkout() {
 
   const effectiveUserId = guestId || 'guest';
 
-  // Preload PixPayment chunk as soon as checkout mounts (before user submits)
-  useEffect(() => {
-    const timer = setTimeout(() => import("@/components/checkout/PixPayment"), 1000);
-    return () => clearTimeout(timer);
-  }, []);
+  // PixPayment is now eagerly imported — no preload needed
 
   useEffect(() => {
     if (items.length === 0 && !paymentData) {
@@ -284,8 +280,9 @@ export default function Checkout() {
         }));
 
         try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
+        // Store paymentUrl so callback page can redirect (avoids popup blockers on mobile)
+        sessionStorage.setItem('valnix_card_payment_url', cardData.paymentUrl);
         clearCart();
-        window.open(cardData.paymentUrl, '_blank');
         navigate(`/card-callback?order_id=${orderId}&payment_id=${cardData.paymentId}`);
         return;
       }
@@ -371,12 +368,6 @@ export default function Checkout() {
         </div>
         <main className="max-w-xl mx-auto px-4 py-8">
           <div className="bg-secondary/50 rounded-2xl border border-border/10 p-6">
-            <Suspense fallback={
-              <div className="flex flex-col items-center justify-center py-16 gap-4">
-                <Loader2 className="w-10 h-10 animate-spin text-primary" />
-                <p className="text-sm text-muted-foreground">Gerando QR Code...</p>
-              </div>
-            }>
               <PixPayment
                 qrCodeText={paymentData.qrCodeText}
                 transactionId={paymentData.transactionId}
@@ -393,7 +384,6 @@ export default function Checkout() {
                 prices={items.map(item => item.price)}
                 onPaymentConfirmed={clearCart}
               />
-            </Suspense>
           </div>
         </main>
       </div>

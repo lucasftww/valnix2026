@@ -1,25 +1,25 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
-import { Loader2, CheckCircle, XCircle } from "lucide-react";
+import { Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invokeFunction } from "@/lib/apiHelper";
 import { sendPurchaseFromClient } from "@/lib/metaCapi";
 import { trackPurchaseEvent } from "@/lib/analytics";
 
-type PaymentStatus = "checking" | "paid" | "pending" | "failed";
+type PaymentStatus = "redirecting" | "checking" | "paid" | "pending" | "failed";
 
 export default function CardPaymentCallback() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const [status, setStatus] = useState<PaymentStatus>("checking");
+  const [status, setStatus] = useState<PaymentStatus>("redirecting");
   const [pollCount, setPollCount] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const confirmCalledRef = useRef(false);
+  const redirectedRef = useRef(false);
 
   const urlOrderId = searchParams.get("order_id");
   const urlPaymentId = searchParams.get("payment_id");
   
-  // Check if this is an upsell callback
   const upsellContext = (() => {
     try {
       const raw = sessionStorage.getItem('valnix_card_upsell');
@@ -38,13 +38,34 @@ export default function CardPaymentCallback() {
   const orderId = isUpsell ? upsellContext?.orderId : (urlOrderId || stored?.orderId);
   const paymentId = isUpsell ? upsellContext?.paymentId : (urlPaymentId || stored?.paymentId);
 
+  // Auto-redirect to FlowPay payment page (avoids popup blockers)
   useEffect(() => {
+    if (redirectedRef.current) return;
+    
+    let paymentUrl: string | null = null;
+    try { paymentUrl = sessionStorage.getItem('valnix_card_payment_url'); } catch {}
+    
+    if (paymentUrl) {
+      redirectedRef.current = true;
+      sessionStorage.removeItem('valnix_card_payment_url');
+      // Small delay so user sees "Redirecionando..." briefly
+      const timer = setTimeout(() => {
+        window.location.href = paymentUrl!;
+      }, 500);
+      return () => clearTimeout(timer);
+    } else {
+      // No payment URL — user returned from FlowPay or is polling
+      setStatus("checking");
+    }
+  }, []);
+
+  useEffect(() => {
+    if (status === "redirecting") return; // Don't poll while redirecting
     if (!orderId || !paymentId) return;
 
     const checkStatus = async () => {
       try {
         if (isUpsell) {
-          // For upsell, use upsell-status action (no auth needed)
           const res = await invokeFunction('flowpay-card', {
             method: 'GET',
             queryParams: { action: 'upsell-status', id: paymentId },
@@ -61,7 +82,6 @@ export default function CardPaymentCallback() {
               const hash = upsellContext.hash || '';
               sessionStorage.removeItem('valnix_card_upsell');
               
-              // Build redirect URL
               const params = new URLSearchParams();
               params.set("order_id", orderId);
               if (hash) params.set("hash", hash);
@@ -82,7 +102,6 @@ export default function CardPaymentCallback() {
             setStatus("pending");
           }
         } else {
-          // Original flow for main order payment
           const statusHeaders: Record<string, string> = {};
           if (stored?.deliveryToken) {
             statusHeaders['x-delivery-token'] = stored.deliveryToken;
@@ -123,14 +142,12 @@ export default function CardPaymentCallback() {
                 if (import.meta.env.DEV) console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
               }
 
-              // Store payment_method=card so upsell pages know
               try {
                 sessionStorage.setItem('valnix_payment_method', 'card');
               } catch {}
 
               sessionStorage.removeItem('valnix_card_payment');
 
-              // Track Purchase events
               if (stored?.amount && stored?.orderId) {
                 trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
                 sendPurchaseFromClient({
@@ -187,7 +204,7 @@ export default function CardPaymentCallback() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [orderId, paymentId, navigate]);
+  }, [orderId, paymentId, navigate, status]);
 
   if (!orderId || !paymentId) {
     return (
@@ -207,7 +224,17 @@ export default function CardPaymentCallback() {
   return (
     <div className="min-h-screen bg-background flex items-center justify-center px-4">
       <div className="max-w-md w-full bg-card border border-border rounded-xl p-8 text-center">
-        {status === "checking" || status === "pending" ? (
+        {status === "redirecting" ? (
+          <>
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
+              <ExternalLink className="w-8 h-8 text-primary animate-pulse" />
+            </div>
+            <h1 className="text-xl font-bold text-foreground mb-2">Redirecionando para pagamento...</h1>
+            <p className="text-muted-foreground text-sm">
+              Você será redirecionado para a página de pagamento segura.
+            </p>
+          </>
+        ) : status === "checking" || status === "pending" ? (
           <>
             <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-primary/10 flex items-center justify-center">
               <Loader2 className="w-8 h-8 text-primary animate-spin" />
