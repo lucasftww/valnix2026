@@ -31,7 +31,7 @@ import {
   Package, Send, Loader2, RefreshCw, Trash2, Search, ChevronDown, ChevronLeft, ChevronRight,
   CreditCard, QrCode, Clock, CheckCircle2, XCircle, AlertCircle,
   Eye, Copy, Hash, Mail, Phone, User, Calendar, DollarSign,
-  ShoppingBag, ArrowUpDown, Filter, MoreHorizontal, ExternalLink, Pencil
+  ShoppingBag, ArrowUpDown, Filter, MoreHorizontal, ExternalLink, Pencil, Zap
 } from "lucide-react";
 import {
   DropdownMenu,
@@ -182,6 +182,42 @@ export const AdminOrders = () => {
     staleTime: 5 * 60_000,
     gcTime: 15 * 60_000,
   });
+
+  // Fetch all sale_addons to identify orders with upsells
+  const { data: allAddons } = useQuery({
+    queryKey: ['admin-addons-summary'],
+    queryFn: async () => {
+      const token = requireAdminToken();
+      if (!token) return [];
+      const res = await invokeFunction("admin-post-payment", {
+        method: "GET",
+        headers: { "x-admin-token": token },
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data.addons) ? data.addons : [];
+    },
+    enabled: isAdmin && !authLoading,
+    staleTime: 5 * 60_000,
+    gcTime: 15 * 60_000,
+  });
+
+  // Map of orderId → addon info (paid addons count + total value)
+  const orderAddonsMap = useMemo(() => {
+    const map = new Map<string, { count: number; paidCount: number; totalValue: number }>();
+    if (!allAddons) return map;
+    for (const a of allAddons) {
+      if (!a.order_id) continue;
+      const existing = map.get(a.order_id) || { count: 0, paidCount: 0, totalValue: 0 };
+      existing.count++;
+      if (a.status === 'paid') {
+        existing.paidCount++;
+        existing.totalValue += Number(a.amount) || 0;
+      }
+      map.set(a.order_id, existing);
+    }
+    return map;
+  }, [allAddons]);
 
   const orders: Order[] = Array.isArray(rawOrders) ? rawOrders : [];
 
@@ -888,7 +924,40 @@ export const AdminOrders = () => {
                           </div>
                         </TableCell>
                         <TableCell>
-                          <span className="font-semibold text-sm">{formatCurrency(order.total_amount)}</span>
+                          <div>
+                            <span className="font-semibold text-sm">{formatCurrency(order.total_amount)}</span>
+                            {(() => {
+                              const addonInfo = orderAddonsMap.get(order.id);
+                              if (!addonInfo || addonInfo.count === 0) return null;
+                              if (addonInfo.paidCount > 0) {
+                                return (
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <span className="ml-1.5 inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/15 text-emerald-500 border border-emerald-500/20 cursor-help">
+                                        <Zap className="w-2.5 h-2.5" />
+                                        +{formatCurrency(addonInfo.totalValue)}
+                                      </span>
+                                    </TooltipTrigger>
+                                    <TooltipContent side="top">
+                                      <p className="text-xs">{addonInfo.paidCount} upsell(s) pago(s)</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                );
+                              }
+                              return (
+                                <Tooltip>
+                                  <TooltipTrigger asChild>
+                                    <span className="ml-1.5 inline-flex items-center px-1 py-0.5 rounded-full text-[10px] font-medium bg-muted text-muted-foreground cursor-help">
+                                      <Zap className="w-2.5 h-2.5" />
+                                    </span>
+                                  </TooltipTrigger>
+                                  <TooltipContent side="top">
+                                    <p className="text-xs">{addonInfo.count} upsell(s) — não pago(s)</p>
+                                  </TooltipContent>
+                                </Tooltip>
+                              );
+                            })()}
+                          </div>
                         </TableCell>
                         <TableCell>
                           <div className="flex items-center gap-1.5">
