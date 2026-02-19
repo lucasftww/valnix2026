@@ -177,8 +177,9 @@ export function sendInitiateCheckout(params: {
 }
 
 // ── Purchase (client-side pixel only) ──────────────────────────────
-// Fires browser pixel fbq only — CAPI is handled exclusively by server.
-// event_id = purchase_{orderId} — MUST match server-side for dedup.
+// Fires browser pixel fbq ONLY — CAPI is handled exclusively by server
+// (webhook or polling fallback, both with idempotent guards).
+// DO NOT send CAPI from client — it causes duplicate events in Meta.
 export function sendPurchaseFromClient(params: {
   orderId: string;
   value: number;
@@ -192,27 +193,26 @@ export function sendPurchaseFromClient(params: {
   prices?: number[];
   eventSourceUrl?: string;
 }) {
-  const nameParts = (params.name || '').split(' ');
   const { contents, numItems } = buildContents(
     params.productIds, params.quantities, params.prices,
   );
 
   clearCheckoutSessionId();
 
-  sendMetaCapiEvent({
-    event_name: 'Purchase',
-    event_id: generateEventId('Purchase', params.orderId),
-    order_id: params.orderId,
-    value: params.value,
-    content_name: params.productNames?.join(', '),
-    content_ids: params.productIds || params.productNames,
-    contents,
-    num_items: numItems,
-    email: params.email || undefined,
-    phone: params.phone || undefined,
-    first_name: nameParts[0] || undefined,
-    last_name: nameParts.slice(1).join(' ') || undefined,
-    external_id: params.userId,
-    event_source_url: params.eventSourceUrl,
-  });
+  // ONLY fire browser Pixel — no CAPI call
+  try {
+    const eventId = generateEventId('Purchase', params.orderId);
+    const fbq = (window as any).fbq;
+    if (typeof fbq === 'function') {
+      fbq('track', 'Purchase', {
+        value: params.value,
+        currency: 'BRL',
+        content_name: params.productNames?.join(', '),
+        content_ids: params.productIds || params.productNames,
+        contents,
+        num_items: numItems,
+      }, { eventID: eventId });
+      console.log(`🌐 [Meta] Pixel Purchase fired — event_id=${eventId}`);
+    }
+  } catch { /* best-effort pixel */ }
 }
