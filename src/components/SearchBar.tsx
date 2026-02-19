@@ -228,7 +228,7 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
                   <p className="text-xs text-muted-foreground">{product.category}</p>
                 </div>
                 <span className="text-base font-bold text-primary whitespace-nowrap">
-                  R$ {product.price.toFixed(2)}
+                  R$ {product.price.toFixed(2).replace('.', ',')}
                 </span>
               </button>
             ))}

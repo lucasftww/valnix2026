@@ -116,7 +116,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
           setTimeout(() => onSkip(), 1500);
         }
       } catch (err) {
-        console.warn("Poll error:", err);
+        if (import.meta.env.DEV) console.warn("Poll error:", err);
       }
     }, 5000);
     return () => clearInterval(poll);
@@ -188,7 +188,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
 
       setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
     } catch (err: any) {
-      console.error("Upsell error:", err);
+      if (import.meta.env.DEV) console.error("Upsell error:", err);
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setPurchasing(false);
@@ -426,7 +426,7 @@ export default function OrderDelivery() {
         }
         return 'ok';
       } catch (err) {
-        console.error("Error fetching guest order:", err);
+        if (import.meta.env.DEV) console.error("Error fetching guest order:", err);
         // Network error → don't mark notFound, just retry with backoff
         return 'error';
       } finally {
