@@ -45,7 +45,7 @@ export function PixPayment({
   onPaymentConfirmed 
 }: PixPaymentProps) {
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(15 * 60);
+  const [timeLeft, setTimeLeft] = useState(5 * 60);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -148,8 +148,8 @@ export function PixPayment({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = (timeLeft / (15 * 60)) * 100;
-  const isExpiring = timeLeft < 180;
+  const progressPercentage = (timeLeft / (5 * 60)) * 100;
+  const isExpiring = timeLeft < 60;
   const isExpired = timeLeft === 0;
 
   const handleCopy = async () => {

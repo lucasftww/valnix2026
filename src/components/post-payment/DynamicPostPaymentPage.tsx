@@ -16,13 +16,6 @@ interface DynamicPostPaymentPageProps {
   addonType: string;
 }
 
-const badgeColorMap: Record<string, string> = {
-  yellow: "bg-red-600 text-white",
-  orange: "bg-red-500 text-white",
-  green: "bg-red-700 text-white",
-  red: "bg-red-600 text-white",
-};
-
 const iconMap: Record<string, typeof Shield> = {
   premium_benefits: Star,
   delivery_priority: Zap,
@@ -78,7 +71,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const [purchasing, setPurchasing] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(10 * 60);
+  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes for urgency
 
   // Track page view on mount via server (immune to adblockers)
   const viewTracked = useRef(false);
@@ -181,8 +174,8 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
         nextRoute: config.next_route || "/",
       }));
 
-      // Open FlowPay in new tab and navigate to card-callback
-      window.open(data.paymentUrl, '_blank');
+      // Save paymentUrl for redirect from callback (avoids popup blockers)
+      sessionStorage.setItem('valnix_card_payment_url', data.paymentUrl);
       navigate(`/card-callback?order_id=${orderId}&payment_id=${data.paymentId}`);
     } catch (err: any) {
       if (import.meta.env.DEV) console.error("Card upsell payment error:", err);
@@ -274,9 +267,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   if (!config) return null;
 
   const Icon = iconMap[addonType] || Star;
-  const badgeClass = badgeColorMap[config.badge_color] || badgeColorMap.yellow;
   const formatTime = (s: number) =>
     `${Math.floor(s / 60).toString().padStart(2, "0")}:${(s % 60).toString().padStart(2, "0")}`;
+  const isExpiring = timeLeft < 60;
 
   // PIX Payment view (only for PIX flow)
   if (pixData) {
@@ -300,11 +293,11 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
                 </p>
               </div>
 
-              <div className="flex items-center justify-between text-sm text-muted-foreground">
+              <div className={`flex items-center justify-between text-sm transition-colors ${isExpiring ? 'text-destructive' : 'text-muted-foreground'}`}>
                 <span><Clock className="w-4 h-4 inline mr-1" />Expira em</span>
-                <span className="font-mono text-primary font-bold">{formatTime(timeLeft)}</span>
+                <span className={`font-mono font-bold ${isExpiring ? 'text-destructive animate-pulse' : 'text-primary'}`}>{formatTime(timeLeft)}</span>
               </div>
-              <Progress value={(timeLeft / (10 * 60)) * 100} className="h-1" />
+              <Progress value={(timeLeft / (5 * 60)) * 100} className="h-1" />
 
               <div className="flex justify-center">
                 <div className="bg-white p-3 rounded-xl">
@@ -330,56 +323,57 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     );
   }
 
-  // Upsell offer view
+  // Upsell offer view — uses semantic design tokens
   return (
     <div className="min-h-[100dvh] relative flex flex-col items-center justify-center p-4 overflow-hidden">
-      <div className="absolute inset-0 bg-gradient-to-b from-red-950 via-red-900 to-black" />
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(220,38,38,0.3)_0%,transparent_70%)]" />
+      {/* Background using primary token gradients */}
+      <div className="absolute inset-0 bg-gradient-to-b from-primary/15 via-primary/10 to-background" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.2)_0%,transparent_70%)]" />
       
       <div className="max-w-lg w-full space-y-3 sm:space-y-5 relative z-10">
         <div className="text-center space-y-2">
           {config.badge_text && (
-            <span className={`inline-block px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest ${badgeClass} shadow-[0_0_20px_rgba(220,38,38,0.5)] animate-[pulse_1.5s_ease-in-out_infinite]`}>
+            <span className="inline-block px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.5)] animate-[pulse_1.5s_ease-in-out_infinite]">
               {config.badge_text}
             </span>
           )}
-          <div className="w-14 h-14 sm:w-20 sm:h-20 bg-red-600/30 border-2 border-red-500/50 rounded-2xl flex items-center justify-center mx-auto shadow-[0_0_30px_rgba(220,38,38,0.4)]">
-            <Icon className="w-7 h-7 sm:w-10 sm:h-10 text-red-400" />
+          <div className="w-14 h-14 sm:w-20 sm:h-20 bg-primary/20 border-2 border-primary/40 rounded-2xl flex items-center justify-center mx-auto shadow-[0_0_30px_hsl(var(--primary)/0.3)]">
+            <Icon className="w-7 h-7 sm:w-10 sm:h-10 text-primary" />
           </div>
-          <h1 className="text-xl sm:text-3xl md:text-4xl font-black text-white drop-shadow-[0_0_10px_rgba(220,38,38,0.3)]">{config.title}</h1>
+          <h1 className="text-xl sm:text-3xl md:text-4xl font-black text-foreground drop-shadow-[0_0_10px_hsl(var(--primary)/0.2)]">{config.title}</h1>
           {config.subtitle && (
-            <p className="text-red-200/70 text-[11px] sm:text-sm md:text-base font-medium">{config.subtitle}</p>
+            <p className="text-muted-foreground text-[11px] sm:text-sm md:text-base font-medium">{config.subtitle}</p>
           )}
         </div>
 
-        <div className="bg-black/60 backdrop-blur-sm border border-red-900/50 rounded-2xl p-3.5 sm:p-5 space-y-2 sm:space-y-3 shadow-[0_0_20px_rgba(220,38,38,0.15)]">
+        <div className="bg-background/60 backdrop-blur-sm border border-primary/20 rounded-2xl p-3.5 sm:p-5 space-y-2 sm:space-y-3 shadow-[0_0_20px_hsl(var(--primary)/0.1)]">
           {config.benefits.map((benefit, i) => (
             <div key={i} className="flex items-start gap-2.5">
-              <div className="w-5 h-5 rounded-full bg-red-500/30 border border-red-500/50 flex items-center justify-center mt-0.5 shrink-0">
-                <Check className="w-3 h-3 text-red-400" />
+              <div className="w-5 h-5 rounded-full bg-primary/20 border border-primary/40 flex items-center justify-center mt-0.5 shrink-0">
+                <Check className="w-3 h-3 text-primary" />
               </div>
-              <span className="text-[12px] sm:text-sm text-white font-medium">{benefit}</span>
+              <span className="text-[12px] sm:text-sm text-foreground font-medium">{benefit}</span>
             </div>
           ))}
         </div>
 
         <div className="text-center space-y-0.5">
           {config.original_price && (
-            <p className="text-red-300/50 line-through text-xs sm:text-sm">
+            <p className="text-muted-foreground/50 line-through text-xs sm:text-sm">
               De R$ {config.original_price.toFixed(2).replace(".", ",")}
             </p>
           )}
-          <p className="text-2xl sm:text-4xl font-black text-red-400 drop-shadow-[0_0_15px_rgba(220,38,38,0.5)]">
+          <p className="text-2xl sm:text-4xl font-black text-primary drop-shadow-[0_0_15px_hsl(var(--primary)/0.4)]">
             R$ {config.price.toFixed(2).replace(".", ",")}
           </p>
-          <p className="text-[10px] sm:text-xs text-red-300/60 font-medium">
+          <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
             {isCardPayment ? "Pagamento único via Cartão" : "Pagamento único via PIX"}
           </p>
         </div>
 
         <Button
           size="lg"
-          className="w-full h-12 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-red-600 hover:bg-red-500 active:scale-[0.98] text-white shadow-[0_0_30px_rgba(220,38,38,0.6)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-red-400/30 uppercase tracking-wider transition-transform duration-150"
+          className="w-full h-12 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground shadow-[0_0_30px_hsl(var(--primary)/0.5)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-primary-foreground/20 uppercase tracking-wider transition-transform duration-150"
           onClick={handleAccept}
           disabled={purchasing}
         >
@@ -389,7 +383,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
         <button
           onClick={handleSkip}
-          className="w-full text-center text-red-300/50 hover:text-red-300/80 active:text-red-300/80 text-xs sm:text-sm py-3 transition-colors underline underline-offset-4 min-h-[48px]"
+          className="w-full text-center text-muted-foreground/50 hover:text-muted-foreground/80 active:text-muted-foreground/80 text-xs sm:text-sm py-3 transition-colors underline underline-offset-4 min-h-[48px]"
         >
           {config.button_skip_text}
         </button>

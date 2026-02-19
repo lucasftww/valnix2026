@@ -6,17 +6,9 @@
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_KEYS, UI_CONFIG } from "@/lib/constants";
 import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/firestoreFallback";
+import { generateConsistentSalesAndReviews } from "@/lib/productUtils";
+import { deduplicateCategories, buildCategoryTree } from "@/lib/categoryUtils";
 import type { ProductCardData, Category } from "@/types";
-
-// Deterministic fake stats (same logic as useFirebaseProducts)
-const generateConsistentSalesAndReviews = (productId: string) => {
-  const hash = productId.split('').reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 1), 0);
-  const hash2 = productId.split('').reduce((acc, char, i) => acc + char.charCodeAt(0) * (i + 3) * 7, 0);
-  const baseSold = 800 + (hash % 7200);
-  const sold = baseSold + (hash2 % 100);
-  const reviewRate = 0.05 + ((hash2 % 13) / 100);
-  return { sold, reviewCount: Math.floor(sold * reviewRate) };
-};
 
 function mapToProductCard(p: any): ProductCardData {
   const stats = generateConsistentSalesAndReviews(p.id);
@@ -32,53 +24,6 @@ function mapToProductCard(p: any): ProductCardData {
     sold: stats.sold,
     reviewCount: stats.reviewCount,
   };
-}
-
-function deduplicateCategories(raw: any[]): Category[] {
-  const score = (c: any) => {
-    let s = 0;
-    if (c?.icon_url) s += 2;
-    if (c?.image_url) s += 2;
-    if (c?.description) s += 1;
-    if (c?.show_on_homepage) s += 1;
-    return s;
-  };
-
-  const bySlug = new Map<string, any>();
-  for (const c of raw) {
-    const slug = String(c?.slug ?? c?.id ?? "");
-    if (!slug) continue;
-    const existing = bySlug.get(slug);
-    if (!existing) { bySlug.set(slug, c); continue; }
-    if (score(c) > score(existing)) bySlug.set(slug, c);
-    else if (score(c) === score(existing) && (c?.display_order ?? Infinity) < (existing?.display_order ?? Infinity)) {
-      bySlug.set(slug, c);
-    }
-  }
-
-  return Array.from(bySlug.values())
-    .sort((a, b) => (a?.display_order ?? 0) - (b?.display_order ?? 0)) as Category[];
-}
-
-function buildCategoryTree(categories: Category[]): Category[] {
-  const categoryMap = new Map<string, Category>();
-  const roots: Category[] = [];
-
-  categories.forEach((c) => categoryMap.set(c.id, { ...c, children: [] }));
-  categories.forEach((c) => {
-    const node = categoryMap.get(c.id)!;
-    if (c.parent_id) {
-      const parent = categoryMap.get(c.parent_id);
-      if (parent) {
-        parent.children = parent.children || [];
-        parent.children.push(node);
-      }
-    } else {
-      roots.push(node);
-    }
-  });
-
-  return roots;
 }
 
 // ── Featured products (homepage) ──
@@ -122,4 +67,3 @@ export const useCategoriesTreeApi = () => {
   const { data: categories = [], ...rest } = useCategoriesApi();
   return { data: buildCategoryTree(categories), ...rest };
 };
-
