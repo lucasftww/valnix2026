@@ -136,7 +136,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           setPaymentConfirmed(true);
           toast({ title: "Pagamento confirmado! 🎉", description: "Benefício ativado com sucesso!" });
           const nextRoute = config?.next_route || "/";
-          setTimeout(() => navigate(buildNextUrl(nextRoute), { replace: true }), 2500);
+          setTimeout(() => navigate(buildNextUrl(nextRoute), { replace: true }), 1500);
         }
       } catch (err) {
         console.warn("Poll error:", err);

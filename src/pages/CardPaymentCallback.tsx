@@ -100,9 +100,9 @@ export default function CardPaymentCallback() {
           // Use the guestHash from stored session data or from create-order response.
           const guestHash = stored?.guestHash;
           if (guestHash) {
-            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 3000);
+            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 1500);
           } else {
-            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 3000);
+            setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 1500);
           }
 
         } else if (result.status === "FAILED" || result.status === "CANCELLED") {
