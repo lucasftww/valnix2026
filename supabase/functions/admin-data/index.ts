@@ -286,7 +286,7 @@ Deno.serve(async (req) => {
       }
 
       if (resource === "cleanup-capi-logs") {
-        const collections = ["capi_event_log", "meta_purchase_events", "sale_addons"];
+        const collections = ["capi_event_log"];
         const accessToken = await getFirebaseAccessToken(ADMIN_SCOPE);
         const queryUrl = `${FIRESTORE_BASE}:runQuery`;
         let totalDeleted = 0;
