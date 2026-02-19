@@ -18,7 +18,8 @@ Deno.serve(async (req) => {
 
   try {
     const url = new URL(req.url);
-    const isPublicPageRequest = req.method === "GET" && !url.searchParams.get("orderId");
+    const adminToken = req.headers.get("x-admin-token");
+    const isPublicPageRequest = req.method === "GET" && !url.searchParams.get("orderId") && !adminToken;
 
     if (isPublicPageRequest) {
       const accessToken = await getFirebaseAccessToken();
@@ -36,7 +37,6 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ pages }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, s-maxage=120" } });
     }
 
-    const adminToken = req.headers.get("x-admin-token");
     if (!adminToken) return new Response(JSON.stringify({ error: "Admin token required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const isValid = await verifyAdminToken(adminToken);
     if (!isValid) return new Response(JSON.stringify({ error: "Invalid or expired admin token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
@@ -54,15 +54,17 @@ Deno.serve(async (req) => {
       const addonQueryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
       const addonRes = await fetch(addonQueryUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'sale_addons' }], limit: 10000 } }) });
       const addonResults = addonRes.ok ? await addonRes.json() : [];
-      console.log(`[admin-post-payment] addon query status: ${addonRes.status}, results count: ${Array.isArray(addonResults) ? addonResults.length : 'not array'}`);
-      const filteredResults = (Array.isArray(addonResults) ? addonResults : []).filter((r: any) => r.document);
-      console.log(`[admin-post-payment] filtered addon docs: ${filteredResults.length}`);
-      if (filteredResults.length > 0) console.log(`[admin-post-payment] sample addon fields:`, JSON.stringify(Object.keys(filteredResults[0].document?.fields || {})));
-      const addons = filteredResults.map((r: any) => {
+      const addons = (Array.isArray(addonResults) ? addonResults : []).filter((r: any) => r.document).map((r: any) => {
         const f = r.document?.fields || {};
-        const parsed = { id: r.document.name.split('/').pop(), order_id: f?.order_id?.stringValue || '', addon_type: f?.addon_type?.stringValue || '', status: f?.status?.stringValue || '', amount: f?.amount?.doubleValue ?? f?.amount?.integerValue ?? 0, paid_at: f?.paid_at?.stringValue || f?.paid_at?.timestampValue || null, created_at: f?.created_at?.timestampValue || f?.created_at?.stringValue || null };
-        console.log(`[admin-post-payment] addon parsed: ${parsed.id} order_id=${parsed.order_id} status=${parsed.status} amount=${parsed.amount}`);
-        return parsed;
+        return {
+          id: r.document.name.split('/').pop(),
+          order_id: f?.order_id?.stringValue || '',
+          addon_type: f?.addon_type?.stringValue || '',
+          status: f?.status?.stringValue || '',
+          amount: f?.amount?.doubleValue ?? (f?.amount?.integerValue != null ? Number(f.amount.integerValue) : 0),
+          paid_at: f?.paid_at?.stringValue || f?.paid_at?.timestampValue || null,
+          created_at: f?.created_at?.timestampValue || f?.created_at?.stringValue || null,
+        };
       });
       return new Response(JSON.stringify({ pages, addons }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
