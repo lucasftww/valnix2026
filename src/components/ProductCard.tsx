@@ -2,7 +2,6 @@ import { memo, useCallback, useRef } from "react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router-dom";
-import { useQueryClient } from "@tanstack/react-query";
 import { QUERY_KEYS, CACHE_TIMES, formatPrice, ROUTES } from "@/lib/constants";
 import { Star } from "lucide-react";
 
@@ -29,34 +28,29 @@ const ProductCardComponent = ({
   discount,
   priority = false,
 }: ProductCardProps) => {
-  const queryClient = useQueryClient();
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
 
-  // Prefetch otimizado - triggers on hover (desktop) and touchstart (mobile)
+  // Prefetch on hover/touch — lazy-import queryClient to reduce initial bundle
   const prefetchTriggered = useRef(false);
   const triggerPrefetch = useCallback(() => {
     if (!productId || prefetchTriggered.current) return;
-    // Respect saveData and slow connections
     const conn = (navigator as any).connection;
-    const slow = ["slow-2g", "2g"].includes(conn?.effectiveType);
-    if (conn?.saveData || slow) return;
+    if (conn?.saveData || ["slow-2g", "2g"].includes(conn?.effectiveType)) return;
     prefetchTriggered.current = true;
-    // Prefetch JS chunk + data in parallel (uses shared fetchProduct with timeout)
-    import("@/pages/ProductDetail");
-    queryClient
-      .prefetchQuery({
+    // Lazy-import queryClient + fetchProduct only on interaction
+    Promise.all([
+      import("@/pages/ProductDetail"),
+      import("@/App").then(m => m.queryClient),
+      import("@/lib/fetchProduct").then(m => m.fetchProduct),
+    ]).then(([, qc, fetchProduct]) => {
+      qc.prefetchQuery({
         queryKey: [QUERY_KEYS.PRODUCT, productId],
-        queryFn: async () => {
-          const { fetchProduct } = await import("@/lib/fetchProduct");
-          return fetchProduct(productId);
-        },
+        queryFn: () => fetchProduct(productId),
         ...CACHE_TIMES.MODERATE,
-      })
-      .catch(() => {
-        // Prefetch é best-effort — não poluir cache com erro
-      });
-  }, [queryClient, productId]);
+      }).catch(() => {});
+    }).catch(() => {});
+  }, [productId]);
 
   // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
 
