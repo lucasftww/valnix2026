@@ -43,7 +43,7 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
           const { requireAdminToken } = await import("@/lib/adminAuth");
           let token: string;
           try { token = requireAdminToken(); } catch { 
-            console.warn(`⚠️ No admin token for card verify ${order.id}`);
+            if (import.meta.env.DEV) console.warn(`⚠️ No admin token for card verify ${order.id}`);
             continue;
           }
 
@@ -62,7 +62,7 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
             if (import.meta.env.DEV) console.log(`ℹ️ Card order ${order.id}: ${data.error || data.status || 'not confirmed yet'}`);
           }
         } catch (error) {
-          console.warn(`⚠️ Auto-verify card failed for order ${order.id}:`, error);
+          if (import.meta.env.DEV) console.warn(`⚠️ Auto-verify card failed for order ${order.id}:`, error);
         }
       }
     };

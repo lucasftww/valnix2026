@@ -146,7 +146,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           setTimeout(() => navigate(buildNextUrl(nextRoute), { replace: true }), 1500);
         }
       } catch (err) {
-        console.warn("Poll error:", err);
+        if (import.meta.env.DEV) console.warn("Poll error:", err);
       } finally {
         pollingRef.current = false;
       }
@@ -185,7 +185,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       window.open(data.paymentUrl, '_blank');
       navigate(`/card-callback?order_id=${orderId}&payment_id=${data.paymentId}`);
     } catch (err: any) {
-      console.error("Card upsell payment error:", err);
+      if (import.meta.env.DEV) console.error("Card upsell payment error:", err);
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setPurchasing(false);
@@ -233,7 +233,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
       setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
     } catch (err: any) {
-      console.error("Upsell payment error:", err);
+      if (import.meta.env.DEV) console.error("Upsell payment error:", err);
       toast({ title: "Erro", description: err.message, variant: "destructive" });
     } finally {
       setPurchasing(false);

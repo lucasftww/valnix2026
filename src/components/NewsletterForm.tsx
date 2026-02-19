@@ -58,7 +58,7 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
       });
       setEmail("");
     } catch (error) {
-      console.error("Erro ao inscrever na newsletter:", error);
+      if (import.meta.env.DEV) console.error("Erro ao inscrever na newsletter:", error);
       toast({
         title: "Erro ao se inscrever",
         description: "Tente novamente mais tarde.",
