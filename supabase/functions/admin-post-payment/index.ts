@@ -84,6 +84,22 @@ Deno.serve(async (req) => {
 
     if (req.method === "POST") {
       const body = await req.json();
+      if (body.action === "fix-addon-status") {
+        const { addon_id, status: newStatus } = body;
+        if (addon_id) {
+          const success = await updateFirestoreDoc('sale_addons', addon_id, { status: newStatus || 'paid', paid_at: new Date().toISOString() });
+          return new Response(JSON.stringify({ success, addon_id }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        }
+        // Fix all pending addons
+        const allAddons = await queryCollectionSimple('sale_addons');
+        const pending = allAddons.filter((a: any) => a.status !== 'paid' && a.status !== 'skipped');
+        let fixed = 0;
+        for (const addon of pending) {
+          await updateFirestoreDoc('sale_addons', addon.id, { status: 'paid', paid_at: new Date().toISOString() });
+          fixed++;
+        }
+        return new Response(JSON.stringify({ success: true, fixed, pending_found: pending.length, all_addons: allAddons.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
       if (body.action === "seed") {
         const existing = await queryCollectionSimple('post_payment_pages');
         if (existing.length > 0) return new Response(JSON.stringify({ message: "Pages already exist", count: existing.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
