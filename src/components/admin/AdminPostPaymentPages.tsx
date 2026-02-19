@@ -210,7 +210,7 @@ export function AdminPostPaymentPages() {
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
             <DollarSign className="w-4 h-4" /> Receita Total
           </div>
-          <p className="text-2xl font-bold text-green-500">R$ {totalRevenue.toFixed(2)}</p>
+          <p className="text-2xl font-bold text-green-500">R$ {totalRevenue.toFixed(2).replace('.', ',')}</p>
         </div>
         <div className="bg-card border border-border/50 rounded-xl p-4">
           <div className="flex items-center gap-2 text-sm text-muted-foreground mb-1">
@@ -265,7 +265,7 @@ export function AdminPostPaymentPages() {
                     <SkipForward className="w-3 h-3" /> {addonStats.skipped} pulados
                   </Badge>
                   <Badge variant="outline" className="gap-1 text-green-500 border-green-500/30">
-                    R$ {addonStats.revenue.toFixed(2)}
+                    R$ {addonStats.revenue.toFixed(2).replace('.', ',')}
                   </Badge>
                 </div>
 

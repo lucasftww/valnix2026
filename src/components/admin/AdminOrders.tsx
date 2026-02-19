@@ -158,7 +158,7 @@ export const AdminOrders = () => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       const ordersArr = Array.isArray(data.orders) ? data.orders : Array.isArray(data) ? data : [];
-      console.log(`[AdminOrders] fetched ${ordersArr.length} orders from API`);
+      if (import.meta.env.DEV) console.log(`[AdminOrders] fetched ${ordersArr.length} orders from API`);
       const ordersData: Order[] = ordersArr.map((o: any) => ({
         id: o.id,
         customer_name: o.customer_name || '',
@@ -566,8 +566,9 @@ export const AdminOrders = () => {
     }
   };
 
-  const copyToClipboard = (text: string, _label: string) => {
+  const copyToClipboard = (text: string, label: string) => {
     navigator.clipboard.writeText(text);
+    toast({ title: `${label} copiado` });
   };
 
   const toggleSort = (field: "date" | "amount") => {
