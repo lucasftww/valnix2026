@@ -211,14 +211,14 @@ export const CategoryManager = () => {
 
     try {
       const token = requireAdminToken();
-      for (let i = 0; i < items.length; i++) {
-        await invokeFunction("admin-data", {
+      await Promise.all(items.map((item, i) =>
+        invokeFunction("admin-data", {
           method: "PUT",
           queryParams: { resource: "categories" },
           headers: { "x-admin-token": token },
-          body: { id: items[i].id, display_order: i },
-        });
-      }
+          body: { id: item.id, display_order: i },
+        })
+      ));
       
       queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
     } catch (err) {
