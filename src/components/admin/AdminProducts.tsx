@@ -106,6 +106,7 @@ export const AdminProducts = () => {
         return dateB - dateA;
       });
     },
+    enabled: isAdmin && !authLoading,
     staleTime: 5 * 60_000,
     retry: false,
     gcTime: 15 * 60_000,
