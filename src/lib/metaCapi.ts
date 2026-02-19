@@ -69,7 +69,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
 
     // 🔒 DEFENSIVE: Purchase CAPI is ALWAYS server-only — never call from client
     if (isServerHandled) {
-      console.log(`🔒 [Meta] CAPI blocked client-side for ${data.event_name} — server handles it`);
+      if (import.meta.env.DEV) console.log(`🔒 [Meta] CAPI blocked client-side for ${data.event_name} — server handles it`);
     } else {
       // Only call the CAPI edge function if the server doesn't already handle it
       const payload = {
@@ -84,7 +84,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       };
 
       invokeFunctionFireAndForget('meta-capi', payload).then(() => {
-        console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
+        if (import.meta.env.DEV) console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
       });
     }
 
@@ -103,7 +103,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
             contents: data.contents,
             num_items: data.num_items,
           }, { eventID: eventId });
-          console.log(`🌐 [Meta] Pixel ${pixelEvent} fired — event_id=${eventId}`);
+          if (import.meta.env.DEV) console.log(`🌐 [Meta] Pixel ${pixelEvent} fired — event_id=${eventId}`);
         }
       }
     } catch { /* best-effort pixel */ }
@@ -212,7 +212,7 @@ export function sendPurchaseFromClient(params: {
         contents,
         num_items: numItems,
       }, { eventID: eventId });
-      console.log(`🌐 [Meta] Pixel Purchase fired — event_id=${eventId}`);
+      if (import.meta.env.DEV) console.log(`🌐 [Meta] Pixel Purchase fired — event_id=${eventId}`);
     }
   } catch { /* best-effort pixel */ }
 }

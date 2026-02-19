@@ -112,7 +112,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                         {item.name}
                       </h4>
                       <p className="text-primary font-bold text-sm">
-                        R$ {(item.price * item.quantity).toFixed(2)}
+                        R$ {(item.price * item.quantity).toFixed(2).replace('.', ',')}
                       </p>
                       
                       <div className="flex items-center justify-between mt-2">
@@ -156,7 +156,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                 <div className="flex justify-between items-center">
                   <span className="text-muted-foreground">Total</span>
                   <span className="text-xl font-bold text-primary">
-                    R$ {finalPrice.toFixed(2)}
+                    R$ {finalPrice.toFixed(2).replace('.', ',')}
                   </span>
                 </div>
               </div>

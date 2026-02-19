@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
 import { db } from "@/integrations/firebase/config";
 import { invokeFunction } from "@/lib/apiHelper";
-import { collection, query, where, onSnapshot, getDocs, doc, getDoc, addDoc, updateDoc, serverTimestamp, Timestamp } from "firebase/firestore";
+import { collection, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
 import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2, Star, Shield, Zap, Clock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
@@ -43,7 +43,7 @@ interface GuestOrderData {
 }
 
 // Upsell sequence manager
-const UPSELL_SEQUENCE = ["premium_benefits", "delivery_priority", "data_swap_warranty"];
+const UPSELL_SEQUENCE = ["delivery_priority", "data_swap_warranty"];
 
 function UpsellSequence({ orderId, userEmail, userName, userId }: {
   orderId: string;
