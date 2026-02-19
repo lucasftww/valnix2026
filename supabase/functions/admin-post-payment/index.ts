@@ -43,7 +43,8 @@ Deno.serve(async (req) => {
       if ((body.action === "track-view" || body.action === "track-skip") && body.addon_type) {
         const docId = crypto.randomUUID();
         const status = body.action === "track-skip" ? "skipped" : "viewed";
-        await createFirestoreDoc('sale_addons', docId, {
+        console.log(`📝 [PostPayment] ${body.action} — addon_type=${body.addon_type}, order_id=${body.order_id || 'lead'}, docId=${docId}`);
+        const ok = await createFirestoreDoc('sale_addons', docId, {
           order_id: body.order_id || `lead-${Date.now()}`,
           addon_type: body.addon_type,
           status,
@@ -55,7 +56,9 @@ Deno.serve(async (req) => {
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
-        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        if (!ok) console.error(`❌ [PostPayment] Firestore write FAILED for ${body.action} docId=${docId}`);
+        else console.log(`✅ [PostPayment] ${body.action} saved — docId=${docId}`);
+        return new Response(JSON.stringify({ success: ok }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       return new Response(JSON.stringify({ error: "Admin token required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
