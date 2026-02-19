@@ -49,8 +49,9 @@ async function uploadToR2(fileName: string, body: Uint8Array, contentType: strin
   const amzDate = now.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
   const region = 'auto'; const service = 's3';
   const payloadHash = toHex(await crypto.subtle.digest('SHA-256', body));
-  const canonicalHeaders = `content-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
-  const signedHeaders = 'content-type;host;x-amz-content-sha256;x-amz-date';
+  const cacheControlValue = 'public, max-age=31536000, immutable';
+  const canonicalHeaders = `cache-control:${cacheControlValue}\ncontent-type:${contentType}\nhost:${host}\nx-amz-content-sha256:${payloadHash}\nx-amz-date:${amzDate}\n`;
+  const signedHeaders = 'cache-control;content-type;host;x-amz-content-sha256;x-amz-date';
   const canonicalRequest = `PUT\n${objectPath}\n\n${canonicalHeaders}\n${signedHeaders}\n${payloadHash}`;
   const credentialScope = `${dateStamp}/${region}/${service}/aws4_request`;
   const stringToSign = `AWS4-HMAC-SHA256\n${amzDate}\n${credentialScope}\n${toHex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(canonicalRequest)))}`;
@@ -58,7 +59,7 @@ async function uploadToR2(fileName: string, body: Uint8Array, contentType: strin
   const signature = toHex(await hmacSHA256(signingKey, stringToSign));
   const authorization = `AWS4-HMAC-SHA256 Credential=${accessKeyId}/${credentialScope}, SignedHeaders=${signedHeaders}, Signature=${signature}`;
   const uploadUrl = `https://${host}${objectPath}`;
-  const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Authorization': authorization, 'Content-Type': contentType, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate }, body: body });
+  const res = await fetch(uploadUrl, { method: 'PUT', headers: { 'Authorization': authorization, 'Content-Type': contentType, 'Cache-Control': cacheControlValue, 'x-amz-content-sha256': payloadHash, 'x-amz-date': amzDate }, body: body });
   if (!res.ok) { const errText = await res.text(); throw new Error(`R2 upload failed: ${res.status} - ${errText}`); }
   const fileUrl = `${publicUrl.replace(/\/$/, '')}/valnix-upload/${fileName}`;
   console.log(`✅ Uploaded to R2: ${fileUrl}`);
