@@ -49,7 +49,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
             onOrderUpdated?.();
           }
         } catch (error) {
-          console.warn(`⚠️ Auto-verify PIX failed for order ${order.id}:`, error);
+          if (import.meta.env.DEV) console.warn(`⚠️ Auto-verify PIX failed for order ${order.id}:`, error);
         }
       }
     };

@@ -53,10 +53,10 @@ export function usePostPaymentPage(addonType: string) {
             display_order: page.display_order || 0,
           });
         } else {
-          console.warn(`Post-payment page "${addonType}" not found or inactive`);
+          if (import.meta.env.DEV) console.warn(`Post-payment page "${addonType}" not found or inactive`);
         }
       } catch (err: any) {
-        console.error('Error fetching post-payment page config:', err);
+        if (import.meta.env.DEV) console.error('Error fetching post-payment page config:', err);
         setError(err.message);
       } finally {
         setLoading(false);
