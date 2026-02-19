@@ -109,6 +109,56 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ success: true, paymentId: flowpayData.payment.id, paymentUrl: flowpayData.payment.paymentUrl, status: flowpayData.payment.status, deliveryToken }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
+    // ==================== CREATE UPSELL card charge (no Firestore order needed) ====================
+    if (action === 'create-upsell' && req.method === 'POST') {
+      const clientIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
+      const rlResult = await checkRateLimitFirestore(`upsell_card_${clientIp}`, 10, 60_000, 300_000);
+      if (!rlResult.allowed) { logRateLimitBlock('flowpay-card-upsell', clientIp, rlResult.attempts); return new Response(JSON.stringify({ success: false, error: 'Muitas tentativas.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
+      const body = await req.json();
+      const { amount, orderId, addonType, description, customer } = body;
+      if (!amount || !orderId || !addonType) return new Response(JSON.stringify({ success: false, error: 'amount, orderId, and addonType are required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const amountNum = Number(amount);
+      if (amountNum < 100) return new Response(JSON.stringify({ success: false, error: 'Valor mínimo é R$ 1,00' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const safeDescription = String(description || `Upsell ${addonType}`).substring(0, 100);
+      const flowpayResponse = await fetch(`${FLOWPAY_CARD_URL}/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-api-key': apiKey },
+        body: JSON.stringify({ value: amountNum, description: safeDescription, customer: customer ? { name: customer.name, email: customer.email, phone: customer.phone, taxId: customer.taxId } : undefined }),
+      });
+      const flowpayData = await flowpayResponse.json();
+      if (!flowpayResponse.ok || !flowpayData.success) { console.error('FlowPay card upsell create error:', flowpayData); return new Response(JSON.stringify({ success: false, error: flowpayData.error || 'Erro ao criar cobrança' }), { status: flowpayResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
+      // Save upsell charge in sale_addons
+      const upsellDocId = `upsell-${orderId}-${addonType}`;
+      try {
+        await addFirestoreDocWithId('sale_addons', upsellDocId, {
+          order_id: orderId, addon_type: addonType, status: 'pending', amount: amountNum / 100,
+          payment_method: 'card', flowpay_charge_id: flowpayData.payment.id,
+          created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        });
+      } catch (e) { console.warn('⚠️ Failed to save upsell addon doc:', e); }
+      console.log(`💳 Card upsell charge created: ${flowpayData.payment.id} for ${addonType} on order ${orderId}`);
+      return new Response(JSON.stringify({ success: true, paymentId: flowpayData.payment.id, paymentUrl: flowpayData.payment.paymentUrl, status: flowpayData.payment.status }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
+    // ==================== UPSELL STATUS (no order ownership check) ====================
+    if (action === 'upsell-status' && req.method === 'GET') {
+      const paymentId = url.searchParams.get('id');
+      if (!paymentId) return new Response(JSON.stringify({ success: false, error: 'Payment ID required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      const statusResponse = await fetch(`${FLOWPAY_CARD_URL}/status?id=${paymentId}`, { headers: { 'x-api-key': apiKey } });
+      const statusData = await statusResponse.json();
+      if (!statusResponse.ok) return new Response(JSON.stringify({ success: false, error: statusData.error || 'Erro ao consultar status' }), { status: statusResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      // If paid, update sale_addons
+      if (statusData.payment?.status === 'COMPLETED') {
+        const upsellResults = await queryFirestore('sale_addons', 'flowpay_charge_id', 'EQUAL', paymentId);
+        if (upsellResults?.[0]?.document) {
+          const docName = upsellResults[0].document.name;
+          const docId = docName.split('/').pop()!;
+          try { await updateFirestoreDoc('sale_addons', docId, { status: 'paid', payment_status: 'paid', updated_at: new Date().toISOString() }); console.log(`✅ Upsell ${docId} marked as paid`); } catch (e) { console.warn('⚠️ Failed to update upsell addon:', e); }
+        }
+      }
+      return new Response(JSON.stringify({ success: true, status: statusData.payment?.status, paidAt: statusData.payment?.paidAt || null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
+
     // ==================== CHECK STATUS ====================
     if (action === 'status' && req.method === 'GET') {
       const paymentId = url.searchParams.get('id');

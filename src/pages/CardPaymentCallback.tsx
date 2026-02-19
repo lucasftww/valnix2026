@@ -14,11 +14,19 @@ export default function CardPaymentCallback() {
   const [status, setStatus] = useState<PaymentStatus>("checking");
   const [pollCount, setPollCount] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const confirmCalledRef = useRef(false); // Prevent double confirm
+  const confirmCalledRef = useRef(false);
 
   const urlOrderId = searchParams.get("order_id");
   const urlPaymentId = searchParams.get("payment_id");
   
+  // Check if this is an upsell callback
+  const upsellContext = (() => {
+    try {
+      const raw = sessionStorage.getItem('valnix_card_upsell');
+      return raw ? JSON.parse(raw) : null;
+    } catch { return null; }
+  })();
+
   const stored = (() => {
     try {
       const raw = sessionStorage.getItem('valnix_card_payment');
@@ -26,88 +34,135 @@ export default function CardPaymentCallback() {
     } catch { return null; }
   })();
 
-  const orderId = urlOrderId || stored?.orderId;
-  const paymentId = urlPaymentId || stored?.paymentId;
+  const isUpsell = !!upsellContext;
+  const orderId = isUpsell ? upsellContext?.orderId : (urlOrderId || stored?.orderId);
+  const paymentId = isUpsell ? upsellContext?.paymentId : (urlPaymentId || stored?.paymentId);
 
   useEffect(() => {
     if (!orderId || !paymentId) return;
 
     const checkStatus = async () => {
       try {
-        const statusHeaders: Record<string, string> = {};
-        if (stored?.deliveryToken) {
-          statusHeaders['x-delivery-token'] = stored.deliveryToken;
-        }
+        if (isUpsell) {
+          // For upsell, use upsell-status action (no auth needed)
+          const res = await invokeFunction('flowpay-card', {
+            method: 'GET',
+            queryParams: { action: 'upsell-status', id: paymentId },
+          });
+          const result = await res.json();
 
-        const res = await invokeFunction('flowpay-card', {
-          method: 'GET',
-          queryParams: { action: 'status', id: paymentId },
-          headers: statusHeaders,
-        });
-        const result = await res.json();
+          if (result.success && result.status === "COMPLETED") {
+            setStatus("paid");
+            if (intervalRef.current) clearInterval(intervalRef.current);
 
-        if (result.success && result.status === "COMPLETED") {
-          setStatus("paid");
-          if (intervalRef.current) clearInterval(intervalRef.current);
-
-          if (!confirmCalledRef.current) {
-            confirmCalledRef.current = true;
-            try {
-              const headers: Record<string, string> = {};
-              if (stored?.deliveryToken) {
-                headers['x-delivery-token'] = stored.deliveryToken;
-              }
-
-              if (stored?.deliveryToken) {
-                const confirmRes = await invokeFunction('flowpay-card', {
-                  method: 'POST',
-                  queryParams: { action: 'confirm' },
-                  headers,
-                  body: { orderId, paymentId },
-                });
-                const confirmResult = await confirmRes.json();
-                if (import.meta.env.DEV) console.log(`🔒 Server-side card confirm result for ${orderId}:`, confirmResult);
-              } else {
-                if (import.meta.env.DEV) console.log(`ℹ️ No auth — card payment will be handled by admin auto-verify`);
-              }
-            } catch (confirmErr) {
-              console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
+            if (!confirmCalledRef.current) {
+              confirmCalledRef.current = true;
+              const nextRoute = upsellContext.nextRoute;
+              const hash = upsellContext.hash || '';
+              sessionStorage.removeItem('valnix_card_upsell');
+              
+              // Build redirect URL
+              const params = new URLSearchParams();
+              params.set("order_id", orderId);
+              if (hash) params.set("hash", hash);
+              
+              const redirectUrl = nextRoute === "/order" && hash
+                ? `/order/${hash}`
+                : nextRoute === "/order"
+                ? "/"
+                : `${nextRoute}?${params.toString()}`;
+              
+              setTimeout(() => navigate(redirectUrl, { replace: true }), 1500);
             }
-
-            sessionStorage.removeItem('valnix_card_payment');
-
-            // Track Purchase events for card payments (inside guard to prevent duplicates)
-            if (stored?.amount && stored?.orderId) {
-              trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
-              sendPurchaseFromClient({
-                orderId,
-                value: stored?.amount,
-                userId: stored?.userId,
-                email: stored?.customerEmail,
-                phone: stored?.customerPhone,
-                name: stored?.customerName,
-                productNames: stored?.productNames,
-                productIds: stored?.productIds,
-                quantities: stored?.quantities,
-                prices: stored?.prices,
-                eventSourceUrl: stored?.eventSourceUrl,
-              });
-            }
-
-            const guestHash = stored?.guestHash;
-            if (guestHash) {
-              setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 1500);
-            } else {
-              setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 1500);
-            }
+          } else if (result.status === "FAILED" || result.status === "CANCELLED") {
+            setStatus("failed");
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            sessionStorage.removeItem('valnix_card_upsell');
+          } else {
+            setStatus("pending");
+          }
+        } else {
+          // Original flow for main order payment
+          const statusHeaders: Record<string, string> = {};
+          if (stored?.deliveryToken) {
+            statusHeaders['x-delivery-token'] = stored.deliveryToken;
           }
 
-        } else if (result.status === "FAILED" || result.status === "CANCELLED") {
-          setStatus("failed");
-          if (intervalRef.current) clearInterval(intervalRef.current);
-          sessionStorage.removeItem('valnix_card_payment');
-        } else {
-          setStatus("pending");
+          const res = await invokeFunction('flowpay-card', {
+            method: 'GET',
+            queryParams: { action: 'status', id: paymentId },
+            headers: statusHeaders,
+          });
+          const result = await res.json();
+
+          if (result.success && result.status === "COMPLETED") {
+            setStatus("paid");
+            if (intervalRef.current) clearInterval(intervalRef.current);
+
+            if (!confirmCalledRef.current) {
+              confirmCalledRef.current = true;
+              try {
+                const headers: Record<string, string> = {};
+                if (stored?.deliveryToken) {
+                  headers['x-delivery-token'] = stored.deliveryToken;
+                }
+
+                if (stored?.deliveryToken) {
+                  const confirmRes = await invokeFunction('flowpay-card', {
+                    method: 'POST',
+                    queryParams: { action: 'confirm' },
+                    headers,
+                    body: { orderId, paymentId },
+                  });
+                  const confirmResult = await confirmRes.json();
+                  if (import.meta.env.DEV) console.log(`🔒 Server-side card confirm result for ${orderId}:`, confirmResult);
+                } else {
+                  if (import.meta.env.DEV) console.log(`ℹ️ No auth — card payment will be handled by admin auto-verify`);
+                }
+              } catch (confirmErr) {
+                console.warn('⚠️ Card confirm call failed (admin auto-verify will retry):', confirmErr);
+              }
+
+              // Store payment_method=card so upsell pages know
+              try {
+                sessionStorage.setItem('valnix_payment_method', 'card');
+              } catch {}
+
+              sessionStorage.removeItem('valnix_card_payment');
+
+              // Track Purchase events
+              if (stored?.amount && stored?.orderId) {
+                trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
+                sendPurchaseFromClient({
+                  orderId,
+                  value: stored?.amount,
+                  userId: stored?.userId,
+                  email: stored?.customerEmail,
+                  phone: stored?.customerPhone,
+                  name: stored?.customerName,
+                  productNames: stored?.productNames,
+                  productIds: stored?.productIds,
+                  quantities: stored?.quantities,
+                  prices: stored?.prices,
+                  eventSourceUrl: stored?.eventSourceUrl,
+                });
+              }
+
+              const guestHash = stored?.guestHash;
+              if (guestHash) {
+                setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}&hash=${guestHash}`), 1500);
+              } else {
+                setTimeout(() => navigate(`/entrega-prioritaria?order_id=${orderId}`), 1500);
+              }
+            }
+
+          } else if (result.status === "FAILED" || result.status === "CANCELLED") {
+            setStatus("failed");
+            if (intervalRef.current) clearInterval(intervalRef.current);
+            sessionStorage.removeItem('valnix_card_payment');
+          } else {
+            setStatus("pending");
+          }
         }
       } catch (err) {
         console.error("Card status check error:", err);
@@ -174,7 +229,7 @@ export default function CardPaymentCallback() {
             </div>
             <h1 className="text-xl font-bold text-foreground mb-2">Pagamento confirmado!</h1>
             <p className="text-muted-foreground text-sm">
-              Redirecionando para a entrega do seu pedido...
+              Redirecionando...
             </p>
           </>
         ) : (
@@ -187,12 +242,14 @@ export default function CardPaymentCallback() {
               O pagamento com cartão não foi concluído ou foi recusado.
             </p>
             <div className="flex gap-3 justify-center">
-              <Button onClick={() => navigate("/checkout")} variant="outline">
-                Tentar novamente
+              <Button onClick={() => navigate(isUpsell ? "/" : "/checkout")} variant="outline">
+                {isUpsell ? "Voltar à loja" : "Tentar novamente"}
               </Button>
-              <Button onClick={() => navigate("/")} variant="ghost">
-                Voltar à loja
-              </Button>
+              {!isUpsell && (
+                <Button onClick={() => navigate("/")} variant="ghost">
+                  Voltar à loja
+                </Button>
+              )}
             </div>
           </>
         )}
