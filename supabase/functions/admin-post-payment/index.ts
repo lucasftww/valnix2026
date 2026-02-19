@@ -2,7 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getFirebaseAccessToken, FIREBASE_PROJECT_ID } from '../_shared/firebase.ts';
 import { verifyAdminToken } from '../_shared/auth.ts';
-import { extractValue, queryCollectionSimple, queryCollectionFiltered, createFirestoreDoc, updateFirestoreDoc, parseFirestoreDoc } from '../_shared/firestore.ts';
+import { extractValue, queryCollectionSimple, queryCollectionFiltered, createFirestoreDoc, updateFirestoreDoc, parseFirestoreDoc, addFirestoreDocWithId } from '../_shared/firestore.ts';
 
 function docToObj(doc: any): Record<string, any> {
   const fields = doc.document?.fields || {};
@@ -125,6 +125,22 @@ Deno.serve(async (req) => {
           fixed++;
         }
         return new Response(JSON.stringify({ success: true, fixed, pending_found: pending.length, all_addons: allAddons.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      if (body.action === "recover-dedup") {
+        // Re-create meta_purchase_events docs for paid orders missing them
+        const orderIds: string[] = body.order_ids;
+        if (!Array.isArray(orderIds) || orderIds.length === 0) return new Response(JSON.stringify({ error: "order_ids array required" }), { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+        let created = 0;
+        for (const oid of orderIds.slice(0, 20)) {
+          const ok = await addFirestoreDocWithId('meta_purchase_events', oid, {
+            sent_at: new Date().toISOString(),
+            source: 'recovery',
+            event_id: `purchase_${oid}_recovery`,
+            created_at: new Date().toISOString(),
+          });
+          if (ok) created++;
+        }
+        return new Response(JSON.stringify({ success: true, created, total: orderIds.length }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
       }
       if (body.action === "seed") {
         const existing = await queryCollectionSimple('post_payment_pages');

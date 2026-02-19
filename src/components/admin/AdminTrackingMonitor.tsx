@@ -162,7 +162,7 @@ export function AdminTrackingMonitor() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Limpar Logs CAPI</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Isso vai remover todos os registros de <strong>capi_event_log</strong> e <strong>meta_purchase_events</strong>. Os contadores serão zerados. Esta ação não pode ser desfeita.
+                  Isso vai remover todos os registros de <strong>capi_event_log</strong> (logs de chamadas). Os contadores de chamadas serão zerados. A cobertura (meta_purchase_events) será mantida. Esta ação não pode ser desfeita.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -496,14 +496,45 @@ export function AdminTrackingMonitor() {
       {Array.isArray(report?.coverage?.missingDetails) && report.coverage.missingDetails.length > 0 && (
         <Card className="border-orange-500/20 bg-orange-500/5">
           <CardHeader className="pb-3">
-            <div className="flex items-center gap-2">
-              <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <AlertTriangle className="h-4 w-4 text-orange-500" />
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className="h-8 w-8 rounded-lg bg-orange-500/10 flex items-center justify-center">
+                  <AlertTriangle className="h-4 w-4 text-orange-500" />
+                </div>
+                <div>
+                  <CardTitle className="text-base text-orange-400">Pedidos sem CAPI</CardTitle>
+                  <CardDescription className="text-xs">Pedidos pagos sem evento Purchase server-side</CardDescription>
+                </div>
               </div>
-              <div>
-                <CardTitle className="text-base text-orange-400">Pedidos sem CAPI</CardTitle>
-                <CardDescription className="text-xs">Pedidos pagos sem evento Purchase server-side</CardDescription>
-              </div>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-8 text-xs gap-1.5 text-orange-400 border-orange-500/30 hover:bg-orange-500/10"
+                disabled={cleaning}
+                onClick={async () => {
+                  try {
+                    const token = requireAdminToken();
+                    const orderIds = report!.coverage.missingDetails.map(m => m.orderId);
+                    const res = await invokeFunction('admin-post-payment', {
+                      method: 'POST',
+                      headers: { 'x-admin-token': token },
+                      body: { action: 'recover-dedup', order_ids: orderIds },
+                    });
+                    const data = await res.json();
+                    if (res.ok && data.success) {
+                      alert(`✅ ${data.created} registro(s) de cobertura recuperados!`);
+                      refetch();
+                    } else {
+                      alert(`❌ Erro: ${data.error || 'Falha ao recuperar'}`);
+                    }
+                  } catch (e: any) {
+                    alert(`❌ Erro: ${e.message}`);
+                  }
+                }}
+              >
+                <Shield className="h-3.5 w-3.5" />
+                Recuperar Cobertura
+              </Button>
             </div>
           </CardHeader>
           <CardContent>
