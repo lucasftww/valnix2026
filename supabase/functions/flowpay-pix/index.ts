@@ -189,9 +189,10 @@ Deno.serve(async (req) => {
       const statusAuthHeader = req.headers.get('authorization'); const statusIdToken = statusAuthHeader?.replace(/^Bearer\s+/i, '');
       let statusCallerUid: string | null = null; let canAttemptSideEffects = false;
       if (statusIdToken) { const fbUser = await verifyFirebaseIdToken(statusIdToken); if (fbUser) statusCallerUid = fbUser.uid; }
-      const ownershipCheck = await getDocFields('ordens', expectedOrderId);
-      if (!ownershipCheck || ownershipCheck.flowpay_charge_id?.stringValue !== chargeId) { const isUpsellOwner = expectedOrderId.startsWith('upsell-'); if (!isUpsellOwner) { console.warn(`🚨 Ownership mismatch: orderId=${expectedOrderId} chargeId=${chargeId}`); return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); } }
-      if (ownershipCheck) { const ownerUid = ownershipCheck.user_id?.stringValue; if (statusCallerUid) { canAttemptSideEffects = (ownerUid === statusCallerUid); } else if (ownerUid?.startsWith('guest_')) { canAttemptSideEffects = true; } }
+      const isUpsellStatus = expectedOrderId.startsWith('upsell-');
+      const ownershipCheck = isUpsellStatus ? null : await getDocFields('ordens', expectedOrderId);
+      if (!isUpsellStatus && (!ownershipCheck || ownershipCheck.flowpay_charge_id?.stringValue !== chargeId)) { console.warn(`🚨 Ownership mismatch: orderId=${expectedOrderId} chargeId=${chargeId}`); return new Response(JSON.stringify({ error: 'Unauthorized' }), { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
+      if (isUpsellStatus) { canAttemptSideEffects = true; } else if (ownershipCheck) { const ownerUid = ownershipCheck.user_id?.stringValue; if (statusCallerUid) { canAttemptSideEffects = (ownerUid === statusCallerUid); } else if (ownerUid?.startsWith('guest_')) { canAttemptSideEffects = true; } }
       const response = await fetch(`${FLOWPAY_BASE_URL}/status?id=${chargeId}`, { headers: { 'x-api-key': apiKey } });
       const data = await response.json();
       if (!response.ok || !data.success) return new Response(JSON.stringify({ error: data.error || 'Failed to check status' }), { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
