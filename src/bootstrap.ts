@@ -16,35 +16,71 @@
 // ── 2. Auto-detect referrer/click IDs and inject UTMs ──
 (function autoDetectUtms() {
   const params = new URLSearchParams(window.location.search);
+  const STORAGE_KEY = 'valnix_utm_params';
+
+  // Helper: persist UTMs to BOTH sessionStorage and localStorage
+  function persistUtms(utms: Record<string, string>) {
+    const json = JSON.stringify(utms);
+    try { sessionStorage.setItem(STORAGE_KEY, json); } catch {}
+    try { localStorage.setItem(STORAGE_KEY, json); } catch {}
+  }
+
+  // 1. Explicit UTMs in URL → highest priority
   if (params.get('utm_source')) {
-    try {
-      const existing: Record<string, string> = {};
-      ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((k) => {
-        const v = params.get(k); if (v) existing[k] = v;
-      });
-      sessionStorage.setItem('valnix_utm_params', JSON.stringify(existing));
-    } catch {}
+    const existing: Record<string, string> = {};
+    ['utm_source', 'utm_medium', 'utm_campaign', 'utm_content', 'utm_term'].forEach((k) => {
+      const v = params.get(k); if (v) existing[k] = v;
+    });
+    const fbclid = params.get('fbclid');
+    if (fbclid) { try { localStorage.setItem('valnix_fbclid', fbclid); } catch {} }
+    persistUtms(existing);
     return;
   }
-  // If UTMs already captured in this session, don't overwrite with auto-detection
-  try { if (sessionStorage.getItem('valnix_utm_params')) return; } catch {}
 
+  // 2. Already captured in this session → don't overwrite
+  try { if (sessionStorage.getItem(STORAGE_KEY)) return; } catch {}
+
+  // 3. Restore from localStorage (survives tab closes / in-app browser → Chrome)
+  try {
+    const stored = localStorage.getItem(STORAGE_KEY);
+    if (stored) {
+      try { sessionStorage.setItem(STORAGE_KEY, stored); } catch {}
+      return;
+    }
+  } catch {}
+
+  // 4. Auto-detect from click IDs (paid traffic)
   const utm: Record<string, string> | null = (() => {
-    // Only auto-detect PAID traffic (click IDs from ad platforms)
+    const fbclid = params.get('fbclid');
+    if (fbclid) {
+      try { localStorage.setItem('valnix_fbclid', fbclid); } catch {}
+      return { utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'facebook_ads' };
+    }
     if (params.get('gclid')) {
       return { utm_source: 'google', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'google_ads' };
-    }
-    if (params.get('fbclid')) {
-      return { utm_source: 'facebook', utm_medium: 'cpc', utm_campaign: params.get('utm_campaign') || 'facebook_ads' };
     }
     return null;
   })();
 
-  if (utm) {
+  // 5. Referrer fallback — if no click ID but came from Facebook/Instagram/Google
+  const finalUtm = utm || (() => {
+    try {
+      const ref = document.referrer.toLowerCase();
+      if (ref.includes('facebook.com') || ref.includes('fb.com') || ref.includes('instagram.com') || ref.includes('l.facebook.com')) {
+        return { utm_source: 'facebook', utm_medium: 'referral', utm_campaign: 'organic_social' };
+      }
+      if (ref.includes('google.com') || ref.includes('google.com.br')) {
+        return { utm_source: 'google', utm_medium: 'organic', utm_campaign: 'organic_search' };
+      }
+    } catch {}
+    return null;
+  })();
+
+  if (finalUtm) {
     const url = new URL(window.location.href);
-    for (const key in utm) { url.searchParams.set(key, utm[key]); }
+    for (const key in finalUtm) { url.searchParams.set(key, finalUtm[key]); }
     window.history.replaceState(null, '', url.toString());
-    try { sessionStorage.setItem('valnix_utm_params', JSON.stringify(utm)); } catch {}
+    persistUtms(finalUtm);
   }
 })();
 
