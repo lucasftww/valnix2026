@@ -356,7 +356,7 @@ export function AdminTrackingMonitor() {
           <CardContent>
             {report?.dedup?.sourceDistribution && Object.keys(report.dedup.sourceDistribution || {}).length > 0 ? (
               <div className="space-y-3">
-                {Object.entries(report.dedup.sourceDistribution || {}).sort((a, b) => b[1] - a[1]).map(([source, count]) => {
+                {Object.entries(report.dedup.sourceDistribution || {}).filter(([source]) => source !== 'recovery').sort((a, b) => b[1] - a[1]).map(([source, count]) => {
                   const total = report.dedup?.totalMetaPurchaseEvents || 1;
                   const pct = (count / total) * 100;
                   const sourceLabel: Record<string, string> = {
