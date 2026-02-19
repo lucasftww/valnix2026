@@ -48,30 +48,33 @@
   }
 })();
 
-// ── 3. Facebook Pixel Base — deferred 3s after load to avoid blocking LCP ──
-// FB SDK is 131 KiB (66% of total JS) — must load AFTER critical paint
+// ── 3. Facebook Pixel Base — deferred 5s after load to avoid blocking LCP/TBT ──
+// FB SDK is 131 KiB (66% of total JS) — must load well AFTER critical paint
 (function initFbPixel() {
   window.addEventListener('load', () => {
     setTimeout(() => {
-      const f = window as any;
-      if (f.fbq) return;
-      const n: any = f.fbq = function () {
-        n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-      };
-      if (!f._fbq) f._fbq = n;
-      n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
-      const t = document.createElement('script');
-      t.async = true;
-      t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-      const s = document.getElementsByTagName('script')[0];
-      s.parentNode!.insertBefore(t, s);
-      f.fbq('set', 'autoConfig', false, '1939179866693535');
-      f.fbq('init', '1939179866693535');
-    }, 3000); // 3s delay after load — ensures LCP is complete
+      const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
+      ric(() => {
+        const f = window as any;
+        if (f.fbq) return;
+        const n: any = f.fbq = function () {
+          n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+        };
+        if (!f._fbq) f._fbq = n;
+        n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+        const t = document.createElement('script');
+        t.async = true;
+        t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+        const s = document.getElementsByTagName('script')[0];
+        s.parentNode!.insertBefore(t, s);
+        f.fbq('set', 'autoConfig', false, '1939179866693535');
+        f.fbq('init', '1939179866693535');
+      });
+    }, 5000); // 5s delay after load + idle callback
   }, { once: true });
 })();
 
-// ── 4. UTMify loader — lazy, guarded, skips admin/checkout ──
+// ── 4. UTMify loader — lazy, guarded, skips admin/checkout, delayed 4s ──
 (function loadUtmify() {
   const path = location.pathname;
   if (/^\/(admin|checkout|card-callback)(\/|$)/.test(path)) return;
@@ -79,16 +82,15 @@
   if ((window as any).__utmify_loaded === true) return;
   (window as any).__utmify_loaded = true;
 
-  const load = () => {
-    if (!document.head) { setTimeout(load, 50); return; }
-    const s = document.createElement('script');
-    s.src = 'https://cdn.utmify.com.br/scripts/utms/latest.js';
-    s.async = true;
-    s.setAttribute('data-utmify-prevent-xcod-sck', '');
-    s.setAttribute('data-utmify-prevent-subids', '');
-    document.head.appendChild(s);
-  };
-
-  const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 200));
-  ric(load);
+  window.addEventListener('load', () => {
+    setTimeout(() => {
+      if (!document.head) return;
+      const s = document.createElement('script');
+      s.src = 'https://cdn.utmify.com.br/scripts/utms/latest.js';
+      s.async = true;
+      s.setAttribute('data-utmify-prevent-xcod-sck', '');
+      s.setAttribute('data-utmify-prevent-subids', '');
+      document.head.appendChild(s);
+    }, 4000);
+  }, { once: true });
 })();

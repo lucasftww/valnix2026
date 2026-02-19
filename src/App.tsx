@@ -1,27 +1,18 @@
-import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { ScrollToTop } from "@/components/ScrollToTop";
-import { useBackRedirect } from "@/hooks/useBackRedirect";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense, useEffect } from "react";
 
+// Lazy-load non-critical UI (Toaster only needed on user actions)
+const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
+
 // Redirect to external URL
 const ExternalRedirect = ({ url }: { url: string }) => {
   useEffect(() => { window.location.href = url; }, [url]);
-  return null;
-};
-
-// Componente interno para usar hooks dentro do BrowserRouter
-const AppContent = () => {
-  useBackRedirect("/");
-  
-  // Prefetch removed from idle — chunks load on hover/touch via ProductCard.
-  // This saves ~1MB of unused JS (Firebase SDK pulled by ProductDetail/Category).
-  
   return null;
 };
 
@@ -56,7 +47,8 @@ const queryClient = new QueryClient({
       refetchOnMount: false,
       refetchOnWindowFocus: false,
       refetchOnReconnect: true,
-      retry: 3,
+      retry: 1, // Reduced from 3 — fewer pending promises = less TBT
+      retryDelay: 2000,
     },
   },
 });
@@ -70,9 +62,10 @@ const App = () => {
       <QueryClientProvider client={queryClient}>
         <TooltipProvider>
             <CartProvider>
-              <Toaster />
+              <Suspense fallback={null}>
+                <Toaster />
+              </Suspense>
                 <BrowserRouter>
-                  <AppContent />
                   <ScrollToTop />
                   
                   <Suspense fallback={

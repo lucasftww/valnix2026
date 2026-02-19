@@ -1,11 +1,11 @@
-import { memo, useState, useCallback } from "react";
-import { Menu } from "lucide-react";
+import { memo, useState, useCallback, lazy, Suspense } from "react";
+import { Menu, ShoppingCart } from "lucide-react";
 import { Button } from "./ui/button";
 import logo from "@/assets/valnix-logo.png";
-import { Link, useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 
 import { SearchBar } from "./SearchBar";
-import { CartSidebar } from "./CartSidebar";
+import { useCart } from "@/contexts/CartContext";
 import { useCategoriesApi } from "@/hooks/useApiData";
 import {
   Sheet,
@@ -15,8 +15,11 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 
+// Lazy-load CartSidebar (pulls in ScrollArea, Separator, more Radix)
+const LazyCartSidebar = lazy(() => import("./CartSidebar").then(m => ({ default: m.CartSidebar })));
+
 const HeaderComponent = () => {
-  const navigate = useNavigate();
+  const { totalItems } = useCart();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [cartOpen, setCartOpen] = useState(false);
   
@@ -90,10 +93,28 @@ const HeaderComponent = () => {
           </div>
         </div>
         
-        {/* Right Section - Actions */}
+        {/* Right Section - Cart */}
         <div className="flex items-center gap-2 flex-shrink-0">
-          {/* Cart Sidebar */}
-          <CartSidebar open={cartOpen} onOpenChange={setCartOpen} />
+          {cartOpen ? (
+            <Suspense fallback={null}>
+              <LazyCartSidebar open={cartOpen} onOpenChange={setCartOpen} />
+            </Suspense>
+          ) : (
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={() => setCartOpen(true)}
+              className="relative h-10 w-10 rounded-full hover:bg-secondary text-foreground hover:text-primary transition-colors"
+              aria-label={`Carrinho${totalItems > 0 ? ` com ${totalItems} itens` : ''}`}
+            >
+              <ShoppingCart className="h-5 w-5" />
+              {totalItems > 0 && (
+                <span className="absolute -top-1 -right-1 bg-primary text-primary-foreground text-[10px] font-bold rounded-full min-w-[18px] h-[18px] flex items-center justify-center px-1 shadow-lg">
+                  {totalItems > 99 ? "99+" : totalItems}
+                </span>
+              )}
+            </Button>
+          )}
         </div>
       </div>
     </header>
