@@ -16,8 +16,8 @@ interface ImageUploaderProps {
 }
 
 const presetConfig = {
-  product: { maxSizeMB: 0.5, maxWidthOrHeight: 800 },
-  icon: { maxSizeMB: 0.2, maxWidthOrHeight: 400 },
+  product: { maxSizeMB: 0.2, maxWidthOrHeight: 600 },
+  icon: { maxSizeMB: 0.1, maxWidthOrHeight: 300 },
 };
 
 /** Convert a File/Blob to base64 string (without the data: prefix) */
