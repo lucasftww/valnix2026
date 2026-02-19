@@ -116,7 +116,7 @@ export function PixPayment({
           handlePaymentSuccess();
         }
       } catch (error) {
-        console.warn('⚠️ Status poll error:', error);
+        if (import.meta.env.DEV) console.warn('⚠️ Status poll error:', error);
       }
     }, 5000);
 

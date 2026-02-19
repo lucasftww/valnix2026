@@ -10,9 +10,10 @@ export const FloatingContactButtons = () => {
 
   // Só mostrar na home e categorias — esconder em admin, produto, checkout, etc.
   const isProductPage = path.startsWith("/product/");
-  const isAdminPage = path.startsWith("/admin");
+  const isAdminPage = path.startsWith("/admin") || path.startsWith("/charles");
   const isCheckoutPage = path.startsWith("/checkout");
-  const shouldShow = !isProductPage && !isAdminPage && !isCheckoutPage;
+  const isPaymentPage = path.startsWith("/card-callback") || path.startsWith("/painel-pagar") || path.startsWith("/entrega-prioritaria") || path.startsWith("/protecao-total");
+  const shouldShow = !isProductPage && !isAdminPage && !isCheckoutPage && !isPaymentPage;
 
   if (!shouldShow || !isVisible) return null;
 
