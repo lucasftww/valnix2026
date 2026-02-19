@@ -313,18 +313,33 @@ export const AdminOrders = () => {
     const todayPaid = todayOrders.filter(o => o.payment_status === 'paid');
     const pendingDelivery = orders.filter(o => o.payment_status === 'paid' && o.status !== 'completed' && o.status !== 'cancelled');
 
+    // Sum paid upsell values
+    let upsellRevenue = 0;
+    let todayUpsellRevenue = 0;
+    if (allAddons) {
+      for (const a of allAddons) {
+        if (a.status === 'paid') {
+          const val = Number(a.amount) || 0;
+          upsellRevenue += val;
+          if (a.paid_at && new Date(a.paid_at) >= today) {
+            todayUpsellRevenue += val;
+          }
+        }
+      }
+    }
+
     return {
       total: orders.length,
       todayCount: todayOrders.length,
-      todayRevenue: todayPaid.reduce((sum, o) => sum + o.total_amount, 0),
-      totalRevenue: paidOrders.reduce((sum, o) => sum + o.total_amount, 0),
+      todayRevenue: todayPaid.reduce((sum, o) => sum + o.total_amount, 0) + todayUpsellRevenue,
+      totalRevenue: paidOrders.reduce((sum, o) => sum + o.total_amount, 0) + upsellRevenue,
+      upsellRevenue,
       pendingDelivery: pendingDelivery.length,
       paidCount: paidOrders.length,
       pixCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'pix' && o.payment_status === 'paid').length,
       cardCount: orders.filter(o => (o.payment_method || (o.payment_status === 'paid' ? 'pix' : null)) === 'card' && o.payment_status === 'paid').length,
-      
     };
-  }, [orders]);
+  }, [orders, allAddons]);
 
   // ── Handlers ────────────────────────────────────────────────────
 
@@ -620,7 +635,12 @@ export const AdminOrders = () => {
                 </div>
               </div>
               <p className="text-2xl font-bold text-green-500">{stats.paidCount}</p>
-              <p className="text-xs text-muted-foreground mt-1">{formatCurrency(stats.totalRevenue)}</p>
+              <p className="text-xs text-muted-foreground mt-1">
+                {formatCurrency(stats.totalRevenue)}
+                {stats.upsellRevenue > 0 && (
+                  <span className="ml-1 text-emerald-500">(⚡+{formatCurrency(stats.upsellRevenue)})</span>
+                )}
+              </p>
             </CardContent>
           </Card>
 
