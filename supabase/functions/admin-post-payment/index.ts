@@ -54,9 +54,15 @@ Deno.serve(async (req) => {
       const addonQueryUrl = `https://firestore.googleapis.com/v1/projects/${FIREBASE_PROJECT_ID}/databases/(default)/documents:runQuery`;
       const addonRes = await fetch(addonQueryUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` }, body: JSON.stringify({ structuredQuery: { from: [{ collectionId: 'sale_addons' }], limit: 10000 } }) });
       const addonResults = addonRes.ok ? await addonRes.json() : [];
-      const addons = (Array.isArray(addonResults) ? addonResults : []).filter((r: any) => r.document).map((r: any) => {
+      console.log(`[admin-post-payment] addon query status: ${addonRes.status}, results count: ${Array.isArray(addonResults) ? addonResults.length : 'not array'}`);
+      const filteredResults = (Array.isArray(addonResults) ? addonResults : []).filter((r: any) => r.document);
+      console.log(`[admin-post-payment] filtered addon docs: ${filteredResults.length}`);
+      if (filteredResults.length > 0) console.log(`[admin-post-payment] sample addon fields:`, JSON.stringify(Object.keys(filteredResults[0].document?.fields || {})));
+      const addons = filteredResults.map((r: any) => {
         const f = r.document?.fields || {};
-        return { id: r.document.name.split('/').pop(), order_id: f?.order_id?.stringValue || '', addon_type: f?.addon_type?.stringValue || '', status: f?.status?.stringValue || '', amount: f?.amount?.doubleValue ?? f?.amount?.integerValue ?? 0, paid_at: f?.paid_at?.stringValue || null, created_at: f?.created_at?.timestampValue || f?.created_at?.stringValue || null };
+        const parsed = { id: r.document.name.split('/').pop(), order_id: f?.order_id?.stringValue || '', addon_type: f?.addon_type?.stringValue || '', status: f?.status?.stringValue || '', amount: f?.amount?.doubleValue ?? f?.amount?.integerValue ?? 0, paid_at: f?.paid_at?.stringValue || f?.paid_at?.timestampValue || null, created_at: f?.created_at?.timestampValue || f?.created_at?.stringValue || null };
+        console.log(`[admin-post-payment] addon parsed: ${parsed.id} order_id=${parsed.order_id} status=${parsed.status} amount=${parsed.amount}`);
+        return parsed;
       });
       return new Response(JSON.stringify({ pages, addons }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
     }
