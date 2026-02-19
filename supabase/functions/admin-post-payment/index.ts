@@ -37,6 +37,28 @@ Deno.serve(async (req) => {
       return new Response(JSON.stringify({ pages }), { headers: { ...corsHeaders, "Content-Type": "application/json", "Cache-Control": "public, max-age=60, s-maxage=120" } });
     }
 
+    // Public POST: track-view (no auth needed)
+    if (req.method === "POST" && !adminToken) {
+      const body = await req.json();
+      if (body.action === "track-view" && body.addon_type) {
+        const docId = crypto.randomUUID();
+        await createFirestoreDoc('sale_addons', docId, {
+          order_id: body.order_id || `lead-${Date.now()}`,
+          addon_type: body.addon_type,
+          status: "viewed",
+          amount: 0,
+          user_id: null,
+          utm_source: body.utm_source || null,
+          utm_medium: body.utm_medium || null,
+          utm_campaign: body.utm_campaign || null,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        });
+        return new Response(JSON.stringify({ success: true }), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ error: "Admin token required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+    }
+
     if (!adminToken) return new Response(JSON.stringify({ error: "Admin token required" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });
     const isValid = await verifyAdminToken(adminToken);
     if (!isValid) return new Response(JSON.stringify({ error: "Invalid or expired admin token" }), { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } });

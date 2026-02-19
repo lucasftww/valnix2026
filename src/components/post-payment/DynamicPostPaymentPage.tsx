@@ -74,21 +74,22 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const [timeLeft, setTimeLeft] = useState(10 * 60);
 
-  // Track page view on mount (fire-and-forget)
+  // Track page view on mount via server (immune to adblockers)
   const viewTracked = useRef(false);
   useEffect(() => {
     if (configLoading || !config || viewTracked.current) return;
     viewTracked.current = true;
-    insertSaleAddonAsync({
-      order_id: orderId,
-      addon_type: addonType,
-      status: "viewed",
-      amount: 0,
-      user_id: null,
-      utm_source: utmSource,
-      utm_medium: utmMedium,
-      utm_campaign: utmCampaign,
-    });
+    invokeFunction("admin-post-payment", {
+      method: "POST",
+      body: {
+        action: "track-view",
+        order_id: orderId,
+        addon_type: addonType,
+        utm_source: utmSource,
+        utm_medium: utmMedium,
+        utm_campaign: utmCampaign,
+      },
+    }).catch(() => {});
   }, [configLoading, config]);
 
   // Build next-route URL helper
