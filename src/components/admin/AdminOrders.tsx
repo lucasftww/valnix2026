@@ -464,17 +464,17 @@ export const AdminOrders = () => {
       const itemsData = await itemsRes.json();
       setDetailItems(Array.isArray(itemsData.items) ? itemsData.items : []);
 
-      // Fetch upsell addons via edge function (service_role) since RLS restricts anon reads
+      // Fetch upsell addons for this specific order
       try {
         const token2 = requireAdminToken();
         const res = await invokeFunction("admin-post-payment", {
           method: "GET",
           headers: { "x-admin-token": token2 },
+          queryParams: { orderId: order.id },
         });
         if (res.ok) {
           const result = await res.json();
-          const orderAddons = (Array.isArray(result.addons) ? result.addons : []).filter((a: any) => a.order_id === order.id);
-          setDetailAddons(orderAddons);
+          setDetailAddons(Array.isArray(result.addons) ? result.addons : []);
         } else {
           setDetailAddons([]);
         }

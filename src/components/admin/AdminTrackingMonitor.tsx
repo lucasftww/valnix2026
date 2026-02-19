@@ -3,6 +3,7 @@ import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useState } from "react";
+import { useToast } from "@/hooks/use-toast";
 import {
   CheckCircle2, AlertTriangle, AlertCircle, RefreshCw,
   Activity, Shield, Zap, Radio, Server, Globe, Flame, Copy as CopyIcon, Trash2
@@ -74,6 +75,7 @@ export function AdminTrackingMonitor() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [hours, setHours] = useState<'24' | '48' | '168'>('24');
   const [cleaning, setCleaning] = useState(false);
+  const { toast } = useToast();
 
   const handleCleanupCapiLogs = async () => {
     setCleaning(true);
@@ -87,10 +89,10 @@ export function AdminTrackingMonitor() {
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
-      alert(`✅ ${data.deleted} logs CAPI removidos com sucesso!`);
+      toast({ title: "Logs limpos", description: `${data.deleted} registros removidos.` });
       refetch();
     } catch (e: any) {
-      alert(`❌ Erro ao limpar logs: ${e.message}`);
+      toast({ title: "Erro ao limpar logs", description: e.message, variant: "destructive" });
     } finally {
       setCleaning(false);
     }
@@ -140,7 +142,7 @@ export function AdminTrackingMonitor() {
             {isFetching && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
           </h2>
           <p className="text-sm text-muted-foreground">
-            Meta CAPI health check • Atualiza a cada 60s
+            Meta CAPI health check • Atualiza a cada 2min
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -162,7 +164,7 @@ export function AdminTrackingMonitor() {
               <AlertDialogHeader>
                 <AlertDialogTitle>Limpar Logs CAPI</AlertDialogTitle>
                 <AlertDialogDescription>
-                  Isso vai remover todos os registros de <strong>capi_event_log</strong> (logs de chamadas). Os contadores de chamadas serão zerados. A cobertura (meta_purchase_events) será mantida. Esta ação não pode ser desfeita.
+                  Isso vai remover todos os registros de <strong>capi_event_log</strong> e <strong>meta_purchase_events</strong>. Os contadores de chamadas e cobertura serão zerados. Esta ação não pode ser desfeita.
                 </AlertDialogDescription>
               </AlertDialogHeader>
               <AlertDialogFooter>
@@ -522,13 +524,13 @@ export function AdminTrackingMonitor() {
                     });
                     const data = await res.json();
                     if (res.ok && data.success) {
-                      alert(`✅ ${data.created} registro(s) de cobertura recuperados!`);
+                      toast({ title: "Cobertura recuperada", description: `${data.created} registro(s) criados.` });
                       refetch();
                     } else {
-                      alert(`❌ Erro: ${data.error || 'Falha ao recuperar'}`);
+                      toast({ title: "Erro", description: data.error || 'Falha ao recuperar', variant: "destructive" });
                     }
                   } catch (e: any) {
-                    alert(`❌ Erro: ${e.message}`);
+                    toast({ title: "Erro", description: e.message, variant: "destructive" });
                   }
                 }}
               >

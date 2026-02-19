@@ -100,7 +100,7 @@ export const AdminDashboard = () => {
         <div>
           <p className="text-sm text-muted-foreground flex items-center gap-1.5">
             <Activity className="h-3.5 w-3.5 text-green-500" />
-            Atualiza a cada 30s
+            Atualiza a cada 2min
           </p>
         </div>
         <div className="flex items-center gap-2">

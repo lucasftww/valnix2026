@@ -368,7 +368,7 @@ export function AdminAnalytics() {
             {isFetching && <RefreshCw className="w-4 h-4 animate-spin text-muted-foreground" />}
           </h2>
           <p className="text-sm text-muted-foreground">
-            {events.length.toLocaleString()} eventos • Atualiza a cada 30s
+            {events.length.toLocaleString()} eventos • Atualiza a cada 2min
           </p>
         </div>
 
