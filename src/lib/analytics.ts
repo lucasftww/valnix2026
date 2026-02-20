@@ -2,7 +2,7 @@
  * Analytics tracking utilities
  * Records events via backend function for the admin funnel dashboard
  */
-import { invokeFunction } from "@/lib/apiHelper";
+import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
 
 function getDeviceType(): string {
   const ua = navigator.userAgent;
@@ -20,7 +20,7 @@ function getBrowser(): string {
   return 'Other';
 }
 
-export async function trackAnalyticsEvent(
+export function trackAnalyticsEvent(
   eventName: string,
   data: {
     userId?: string | null;
@@ -30,27 +30,20 @@ export async function trackAnalyticsEvent(
     contentCategory?: string;
   } = {}
 ) {
-  try {
-    await invokeFunction('track-analytics', {
-      body: {
-        event_name: eventName,
-        user_id: data.userId || null,
-        page_url: window.location.href,
-        device_type: getDeviceType(),
-        browser: getBrowser(),
-        value: data.value || null,
-        currency: data.value ? 'BRL' : null,
-        order_id: data.orderId || null,
-        content_name: data.contentName || null,
-        content_category: data.contentCategory || null,
-      },
-    });
-  } catch (e) {
-    // Best-effort: never spam console in production
-    if (import.meta.env.DEV) {
-      console.warn('⚠️ Analytics event failed:', e);
-    }
-  }
+  // Fire-and-forget — NEVER await analytics during checkout flow
+  // This prevents blocking the main thread during payment submission
+  invokeFunctionFireAndForget('track-analytics', {
+    event_name: eventName,
+    user_id: data.userId || null,
+    page_url: window.location.href,
+    device_type: getDeviceType(),
+    browser: getBrowser(),
+    value: data.value || null,
+    currency: data.value ? 'BRL' : null,
+    order_id: data.orderId || null,
+    content_name: data.contentName || null,
+    content_category: data.contentCategory || null,
+  });
 }
 
 export const trackViewContentEvent = (userId?: string | null, contentName?: string, contentCategory?: string) =>

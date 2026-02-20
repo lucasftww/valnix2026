@@ -117,7 +117,7 @@ export const OrderSummary = memo(function OrderSummary({
           {loading ? (
             <span className="flex items-center gap-2.5">
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span className="animate-pulse">Processando pagamento...</span>
+              <span>Processando pagamento...</span>
             </span>
           ) : (
             "Finalizar Compra"

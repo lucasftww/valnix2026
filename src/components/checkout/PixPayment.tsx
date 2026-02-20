@@ -45,7 +45,7 @@ export function PixPayment({
   onPaymentConfirmed 
 }: PixPaymentProps) {
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(5 * 60);
+  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes — creates urgency
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -191,19 +191,19 @@ export function PixPayment({
       </div>
 
       {/* Timer */}
-      <div className={`p-3 rounded-xl border transition-all ${
+      <div className={`p-3 rounded-xl border transition-colors ${
         isExpired 
-          ? 'bg-red-500/10 border-red-500/20' 
+          ? 'bg-destructive/10 border-destructive/20' 
           : isExpiring 
-            ? 'bg-yellow-500/10 border-yellow-500/20 animate-pulse' 
+            ? 'bg-accent/10 border-accent/20' 
             : 'bg-muted/50 border-border/10'
       }`}>
         <div className="flex items-center justify-between mb-2">
           <div className="flex items-center gap-2">
             {isExpired ? (
-              <AlertCircle className="w-4 h-4 text-red-500" />
+              <AlertCircle className="w-4 h-4 text-destructive" />
             ) : (
-              <Clock className={`w-4 h-4 ${isExpiring ? 'text-yellow-500' : 'text-primary'}`} />
+              <Clock className={`w-4 h-4 ${isExpiring ? 'text-destructive' : 'text-primary'}`} />
             )}
             <span className="font-medium text-sm text-muted-foreground">
               {isExpired ? 'QR Code Expirado' : 'Tempo restante'}
@@ -211,9 +211,9 @@ export function PixPayment({
           </div>
           <span className={`text-xl font-bold font-mono ${
             isExpired 
-              ? 'text-red-500' 
+              ? 'text-destructive' 
               : isExpiring 
-                ? 'text-yellow-500' 
+                ? 'text-destructive' 
                 : 'text-primary'
           }`}>
             {formatTime(timeLeft)}
@@ -221,11 +221,11 @@ export function PixPayment({
         </div>
         <div className="w-full h-2 bg-background rounded-full overflow-hidden">
           <div 
-            className={`h-full rounded-full transition-all duration-1000 ease-linear ${
+            className={`h-full rounded-full transition-[width] duration-1000 ease-linear ${
               isExpired 
-                ? 'bg-red-500' 
+                ? 'bg-destructive' 
                 : isExpiring 
-                  ? 'bg-yellow-500' 
+                  ? 'bg-destructive' 
                   : 'bg-primary'
             }`}
             style={{ width: `${progressPercentage}%` }}
