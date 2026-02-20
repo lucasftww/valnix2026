@@ -10,7 +10,7 @@ export function getCorsHeaders(
   req: Request,
   options?: { headers?: string; methods?: string }
 ): Record<string, string> | null {
-  const allowHeaders = options?.headers ?? "authorization, x-client-info, apikey, content-type";
+  const allowHeaders = options?.headers ?? "authorization, x-client-info, apikey, content-type, x-admin-token, x-delivery-token";
   const allowMethods = options?.methods ?? "GET, POST, OPTIONS";
   const origin = req.headers.get("Origin");
   if (!origin) {
