@@ -212,7 +212,9 @@ export default function Checkout() {
       return;
     }
     
+    // Show loading state IMMEDIATELY — yield to browser to paint before heavy work
     setLoading(true);
+    await new Promise(r => setTimeout(r, 0));
     
     try {
       const orderAmount = finalPrice;
