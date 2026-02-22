@@ -175,7 +175,7 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
           onFocus={handleFocus}
           onKeyDown={handleKeyDown}
           autoComplete="off"
-          className="w-full pl-4 pr-12 h-12 md:h-10 bg-muted/50 border border-border/20 rounded-full text-sm text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/50 focus:border-primary/30 focus:bg-muted/70 transition-all"
+          className="w-full pl-4 pr-12 h-12 md:h-10 bg-muted/50 border border-border/20 rounded-full text-sm text-foreground placeholder:text-muted-foreground/60 focus:ring-1 focus:ring-primary/50 focus:border-primary/30 focus:bg-muted/70 transition-colors"
           aria-label="Buscar produtos"
           role="combobox"
           aria-autocomplete="list"

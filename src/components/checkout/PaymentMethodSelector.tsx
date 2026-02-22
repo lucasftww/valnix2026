@@ -42,7 +42,7 @@ export const PaymentMethodSelector = memo(function PaymentMethodSelector({
           if (!showCard) onMethodChange("card");
           else onMethodChange("pix");
         }}
-        className="flex items-center gap-3 lg:gap-2.5 w-full p-3 lg:p-3 mt-2 lg:mt-1.5 rounded-xl border border-border/10 bg-background hover:border-border/20 transition-all text-left"
+        className="flex items-center gap-3 lg:gap-2.5 w-full p-3 lg:p-3 mt-2 lg:mt-1.5 rounded-xl border border-border/10 bg-background hover:border-border/20 transition-colors text-left"
       >
         <div className="w-5 lg:w-4 h-5 lg:h-4 rounded-full border-2 border-border/30 flex items-center justify-center shrink-0">
           {paymentMethod === "card" && <div className="w-2.5 lg:w-2 h-2.5 lg:h-2 rounded-full bg-foreground" />}

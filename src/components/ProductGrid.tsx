@@ -83,7 +83,7 @@ const ProductGridComponent = () => {
         </p>
       </div>
       
-      <div className="relative group/carousel">
+      <div className="relative group/carousel" style={{ contain: 'layout style' }}>
         <Carousel
           opts={{
             align: "start",

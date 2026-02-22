@@ -47,7 +47,7 @@ export const CategorySidebar = () => {
       <div key={category.id} className={isChild ? "ml-6" : ""}>
         <Link
           to={`/${category.slug}`}
-          className={`flex items-center justify-between py-2.5 px-3 rounded-xl transition-all text-sm ${
+          className={`flex items-center justify-between py-2.5 px-3 rounded-xl transition-colors text-sm ${
             isActive
               ? "bg-foreground text-background font-bold"
               : isChild
