@@ -301,12 +301,20 @@ async function handleDashboardStats(corsHeaders: Record<string, string>): Promis
   const d30Cutoff = new Date(now);
   d30Cutoff.setDate(now.getDate() - 30);
 
-  const [orders, products, productCodes] = await Promise.all([
+  const [orders, products, productCodes, allAddons] = await Promise.all([
     queryOrdersSince(d30Cutoff.toISOString()),
     queryCollectionSimple("products"),
     queryCollectionSimple("product_codes"),
+    queryCollectionSimple("sale_addons"),
   ]);
-  console.log(`📊 dashboard-stats: ${orders.length} orders (last 30d), ${products.length} products`);
+  console.log(`📊 dashboard-stats: ${orders.length} orders (last 30d), ${products.length} products, ${allAddons.length} addons`);
+  
+  // Normalize addon timestamps
+  for (const a of allAddons) {
+    normalizeTimestamp(a, 'paid_at');
+    normalizeTimestamp(a, 'created_at');
+  }
+  const paidAddons = allAddons.filter((a) => a.status === 'paid');
 
   for (const o of orders) {
     normalizeTimestamp(o, 'created_at');
@@ -319,24 +327,35 @@ async function handleDashboardStats(corsHeaders: Record<string, string>): Promis
       return !isNaN(d.getTime()) && d >= cutoff;
     });
 
-  const computePeriod = (periodOrders: Record<string, unknown>[]) => {
+  const computePeriod = (periodOrders: Record<string, unknown>[], periodAddons: Record<string, unknown>[] = []) => {
     const paid = periodOrders.filter((o) => o.payment_status === 'paid');
-    const revenue = paid.reduce((s, o) => s + (Number(o.total_amount) || 0), 0);
+    const orderRevenue = paid.reduce((s, o) => s + (Number(o.total_amount) || 0), 0);
+    const upsellRevenue = periodAddons
+      .filter((a) => a.status === 'paid')
+      .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+    const revenue = Math.round((orderRevenue + upsellRevenue) * 100) / 100;
     return {
       orders: paid.length,
       paidCount: paid.length,
       revenue,
-      avgTicket: paid.length > 0 ? revenue / paid.length : 0,
+      avgTicket: paid.length > 0 ? Math.round((revenue / paid.length) * 100) / 100 : 0,
       failed: periodOrders.filter((o) => o.payment_status === 'failed').length,
       pending: periodOrders.filter((o) => o.payment_status === 'pending').length,
       totalAttempts: periodOrders.length,
+      upsellRevenue: Math.round(upsellRevenue * 100) / 100,
     };
   };
 
+  const filterAddonsByDate = (addons: Record<string, unknown>[], cutoff: Date) =>
+    addons.filter((a) => {
+      const d = new Date((a.paid_at || a.created_at) as string);
+      return !isNaN(d.getTime()) && d >= cutoff;
+    });
+
   const periods = {
-    today: computePeriod(filterByDate(orders, todayCutoff)),
-    '7d': computePeriod(filterByDate(orders, d7Cutoff)),
-    '30d': computePeriod(orders),
+    today: computePeriod(filterByDate(orders, todayCutoff), filterAddonsByDate(paidAddons, todayCutoff)),
+    '7d': computePeriod(filterByDate(orders, d7Cutoff), filterAddonsByDate(paidAddons, d7Cutoff)),
+    '30d': computePeriod(orders, paidAddons),
   };
 
   const allPaid = orders.filter((o) => o.payment_status === 'paid');
@@ -383,7 +402,11 @@ async function handleDashboardStats(corsHeaders: Record<string, string>): Promis
   });
   const revenueByDay = last7Days.map((date) => {
     const dayPaid = orders.filter((o) => (o.created_at as string)?.startsWith(date) && o.payment_status === 'paid');
-    const rev = dayPaid.reduce((s, o) => s + (Number(o.total_amount) || 0), 0);
+    const orderRev = dayPaid.reduce((s, o) => s + (Number(o.total_amount) || 0), 0);
+    const dayUpsellRev = paidAddons
+      .filter((a) => ((a.paid_at || a.created_at) as string)?.startsWith(date))
+      .reduce((s, a) => s + (Number(a.amount) || 0), 0);
+    const rev = Math.round((orderRev + dayUpsellRev) * 100) / 100;
     const dn = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
     return { name: dn.charAt(0).toUpperCase() + dn.slice(1, 3), receita: rev, pedidos: dayPaid.length };
   });
