@@ -61,7 +61,7 @@ const NavigationComponent = () => {
                     <button 
                       onClick={() => navigate(categoryLink)}
                       onMouseEnter={() => handleMouseEnter(category.id, category.slug, true)}
-                      className="inline-flex items-center h-12 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
+                      className="inline-flex items-center h-12 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-colors"
                       aria-label={`Ver produtos de ${category.name}`}
                       aria-expanded={openDropdown === category.id}
                       aria-haspopup="true"
@@ -102,7 +102,7 @@ const NavigationComponent = () => {
                 ) : (
                   <Link 
                     to={categoryLink} 
-                    className="inline-flex items-center h-12 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-all"
+                    className="inline-flex items-center h-12 px-3 text-[13px] font-medium tracking-wide text-muted-foreground hover:text-foreground whitespace-nowrap rounded-full transition-colors"
                     aria-label={`Ver produtos de ${category.name}`}
                   >
                     {category.icon_url && (

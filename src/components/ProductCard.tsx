@@ -38,18 +38,21 @@ const ProductCardComponent = ({
     const conn = (navigator as any).connection;
     if (conn?.saveData || ["slow-2g", "2g"].includes(conn?.effectiveType)) return;
     prefetchTriggered.current = true;
-    // Lazy-import queryClient + fetchProduct only on interaction
-    Promise.all([
-      import("@/pages/ProductDetail"),
-      import("@/App").then(m => m.queryClient),
-      import("@/lib/fetchProduct").then(m => m.fetchProduct),
-    ]).then(([, qc, fetchProduct]) => {
-      qc.prefetchQuery({
-        queryKey: [QUERY_KEYS.PRODUCT, productId],
-        queryFn: () => fetchProduct(productId),
-        ...CACHE_TIMES.MODERATE,
+    // Use requestIdleCallback to avoid blocking click/hover handlers
+    const schedule = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 50));
+    schedule(() => {
+      Promise.all([
+        import("@/pages/ProductDetail"),
+        import("@/App").then(m => m.queryClient),
+        import("@/lib/fetchProduct").then(m => m.fetchProduct),
+      ]).then(([, qc, fetchProduct]) => {
+        qc.prefetchQuery({
+          queryKey: [QUERY_KEYS.PRODUCT, productId],
+          queryFn: () => fetchProduct(productId),
+          ...CACHE_TIMES.MODERATE,
+        }).catch(() => {});
       }).catch(() => {});
-    }).catch(() => {});
+    });
   }, [productId]);
 
   // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
