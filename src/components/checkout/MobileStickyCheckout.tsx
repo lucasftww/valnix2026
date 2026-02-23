@@ -7,6 +7,7 @@ interface MobileStickyCheckoutProps {
   items: CartItem[];
   finalPrice: number;
   loading: boolean;
+  loadingStage?: "idle" | "creating" | "generating";
   paymentMethod: "pix" | "card";
   onSubmit: () => void;
   onRemoveItem?: (id: string) => void;
@@ -17,6 +18,7 @@ const MobileStickyCheckoutComponent = ({
   items,
   finalPrice,
   loading,
+  loadingStage = "idle",
   paymentMethod,
   onSubmit,
   onRemoveItem,
@@ -120,7 +122,7 @@ const MobileStickyCheckoutComponent = ({
         {loading ? (
             <span className="flex items-center gap-2.5">
               <Loader2 className="w-5 h-5 animate-spin" />
-              <span>Processando pagamento...</span>
+              <span>{loadingStage === "generating" ? "Gerando QR Code..." : "Criando pedido..."}</span>
             </span>
           ) : (
             "Finalizar Compra"

@@ -61,6 +61,7 @@ export default function Checkout() {
   const { toast } = useToast();
   
   const [loading, setLoading] = useState(false);
+  const [loadingStage, setLoadingStage] = useState<"idle" | "creating" | "generating">("idle");
   const isSubmittingRef = useRef(false);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
   const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
@@ -214,6 +215,7 @@ export default function Checkout() {
     
     // Show loading state IMMEDIATELY — yield to browser to paint before heavy work
     setLoading(true);
+    setLoadingStage("creating");
     await new Promise(r => setTimeout(r, 0));
     
     try {
@@ -290,6 +292,7 @@ export default function Checkout() {
       }
 
       // ─── PIX PAYMENT ─────────────────────────────────────────────────
+      setLoadingStage("creating");
       const cpfDigits = formData.document.replace(/\D/g, '');
       const firebaseIdToken = null;
       const orderItemsData = items.map(item => ({
@@ -313,6 +316,7 @@ export default function Checkout() {
         utm_term: utmParams.utm_term || null,
       }, orderItemsData, firebaseIdToken);
 
+      setLoadingStage("generating");
       const pixResponse = await invokeFunction('flowpay-pix', {
         method: 'POST',
         queryParams: { action: 'create' },
@@ -361,6 +365,7 @@ export default function Checkout() {
       toast({ title: "Erro ao criar pedido", description: errorMessage, variant: "destructive" });
     } finally {
       setLoading(false);
+      setLoadingStage("idle");
       isSubmittingRef.current = false;
     }
   }, [loading, isFormValid, formData, items, finalPrice, toast, paymentMethod, clearCart, navigate, effectiveUserId]);
@@ -408,6 +413,7 @@ export default function Checkout() {
           items={items}
           finalPrice={finalPrice}
           loading={loading}
+          loadingStage={loadingStage}
           paymentMethod={paymentMethod}
           onSubmit={handleSubmit}
           onRemoveItem={removeItem}
