@@ -85,7 +85,7 @@ async function queryCollection(collectionId: string, filters?: FieldFilter[]) {
 
 Deno.serve(async (req) => {
   const corsHeaders = getCorsHeaders(req, {
-    headers: "content-type, apikey, authorization, x-client-info",
+    headers: "content-type, apikey, authorization, x-client-info, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
     methods: "GET, OPTIONS",
   });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
