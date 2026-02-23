@@ -145,13 +145,28 @@ Deno.serve(async (req) => {
         if (!orderFields) return new Response(JSON.stringify({ error: 'Order not found' }), { status: 404, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
         const at3 = await getFirebaseAccessToken(); const oiUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=100`; const oiRes = await fetch(oiUrl, { headers: { 'Authorization': `Bearer ${at3}` } }); const oiData = oiRes.ok ? await oiRes.json() : { documents: [] }; const orderItemsResults = (oiData.documents || []).map((doc: any) => ({ document: doc }));
         if (!orderItemsResults.length) return new Response(JSON.stringify({ error: 'Order items not found' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-        const productCache = new Map<string, any>(); let recalculatedTotal = 0;
+        // ── Parallelized product reads for faster price recalculation ──
+        const productCache = new Map<string, any>();
+        const validItems: Array<{ productId: string; quantity: number }> = [];
         for (const result of orderItemsResults) {
-          if (!result.document) continue; const itemFields = result.document.fields; const productId = itemFields?.product_id?.stringValue; const quantity = parseInt(itemFields?.quantity?.integerValue || '1');
+          if (!result.document) continue;
+          const itemFields = result.document.fields;
+          const productId = itemFields?.product_id?.stringValue;
+          const quantity = parseInt(itemFields?.quantity?.integerValue || '1');
           if (!productId) return new Response(JSON.stringify({ error: 'Invalid order item' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-          let productFields = productCache.get(productId);
-          if (!productFields) { productFields = await getDocFields('products', productId); if (!productFields) return new Response(JSON.stringify({ error: `Product ${productId} not found` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); productCache.set(productId, productFields); }
-          recalculatedTotal += Number(productFields.price?.doubleValue || productFields.price?.integerValue || 0) * quantity;
+          validItems.push({ productId, quantity });
+        }
+        // Fetch all unique products in parallel
+        const uniqueProductIds = [...new Set(validItems.map(i => i.productId))];
+        const productResults = await Promise.all(uniqueProductIds.map(pid => getDocFields('products', pid).then(f => ({ pid, fields: f }))));
+        for (const { pid, fields } of productResults) {
+          if (!fields) return new Response(JSON.stringify({ error: `Product ${pid} not found` }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+          productCache.set(pid, fields);
+        }
+        let recalculatedTotal = 0;
+        for (const { productId, quantity } of validItems) {
+          const pf = productCache.get(productId)!;
+          recalculatedTotal += Number(pf.price?.doubleValue || pf.price?.integerValue || 0) * quantity;
         }
         const couponId = orderFields.coupon_id?.stringValue;
         if (couponId) { const couponFields = await getDocFields('coupons', couponId); if (couponFields) { const discountType = couponFields.discount_type?.stringValue; const discountValue = Number(couponFields.discount_value?.doubleValue || couponFields.discount_value?.integerValue || 0); const isActive = couponFields.is_active?.booleanValue !== false; const maxUses = couponFields.max_uses?.integerValue ? parseInt(couponFields.max_uses.integerValue) : null; const currentUses = couponFields.current_uses?.integerValue ? parseInt(couponFields.current_uses.integerValue) : 0; if (isActive && (!maxUses || currentUses < maxUses)) { let discountAmount = 0; if (discountType === 'percentage') discountAmount = Math.min(recalculatedTotal * (discountValue / 100), recalculatedTotal); else discountAmount = Math.min(discountValue, recalculatedTotal); recalculatedTotal -= discountAmount; console.log(`🏷️ Coupon ${couponId}: -R$${discountAmount.toFixed(2)}`); } } }
