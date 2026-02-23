@@ -654,9 +654,9 @@ export const AdminProducts = () => {
                   <h3 className="font-semibold text-sm truncate">{product.name}</h3>
                   <p className="text-xs text-muted-foreground truncate">{product.category}</p>
                   <div className="flex items-center gap-2 mt-1">
-                    <span className="text-sm font-bold text-primary">R$ {product.price.toFixed(2).replace('.', ',')}</span>
-                    {product.old_price && product.old_price > product.price && (
-                      <span className="text-xs text-muted-foreground line-through">R$ {product.old_price.toFixed(2).replace('.', ',')}</span>
+                    <span className="text-sm font-bold text-primary">R$ {(product.price ?? 0).toFixed(2).replace('.', ',')}</span>
+                    {product.old_price != null && product.old_price > (product.price ?? 0) && (
+                      <span className="text-xs text-muted-foreground line-through">R$ {(product.old_price ?? 0).toFixed(2).replace('.', ',')}</span>
                     )}
                   </div>
                 </div>
