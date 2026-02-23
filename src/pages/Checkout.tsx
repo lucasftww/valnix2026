@@ -341,7 +341,11 @@ export default function Checkout() {
       }
 
       if (!pixResponse.ok || !pixData.success) {
-        throw new Error(pixData.error || 'Erro ao gerar cobrança PIX');
+        const rawError = pixData.error || '';
+        const isGatewayError = rawError.includes('ADQUIRENTES_FAILURE') || rawError.includes('LOTTOPAY') || rawError.includes('Gateway') || pixResponse.status >= 500;
+        throw new Error(isGatewayError 
+          ? 'O gateway de pagamento está temporariamente indisponível. Tente novamente em alguns segundos.' 
+          : rawError || 'Erro ao gerar cobrança PIX');
       }
 
       startTransition(() => {
