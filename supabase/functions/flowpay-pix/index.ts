@@ -190,6 +190,8 @@ Deno.serve(async (req) => {
       const data = await response.json();
       if (!response.ok || !data.success) return new Response(JSON.stringify({ error: data.error || 'Failed to create PIX charge' }), { status: response.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
       if (orderId && !isUpsell) { try { await updateDocOrThrow('ordens', orderId, { flowpay_charge_id: data.charge.id, ...(utmParameters ? { utm_parameters: utmParameters } : {}), ...(clientIpAtCreate ? { client_ip: clientIpAtCreate } : {}), ...(clientUaAtCreate ? { client_ua: clientUaAtCreate } : {}) }); } catch (err) { console.warn('⚠️ Failed to store chargeId:', err); } }
+      // For upsells, store the chargeId in the corresponding sale_addon document so webhook/polling can find it
+      if (isUpsell) { try { const parts = orderId.replace('upsell-', '').split('-'); const baseOrderId = parts.slice(0, 5).join('-'); const upsellAddonType = parts.slice(5).join('-'); const addonResults = await queryFirestore('sale_addons', 'order_id', 'EQUAL', baseOrderId); if (addonResults) { for (const r of addonResults) { if (r.document?.fields?.addon_type?.stringValue === upsellAddonType) { const addonDocId = r.document.name.split('/').pop()!; await updateDocOrThrow('sale_addons', addonDocId, { flowpay_charge_id: data.charge.id }); console.log(`🔗 Upsell chargeId stored in sale_addon ${addonDocId}`); break; } } } } catch (err) { console.warn('⚠️ Failed to store upsell chargeId:', err); } }
       return new Response(JSON.stringify({ success: true, chargeId: data.charge.id, brCode: data.charge.brCode, qrCodeImage: data.charge.qrCodeImage, expiresAt: data.charge.expiresAt }), { status: 201, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
