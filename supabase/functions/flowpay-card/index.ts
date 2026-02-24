@@ -26,7 +26,7 @@ async function checkPendingOrderFlood(userId: string): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-delivery-token" });
+  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-delivery-token, x-admin-token" });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
