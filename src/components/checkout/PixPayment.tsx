@@ -154,15 +154,50 @@ export function PixPayment({
 
   const handleCopy = async () => {
     try {
-      await navigator.clipboard.writeText(qrCodeText);
+      // Try modern clipboard API first
+      if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+        await navigator.clipboard.writeText(qrCodeText);
+      } else {
+        // Fallback for iOS Safari and older browsers
+        const textarea = document.createElement('textarea');
+        textarea.value = qrCodeText;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        textarea.style.opacity = '0';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        // iOS Safari requires setSelectionRange
+        textarea.setSelectionRange(0, textarea.value.length);
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+      }
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     } catch (error) {
-      toast({
-        title: "Erro ao copiar",
-        description: "Não foi possível copiar o código",
-        variant: "destructive",
-      });
+      // Last resort fallback
+      try {
+        const textarea = document.createElement('textarea');
+        textarea.value = qrCodeText;
+        textarea.setAttribute('readonly', '');
+        textarea.style.position = 'fixed';
+        textarea.style.left = '-9999px';
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        textarea.setSelectionRange(0, textarea.value.length);
+        document.execCommand('copy');
+        document.body.removeChild(textarea);
+        setCopied(true);
+        setTimeout(() => setCopied(false), 2000);
+      } catch {
+        toast({
+          title: "Erro ao copiar",
+          description: "Toque e segure o código acima para copiar manualmente.",
+          variant: "destructive",
+        });
+      }
     }
   };
 

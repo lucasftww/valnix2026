@@ -312,7 +312,29 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
               <Button
                 className="w-full"
-                onClick={() => { navigator.clipboard.writeText(pixData.qrCode); toast({ title: "Copiado!" }); }}
+                onClick={async () => {
+                  try {
+                    if (navigator.clipboard && typeof navigator.clipboard.writeText === 'function') {
+                      await navigator.clipboard.writeText(pixData.qrCode);
+                    } else {
+                      const ta = document.createElement('textarea');
+                      ta.value = pixData.qrCode;
+                      ta.setAttribute('readonly', '');
+                      ta.style.position = 'fixed';
+                      ta.style.left = '-9999px';
+                      ta.style.opacity = '0';
+                      document.body.appendChild(ta);
+                      ta.focus();
+                      ta.select();
+                      ta.setSelectionRange(0, ta.value.length);
+                      document.execCommand('copy');
+                      document.body.removeChild(ta);
+                    }
+                    toast({ title: "Copiado!" });
+                  } catch {
+                    toast({ title: "Erro ao copiar", description: "Toque e segure o código para copiar manualmente.", variant: "destructive" });
+                  }
+                }}
               >
                 Copiar Código PIX
               </Button>
