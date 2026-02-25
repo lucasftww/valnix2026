@@ -23,6 +23,7 @@ interface PixPaymentProps {
   customerId?: string;
   productNames?: string[];
   productIds?: string[];
+  productCategories?: string[];
   quantities?: number[];
   prices?: number[];
   onPaymentConfirmed?: () => void;
@@ -40,6 +41,7 @@ export function PixPayment({
   customerId,
   productNames,
   productIds,
+  productCategories,
   quantities,
   prices,
   onPaymentConfirmed 
@@ -60,7 +62,8 @@ export function PixPayment({
     try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
     
     // Track Purchase event for PIX payments
-    trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
+    const categoryStr = productCategories ? [...new Set(productCategories.filter(Boolean))].join(', ') : undefined;
+    trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '), categoryStr);
     
     // Send Purchase to Meta CAPI
     sendPurchaseFromClient({
@@ -72,6 +75,7 @@ export function PixPayment({
       name: customerName,
       productNames,
       productIds,
+      productCategories,
       quantities,
       prices,
     });

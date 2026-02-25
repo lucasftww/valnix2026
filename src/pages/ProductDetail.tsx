@@ -97,6 +97,7 @@ const ProductDetail = () => {
       name: product.name,
       price: Number(product.price),
       image: product.image_url || '',
+      category: product.category || '',
       delivery_type: product.delivery_type || 'manual',
       type: 'product'
     });

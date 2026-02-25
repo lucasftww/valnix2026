@@ -68,7 +68,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { event_name, event_id, order_id, value, currency = 'BRL', content_name, content_ids, contents, content_type = 'product', num_items, event_source_url, email, phone, first_name, last_name, external_id, client_ip, user_agent, fbc, fbp, test_event_code } = body;
+    const { event_name, event_id, order_id, value, currency = 'BRL', content_name, content_category, content_ids, contents, content_type = 'product', num_items, event_source_url, email, phone, first_name, last_name, external_id, client_ip, user_agent, fbc, fbp, test_event_code } = body;
     if (!event_name) return new Response(JSON.stringify({ error: 'event_name is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
     const resolvedIp = client_ip ? parsePublicIp(client_ip) : parsePublicIp(req.headers.get('x-forwarded-for') || undefined) || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip') || undefined;
@@ -81,9 +81,9 @@ Deno.serve(async (req) => {
     if (event_source_url) eventPayload.event_source_url = event_source_url;
 
     // Build custom_data if ANY custom field is present (not just value)
-    const hasCustomData = value !== undefined || content_name || content_ids || (contents && Array.isArray(contents) && contents.length > 0) || num_items;
+    const hasCustomData = value !== undefined || content_name || content_category || content_ids || (contents && Array.isArray(contents) && contents.length > 0) || num_items;
     if (hasCustomData) {
-      const customData: Record<string, unknown> = { ...(value !== undefined ? { value: Number(value) } : {}), currency, ...(content_name ? { content_name } : {}), ...(content_ids ? { content_ids } : {}), ...(contents && Array.isArray(contents) && contents.length > 0 ? { contents } : {}), content_type, ...(num_items ? { num_items: Number(num_items) } : {}) };
+      const customData: Record<string, unknown> = { ...(value !== undefined ? { value: Number(value) } : {}), currency, ...(content_name ? { content_name } : {}), ...(content_category ? { content_category } : {}), ...(content_ids ? { content_ids } : {}), ...(contents && Array.isArray(contents) && contents.length > 0 ? { contents } : {}), content_type, ...(num_items ? { num_items: Number(num_items) } : {}) };
       eventPayload.custom_data = customData;
     }
 

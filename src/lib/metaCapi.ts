@@ -41,6 +41,7 @@ interface MetaCapiEventData {
   order_id?: string;
   value?: number;
   content_name?: string;
+  content_category?: string;
   content_ids?: string[];
   contents?: ContentItem[];
   num_items?: number;
@@ -99,6 +100,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
             value: data.value,
             currency: 'BRL',
             content_name: data.content_name,
+            content_category: data.content_category,
             content_ids: data.content_ids,
             contents: data.contents,
             num_items: data.num_items,
@@ -150,6 +152,7 @@ export function sendInitiateCheckout(params: {
   value?: number;
   productNames?: string[];
   productIds?: string[];
+  productCategories?: string[];
   quantities?: number[];
   prices?: number[];
 }) {
@@ -160,11 +163,17 @@ export function sendInitiateCheckout(params: {
 
   const nameParts = (params.userName || '').split(' ');
 
+  // Derive content_category from product categories (unique, joined)
+  const contentCategory = params.productCategories
+    ? [...new Set(params.productCategories.filter(Boolean))].join(', ')
+    : undefined;
+
   sendMetaCapiEvent({
     event_name: 'InitiateCheckout',
     event_id: generateEventId('InitiateCheckout', checkoutSessionId),
     value: params.value,
     content_name: params.productNames?.join(', '),
+    content_category: contentCategory,
     content_ids: params.productIds || params.productNames,
     contents,
     num_items: numItems,
@@ -189,6 +198,7 @@ export function sendPurchaseFromClient(params: {
   name?: string;
   productNames?: string[];
   productIds?: string[];
+  productCategories?: string[];
   quantities?: number[];
   prices?: number[];
   eventSourceUrl?: string;
@@ -199,6 +209,11 @@ export function sendPurchaseFromClient(params: {
 
   clearCheckoutSessionId();
 
+  // Derive content_category from product categories
+  const contentCategory = params.productCategories
+    ? [...new Set(params.productCategories.filter(Boolean))].join(', ')
+    : undefined;
+
   // ONLY fire browser Pixel — no CAPI call
   try {
     const eventId = generateEventId('Purchase', params.orderId);
@@ -208,6 +223,7 @@ export function sendPurchaseFromClient(params: {
         value: params.value,
         currency: 'BRL',
         content_name: params.productNames?.join(', '),
+        content_category: contentCategory,
         content_ids: params.productIds || params.productNames,
         contents,
         num_items: numItems,
