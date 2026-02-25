@@ -84,7 +84,28 @@
   }
 })();
 
-// ── 3. Facebook Pixel Base — deferred 5s after load to avoid blocking LCP/TBT ──
+// ── 3. Facebook cookies (fbc/fbp) — ensure they exist for CAPI match quality ──
+(function ensureFbCookies() {
+  const ONE_YEAR = 365 * 24 * 60 * 60;
+  
+  // Generate _fbp if missing (browser ID for Meta matching)
+  if (!document.cookie.match(/(^| )_fbp=/)) {
+    const fbp = `fb.1.${Date.now()}.${Math.floor(Math.random() * 2147483647 + 1000000000)}`;
+    document.cookie = `_fbp=${fbp}; max-age=${ONE_YEAR}; path=/; SameSite=Lax`;
+  }
+
+  // Generate _fbc from fbclid if missing (click ID for Meta attribution)
+  if (!document.cookie.match(/(^| )_fbc=/)) {
+    const params = new URLSearchParams(window.location.search);
+    const fbclid = params.get('fbclid') || (() => { try { return localStorage.getItem('valnix_fbclid'); } catch { return null; } })();
+    if (fbclid) {
+      const fbc = `fb.1.${Date.now()}.${fbclid}`;
+      document.cookie = `_fbc=${fbc}; max-age=${ONE_YEAR}; path=/; SameSite=Lax`;
+    }
+  }
+})();
+
+// ── 4. Facebook Pixel Base — deferred 5s after load to avoid blocking LCP/TBT ──
 // FB SDK is 131 KiB (66% of total JS) — must load well AFTER critical paint
 (function initFbPixel() {
   window.addEventListener('load', () => {
