@@ -132,8 +132,7 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             loop: true,
             dragFree: true,
             skipSnaps: true,
-            duration: 12,
-            slidesToScroll: 1,
+            duration: 14,
             containScroll: "trimSnaps",
           }}
           plugins={[autoplayRef.current]}
