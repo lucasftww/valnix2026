@@ -294,12 +294,12 @@ async function handleDashboardStats(corsHeaders: Record<string, string>): Promis
     new Response(JSON.stringify(data), { headers: { ...corsHeaders, "Content-Type": "application/json" } });
 
   const now = new Date();
-  const todayCutoff = new Date(now);
-  todayCutoff.setHours(0, 0, 0, 0);
-  const d7Cutoff = new Date(now);
-  d7Cutoff.setDate(now.getDate() - 7);
-  const d30Cutoff = new Date(now);
-  d30Cutoff.setDate(now.getDate() - 30);
+  // Use BRT (UTC-3) for "today" calculations so dashboard matches Brazilian users' expectations
+  const BRT_OFFSET_MS = 3 * 3600_000;
+  const brtNow = new Date(now.getTime() - BRT_OFFSET_MS);
+  const todayCutoff = new Date(Date.UTC(brtNow.getUTCFullYear(), brtNow.getUTCMonth(), brtNow.getUTCDate()) + BRT_OFFSET_MS);
+  const d7Cutoff = new Date(todayCutoff.getTime() - 7 * 86400_000);
+  const d30Cutoff = new Date(todayCutoff.getTime() - 30 * 86400_000);
 
   const [orders, products, productCodes, allAddons] = await Promise.all([
     queryOrdersSince(d30Cutoff.toISOString()),
@@ -324,7 +324,7 @@ async function handleDashboardStats(corsHeaders: Record<string, string>): Promis
   const filterByDate = (items: Record<string, unknown>[], cutoff: Date) =>
     items.filter((i) => {
       const d = new Date(i.created_at as string);
-      return !isNaN(d.getTime()) && d >= cutoff;
+      return !isNaN(d.getTime()) && d.getTime() >= cutoff.getTime();
     });
 
   const computePeriod = (periodOrders: Record<string, unknown>[], periodAddons: Record<string, unknown>[] = []) => {
@@ -394,20 +394,28 @@ async function handleDashboardStats(corsHeaders: Record<string, string>): Promis
     .sort((a, b) => b[1].quantity - a[1].quantity)
     .slice(0, 5);
 
-  // Revenue by day (last 7 days)
+  // Revenue by day (last 7 days) — use BRT dates
   const last7Days = Array.from({ length: 7 }, (_, i) => {
-    const d = new Date();
-    d.setDate(d.getDate() - (6 - i));
+    const d = new Date(brtNow.getTime());
+    d.setUTCDate(d.getUTCDate() - (6 - i));
     return d.toISOString().split('T')[0];
   });
   const revenueByDay = last7Days.map((date) => {
-    const dayPaid = orders.filter((o) => (o.created_at as string)?.startsWith(date) && o.payment_status === 'paid');
+    // Compare using BRT date: convert order created_at to BRT, then extract date
+    const dayPaid = orders.filter((o) => {
+      if (o.payment_status !== 'paid') return false;
+      const orderBrt = new Date(new Date(o.created_at as string).getTime() - BRT_OFFSET_MS);
+      return orderBrt.toISOString().split('T')[0] === date;
+    });
     const orderRev = dayPaid.reduce((s, o) => s + (Number(o.total_amount) || 0), 0);
     const dayUpsellRev = paidAddons
-      .filter((a) => ((a.paid_at || a.created_at) as string)?.startsWith(date))
+      .filter((a) => {
+        const addonBrt = new Date(new Date((a.paid_at || a.created_at) as string).getTime() - BRT_OFFSET_MS);
+        return addonBrt.toISOString().split('T')[0] === date;
+      })
       .reduce((s, a) => s + (Number(a.amount) || 0), 0);
     const rev = Math.round((orderRev + dayUpsellRev) * 100) / 100;
-    const dn = new Date(date).toLocaleDateString('pt-BR', { weekday: 'short' });
+    const dn = new Date(date + 'T12:00:00Z').toLocaleDateString('pt-BR', { weekday: 'short' });
     return { name: dn.charAt(0).toUpperCase() + dn.slice(1, 3), receita: rev, pedidos: dayPaid.length };
   });
 
