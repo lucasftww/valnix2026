@@ -26,6 +26,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
     const pendingPixOrders = orders.filter(
       o => o.payment_status !== 'paid' && 
            o.status !== 'cancelled' && 
+           o.payment_method !== 'card' &&
            o.flowpay_charge_id &&
            !verifiedRef.current.has(o.id)
     );
