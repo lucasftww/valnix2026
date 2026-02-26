@@ -212,7 +212,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           amount: amountInCents,
           orderId: `upsell-${orderId}-${addonType}`,
           description: `Upsell ${config.title}`,
-          customer: { name: "Cliente" },
+          addonType,
         },
       });
       const data = await pixResponse.json();
