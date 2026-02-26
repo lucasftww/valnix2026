@@ -207,7 +207,7 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
               <button
                 key={product.id}
                 onClick={() => handleSelect(product.id)}
-                className={`w-full flex items-center gap-3 p-3 min-h-[48px] hover:bg-secondary/80 active:scale-[0.99] transition-all text-left ${
+                className={`w-full flex items-center gap-3 p-3 min-h-[48px] hover:bg-secondary/80 active:scale-[0.99] transition-colors text-left ${
                   index === selectedIndex ? 'bg-secondary/80' : ''
                 }`}
                 role="option"
