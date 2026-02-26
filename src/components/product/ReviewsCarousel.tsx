@@ -7,6 +7,7 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel";
+import { useIsMobile } from "@/hooks/use-mobile";
 import Autoplay from "embla-carousel-autoplay";
 
 interface Review {
@@ -103,8 +104,9 @@ const ReviewCard = ({ review }: { review: Review }) => (
 );
 
 const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
+  const isMobile = useIsMobile();
   const autoplayRef = useRef(
-    Autoplay({ delay: 2500, stopOnInteraction: false, stopOnMouseEnter: true })
+    Autoplay({ delay: 3200, stopOnInteraction: true, stopOnMouseEnter: true })
   );
 
   const allReviews = useMemo(() => {
@@ -129,13 +131,13 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
         <Carousel
           opts={{
             align: "start",
-            loop: true,
-            dragFree: true,
-            skipSnaps: true,
+            loop: allReviews.length > 3,
+            dragFree: false,
+            skipSnaps: false,
             duration: 14,
-            containScroll: "trimSnaps",
+            containScroll: "keepSnaps",
           }}
-          plugins={[autoplayRef.current]}
+          plugins={isMobile ? [] : [autoplayRef.current]}
           className="w-full"
         >
           <CarouselContent className="-ml-3">

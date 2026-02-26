@@ -50,12 +50,12 @@ const IndexComponent = () => {
         
         <ProductGrid />
         <div className="content-lazy">
-          <Suspense fallback={<div className="h-20" />}>
+          <Suspense fallback={<div className="h-[320px] md:h-[420px]" />}>
             <CategoryCards />
           </Suspense>
         </div>
         <div className="content-lazy">
-          <Suspense fallback={<div className="h-20" />}>
+          <Suspense fallback={<div className="h-[220px] md:h-[300px]" />}>
             <FAQ />
           </Suspense>
         </div>

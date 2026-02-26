@@ -2,8 +2,8 @@ import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lu
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
-import visaLogo from "@/assets/visa-logo.png";
-import mastercardLogo from "@/assets/mastercard-logo.png";
+import visaLogo from "@/assets/visa-logo.svg";
+import mastercardLogo from "@/assets/mastercard-logo.svg";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
