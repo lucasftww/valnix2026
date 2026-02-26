@@ -83,14 +83,14 @@ const ProductGridComponent = () => {
         </p>
       </div>
       
-      <div className="relative group/carousel" style={{ contain: 'layout style' }}>
+      <div className="relative group/carousel">
         <Carousel
           opts={{
             align: "start",
             loop: products.length > 4,
             dragFree: true,
             containScroll: "trimSnaps",
-            duration: 20,
+            duration: 14,
             skipSnaps: true,
           }}
           className="w-full"
