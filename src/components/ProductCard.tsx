@@ -66,10 +66,10 @@ const ProductCardComponent = ({
       to={ROUTES.PRODUCT(productId)} 
       className="group block touch-manipulation"
       onMouseEnter={triggerPrefetch}
-      onTouchStart={triggerPrefetch}
+      onFocus={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
-      <Card className="relative overflow-hidden border border-border/10 md:hover:border-border/30 bg-card cursor-pointer h-full rounded-2xl contain-layout md:transition-[border-color] md:duration-300">
+      <Card className="relative overflow-hidden border border-border/10 md:hover:border-border/30 bg-card cursor-pointer h-full rounded-2xl md:transition-[border-color] md:duration-300">
         {/* Badge de desconto */}
         {hasDiscount && (
           <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-discount text-discount-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full">
@@ -87,7 +87,6 @@ const ProductCardComponent = ({
             loading={priority ? "eager" : "lazy"}
             decoding="async"
             sizes="(max-width: 640px) 45vw, (max-width: 768px) 35vw, (max-width: 1024px) 33vw, 25vw"
-            {...(priority ? { fetchPriority: "high" as const } : {})}
             className="w-full h-full object-cover"
           />
         </div>

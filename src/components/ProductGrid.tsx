@@ -88,10 +88,10 @@ const ProductGridComponent = () => {
           opts={{
             align: "start",
             loop: products.length > 4,
-            dragFree: true,
-            containScroll: "trimSnaps",
+            dragFree: false,
+            containScroll: "keepSnaps",
             duration: 14,
-            skipSnaps: true,
+            skipSnaps: false,
           }}
           className="w-full"
         >
@@ -109,7 +109,7 @@ const ProductGridComponent = () => {
                   price={product.price}
                   originalPrice={product.old_price || undefined}
                   discount={product.discount || undefined}
-                  priority={index < 2}
+                  priority={index === 0}
                 />
               </CarouselItem>
             ))}

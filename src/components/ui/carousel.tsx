@@ -49,6 +49,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     );
     const [canScrollPrev, setCanScrollPrev] = React.useState(false);
     const [canScrollNext, setCanScrollNext] = React.useState(false);
+    const [isDragging, setIsDragging] = React.useState(false);
 
     const onSelect = React.useCallback((api: CarouselApi) => {
       if (!api) {
@@ -57,6 +58,14 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 
       setCanScrollPrev(api.canScrollPrev());
       setCanScrollNext(api.canScrollNext());
+    }, []);
+
+    const handlePointerDown = React.useCallback(() => {
+      setIsDragging(true);
+    }, []);
+
+    const handlePointerUp = React.useCallback(() => {
+      setIsDragging(false);
     }, []);
 
     const scrollPrev = React.useCallback(() => {
@@ -96,11 +105,18 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       onSelect(api);
       api.on("reInit", onSelect);
       api.on("select", onSelect);
+      api.on("pointerDown", handlePointerDown);
+      api.on("pointerUp", handlePointerUp);
+      api.on("settle", handlePointerUp);
 
       return () => {
-        api?.off("select", onSelect);
+        api.off("select", onSelect);
+        api.off("reInit", onSelect);
+        api.off("pointerDown", handlePointerDown);
+        api.off("pointerUp", handlePointerUp);
+        api.off("settle", handlePointerUp);
       };
-    }, [api, onSelect]);
+    }, [api, onSelect, handlePointerDown, handlePointerUp]);
 
     return (
       <CarouselContext.Provider
@@ -120,6 +136,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         onKeyDownCapture={handleKeyDown}
         className={cn("relative", className)}
         role="region"
+        data-carousel-dragging={isDragging ? "true" : "false"}
         aria-label="Carrossel de conteúdo"
         {...props}
       >
@@ -139,7 +156,7 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
       <div ref={carouselRef} className="overflow-hidden" style={{ touchAction: 'pan-y pinch-zoom' }}>
         <div
           ref={ref}
-          className={cn("flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}
+          className={cn("carousel-track flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}
           {...props}
         />
       </div>

@@ -49,10 +49,10 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
           opts={{
             align: "start",
             loop: relatedProducts.length > 4,
-            dragFree: true,
-            containScroll: "trimSnaps",
+            dragFree: false,
+            containScroll: "keepSnaps",
             duration: 14,
-            skipSnaps: true,
+            skipSnaps: false,
           }}
           className="w-full"
         >
@@ -71,14 +71,18 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                     to={ROUTES.PRODUCT(product.id)}
                     className="group block h-full"
                   >
-                    <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col contain-layout">
+                    <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col">
                       {/* Imagem */}
-                      <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden contain-layout">
+                      <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden">
                         <img
                           src={product.image_url || ""}
                           alt={product.name}
+                          width={280}
+                          height={374}
                           loading="lazy"
                           decoding="async"
+                          fetchPriority="low"
+                          sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
                           className="w-full h-full object-cover"
                         />
                       </div>

@@ -97,6 +97,10 @@ Deno.serve(async (req) => {
     const slug = url.searchParams.get("slug") || "";
     const id = url.searchParams.get("id") || "";
     const cacheKey = `${type}_${slug || id || "all"}`;
+    const cacheControl =
+      type === "featured" || type === "categories"
+        ? "public, max-age=1800, s-maxage=3600, stale-while-revalidate=86400"
+        : "public, max-age=300, s-maxage=900, stale-while-revalidate=3600";
 
     if (type !== "check-role") {
       const cached = cache.get(cacheKey);
@@ -106,7 +110,7 @@ Deno.serve(async (req) => {
             ...corsHeaders,
             "Content-Type": "application/json",
             "X-Cache": "HIT",
-            "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600",
+            "Cache-Control": cacheControl,
           },
         });
       }
@@ -252,7 +256,7 @@ Deno.serve(async (req) => {
         ...corsHeaders,
         "Content-Type": "application/json",
         "X-Cache": "MISS",
-        "Cache-Control": "public, max-age=120, s-maxage=300, stale-while-revalidate=600",
+        "Cache-Control": cacheControl,
       },
     });
   } catch (error) {

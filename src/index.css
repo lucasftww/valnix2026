@@ -156,6 +156,11 @@ All colors MUST be HSL.
   .scrollbar-hide * {
     touch-action: inherit;
   }
+
+  /* Hint GPU only while the user is actively dragging the carousel */
+  [data-carousel-dragging="true"] .carousel-track {
+    will-change: transform;
+  }
 }
 
 /* Mobile-specific fixes */
