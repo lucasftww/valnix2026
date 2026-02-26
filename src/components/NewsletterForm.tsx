@@ -98,7 +98,7 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
         <Button
           type="submit"
           disabled={isLoading}
-          className="bg-foreground hover:bg-foreground/90 text-background font-medium px-6 py-2 text-xs tracking-wide transition-all disabled:opacity-50 disabled:cursor-not-allowed rounded-full h-10 min-w-[90px]"
+          className="bg-foreground hover:bg-foreground/90 text-background font-medium px-6 py-2 text-xs tracking-wide transition-colors disabled:opacity-50 disabled:cursor-not-allowed rounded-full h-10 min-w-[90px]"
           aria-label={isLoading ? "Processando assinatura" : "Assinar newsletter"}
         >
           {isLoading ? "..." : "Assinar"}

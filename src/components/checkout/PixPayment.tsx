@@ -1,7 +1,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Clock, AlertCircle, CheckCircle } from "lucide-react";
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
@@ -53,8 +53,11 @@ export function PixPayment({
   const navigate = useNavigate();
   const isMobile = useIsMobile();
 
+  // Use ref for handlePaymentSuccess to avoid stale closure in polling effect
+  const paymentSuccessRef = useRef<() => void>(() => {});
+  
   // Callback de confirmação de pagamento
-  const handlePaymentSuccess = async () => {
+  const handlePaymentSuccess = useCallback(async () => {
     if (paymentConfirmed) return;
     setPaymentConfirmed(true);
     
@@ -82,8 +85,6 @@ export function PixPayment({
     
     onPaymentConfirmed?.();
     
-    // Toast removed — visual confirmation on screen is sufficient
-    
     // Use the server-side generated guestHash for redirect
     setTimeout(() => {
       if (guestHash) {
@@ -92,7 +93,10 @@ export function PixPayment({
         navigate(`/entrega-prioritaria?order_id=${orderId}`);
       }
     }, 1500);
-  };
+  }, [paymentConfirmed, amount, orderId, guestHash, customerEmail, customerName, customerPhone, customerId, productNames, productIds, productCategories, quantities, prices, onPaymentConfirmed, navigate]);
+
+  // Keep ref in sync so polling always calls latest version
+  paymentSuccessRef.current = handlePaymentSuccess;
 
   // Track expiry via ref so polling effect doesn't re-run every second
   const expiredRef = useRef(false);
@@ -117,7 +121,7 @@ export function PixPayment({
         if (data.success && data.status === 'COMPLETED') {
           if (import.meta.env.DEV) console.log('✅ Payment confirmed via polling!');
           clearInterval(pollInterval);
-          handlePaymentSuccess();
+          paymentSuccessRef.current();
         }
       } catch (error) {
         if (import.meta.env.DEV) console.warn('⚠️ Status poll error:', error);
@@ -315,7 +319,7 @@ export function PixPayment({
         </div>
         <Button
           size="lg"
-          className={`w-full h-12 font-semibold rounded-xl transition-all duration-150 active:scale-[0.98] ${
+          className={`w-full h-12 font-semibold rounded-xl transition-colors duration-150 active:scale-[0.98] ${
             copied 
               ? 'bg-success hover:bg-success/90' 
               : 'bg-primary hover:bg-primary/90'
