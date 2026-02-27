@@ -72,6 +72,16 @@ const ProductGridComponent = () => {
     );
   }
   
+  const carouselOpts = {
+    align: "start" as const,
+    loop: products.length > 4,
+    dragFree: true,
+    containScroll: "trimSnaps" as const,
+    duration: 12,
+    skipSnaps: false,
+    dragThreshold: 6,
+  };
+
   return (
     <section className="container px-4 md:px-8 py-8 md:py-16">
       <div className="mb-6 md:mb-10">
@@ -84,17 +94,7 @@ const ProductGridComponent = () => {
       </div>
       
       <div className="relative group/carousel">
-        <Carousel
-          opts={{
-            align: "start",
-            loop: products.length > 4,
-            dragFree: false,
-            containScroll: "keepSnaps",
-            duration: 14,
-            skipSnaps: false,
-          }}
-          className="w-full"
-        >
+        <Carousel opts={carouselOpts} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
             {products.map((product, index) => (
               <CarouselItem
@@ -109,7 +109,7 @@ const ProductGridComponent = () => {
                   price={product.price}
                   originalPrice={product.old_price || undefined}
                   discount={product.discount || undefined}
-                  priority={index === 0}
+                  priority={index < 2}
                 />
               </CarouselItem>
             ))}

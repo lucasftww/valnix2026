@@ -25,6 +25,19 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
     [products, currentProductId]
   );
 
+  const carouselOpts = useMemo(
+    () => ({
+      align: "start" as const,
+      loop: relatedProducts.length > 4,
+      dragFree: true,
+      containScroll: "trimSnaps" as const,
+      duration: 12,
+      skipSnaps: false,
+      dragThreshold: 6,
+    }),
+    [relatedProducts.length],
+  );
+
   if (relatedProducts.length === 0) return null;
 
   return (
@@ -45,19 +58,9 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
       {/* Carousel */}
       <div className="relative group/carousel">
-        <Carousel
-          opts={{
-            align: "start",
-            loop: relatedProducts.length > 4,
-            dragFree: false,
-            containScroll: "keepSnaps",
-            duration: 14,
-            skipSnaps: false,
-          }}
-          className="w-full"
-        >
+        <Carousel opts={carouselOpts} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
-            {relatedProducts.map((product) => {
+            {relatedProducts.map((product, index) => {
               const stats = generateConsistentSalesAndReviews(product.id);
               const hasOldPrice =
                 product.old_price && product.old_price > product.price;
@@ -79,9 +82,9 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                           alt={product.name}
                           width={280}
                           height={374}
-                          loading="lazy"
+                          loading={index < 2 ? "eager" : "lazy"}
                           decoding="async"
-                          fetchPriority="low"
+                          fetchPriority={index < 2 ? "high" : "low"}
                           sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
                           className="w-full h-full object-cover"
                         />

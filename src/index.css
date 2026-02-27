@@ -157,9 +157,18 @@ All colors MUST be HSL.
     touch-action: inherit;
   }
 
-  /* Hint GPU only while the user is actively dragging the carousel */
+  .carousel-track {
+    transform: translate3d(0, 0, 0);
+    contain: paint;
+  }
+
   [data-carousel-dragging="true"] .carousel-track {
-    will-change: transform;
+    cursor: grabbing;
+  }
+
+  [data-carousel-dragging="true"] .carousel-track a,
+  [data-carousel-dragging="true"] .carousel-track button {
+    pointer-events: none;
   }
 }
 
