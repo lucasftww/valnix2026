@@ -1,11 +1,11 @@
-import { memo, useCallback, useRef } from "react";
+import { memo, useCallback, useEffect, useRef, useState } from "react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router-dom";
 import { QUERY_KEYS, CACHE_TIMES, formatPrice, ROUTES } from "@/lib/constants";
 import { Star } from "lucide-react";
 
-
+const BLANK_IMAGE_SRC = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 interface ProductCardProps {
   id: string | number;
@@ -30,15 +30,40 @@ const ProductCardComponent = ({
 }: ProductCardProps) => {
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
+  const imageWrapperRef = useRef<HTMLDivElement>(null);
+  const [shouldLoadImage, setShouldLoadImage] = useState(priority);
 
-  // Prefetch on hover/touch — lazy-import queryClient to reduce initial bundle
+  useEffect(() => {
+    if (priority || shouldLoadImage) return;
+
+    const element = imageWrapperRef.current;
+    if (!element || typeof IntersectionObserver === "undefined") {
+      setShouldLoadImage(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries.some((entry) => entry.isIntersecting)) {
+          setShouldLoadImage(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "300px 0px" },
+    );
+
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [priority, shouldLoadImage]);
+
+  // Prefetch on keyboard focus — lazy-import queryClient to reduce initial bundle
   const prefetchTriggered = useRef(false);
   const triggerPrefetch = useCallback(() => {
     if (!productId || prefetchTriggered.current) return;
     const conn = (navigator as any).connection;
     if (conn?.saveData || ["slow-2g", "2g"].includes(conn?.effectiveType)) return;
     prefetchTriggered.current = true;
-    // Use requestIdleCallback to avoid blocking click/hover handlers
+    // Use requestIdleCallback to avoid blocking interactions
     const schedule = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 50));
     schedule(() => {
       Promise.all([
@@ -55,17 +80,14 @@ const ProductCardComponent = ({
     });
   }, [productId]);
 
-  // Prefetch on hover/touch only (removed auto-prefetch on visibility to reduce Firebase reads)
-
   const hasDiscount = discount && discount > 0;
   const hasOriginalPrice = originalPrice && originalPrice > price;
 
   return (
-    <Link 
+    <Link
       ref={cardRef}
-      to={ROUTES.PRODUCT(productId)} 
-      className="group block touch-manipulation"
-      onMouseEnter={triggerPrefetch}
+      to={ROUTES.PRODUCT(productId)}
+      className="group block"
       onFocus={triggerPrefetch}
       aria-label={`Ver produto ${title}`}
     >
@@ -76,18 +98,20 @@ const ProductCardComponent = ({
             -{discount}%
           </Badge>
         )}
-        
+
         {/* Imagem com lazy loading otimizado */}
-        <div className="relative w-full aspect-[4/5] bg-background overflow-hidden">
+        <div ref={imageWrapperRef} className="relative w-full aspect-[4/5] bg-background overflow-hidden">
           <img
-            src={image}
+            src={shouldLoadImage ? image : BLANK_IMAGE_SRC}
             alt={title}
             width={300}
             height={375}
             loading={priority ? "eager" : "lazy"}
             decoding="async"
+            fetchPriority={priority ? "high" : "low"}
             sizes="(max-width: 640px) 45vw, (max-width: 768px) 35vw, (max-width: 1024px) 33vw, 25vw"
             className="w-full h-full object-cover"
+            draggable={false}
           />
         </div>
 

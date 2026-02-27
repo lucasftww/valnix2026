@@ -1,4 +1,4 @@
-import { memo, useRef, useMemo } from "react";
+import { memo, useMemo } from "react";
 import { Star } from "lucide-react";
 import {
   Carousel,
@@ -7,8 +7,6 @@ import {
   CarouselPrevious,
   CarouselNext,
 } from "@/components/ui/carousel";
-import { useIsMobile } from "@/hooks/use-mobile";
-import Autoplay from "embla-carousel-autoplay";
 
 interface Review {
   id: string;
@@ -104,10 +102,6 @@ const ReviewCard = ({ review }: { review: Review }) => (
 );
 
 const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
-  const isMobile = useIsMobile();
-  const autoplayRef = useRef(
-    Autoplay({ delay: 3200, stopOnInteraction: true, stopOnMouseEnter: true })
-  );
 
   const allReviews = useMemo(() => {
     const target = targetCount || reviews.length;
@@ -132,12 +126,12 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
           opts={{
             align: "start",
             loop: allReviews.length > 3,
-            dragFree: false,
+            dragFree: true,
             skipSnaps: false,
-            duration: 14,
-            containScroll: "keepSnaps",
+            duration: 12,
+            containScroll: "trimSnaps",
+            dragThreshold: 6,
           }}
-          plugins={isMobile ? [] : [autoplayRef.current]}
           className="w-full"
         >
           <CarouselContent className="-ml-3">
