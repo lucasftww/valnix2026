@@ -1,6 +1,6 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import { Star } from "lucide-react";
-import Autoplay from "embla-carousel-autoplay";
+import type { EmblaPluginType } from "embla-carousel";
 import {
   Carousel,
   CarouselContent,
@@ -147,6 +147,14 @@ const ReviewsCarousel = ({ reviews, targetCount = 0, category }: ReviewsCarousel
     return [...reviews, ...generateFakeReviews(needed, seed, category)];
   }, [reviews, renderedCount, category]);
 
+  // Lazy-load autoplay
+  const [plugins, setPlugins] = useState<EmblaPluginType[]>([]);
+  useEffect(() => {
+    import("embla-carousel-autoplay").then((mod) => {
+      setPlugins([mod.default({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true })]);
+    });
+  }, []);
+
   if (allReviews.length === 0) return null;
 
   return (
@@ -168,9 +176,7 @@ const ReviewsCarousel = ({ reviews, targetCount = 0, category }: ReviewsCarousel
             dragThreshold: 3,
             inViewThreshold: 0,
           }}
-          plugins={[
-            Autoplay({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true }),
-          ]}
+          plugins={plugins}
           className="w-full"
         >
           <CarouselContent className="-ml-3">

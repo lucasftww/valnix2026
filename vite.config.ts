@@ -90,13 +90,14 @@ export default defineConfig(({ mode }) => ({
     modulePreload: {
       // Only preload chunks that are directly imported (not lazy chunks)
       resolveDependencies: (filename, deps) => {
-        // Skip preloading admin-only, lazy, and Firebase chunks
         return deps.filter(dep => 
           !dep.includes('charts') && 
           !dep.includes('carousel') && 
           !dep.includes('Admin') &&
           !dep.includes('recharts') &&
-          !dep.includes('firebase')
+          !dep.includes('firebase') &&
+          !dep.includes('autoplay') &&
+          !dep.includes('embla')
         );
       },
     },
