@@ -22,7 +22,6 @@ All colors MUST be HSL.
   
   body {
     overscroll-behavior-x: none;
-    overscroll-behavior-y: none;
   }
   
   img {
@@ -157,9 +156,9 @@ All colors MUST be HSL.
   }
 
   .carousel-viewport {
-    touch-action: pan-x pan-y pinch-zoom;
+    touch-action: pan-y pinch-zoom;
     overflow: hidden;
-    overscroll-behavior: contain;
+    overscroll-behavior-x: contain;
   }
 
   .carousel-track {
