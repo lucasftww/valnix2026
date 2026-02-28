@@ -28,12 +28,12 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
   const carouselOpts = useMemo(
     () => ({
       align: "start" as const,
-      loop: relatedProducts.length > 4,
-      dragFree: false,
-      containScroll: "keepSnaps" as const,
-      duration: 20,
-      skipSnaps: false,
-      dragThreshold: 8,
+      loop: relatedProducts.length > 1,
+      dragFree: true,
+      containScroll: "trimSnaps" as const,
+      duration: 24,
+      skipSnaps: true,
+      dragThreshold: 2,
     }),
     [relatedProducts.length],
   );
@@ -84,7 +84,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                           height={374}
                           loading={index < 2 ? "eager" : "lazy"}
                           decoding="async"
-                          fetchPriority={index < 2 ? "high" : "low"}
+                          
                           sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
                           className="w-full h-full object-cover"
                         />
