@@ -158,18 +158,9 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       };
     }, [api, onSelect, handlePointerDown, handlePointerUp, handleScroll, handleSettle]);
 
-    React.useEffect(() => {
-      const node = rootRef.current;
-      if (!node) return;
-
-      node.addEventListener("touchend", handleSettle, { passive: true });
-      node.addEventListener("touchcancel", handleSettle, { passive: true });
-
-      return () => {
-        node.removeEventListener("touchend", handleSettle);
-        node.removeEventListener("touchcancel", handleSettle);
-      };
-    }, [handleSettle]);
+    // Touch end/cancel handling is managed by Embla's settle event.
+    // Manual touchend listeners were causing premature state resets on mobile,
+    // leading to freezes during inertial scrolling.
 
     const contextValue = React.useMemo(
       () => ({

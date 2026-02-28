@@ -129,12 +129,12 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             loop: allReviews.length > 1,
             dragFree: true,
             skipSnaps: true,
-            duration: 24,
+            duration: 16,
             containScroll: "trimSnaps",
-            dragThreshold: 2,
+            dragThreshold: 5,
           }}
           plugins={[
-            Autoplay({ delay: 2000, stopOnInteraction: true, stopOnMouseEnter: true }),
+            Autoplay({ delay: 2000, stopOnInteraction: false, stopOnMouseEnter: true }),
           ]}
           className="w-full"
         >
