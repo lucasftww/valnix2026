@@ -27,7 +27,6 @@ All colors MUST be HSL.
   
   img {
     image-rendering: auto;
-    pointer-events: none;
     -webkit-user-drag: none;
   }
   
@@ -159,10 +158,13 @@ All colors MUST be HSL.
 
   .carousel-viewport {
     touch-action: pan-y pinch-zoom;
+    overflow: hidden;
   }
 
   .carousel-track {
     cursor: grab;
+    will-change: transform;
+    backface-visibility: hidden;
   }
 
   [data-carousel-dragging="true"] .carousel-track {
@@ -172,6 +174,11 @@ All colors MUST be HSL.
   [data-carousel-dragging="true"] .carousel-track a,
   [data-carousel-dragging="true"] .carousel-track button {
     pointer-events: none;
+  }
+
+  /* Isolate each carousel slide to its own paint layer */
+  .carousel-track > div {
+    contain: layout style paint;
   }
 }
 
