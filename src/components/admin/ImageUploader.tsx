@@ -16,9 +16,23 @@ interface ImageUploaderProps {
 }
 
 const presetConfig = {
-  product: { maxSizeMB: 0.2, maxWidthOrHeight: 600 },
-  icon: { maxSizeMB: 0.1, maxWidthOrHeight: 300 },
+  product: { maxSizeMB: 0.15, maxWidthOrHeight: 600 },
+  icon: { maxSizeMB: 0.08, maxWidthOrHeight: 300 },
 };
+
+/** Check if browser supports AVIF encoding via canvas */
+const supportsAvif = (() => {
+  let result: boolean | null = null;
+  return () => {
+    if (result !== null) return result;
+    try {
+      const c = document.createElement('canvas');
+      c.width = 1; c.height = 1;
+      result = c.toDataURL('image/avif').startsWith('data:image/avif');
+    } catch { result = false; }
+    return result;
+  };
+})();
 
 /** Convert a File/Blob to base64 string (without the data: prefix) */
 const fileToBase64 = (file: Blob): Promise<string> =>
@@ -48,33 +62,46 @@ export const ImageUploader = ({
     setPreviewUrl(currentImageUrl || null);
   }, [currentImageUrl]);
 
-  const compressImage = async (file: File): Promise<File> => {
+  const compressImage = async (file: File): Promise<{ compressed: File; outputType: string }> => {
     const config = presetConfig[preset];
+    const useAvif = supportsAvif();
+    const outputType = useAvif ? "image/avif" : "image/webp";
     const options = {
       maxSizeMB: config.maxSizeMB,
       maxWidthOrHeight: config.maxWidthOrHeight,
       useWebWorker: true,
-      fileType: "image/webp" as const,
+      fileType: outputType as any,
+      initialQuality: 0.75,
       onProgress: (progress: number) => {
-        setCompressionProgress(`Otimizando: ${Math.round(progress)}%`);
+        setCompressionProgress(`Otimizando (${useAvif ? 'AVIF' : 'WebP'}): ${Math.round(progress)}%`);
       },
     };
 
     try {
       setCompressionProgress("Iniciando otimização...");
-      const compressedFile = await imageCompression(file, options);
+      let compressedFile = await imageCompression(file, options);
+      
+      // If AVIF attempt produced larger file or failed, fallback to WebP
+      if (useAvif && compressedFile.size > file.size * 0.9) {
+        const webpOptions = { ...options, fileType: "image/webp" as const };
+        const webpFile = await imageCompression(file, webpOptions);
+        if (webpFile.size < compressedFile.size) {
+          compressedFile = webpFile;
+          return { compressed: compressedFile, outputType: "image/webp" };
+        }
+      }
       
       if (import.meta.env.DEV) {
-        console.log(`✅ Imagem otimizada: ${file.name} (${file.type}) → WebP`);
+        console.log(`✅ Imagem otimizada: ${file.name} → ${useAvif ? 'AVIF' : 'WebP'}`);
         console.log(`   Tamanho: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB`);
       }
       
       setCompressionProgress(null);
-      return compressedFile;
+      return { compressed: compressedFile, outputType };
     } catch (error) {
       console.error("Erro ao comprimir imagem:", error);
       setCompressionProgress(null);
-      return file;
+      return { compressed: file, outputType: "image/webp" };
     }
   };
 
@@ -105,20 +132,21 @@ export const ImageUploader = ({
 
     try {
       // Compress
-      const compressedFile = await compressImage(file);
+      const { compressed, outputType } = await compressImage(file);
+      const ext = outputType === 'image/avif' ? 'avif' : 'webp';
 
       // Build unique file name
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.webp`;
+      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
       setCompressionProgress("Enviando para Cloudflare R2...");
 
       const token = requireAdminToken();
 
       // Convert to base64 and upload via edge function
-      const base64 = await fileToBase64(compressedFile);
+      const base64 = await fileToBase64(compressed);
 
       const response = await invokeFunction("upload-r2", {
-        body: { fileBase64: base64, fileName, contentType: "image/webp" },
+        body: { fileBase64: base64, fileName, contentType: outputType },
         headers: { "x-admin-token": token },
       });
 
@@ -132,10 +160,10 @@ export const ImageUploader = ({
       setPreviewUrl(url);
       onImageUploaded(url);
       
-      const savedKB = ((file.size - compressedFile.size) / 1024).toFixed(0);
+      const savedKB = ((file.size - compressed.size) / 1024).toFixed(0);
       toast({
         title: "Sucesso",
-        description: `Imagem enviada! Economizou ${savedKB}KB`
+        description: `Imagem enviada em ${ext.toUpperCase()}! Economizou ${savedKB}KB`
       });
 
     } catch (error) {
@@ -225,9 +253,9 @@ export const ImageUploader = ({
                   <p className="text-xs text-muted-foreground mt-1">
                     JPG, PNG, WEBP ou AVIF (máx. 20MB)
                   </p>
-                   <p className="text-xs text-primary mt-1">
-                     ✓ Otimização automática para WebP → Cloudflare R2
-                   </p>
+                    <p className="text-xs text-primary mt-1">
+                      ✓ Otimização automática AVIF/WebP → Cloudflare R2
+                    </p>
                 </div>
               </>
             )}
