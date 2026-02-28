@@ -19,6 +19,7 @@ interface Review {
 interface ReviewsCarouselProps {
   reviews: Review[];
   targetCount?: number;
+  category?: string;
 }
 
 const MIN_RENDERED_REVIEWS = 8;
@@ -37,14 +38,12 @@ const FAKE_NAMES = [
   "Rodrigo", "Leandro", "Fábio", "Sérgio", "Patrick",
 ];
 
-const FAKE_COMMENTS = [
+const GENERIC_COMMENTS = [
   "veio certinho, muito rápido", "caiu na hora, recomendo demais",
-  "melhor site que já comprei, confiável", "os vp caiu em 2 min, sensacional",
-  "comprei e ja recebi, top demais", "entrega super rapida, amei",
-  "site confiavel, ja é a terceira vez que compro", "veio tudo certo mano",
-  "comprei pra pegar a skin, chegou rapidao", "muito bom, vou comprar de novo",
-  "salvou minha vida, comprei vp e caiu na hora", "rapido e seguro, recomendo",
-  "os vp caiu na conta instantaneo", "otimo atendimento e entrega rapida",
+  "melhor site que já comprei, confiável", "comprei e ja recebi, top demais",
+  "entrega super rapida, amei", "site confiavel, ja é a terceira vez que compro",
+  "veio tudo certo mano", "muito bom, vou comprar de novo",
+  "rapido e seguro, recomendo", "otimo atendimento e entrega rapida",
   "ja indiquei pros meus amigos, muito bom", "perfeito, sem problema nenhum",
   "primeira vez comprando aqui, surpreendeu", "entregou antes do esperado",
   "preço bom e entrega imediata", "confiavel demais, ja comprei varias vezes",
@@ -52,24 +51,52 @@ const FAKE_COMMENTS = [
   "excelente, voltarei a comprar com certeza", "surreal a velocidade da entrega",
   "melhor custo beneficio que achei", "nota 10, entrega instantanea",
   "recomendo pra todo mundo", "nunca tive problema, sempre entrega",
-  "mto bom vei os vp caiu em 2 min", "mlk os vp veio certinho ja to radiante",
   "comprei e nao me arrependi", "site seguro e rapido, aprovado",
-  "ja fiz 5 compras aqui, sempre certo", "os vp cai muito rapido confia",
-  "preco justo e entrega na hora", "confia que é bom demais",
+  "ja fiz 5 compras aqui, sempre certo", "confia que é bom demais",
   "veio tudo certo como prometido", "muito rapido, menos de 5 min",
-  "sensacional a entrega", "top tier site de vp",
 ];
 
-function generateFakeReviews(count: number, seed: number): Review[] {
+const CATEGORY_COMMENTS: Record<string, string[]> = {
+  valorant: [
+    "os vp caiu em 2 min, sensacional", "os vp caiu na conta instantaneo",
+    "comprei pra pegar a skin, chegou rapidao", "salvou minha vida, comprei vp e caiu na hora",
+    "mto bom vei os vp caiu em 2 min", "mlk os vp veio certinho ja to radiante",
+    "os vp cai muito rapido confia", "top tier site de vp",
+    "comprei vp e ja entrou na hora, show", "melhor site pra comprar vp",
+  ],
+  "league-of-legends": [
+    "os rp caiu na hora, muito bom", "comprei rp e veio certinho rapidao",
+    "melhor site pra comprar rp", "os rp caiu em 2 min na conta",
+    "comprei pra pegar skin nova, chegou rapido", "rp caiu instantaneo, recomendo demais",
+    "salvou pra comprar o passe, rp veio rapidao", "comprei rp e ja saí comprando skin",
+    "site top pra comprar rp, nunca deu problema", "os rp veio certinho confia",
+  ],
+  roblox: [
+    "os robux caiu na hora, muito bom", "comprei robux e veio certinho",
+    "melhor site pra comprar robux", "os robux caiu em 2 min na conta",
+    "comprei pro meu filho e ele amou, veio rapido", "robux caiu instantaneo, recomendo",
+    "meu moleque ficou feliz, robux veio rapidao", "comprei robux e ja entrou na conta",
+    "site top pra comprar robux, sempre entrega", "os robux veio certinho confia",
+  ],
+};
+
+function getCommentsForCategory(category?: string): string[] {
+  const catKey = category?.toLowerCase() || "";
+  const specific = CATEGORY_COMMENTS[catKey] || [];
+  return [...specific, ...GENERIC_COMMENTS];
+}
+
+function generateFakeReviews(count: number, seed: number, category?: string): Review[] {
+  const comments = getCommentsForCategory(category);
   const fakes: Review[] = [];
   for (let i = 0; i < count; i++) {
     const idx = (seed + i * 7 + i * i) % FAKE_NAMES.length;
-    const cidx = (seed + i * 13 + i) % FAKE_COMMENTS.length;
+    const cidx = (seed + i * 13 + i) % comments.length;
     fakes.push({
       id: `fake_${seed}_${i}`,
       customer_name: FAKE_NAMES[idx],
       rating: 5,
-      comment: FAKE_COMMENTS[cidx],
+      comment: comments[cidx],
     });
   }
   return fakes;
@@ -105,7 +132,7 @@ const ReviewCard = ({ review }: { review: Review }) => (
   </div>
 );
 
-const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
+const ReviewsCarousel = ({ reviews, targetCount = 0, category }: ReviewsCarouselProps) => {
   const renderedCount = useMemo(() => {
     const requested = targetCount || reviews.length;
     const bounded = Math.min(requested, MAX_RENDERED_REVIEWS);
@@ -117,8 +144,8 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
     if (renderedCount <= reviews.length) return reviews.slice(0, renderedCount);
     const needed = renderedCount - reviews.length;
     const seed = reviews.length > 0 ? reviews[0].customer_name.charCodeAt(0) * 17 : 42;
-    return [...reviews, ...generateFakeReviews(needed, seed)];
-  }, [reviews, renderedCount]);
+    return [...reviews, ...generateFakeReviews(needed, seed, category)];
+  }, [reviews, renderedCount, category]);
 
   if (allReviews.length === 0) return null;
 

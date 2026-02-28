@@ -545,7 +545,7 @@ const ProductDetail = () => {
           </div>
 
           {/* Reviews */}
-          <ReviewsCarousel reviews={reviews} targetCount={productStats.reviewCount} />
+          <ReviewsCarousel reviews={reviews} targetCount={productStats.reviewCount} category={product.category} />
 
           {/* Produtos Relacionados */}
           <Suspense fallback={<div className="h-48 mt-6 animate-pulse bg-muted/10 rounded-2xl" />}>
