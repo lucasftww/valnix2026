@@ -225,7 +225,28 @@
       </div>
     </noscript>
     <!-- noscript pixel removed — no PageView event needed -->
-    <div id="root"></div>
+    <div id="root">
+      <!-- Inline skeleton for instant FCP before JS hydrates -->
+      <div style="min-height:100vh;display:flex;flex-direction:column;background:#000">
+        <header style="position:sticky;top:0;z-index:50;width:100%;border-bottom:1px solid rgba(127,29,29,0.1);background:#000">
+          <div style="max-width:1280px;margin:0 auto;height:56px;display:flex;align-items:center;padding:0 16px">
+            <div style="width:140px;height:44px;background:#111;border-radius:8px"></div>
+            <div style="flex:1"></div>
+            <div style="width:40px;height:40px;background:#111;border-radius:50%"></div>
+          </div>
+        </header>
+        <main style="flex:1;max-width:1280px;margin:0 auto;padding:32px 16px;width:100%">
+          <div style="margin-bottom:24px">
+            <div style="height:28px;width:160px;background:#111;border-radius:6px"></div>
+            <div style="height:16px;width:256px;background:#0a0a0a;border-radius:6px;margin-top:8px"></div>
+          </div>
+          <div style="display:flex;gap:8px;overflow:hidden">
+            <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px"></div>
+            <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px"></div>
+          </div>
+        </main>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

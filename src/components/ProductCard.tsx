@@ -80,8 +80,8 @@ const ProductCardComponent = ({
             width={300}
             height={375}
             loading={priority ? "eager" : "lazy"}
-            decoding="async"
-            
+            decoding={priority ? "sync" : "async"}
+            fetchPriority={priority ? "high" : "auto"}
             sizes="(max-width: 640px) 45vw, (max-width: 768px) 35vw, (max-width: 1024px) 33vw, 25vw"
             className="w-full h-full object-cover"
             draggable={false}
