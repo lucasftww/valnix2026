@@ -29,7 +29,6 @@
           preloaded[src]=true;
           var l=document.createElement('link');
           l.rel='preload';l.as='image';l.href=src;
-          l.crossOrigin='anonymous';
           if(priority)l.fetchPriority='high';
           document.head.appendChild(l);
         }
@@ -258,7 +257,6 @@
             if(el){
               var i=document.createElement('img');
               i.src=img;i.alt='';i.width=300;i.height=375;
-              i.crossOrigin='anonymous';
               i.fetchPriority='high';i.decoding='sync';
               i.style.cssText='width:100%;height:100%;object-fit:cover';
               i.draggable=false;
