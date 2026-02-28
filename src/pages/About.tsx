@@ -79,7 +79,7 @@ export default function About() {
               <ul className="space-y-2">
                 <li>
                   <strong className="text-foreground">Discord:</strong>{" "}
-                  <a href="https://discord.gg/ZYdz9xYdq5" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                  <a href="https://discord.gg/4kpUy45CM8" target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
                     Entre em contato através do nosso servidor
                   </a>
                 </li>
