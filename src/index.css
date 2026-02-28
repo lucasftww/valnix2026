@@ -159,11 +159,15 @@ All colors MUST be HSL.
     touch-action: pan-y pinch-zoom;
     overflow: hidden;
     overscroll-behavior-x: contain;
+    -webkit-overflow-scrolling: touch;
   }
 
   .carousel-track {
     cursor: grab;
     transform: translate3d(0, 0, 0);
+    will-change: transform;
+    backface-visibility: hidden;
+    -webkit-backface-visibility: hidden;
   }
 
   .carousel-track > * {
@@ -172,7 +176,6 @@ All colors MUST be HSL.
 
   [data-carousel-dragging="true"] .carousel-track {
     cursor: grabbing;
-    will-change: transform;
   }
 
 }

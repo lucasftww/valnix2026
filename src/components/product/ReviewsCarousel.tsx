@@ -163,9 +163,10 @@ const ReviewsCarousel = ({ reviews, targetCount = 0, category }: ReviewsCarousel
             loop: allReviews.length > 1,
             dragFree: true,
             skipSnaps: true,
-            duration: 20,
+            duration: 12,
             containScroll: "trimSnaps",
-            dragThreshold: 10,
+            dragThreshold: 3,
+            inViewThreshold: 0,
           }}
           plugins={[
             Autoplay({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true }),

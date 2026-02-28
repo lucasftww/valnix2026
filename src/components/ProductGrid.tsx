@@ -77,9 +77,10 @@ const ProductGridComponent = () => {
     loop: products.length > 1,
     dragFree: true,
     containScroll: "trimSnaps" as const,
-    duration: 20,
+    duration: 12,
     skipSnaps: true,
-    dragThreshold: 10,
+    dragThreshold: 3,
+    inViewThreshold: 0,
   };
 
   return (
