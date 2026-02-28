@@ -51,6 +51,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const [canScrollNext, setCanScrollNext] = React.useState(false);
     const rootRef = React.useRef<HTMLDivElement | null>(null);
     const isDraggingRef = React.useRef(false);
+    const scrollingRef = React.useRef(false);
 
     const onSelect = React.useCallback((api: CarouselApi) => {
       if (!api) return;
@@ -58,30 +59,38 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       setCanScrollNext(api.canScrollNext());
     }, []);
 
+    const setDraggingAttr = React.useCallback((value: boolean) => {
+      const node = rootRef.current;
+      if (node) node.dataset.carouselDragging = value ? "true" : "false";
+    }, []);
+
     const handlePointerDown = React.useCallback(() => {
       isDraggingRef.current = false;
+      scrollingRef.current = false;
     }, []);
 
     const handleScroll = React.useCallback(() => {
+      scrollingRef.current = true;
       if (isDraggingRef.current) return;
       isDraggingRef.current = true;
-      const node = rootRef.current;
-      if (node) node.dataset.carouselDragging = "true";
-    }, []);
+      setDraggingAttr(true);
+    }, [setDraggingAttr]);
 
     const handlePointerUp = React.useCallback(() => {
-      // Reset dragging immediately on pointer up so clicks aren't blocked
-      // settle can be delayed due to deceleration animation
-      isDraggingRef.current = false;
-      const node = rootRef.current;
-      if (node) node.dataset.carouselDragging = "false";
-    }, []);
+      // If no scroll happened (pure tap/click), reset immediately
+      if (!scrollingRef.current) {
+        isDraggingRef.current = false;
+        setDraggingAttr(false);
+      }
+      // If scrolling (inertia active), let settle handle the reset
+      // This prevents the flicker from toggling dragging on/off mid-inertia
+    }, [setDraggingAttr]);
 
     const handleSettle = React.useCallback(() => {
       isDraggingRef.current = false;
-      const node = rootRef.current;
-      if (node) node.dataset.carouselDragging = "false";
-    }, []);
+      scrollingRef.current = false;
+      setDraggingAttr(false);
+    }, [setDraggingAttr]);
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev();

@@ -163,11 +163,11 @@ All colors MUST be HSL.
 
   .carousel-track {
     cursor: grab;
-    will-change: transform;
     backface-visibility: hidden;
   }
 
   [data-carousel-dragging="true"] .carousel-track {
+    will-change: transform;
     cursor: grabbing;
   }
 
