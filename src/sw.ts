@@ -48,10 +48,10 @@ registerRoute(
 // ── 2. Google Fonts stylesheet ──
 registerRoute(
   ({ url }) => url.origin === 'https://fonts.googleapis.com',
-  new CacheFirst({
+  new StaleWhileRevalidate({
     cacheName: 'google-fonts-cache',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }),
+      new ExpirationPlugin({ maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 30 }),
       cacheableOk,
     ],
   })
@@ -63,7 +63,7 @@ registerRoute(
   new CacheFirst({
     cacheName: 'gstatic-fonts-cache',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 10, maxAgeSeconds: 60 * 60 * 24 * 365 }),
+      new ExpirationPlugin({ maxEntries: 5, maxAgeSeconds: 60 * 60 * 24 * 30 }),
       cacheableOk,
     ],
   })
@@ -75,7 +75,7 @@ registerRoute(
   new CacheFirst({
     cacheName: 'r2-images-cache',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 300, maxAgeSeconds: 60 * 60 * 24 * 90 }),
+      new ExpirationPlugin({ maxEntries: 150, maxAgeSeconds: 60 * 60 * 24 * 30 }),
       cacheableOk,
     ],
   })
@@ -89,13 +89,13 @@ registerRoute(
   new CacheFirst({
     cacheName: 'supabase-images-cache',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 }),
+      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 14 }),
       cacheableOk,
     ],
   })
 );
 
-// ── 5. Discord images ──
+// ── 6. Discord images ──
 registerRoute(
   ({ url }) =>
     (url.hostname === 'media.discordapp.net' || url.hostname === 'cdn.discordapp.com') &&
@@ -103,13 +103,13 @@ registerRoute(
   new CacheFirst({
     cacheName: 'discord-images-cache',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 200, maxAgeSeconds: 60 * 60 * 24 * 30 }),
+      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 14 }),
       cacheableOk,
     ],
   })
 );
 
-// ── 6. Local images ──
+// ── 7. Local images ──
 registerRoute(
   ({ url }) =>
     url.origin === self.location.origin &&
@@ -117,7 +117,7 @@ registerRoute(
   new CacheFirst({
     cacheName: 'local-images-cache',
     plugins: [
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 90 }),
+      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 * 30 }),
       cacheableOk,
     ],
   })

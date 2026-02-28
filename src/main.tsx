@@ -1,6 +1,11 @@
 // Bootstrap scripts (token strip, UTM detection, FB Pixel, UTMify loader)
-// Must run before React to capture URL params early
-import "./bootstrap";
+// Deferred to avoid blocking FCP — URL params are captured async
+const loadBootstrap = () => import("./bootstrap");
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(loadBootstrap);
+} else {
+  setTimeout(loadBootstrap, 50);
+}
 
 // Pre-warm handled by inline <script> in index.html (starts before JS bundle parses).
 // These calls reuse the global __API_PREFETCH_* promises — zero extra network requests.
