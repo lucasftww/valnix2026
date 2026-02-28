@@ -1,11 +1,9 @@
-import { memo, useCallback, useEffect, useRef, useState } from "react";
+import { memo, useCallback, useRef } from "react";
 import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router-dom";
 import { QUERY_KEYS, CACHE_TIMES, formatPrice, ROUTES } from "@/lib/constants";
 import { Star } from "lucide-react";
-
-const BLANK_IMAGE_SRC = "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==";
 
 interface ProductCardProps {
   id: string | number;
@@ -30,31 +28,6 @@ const ProductCardComponent = ({
 }: ProductCardProps) => {
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
-  const imageWrapperRef = useRef<HTMLDivElement>(null);
-  const [shouldLoadImage, setShouldLoadImage] = useState(priority);
-
-  useEffect(() => {
-    if (priority || shouldLoadImage) return;
-
-    const element = imageWrapperRef.current;
-    if (!element || typeof IntersectionObserver === "undefined") {
-      setShouldLoadImage(true);
-      return;
-    }
-
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries.some((entry) => entry.isIntersecting)) {
-          setShouldLoadImage(true);
-          observer.disconnect();
-        }
-      },
-      { rootMargin: "300px 0px" },
-    );
-
-    observer.observe(element);
-    return () => observer.disconnect();
-  }, [priority, shouldLoadImage]);
 
   // Prefetch on keyboard focus — lazy-import queryClient to reduce initial bundle
   const prefetchTriggered = useRef(false);
@@ -99,10 +72,10 @@ const ProductCardComponent = ({
           </Badge>
         )}
 
-        {/* Imagem com lazy loading otimizado */}
-        <div ref={imageWrapperRef} className="relative w-full aspect-[4/5] bg-background overflow-hidden">
+        {/* Imagem otimizada (sem placeholder preto durante drag) */}
+        <div className="relative w-full aspect-[4/5] bg-muted/20 overflow-hidden">
           <img
-            src={shouldLoadImage ? image : BLANK_IMAGE_SRC}
+            src={image}
             alt={title}
             width={300}
             height={375}
