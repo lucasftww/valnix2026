@@ -1,4 +1,4 @@
-import { Mail, MessageCircle, Shield, ArrowUp, Headphones, RefreshCcw } from "lucide-react";
+import { Mail, MessageCircle, Shield, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
@@ -31,19 +31,12 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const trustBadges = [
-    { icon: <Shield className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Compra Segura", desc: "Ambiente seguro para pagamentos online" },
-    { icon: <Mail className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Envio Imediato", desc: "Envio imediato via E-mail após a compra" },
-    { icon: <Headphones className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Suporte Profissional", desc: "Equipe de suporte das 10h às 23h diariamente" },
-    { icon: <RefreshCcw className="w-6 h-6 text-primary" strokeWidth={1.5} />, title: "Entrega ou Reembolso", desc: "Caso haja qualquer tipo de problema, devolvemos seu dinheiro integralmente!" },
-  ];
-
   return (
     <footer className="w-full bg-muted/20 border-t border-border/10 mt-16 content-lazy">
       {/* Main Footer Content */}
       {showFullVersion && (
         <>
-          {/* Back to Top Button - Only on homepage */}
+          {/* Back to Top Button */}
           <div className="border-b border-border/30 py-4">
             <div className="container px-4 md:px-8 flex justify-center">
               <Button 
@@ -56,38 +49,6 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
               </Button>
             </div>
           </div>
-
-          {/* Trust Badges */}
-          <div className="bg-muted/30 py-8 border-b border-border/30">
-            <div className="container px-4 md:px-8">
-              {isMobile ? (
-                <div className="flex gap-4 overflow-x-auto snap-x snap-mandatory scrollbar-hide -mx-4 px-4" style={{ WebkitOverflowScrolling: 'touch' }}>
-                  {trustBadges.map((badge) => (
-                    <div key={badge.title} className="snap-start shrink-0 w-[75%] flex items-start gap-3">
-                      <div className="flex-shrink-0">{badge.icon}</div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-foreground mb-1">{badge.title}</h4>
-                        <p className="text-xs text-muted-foreground">{badge.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
-                  {trustBadges.map((badge) => (
-                    <div key={badge.title} className="flex items-start gap-3">
-                      <div className="flex-shrink-0">{badge.icon}</div>
-                      <div>
-                        <h4 className="text-sm font-semibold text-foreground mb-1">{badge.title}</h4>
-                        <p className="text-xs text-muted-foreground">{badge.desc}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-        
         </>
       )}
 
