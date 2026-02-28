@@ -162,7 +162,7 @@ All colors MUST be HSL.
   }
 
   .carousel-track {
-    transform: translate3d(0, 0, 0);
+    cursor: grab;
   }
 
   [data-carousel-dragging="true"] .carousel-track {
