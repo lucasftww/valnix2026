@@ -65,7 +65,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
                 <ul className="space-y-3">
                   <li>
                     <a 
-                      href="https://discord.gg/ZYdz9xYdq5" 
+                    href="https://discord.gg/4kpUy45CM8" 
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-foreground hover:text-primary transition-colors flex items-center gap-2"
@@ -181,7 +181,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
             <ul className="space-y-3">
               <li>
                 <a 
-                  href="https://discord.gg/ZYdz9xYdq5" 
+                  href="https://discord.gg/4kpUy45CM8" 
                   target="_blank"
                   rel="noopener noreferrer"
                   className="text-sm text-muted-foreground hover:text-primary transition-colors flex items-center gap-2"
