@@ -162,13 +162,11 @@ All colors MUST be HSL.
   }
 
   .carousel-track {
-    -webkit-backface-visibility: hidden;
-    backface-visibility: hidden;
+    transform: translate3d(0, 0, 0);
   }
 
   [data-carousel-dragging="true"] .carousel-track {
     cursor: grabbing;
-    will-change: transform;
   }
 
   [data-carousel-dragging="true"] .carousel-track a,

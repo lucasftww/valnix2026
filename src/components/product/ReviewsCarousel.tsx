@@ -125,12 +125,12 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
         <Carousel
           opts={{
             align: "start",
-            loop: allReviews.length > 3,
-            dragFree: false,
-            skipSnaps: false,
-            duration: 20,
-            containScroll: "keepSnaps",
-            dragThreshold: 8,
+            loop: allReviews.length > 1,
+            dragFree: true,
+            skipSnaps: true,
+            duration: 24,
+            containScroll: "trimSnaps",
+            dragThreshold: 2,
           }}
           className="w-full"
         >

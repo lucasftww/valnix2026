@@ -74,12 +74,12 @@ const ProductGridComponent = () => {
   
   const carouselOpts = {
     align: "start" as const,
-    loop: products.length > 4,
-    dragFree: false,
-    containScroll: "keepSnaps" as const,
-    duration: 20,
-    skipSnaps: false,
-    dragThreshold: 8,
+    loop: products.length > 1,
+    dragFree: true,
+    containScroll: "trimSnaps" as const,
+    duration: 24,
+    skipSnaps: true,
+    dragThreshold: 2,
   };
 
   return (
