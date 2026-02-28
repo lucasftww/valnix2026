@@ -31,9 +31,10 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
       loop: relatedProducts.length > 1,
       dragFree: true,
       containScroll: "trimSnaps" as const,
-      duration: 20,
+      duration: 12,
       skipSnaps: true,
-      dragThreshold: 10,
+      dragThreshold: 3,
+      inViewThreshold: 0,
     }),
     [relatedProducts.length],
   );
