@@ -1,5 +1,6 @@
 import { memo, useMemo } from "react";
 import { Star } from "lucide-react";
+import Autoplay from "embla-carousel-autoplay";
 import {
   Carousel,
   CarouselContent,
@@ -132,6 +133,9 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             containScroll: "trimSnaps",
             dragThreshold: 2,
           }}
+          plugins={[
+            Autoplay({ delay: 2000, stopOnInteraction: true, stopOnMouseEnter: true }),
+          ]}
           className="w-full"
         >
           <CarouselContent className="-ml-3">
