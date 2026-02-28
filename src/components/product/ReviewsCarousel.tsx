@@ -161,9 +161,9 @@ const ReviewsCarousel = ({ reviews, targetCount = 0, category }: ReviewsCarousel
           opts={{
             align: "start",
             loop: allReviews.length > 1,
-            dragFree: false,
-            skipSnaps: false,
-            duration: 18,
+            dragFree: true,
+            skipSnaps: true,
+            duration: 20,
             containScroll: "trimSnaps",
             dragThreshold: 10,
           }}

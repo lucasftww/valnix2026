@@ -29,10 +29,10 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
     () => ({
       align: "start" as const,
       loop: relatedProducts.length > 1,
-      dragFree: false,
+      dragFree: true,
       containScroll: "trimSnaps" as const,
-      duration: 18,
-      skipSnaps: false,
+      duration: 20,
+      skipSnaps: true,
       dragThreshold: 10,
     }),
     [relatedProducts.length],
