@@ -3,7 +3,7 @@ import { getCorsHeaders } from '../_shared/cors.ts';
 import { getFirebaseAccessToken, FIREBASE_PROJECT_ID } from '../_shared/firebase.ts';
 
 const MAX_FILE_SIZE = 5 * 1024 * 1024;
-const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif"];
+const ALLOWED_CONTENT_TYPES = ["image/webp", "image/png", "image/jpeg", "image/jpg", "image/gif", "image/avif"];
 const FIREBASE_API_KEY = Deno.env.get('FIREBASE_WEB_API_KEY') || '';
 
 // ── Admin check via Firestore user_roles ───────────────────────────
