@@ -50,6 +50,8 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const [canScrollPrev, setCanScrollPrev] = React.useState(false);
     const [canScrollNext, setCanScrollNext] = React.useState(false);
     const rootRef = React.useRef<HTMLDivElement | null>(null);
+    const isPointerDownRef = React.useRef(false);
+    const hasDraggedRef = React.useRef(false);
 
     const setDraggingAttribute = React.useCallback((dragging: boolean) => {
       if (!rootRef.current) return;
@@ -66,11 +68,21 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     }, []);
 
     const handlePointerDown = React.useCallback(() => {
-      setDraggingAttribute(true);
+      isPointerDownRef.current = true;
+      hasDraggedRef.current = false;
+      setDraggingAttribute(false);
     }, [setDraggingAttribute]);
 
     const handlePointerUp = React.useCallback(() => {
+      isPointerDownRef.current = false;
+      hasDraggedRef.current = false;
       setDraggingAttribute(false);
+    }, [setDraggingAttribute]);
+
+    const handleScroll = React.useCallback(() => {
+      if (!isPointerDownRef.current || hasDraggedRef.current) return;
+      hasDraggedRef.current = true;
+      setDraggingAttribute(true);
     }, [setDraggingAttribute]);
 
     const scrollPrev = React.useCallback(() => {
@@ -128,6 +140,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       api.on("select", onSelect);
       api.on("pointerDown", handlePointerDown);
       api.on("pointerUp", handlePointerUp);
+      api.on("scroll", handleScroll);
       api.on("settle", handlePointerUp);
 
       return () => {
@@ -135,26 +148,35 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         api.off("reInit", onSelect);
         api.off("pointerDown", handlePointerDown);
         api.off("pointerUp", handlePointerUp);
+        api.off("scroll", handleScroll);
         api.off("settle", handlePointerUp);
       };
-    }, [api, onSelect, handlePointerDown, handlePointerUp]);
+    }, [api, onSelect, handlePointerDown, handlePointerUp, handleScroll]);
 
     React.useEffect(() => {
       const node = rootRef.current;
       if (!node) return;
 
-      const resetDragging = () => setDraggingAttribute(false);
+      const resetDragging = () => handlePointerUp();
 
       node.addEventListener("touchend", resetDragging, { passive: true });
       node.addEventListener("touchcancel", resetDragging, { passive: true });
       node.addEventListener("pointercancel", resetDragging);
+      window.addEventListener("pointerup", resetDragging);
+      window.addEventListener("touchend", resetDragging, { passive: true });
+      window.addEventListener("mouseup", resetDragging);
+      window.addEventListener("blur", resetDragging);
 
       return () => {
         node.removeEventListener("touchend", resetDragging);
         node.removeEventListener("touchcancel", resetDragging);
         node.removeEventListener("pointercancel", resetDragging);
+        window.removeEventListener("pointerup", resetDragging);
+        window.removeEventListener("touchend", resetDragging);
+        window.removeEventListener("mouseup", resetDragging);
+        window.removeEventListener("blur", resetDragging);
       };
-    }, [setDraggingAttribute]);
+    }, [handlePointerUp]);
 
     const contextValue = React.useMemo(
       () => ({
@@ -197,8 +219,6 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
       <div
         ref={carouselRef}
         className="carousel-viewport overflow-hidden"
-        onPointerDownCapture={(event) => event.stopPropagation()}
-        onTouchStartCapture={(event) => event.stopPropagation()}
       >
         <div
           ref={ref}
