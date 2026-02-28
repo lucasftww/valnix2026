@@ -79,6 +79,7 @@ const ProductCardComponent = ({
             alt={title}
             width={300}
             height={375}
+            crossOrigin="anonymous"
             loading={priority ? "eager" : "lazy"}
             decoding={priority ? "sync" : "async"}
             fetchPriority={priority ? "high" : "auto"}

@@ -1,4 +1,4 @@
-import { TooltipProvider } from "@/components/ui/tooltip";
+// TooltipProvider moved to admin/sidebar only — not needed on homepage
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
@@ -60,7 +60,7 @@ const App = () => {
   return (
     <HelmetProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
+        <>
             <CartProvider>
               <Suspense fallback={null}>
                 <Toaster />
@@ -102,7 +102,7 @@ const App = () => {
                   </Suspense>
                 </BrowserRouter>
             </CartProvider>
-        </TooltipProvider>
+        </>
       </QueryClientProvider>
     </HelmetProvider>
   );
