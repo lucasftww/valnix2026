@@ -4,6 +4,7 @@ import { Star, ChevronRight } from "lucide-react";
 import { useCategoryProducts } from "@/hooks/firebase/useFirebaseProducts";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import { formatPrice, ROUTES } from "@/lib/constants";
+import Autoplay from "embla-carousel-autoplay";
 import {
   Carousel,
   CarouselContent,
@@ -59,7 +60,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
       {/* Carousel */}
       <div className="relative group/carousel">
-        <Carousel opts={carouselOpts} className="w-full">
+        <Carousel opts={carouselOpts} plugins={[Autoplay({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true })]} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
             {relatedProducts.map((product, index) => {
               const stats = generateConsistentSalesAndReviews(product.id);
