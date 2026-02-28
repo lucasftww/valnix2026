@@ -226,8 +226,8 @@
     </noscript>
     <!-- noscript pixel removed — no PageView event needed -->
     <div id="root">
-      <!-- Inline skeleton for instant FCP before JS hydrates -->
-      <div style="min-height:100vh;display:flex;flex-direction:column;background:#000">
+      <!-- Inline skeleton with LCP image from cache — paints before JS -->
+      <div style="min-height:100vh;display:flex;flex-direction:column;background:#000" id="shell">
         <header style="position:sticky;top:0;z-index:50;width:100%;border-bottom:1px solid rgba(127,29,29,0.1);background:#000">
           <div style="max-width:1280px;margin:0 auto;height:56px;display:flex;align-items:center;padding:0 16px">
             <div style="width:140px;height:44px;background:#111;border-radius:8px"></div>
@@ -240,13 +240,32 @@
             <div style="height:28px;width:160px;background:#111;border-radius:6px"></div>
             <div style="height:16px;width:256px;background:#0a0a0a;border-radius:6px;margin-top:8px"></div>
           </div>
-          <div style="display:flex;gap:8px;overflow:hidden">
-            <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px"></div>
+          <div id="lcp-slot" style="display:flex;gap:8px;overflow:hidden">
+            <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px;overflow:hidden" id="lcp-card"></div>
             <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px"></div>
           </div>
         </main>
       </div>
     </div>
+    <!-- Inject LCP image from localStorage BEFORE module JS loads -->
+    <script>
+      (function(){
+        try{
+          var img=localStorage.getItem('valnix_lcp_img');
+          if(img){
+            var el=document.getElementById('lcp-card');
+            if(el){
+              var i=document.createElement('img');
+              i.src=img;i.alt='';i.width=300;i.height=375;
+              i.fetchPriority='high';i.decoding='sync';
+              i.style.cssText='width:100%;height:100%;object-fit:cover';
+              i.draggable=false;
+              el.appendChild(i);
+            }
+          }
+        }catch(e){}
+      })();
+    </script>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
