@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 
 type EmblaApi = {
   slidesInView: (target?: boolean) => number[];
@@ -7,46 +7,54 @@ type EmblaApi = {
 };
 
 /**
- * Tracks which carousel slides are near the viewport.
- * Returns a Set of indices that should render full content.
- * Slides outside the buffer render a lightweight placeholder.
+ * Tracks which carousel slides should render full content.
+ * Uses a grow-only Set (never un-mounts seen slides).
+ * Updates on settle/reInit only — NOT during active drag — to avoid
+ * React re-renders that cause jank on low-end devices.
  */
-export function useVisibleSlides(api: EmblaApi | undefined, buffer = 2): Set<number> {
-  const [visible, setVisible] = useState<Set<number>>(new Set([0, 1, 2, 3]));
+export function useVisibleSlides(api: EmblaApi | undefined, buffer = 3): Set<number> {
+  // Start with first few slides visible (covers initial render)
+  const [visible, setVisible] = useState<Set<number>>(() => {
+    const initial = new Set<number>();
+    for (let i = 0; i < buffer + 2; i++) initial.add(i);
+    return initial;
+  });
 
-  const update = useCallback(() => {
+  const visibleRef = useRef(visible);
+  visibleRef.current = visible;
+
+  const expand = useCallback(() => {
     if (!api) return;
     const inView = api.slidesInView(true);
-    const expanded = new Set<number>();
+    const prev = visibleRef.current;
+    let changed = false;
+    const merged = new Set(prev);
     for (const idx of inView) {
       for (let i = idx - buffer; i <= idx + buffer; i++) {
-        if (i >= 0) expanded.add(i);
-      }
-    }
-    setVisible((prev) => {
-      // Merge — never un-mount already-seen slides (prevents flicker on scroll-back)
-      const merged = new Set(prev);
-      let changed = false;
-      for (const v of expanded) {
-        if (!merged.has(v)) {
-          merged.add(v);
+        if (i >= 0 && !merged.has(i)) {
+          merged.add(i);
           changed = true;
         }
       }
-      return changed ? merged : prev;
-    });
+    }
+    if (changed) setVisible(merged);
   }, [api, buffer]);
 
   useEffect(() => {
     if (!api) return;
-    update();
-    api.on("slidesInView", update);
-    api.on("reInit", update);
+    // Initial expansion
+    expand();
+    // Only expand on settle (after drag/scroll ends) and reInit
+    api.on("settle", expand);
+    api.on("reInit", expand);
+    // Also expand on select (arrow clicks)
+    api.on("select", expand);
     return () => {
-      api.off("slidesInView", update);
-      api.off("reInit", update);
+      api.off("settle", expand);
+      api.off("reInit", expand);
+      api.off("select", expand);
     };
-  }, [api, update]);
+  }, [api, expand]);
 
   return visible;
 }
