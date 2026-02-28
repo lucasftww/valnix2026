@@ -30,7 +30,7 @@ export const FloatingContactButtons = () => {
           <X className="h-3.5 w-3.5 text-foreground" />
         </button>
       <a
-        href="https://discord.gg/ZYdz9xYdq5"
+        href="https://discord.gg/4kpUy45CM8"
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Entrar no Discord"
