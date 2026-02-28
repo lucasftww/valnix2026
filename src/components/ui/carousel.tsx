@@ -50,40 +50,30 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const [canScrollPrev, setCanScrollPrev] = React.useState(false);
     const [canScrollNext, setCanScrollNext] = React.useState(false);
     const rootRef = React.useRef<HTMLDivElement | null>(null);
-    const isPointerDownRef = React.useRef(false);
-    const hasDraggedRef = React.useRef(false);
-
-    const setDraggingAttribute = React.useCallback((dragging: boolean) => {
-      if (!rootRef.current) return;
-      rootRef.current.dataset.carouselDragging = dragging ? "true" : "false";
-    }, []);
+    const isDraggingRef = React.useRef(false);
 
     const onSelect = React.useCallback((api: CarouselApi) => {
-      if (!api) {
-        return;
-      }
-
+      if (!api) return;
       setCanScrollPrev(api.canScrollPrev());
       setCanScrollNext(api.canScrollNext());
     }, []);
 
     const handlePointerDown = React.useCallback(() => {
-      isPointerDownRef.current = true;
-      hasDraggedRef.current = false;
-      setDraggingAttribute(false);
-    }, [setDraggingAttribute]);
-
-    const handlePointerUp = React.useCallback(() => {
-      isPointerDownRef.current = false;
-      hasDraggedRef.current = false;
-      setDraggingAttribute(false);
-    }, [setDraggingAttribute]);
+      isDraggingRef.current = false;
+    }, []);
 
     const handleScroll = React.useCallback(() => {
-      if (!isPointerDownRef.current || hasDraggedRef.current) return;
-      hasDraggedRef.current = true;
-      setDraggingAttribute(true);
-    }, [setDraggingAttribute]);
+      if (isDraggingRef.current) return;
+      isDraggingRef.current = true;
+      const node = rootRef.current;
+      if (node) node.dataset.carouselDragging = "true";
+    }, []);
+
+    const handleSettle = React.useCallback(() => {
+      isDraggingRef.current = false;
+      const node = rootRef.current;
+      if (node) node.dataset.carouselDragging = "false";
+    }, []);
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev();
@@ -131,52 +121,36 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     }, [api, setApi]);
 
     React.useEffect(() => {
-      if (!api) {
-        return;
-      }
+      if (!api) return;
 
       onSelect(api);
       api.on("reInit", onSelect);
       api.on("select", onSelect);
       api.on("pointerDown", handlePointerDown);
-      api.on("pointerUp", handlePointerUp);
       api.on("scroll", handleScroll);
-      api.on("settle", handlePointerUp);
+      api.on("settle", handleSettle);
 
       return () => {
         api.off("select", onSelect);
         api.off("reInit", onSelect);
         api.off("pointerDown", handlePointerDown);
-        api.off("pointerUp", handlePointerUp);
         api.off("scroll", handleScroll);
-        api.off("settle", handlePointerUp);
+        api.off("settle", handleSettle);
       };
-    }, [api, onSelect, handlePointerDown, handlePointerUp, handleScroll]);
+    }, [api, onSelect, handlePointerDown, handleScroll, handleSettle]);
 
     React.useEffect(() => {
       const node = rootRef.current;
       if (!node) return;
 
-      const resetDragging = () => handlePointerUp();
-
-      node.addEventListener("touchend", resetDragging, { passive: true });
-      node.addEventListener("touchcancel", resetDragging, { passive: true });
-      node.addEventListener("pointercancel", resetDragging);
-      window.addEventListener("pointerup", resetDragging);
-      window.addEventListener("touchend", resetDragging, { passive: true });
-      window.addEventListener("mouseup", resetDragging);
-      window.addEventListener("blur", resetDragging);
+      node.addEventListener("touchend", handleSettle, { passive: true });
+      node.addEventListener("touchcancel", handleSettle, { passive: true });
 
       return () => {
-        node.removeEventListener("touchend", resetDragging);
-        node.removeEventListener("touchcancel", resetDragging);
-        node.removeEventListener("pointercancel", resetDragging);
-        window.removeEventListener("pointerup", resetDragging);
-        window.removeEventListener("touchend", resetDragging);
-        window.removeEventListener("mouseup", resetDragging);
-        window.removeEventListener("blur", resetDragging);
+        node.removeEventListener("touchend", handleSettle);
+        node.removeEventListener("touchcancel", handleSettle);
       };
-    }, [handlePointerUp]);
+    }, [handleSettle]);
 
     const contextValue = React.useMemo(
       () => ({
