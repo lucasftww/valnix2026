@@ -29,11 +29,11 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
     () => ({
       align: "start" as const,
       loop: relatedProducts.length > 1,
-      dragFree: true,
+      dragFree: false,
       containScroll: "trimSnaps" as const,
-      duration: 24,
-      skipSnaps: true,
-      dragThreshold: 12,
+      duration: 18,
+      skipSnaps: false,
+      dragThreshold: 10,
     }),
     [relatedProducts.length],
   );
