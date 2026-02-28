@@ -21,6 +21,9 @@ interface ReviewsCarouselProps {
   targetCount?: number;
 }
 
+const MIN_RENDERED_REVIEWS = 8;
+const MAX_RENDERED_REVIEWS = 18;
+
 const FAKE_NAMES = [
   "Matheus", "João Pedro", "Pedrin", "Lucas", "Biel", "Gustavinho",
   "Rafael", "Davi", "Kaio", "Nicolas", "Bruno",
@@ -103,15 +106,19 @@ const ReviewCard = ({ review }: { review: Review }) => (
 );
 
 const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
+  const renderedCount = useMemo(() => {
+    const requested = targetCount || reviews.length;
+    const bounded = Math.min(requested, MAX_RENDERED_REVIEWS);
+    return Math.max(Math.min(reviews.length, MAX_RENDERED_REVIEWS), Math.min(MIN_RENDERED_REVIEWS, bounded));
+  }, [reviews.length, targetCount]);
 
   const allReviews = useMemo(() => {
-    const target = targetCount || reviews.length;
-    if (target === 0) return reviews;
-    if (target <= reviews.length) return reviews;
-    const needed = target - reviews.length;
+    if (renderedCount === 0) return reviews;
+    if (renderedCount <= reviews.length) return reviews.slice(0, renderedCount);
+    const needed = renderedCount - reviews.length;
     const seed = reviews.length > 0 ? reviews[0].customer_name.charCodeAt(0) * 17 : 42;
     return [...reviews, ...generateFakeReviews(needed, seed)];
-  }, [reviews, targetCount]);
+  }, [reviews, renderedCount]);
 
   if (allReviews.length === 0) return null;
 
@@ -134,7 +141,7 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             dragThreshold: 12,
           }}
           plugins={[
-            Autoplay({ delay: 2200, stopOnInteraction: true, stopOnMouseEnter: true }),
+            Autoplay({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true }),
           ]}
           className="w-full"
         >
