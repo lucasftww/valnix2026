@@ -128,14 +128,33 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       api.on("select", onSelect);
       api.on("pointerDown", handlePointerDown);
       api.on("pointerUp", handlePointerUp);
+      api.on("settle", handlePointerUp);
 
       return () => {
         api.off("select", onSelect);
         api.off("reInit", onSelect);
         api.off("pointerDown", handlePointerDown);
         api.off("pointerUp", handlePointerUp);
+        api.off("settle", handlePointerUp);
       };
     }, [api, onSelect, handlePointerDown, handlePointerUp]);
+
+    React.useEffect(() => {
+      const node = rootRef.current;
+      if (!node) return;
+
+      const resetDragging = () => setDraggingAttribute(false);
+
+      node.addEventListener("touchend", resetDragging, { passive: true });
+      node.addEventListener("touchcancel", resetDragging, { passive: true });
+      node.addEventListener("pointercancel", resetDragging);
+
+      return () => {
+        node.removeEventListener("touchend", resetDragging);
+        node.removeEventListener("touchcancel", resetDragging);
+        node.removeEventListener("pointercancel", resetDragging);
+      };
+    }, [setDraggingAttribute]);
 
     const contextValue = React.useMemo(
       () => ({
@@ -175,7 +194,7 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
     const { carouselRef, orientation } = useCarousel();
 
     return (
-      <div ref={carouselRef} className="overflow-hidden" style={{ touchAction: 'pan-y pinch-zoom' }}>
+      <div ref={carouselRef} className="carousel-viewport overflow-hidden">
         <div
           ref={ref}
           className={cn("carousel-track flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}

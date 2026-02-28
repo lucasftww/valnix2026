@@ -157,13 +157,18 @@ All colors MUST be HSL.
     touch-action: inherit;
   }
 
+  .carousel-viewport {
+    touch-action: pan-y pinch-zoom;
+  }
+
   .carousel-track {
-    transform: translate3d(0, 0, 0);
-    contain: paint;
+    -webkit-backface-visibility: hidden;
+    backface-visibility: hidden;
   }
 
   [data-carousel-dragging="true"] .carousel-track {
     cursor: grabbing;
+    will-change: transform;
   }
 
   [data-carousel-dragging="true"] .carousel-track a,
