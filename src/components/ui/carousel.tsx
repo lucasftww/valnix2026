@@ -50,8 +50,9 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const [canScrollPrev, setCanScrollPrev] = React.useState(false);
     const [canScrollNext, setCanScrollNext] = React.useState(false);
     const rootRef = React.useRef<HTMLDivElement | null>(null);
-    const isDraggingRef = React.useRef(false);
-    const scrollingRef = React.useRef(false);
+    const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
+    const isPointerDownRef = React.useRef(false);
+    const suppressClickRef = React.useRef(false);
 
     const onSelect = React.useCallback((api: CarouselApi) => {
       if (!api) return;
@@ -64,33 +65,40 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       if (node) node.dataset.carouselDragging = value ? "true" : "false";
     }, []);
 
-    const handlePointerDown = React.useCallback(() => {
-      isDraggingRef.current = false;
-      scrollingRef.current = false;
-    }, []);
+    const clearDraggingState = React.useCallback(() => {
+      isPointerDownRef.current = false;
+      dragStartRef.current = null;
+      setDraggingAttr(false);
 
-    const handleScroll = React.useCallback(() => {
-      scrollingRef.current = true;
-      if (isDraggingRef.current) return;
-      isDraggingRef.current = true;
-      setDraggingAttr(true);
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
     }, [setDraggingAttr]);
 
-    const handlePointerUp = React.useCallback(() => {
-      // If no scroll happened (pure tap/click), reset immediately
-      if (!scrollingRef.current) {
-        isDraggingRef.current = false;
-        setDraggingAttr(false);
-      }
-      // If scrolling (inertia active), let settle handle the reset
-      // This prevents the flicker from toggling dragging on/off mid-inertia
-    }, [setDraggingAttr]);
-
-    const handleSettle = React.useCallback(() => {
-      isDraggingRef.current = false;
-      scrollingRef.current = false;
+    const handlePointerDownCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      isPointerDownRef.current = true;
+      suppressClickRef.current = false;
+      dragStartRef.current = { x: event.clientX, y: event.clientY };
       setDraggingAttr(false);
     }, [setDraggingAttr]);
+
+    const handlePointerMoveCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
+      if (!isPointerDownRef.current || !dragStartRef.current || suppressClickRef.current) return;
+
+      const deltaX = Math.abs(event.clientX - dragStartRef.current.x);
+      const deltaY = Math.abs(event.clientY - dragStartRef.current.y);
+
+      if (deltaX > 6 || deltaY > 6) {
+        suppressClickRef.current = true;
+        setDraggingAttr(true);
+      }
+    }, [setDraggingAttr]);
+
+    const handleClickCapture = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
+      if (!suppressClickRef.current) return;
+      event.preventDefault();
+      event.stopPropagation();
+    }, []);
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev();
@@ -143,20 +151,12 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       onSelect(api);
       api.on("reInit", onSelect);
       api.on("select", onSelect);
-      api.on("pointerDown", handlePointerDown);
-      api.on("pointerUp", handlePointerUp);
-      api.on("scroll", handleScroll);
-      api.on("settle", handleSettle);
 
       return () => {
         api.off("select", onSelect);
         api.off("reInit", onSelect);
-        api.off("pointerDown", handlePointerDown);
-        api.off("pointerUp", handlePointerUp);
-        api.off("scroll", handleScroll);
-        api.off("settle", handleSettle);
       };
-    }, [api, onSelect, handlePointerDown, handlePointerUp, handleScroll, handleSettle]);
+    }, [api, onSelect]);
 
     // Touch end/cancel handling is managed by Embla's settle event.
     // Manual touchend listeners were causing premature state resets on mobile,
@@ -181,6 +181,11 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         <div
           ref={setRootRef}
           onKeyDownCapture={handleKeyDown}
+          onPointerDownCapture={handlePointerDownCapture}
+          onPointerMoveCapture={handlePointerMoveCapture}
+          onPointerUpCapture={clearDraggingState}
+          onPointerCancelCapture={clearDraggingState}
+          onClickCapture={handleClickCapture}
           className={cn("relative", className)}
           role="region"
           data-carousel-dragging="false"
