@@ -1,12 +1,10 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Star, ChevronRight } from "lucide-react";
 import { useCategoryProducts } from "@/hooks/firebase/useFirebaseProducts";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import { formatPrice, ROUTES } from "@/lib/constants";
-import { useVisibleSlides } from "@/hooks/useVisibleSlides";
 import {
-  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -21,8 +19,6 @@ interface RelatedProductsProps {
 
 const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) => {
   const { data: products = [] } = useCategoryProducts(category);
-  const [api, setApi] = useState<CarouselApi>();
-  const visibleSlides = useVisibleSlides(api, 3);
 
   const relatedProducts = useMemo(
     () => products.filter((p) => p.id !== currentProductId).slice(0, 12),
@@ -62,21 +58,61 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
       {/* Carousel */}
       <div className="relative group/carousel">
-        <Carousel opts={carouselOpts} setApi={setApi} className="w-full">
+        <Carousel opts={carouselOpts} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
             {relatedProducts.map((product, index) => {
-              const isVisible = visibleSlides.has(index);
+              const stats = generateConsistentSalesAndReviews(product.id);
+              const hasOldPrice =
+                product.old_price && product.old_price > product.price;
 
               return (
                 <CarouselItem
                   key={product.id}
                   className="pl-2 md:pl-3 basis-[42%] sm:basis-[32%] md:basis-1/4 lg:basis-1/5"
                 >
-                  {isVisible ? (
-                    <RelatedProductCard product={product} index={index} />
-                  ) : (
-                    <div className="rounded-xl bg-card border border-border/10 aspect-[3/4]" />
-                  )}
+                  <Link
+                    to={ROUTES.PRODUCT(product.id)}
+                    className="group block h-full"
+                  >
+                    <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col">
+                      <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden">
+                        <img
+                          src={product.image_url || ""}
+                          alt={product.name}
+                          width={280}
+                          height={374}
+                          loading={index < 2 ? "eager" : "lazy"}
+                          decoding="async"
+                          sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
+                          className="w-full h-full object-cover"
+                        />
+                      </div>
+
+                      <div className="p-2.5 md:p-3 flex-1 flex flex-col gap-1">
+                        <h3 className="text-xs md:text-sm font-semibold text-foreground line-clamp-2 leading-snug">
+                          {product.name}
+                        </h3>
+
+                        <div className="flex items-center gap-1 mt-auto">
+                          <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
+                          <span className="text-[10px] md:text-[11px] text-muted-foreground">
+                            {stats.reviewCount.toLocaleString("pt-BR")} avaliações
+                          </span>
+                        </div>
+
+                        <div className="flex flex-col">
+                          {hasOldPrice && (
+                            <span className="text-[10px] md:text-[11px] text-muted-foreground line-through leading-none">
+                              {formatPrice(product.old_price!)}
+                            </span>
+                          )}
+                          <span className="text-sm md:text-base font-extrabold tracking-tight leading-tight">
+                            {formatPrice(product.price)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </Link>
                 </CarouselItem>
               );
             })}
@@ -93,51 +129,5 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
     </section>
   );
 };
-
-const RelatedProductCard = memo(({ product, index }: { product: any; index: number }) => {
-  const stats = generateConsistentSalesAndReviews(product.id);
-  const hasOldPrice = product.old_price && product.old_price > product.price;
-
-  return (
-    <Link to={ROUTES.PRODUCT(product.id)} className="group block h-full">
-      <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col">
-        <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden">
-          <img
-            src={product.image_url || ""}
-            alt={product.name}
-            width={280}
-            height={374}
-            loading={index < 2 ? "eager" : "lazy"}
-            decoding="async"
-            sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <div className="p-2.5 md:p-3 flex-1 flex flex-col gap-1">
-          <h3 className="text-xs md:text-sm font-semibold text-foreground line-clamp-2 leading-snug">
-            {product.name}
-          </h3>
-          <div className="flex items-center gap-1 mt-auto">
-            <Star className="w-3 h-3 fill-amber-400 text-amber-400 shrink-0" />
-            <span className="text-[10px] md:text-[11px] text-muted-foreground">
-              {stats.reviewCount.toLocaleString("pt-BR")} avaliações
-            </span>
-          </div>
-          <div className="flex flex-col">
-            {hasOldPrice && (
-              <span className="text-[10px] md:text-[11px] text-muted-foreground line-through leading-none">
-                {formatPrice(product.old_price!)}
-              </span>
-            )}
-            <span className="text-sm md:text-base font-extrabold tracking-tight leading-tight">
-              {formatPrice(product.price)}
-            </span>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-});
-RelatedProductCard.displayName = "RelatedProductCard";
 
 export default memo(RelatedProducts);

@@ -1,11 +1,9 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
 import { useFeaturedProductsApi } from "@/hooks/useApiData";
 import { Button } from "./ui/button";
-import { useVisibleSlides } from "@/hooks/useVisibleSlides";
 import {
-  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -15,8 +13,6 @@ import {
 
 const ProductGridComponent = () => {
   const { data: products = [], isLoading, error, refetch } = useFeaturedProductsApi();
-  const [api, setApi] = useState<CarouselApi>();
-  const visibleSlides = useVisibleSlides(api, 3);
   
   if (isLoading) {
     return (
@@ -98,27 +94,23 @@ const ProductGridComponent = () => {
       </div>
       
       <div className="relative group/carousel">
-        <Carousel opts={carouselOpts} setApi={setApi} className="w-full">
+        <Carousel opts={carouselOpts} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
             {products.map((product, index) => (
               <CarouselItem
                 key={product.id}
                 className="pl-2 md:pl-3 basis-[45%] sm:basis-[35%] md:basis-1/3 lg:basis-1/4"
               >
-                {visibleSlides.has(index) ? (
-                  <ProductCard 
-                    id={product.id}
-                    image={product.image_url || ""}
-                    title={product.name}
-                    reviewCount={product.reviewCount || 0}
-                    price={product.price}
-                    originalPrice={product.old_price || undefined}
-                    discount={product.discount || undefined}
-                    priority={index < 2}
-                  />
-                ) : (
-                  <div className="rounded-2xl bg-card border border-border/10 aspect-[4/5]" />
-                )}
+                <ProductCard 
+                  id={product.id}
+                  image={product.image_url || ""}
+                  title={product.name}
+                  reviewCount={product.reviewCount || 0}
+                  price={product.price}
+                  originalPrice={product.old_price || undefined}
+                  discount={product.discount || undefined}
+                  priority={index < 2}
+                />
               </CarouselItem>
             ))}
           </CarouselContent>

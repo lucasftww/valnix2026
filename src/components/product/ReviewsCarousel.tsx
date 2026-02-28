@@ -1,8 +1,6 @@
-import { memo, useMemo, useState } from "react";
+import { memo, useMemo } from "react";
 import { Star } from "lucide-react";
-import { useVisibleSlides } from "@/hooks/useVisibleSlides";
 import {
-  type CarouselApi,
   Carousel,
   CarouselContent,
   CarouselItem,
@@ -73,7 +71,7 @@ function generateFakeReviews(count: number, seed: number): Review[] {
   return fakes;
 }
 
-const ReviewCard = memo(({ review }: { review: Review }) => (
+const ReviewCard = ({ review }: { review: Review }) => (
   <div className="rounded-xl border border-border/10 bg-card px-5 pt-5 pb-4 md:px-6 md:pt-6 md:pb-5 h-full flex flex-col gap-3.5 select-none">
     <div className="flex items-center gap-0.5">
       {[1, 2, 3, 4, 5].map((star) => (
@@ -87,9 +85,11 @@ const ReviewCard = memo(({ review }: { review: Review }) => (
         />
       ))}
     </div>
+
     <p className="text-sm md:text-[15px] text-muted-foreground leading-[1.7] line-clamp-3 max-w-[42ch]">
       {review.comment}
     </p>
+
     <div className="flex items-center gap-2.5 mt-auto">
       <div className="w-7 h-7 rounded-full bg-muted flex items-center justify-center text-[11px] font-bold text-foreground/60 uppercase shrink-0">
         {review.customer_name.charAt(0)}
@@ -99,12 +99,9 @@ const ReviewCard = memo(({ review }: { review: Review }) => (
       </span>
     </div>
   </div>
-));
-ReviewCard.displayName = "ReviewCard";
+);
 
 const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => {
-  const [api, setApi] = useState<CarouselApi>();
-  const visibleSlides = useVisibleSlides(api, 2);
 
   const allReviews = useMemo(() => {
     const target = targetCount || reviews.length;
@@ -123,6 +120,7 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
         Avaliações dos clientes
       </h2>
 
+      {/* Wrapper com padding lateral para as setas no desktop */}
       <div className="md:px-12">
         <Carousel
           opts={{
@@ -134,24 +132,20 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             containScroll: "trimSnaps",
             dragThreshold: 2,
           }}
-          setApi={setApi}
           className="w-full"
         >
           <CarouselContent className="-ml-3">
-            {allReviews.map((review, index) => (
+            {allReviews.map((review) => (
               <CarouselItem
                 key={review.id}
                 className="pl-3 basis-[85%] sm:basis-[48%] lg:basis-[33.333%]"
               >
-                {visibleSlides.has(index) ? (
-                  <ReviewCard review={review} />
-                ) : (
-                  <div className="rounded-xl border border-border/10 bg-card h-[140px]" />
-                )}
+                <ReviewCard review={review} />
               </CarouselItem>
             ))}
           </CarouselContent>
 
+          {/* Desktop: setas nas laterais */}
           <CarouselPrevious
             className="hidden md:flex -left-11 top-1/2 -translate-y-1/2 h-9 w-9 rounded-full bg-card border-border/10 text-foreground/50 hover:bg-muted hover:text-foreground"
             aria-label="Ver avaliação anterior"
@@ -161,6 +155,7 @@ const ReviewsCarousel = ({ reviews, targetCount = 0 }: ReviewsCarouselProps) => 
             aria-label="Ver próxima avaliação"
           />
 
+          {/* Mobile: setas abaixo */}
           <div className="flex items-center justify-center gap-8 mt-4 md:hidden">
             <CarouselPrevious
               className="static translate-y-0 h-8 w-8 rounded-full bg-card border-border/10 text-foreground/40 hover:bg-muted hover:text-foreground"
