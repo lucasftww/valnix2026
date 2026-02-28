@@ -50,9 +50,10 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const [canScrollPrev, setCanScrollPrev] = React.useState(false);
     const [canScrollNext, setCanScrollNext] = React.useState(false);
     const rootRef = React.useRef<HTMLDivElement | null>(null);
-    const dragStartRef = React.useRef<{ x: number; y: number } | null>(null);
     const isPointerDownRef = React.useRef(false);
+    const didDragRef = React.useRef(false);
     const suppressClickRef = React.useRef(false);
+    const suppressClickTimeoutRef = React.useRef<number | null>(null);
 
     const onSelect = React.useCallback((api: CarouselApi) => {
       if (!api) return;
@@ -65,34 +66,12 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       if (node) node.dataset.carouselDragging = value ? "true" : "false";
     }, []);
 
-    const clearDraggingState = React.useCallback(() => {
-      isPointerDownRef.current = false;
-      dragStartRef.current = null;
-      setDraggingAttr(false);
-
-      window.setTimeout(() => {
-        suppressClickRef.current = false;
-      }, 0);
-    }, [setDraggingAttr]);
-
-    const handlePointerDownCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-      isPointerDownRef.current = true;
-      suppressClickRef.current = false;
-      dragStartRef.current = { x: event.clientX, y: event.clientY };
-      setDraggingAttr(false);
-    }, [setDraggingAttr]);
-
-    const handlePointerMoveCapture = React.useCallback((event: React.PointerEvent<HTMLDivElement>) => {
-      if (!isPointerDownRef.current || !dragStartRef.current || suppressClickRef.current) return;
-
-      const deltaX = Math.abs(event.clientX - dragStartRef.current.x);
-      const deltaY = Math.abs(event.clientY - dragStartRef.current.y);
-
-      if (deltaX > 6 || deltaY > 6) {
-        suppressClickRef.current = true;
-        setDraggingAttr(true);
+    const clearSuppressClickTimeout = React.useCallback(() => {
+      if (suppressClickTimeoutRef.current !== null) {
+        window.clearTimeout(suppressClickTimeoutRef.current);
+        suppressClickTimeoutRef.current = null;
       }
-    }, [setDraggingAttr]);
+    }, []);
 
     const handleClickCapture = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
       if (!suppressClickRef.current) return;
@@ -158,9 +137,62 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       };
     }, [api, onSelect]);
 
-    // Touch end/cancel handling is managed by Embla's settle event.
-    // Manual touchend listeners were causing premature state resets on mobile,
-    // leading to freezes during inertial scrolling.
+    React.useEffect(() => {
+      if (!api) return;
+
+      const handlePointerDown = () => {
+        clearSuppressClickTimeout();
+        suppressClickRef.current = false;
+        isPointerDownRef.current = true;
+        didDragRef.current = false;
+        setDraggingAttr(false);
+      };
+
+      const handleScroll = () => {
+        if (!isPointerDownRef.current) return;
+        didDragRef.current = true;
+        setDraggingAttr(true);
+      };
+
+      const handlePointerUp = () => {
+        isPointerDownRef.current = false;
+        setDraggingAttr(false);
+
+        if (!didDragRef.current) return;
+
+        suppressClickRef.current = true;
+        clearSuppressClickTimeout();
+        suppressClickTimeoutRef.current = window.setTimeout(() => {
+          suppressClickRef.current = false;
+          suppressClickTimeoutRef.current = null;
+        }, 140);
+        didDragRef.current = false;
+      };
+
+      const handleSettle = () => {
+        setDraggingAttr(false);
+      };
+
+      api.on("pointerDown", handlePointerDown);
+      api.on("scroll", handleScroll);
+      api.on("pointerUp", handlePointerUp);
+      api.on("settle", handleSettle);
+      api.on("reInit", handleSettle);
+
+      return () => {
+        api.off("pointerDown", handlePointerDown);
+        api.off("scroll", handleScroll);
+        api.off("pointerUp", handlePointerUp);
+        api.off("settle", handleSettle);
+        api.off("reInit", handleSettle);
+      };
+    }, [api, clearSuppressClickTimeout, setDraggingAttr]);
+
+    React.useEffect(() => {
+      return () => {
+        clearSuppressClickTimeout();
+      };
+    }, [clearSuppressClickTimeout]);
 
     const contextValue = React.useMemo(
       () => ({
@@ -181,10 +213,6 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         <div
           ref={setRootRef}
           onKeyDownCapture={handleKeyDown}
-          onPointerDownCapture={handlePointerDownCapture}
-          onPointerMoveCapture={handlePointerMoveCapture}
-          onPointerUpCapture={clearDraggingState}
-          onPointerCancelCapture={clearDraggingState}
           onClickCapture={handleClickCapture}
           className={cn("relative", className)}
           role="region"

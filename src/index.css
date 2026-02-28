@@ -164,10 +164,10 @@ All colors MUST be HSL.
 
   .carousel-track {
     cursor: grab;
+    transform: translate3d(0, 0, 0);
   }
 
   [data-carousel-dragging="true"] .carousel-track {
-    will-change: transform;
     cursor: grabbing;
   }
 
