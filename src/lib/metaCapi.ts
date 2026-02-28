@@ -5,6 +5,9 @@
 import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { generateEventId } from "@/lib/eventId";
 
+// ⏸️ MIGRATION FLAG: set to false when new pixel is ready
+const PIXEL_PAUSED = true;
+
 // Read cookie by name
 function getCookie(name: string): string | undefined {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -89,26 +92,28 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       });
     }
 
-    // Browser-side Pixel: fire for whitelisted standard events (dedup via eventID)
-    try {
-      const PIXEL_WHITELIST = ['InitiateCheckout', 'Purchase'] as const;
-      const pixelEvent = PIXEL_WHITELIST.find(e => e === data.event_name);
-      if (pixelEvent) {
-        const fbq = (window as any).fbq;
-        if (typeof fbq === 'function') {
-          fbq('track', pixelEvent, {
-            value: data.value,
-            currency: 'BRL',
-            content_name: data.content_name,
-            content_category: data.content_category,
-            content_ids: data.content_ids,
-            contents: data.contents,
-            num_items: data.num_items,
-          }, { eventID: eventId });
-          if (import.meta.env.DEV) console.log(`🌐 [Meta] Pixel ${pixelEvent} fired — event_id=${eventId}`);
+    // ⏸️ PAUSED: Pixel browser desabilitado durante migração de BM
+    // Quando novo pixel estiver pronto, setar PIXEL_PAUSED = false
+    if (!PIXEL_PAUSED) {
+      try {
+        const PIXEL_WHITELIST = ['InitiateCheckout', 'Purchase'] as const;
+        const pixelEvent = PIXEL_WHITELIST.find(e => e === data.event_name);
+        if (pixelEvent) {
+          const fbq = (window as any).fbq;
+          if (typeof fbq === 'function') {
+            fbq('track', pixelEvent, {
+              value: data.value,
+              currency: 'BRL',
+              content_name: data.content_name,
+              content_category: data.content_category,
+              content_ids: data.content_ids,
+              contents: data.contents,
+              num_items: data.num_items,
+            }, { eventID: eventId });
+          }
         }
-      }
-    } catch { /* best-effort pixel */ }
+      } catch { /* best-effort pixel */ }
+    }
   } catch (e) {
     if (import.meta.env.DEV) {
       console.warn('⚠️ Meta CAPI helper error:', e);
@@ -214,21 +219,22 @@ export function sendPurchaseFromClient(params: {
     ? [...new Set(params.productCategories.filter(Boolean))].join(', ')
     : undefined;
 
-  // ONLY fire browser Pixel — no CAPI call
-  try {
-    const eventId = generateEventId('Purchase', params.orderId);
-    const fbq = (window as any).fbq;
-    if (typeof fbq === 'function') {
-      fbq('track', 'Purchase', {
-        value: params.value,
-        currency: 'BRL',
-        content_name: params.productNames?.join(', '),
-        content_category: contentCategory,
-        content_ids: params.productIds || params.productNames,
-        contents,
-        num_items: numItems,
-      }, { eventID: eventId });
-      if (import.meta.env.DEV) console.log(`🌐 [Meta] Pixel Purchase fired — event_id=${eventId}`);
-    }
-  } catch { /* best-effort pixel */ }
+  // ⏸️ PAUSED: Pixel browser desabilitado durante migração de BM
+  if (!PIXEL_PAUSED) {
+    try {
+      const eventId = generateEventId('Purchase', params.orderId);
+      const fbq = (window as any).fbq;
+      if (typeof fbq === 'function') {
+        fbq('track', 'Purchase', {
+          value: params.value,
+          currency: 'BRL',
+          content_name: params.productNames?.join(', '),
+          content_category: contentCategory,
+          content_ids: params.productIds || params.productNames,
+          contents,
+          num_items: numItems,
+        }, { eventID: eventId });
+      }
+    } catch { /* best-effort pixel */ }
+  }
 }
