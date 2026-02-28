@@ -1,10 +1,10 @@
-import { memo, useMemo } from "react";
+import { memo, useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, ChevronRight } from "lucide-react";
 import { useCategoryProducts } from "@/hooks/firebase/useFirebaseProducts";
 import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
 import { formatPrice, ROUTES } from "@/lib/constants";
-import Autoplay from "embla-carousel-autoplay";
+import type { EmblaPluginType } from "embla-carousel";
 import {
   Carousel,
   CarouselContent,
@@ -40,6 +40,17 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
     [relatedProducts.length],
   );
 
+  // Lazy-load autoplay
+  const [plugins, setPlugins] = useState<EmblaPluginType[]>([]);
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      import("embla-carousel-autoplay").then((mod) => {
+        setPlugins([mod.default({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true })]);
+      });
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, []);
+
   if (relatedProducts.length === 0) return null;
 
   return (
@@ -60,7 +71,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
 
       {/* Carousel */}
       <div className="relative group/carousel">
-        <Carousel opts={carouselOpts} plugins={[Autoplay({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true })]} className="w-full">
+        <Carousel opts={carouselOpts} plugins={plugins} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
             {relatedProducts.map((product, index) => {
               const stats = generateConsistentSalesAndReviews(product.id);
