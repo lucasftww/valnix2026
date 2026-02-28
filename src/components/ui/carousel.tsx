@@ -50,10 +50,6 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     const [canScrollPrev, setCanScrollPrev] = React.useState(false);
     const [canScrollNext, setCanScrollNext] = React.useState(false);
     const rootRef = React.useRef<HTMLDivElement | null>(null);
-    const isPointerDownRef = React.useRef(false);
-    const didDragRef = React.useRef(false);
-    const suppressClickRef = React.useRef(false);
-    const suppressClickTimeoutRef = React.useRef<number | null>(null);
 
     const onSelect = React.useCallback((api: CarouselApi) => {
       if (!api) return;
@@ -69,18 +65,6 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       node.dataset.carouselDragging = nextValue;
     }, []);
 
-    const clearSuppressClickTimeout = React.useCallback(() => {
-      if (suppressClickTimeoutRef.current !== null) {
-        window.clearTimeout(suppressClickTimeoutRef.current);
-        suppressClickTimeoutRef.current = null;
-      }
-    }, []);
-
-    const handleClickCapture = React.useCallback((event: React.MouseEvent<HTMLDivElement>) => {
-      if (!suppressClickRef.current) return;
-      event.preventDefault();
-      event.stopPropagation();
-    }, []);
 
     const scrollPrev = React.useCallback(() => {
       api?.scrollPrev();
@@ -144,32 +128,11 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       if (!api) return;
 
       const handlePointerDown = () => {
-        clearSuppressClickTimeout();
-        suppressClickRef.current = false;
-        isPointerDownRef.current = true;
-        didDragRef.current = false;
-        setDraggingAttr(false);
-      };
-
-      const handleScroll = () => {
-        if (!isPointerDownRef.current) return;
-        didDragRef.current = true;
         setDraggingAttr(true);
       };
 
       const handlePointerUp = () => {
-        isPointerDownRef.current = false;
         setDraggingAttr(false);
-
-        if (!didDragRef.current) return;
-
-        suppressClickRef.current = true;
-        clearSuppressClickTimeout();
-        suppressClickTimeoutRef.current = window.setTimeout(() => {
-          suppressClickRef.current = false;
-          suppressClickTimeoutRef.current = null;
-        }, 140);
-        didDragRef.current = false;
       };
 
       const handleSettle = () => {
@@ -177,25 +140,17 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       };
 
       api.on("pointerDown", handlePointerDown);
-      api.on("scroll", handleScroll);
       api.on("pointerUp", handlePointerUp);
       api.on("settle", handleSettle);
       api.on("reInit", handleSettle);
 
       return () => {
         api.off("pointerDown", handlePointerDown);
-        api.off("scroll", handleScroll);
         api.off("pointerUp", handlePointerUp);
         api.off("settle", handleSettle);
         api.off("reInit", handleSettle);
       };
-    }, [api, clearSuppressClickTimeout, setDraggingAttr]);
-
-    React.useEffect(() => {
-      return () => {
-        clearSuppressClickTimeout();
-      };
-    }, [clearSuppressClickTimeout]);
+    }, [api, setDraggingAttr]);
 
     const contextValue = React.useMemo(
       () => ({
@@ -216,7 +171,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         <div
           ref={setRootRef}
           onKeyDownCapture={handleKeyDown}
-          onClickCapture={handleClickCapture}
+          
           className={cn("relative", className)}
           role="region"
           data-carousel-dragging="false"
