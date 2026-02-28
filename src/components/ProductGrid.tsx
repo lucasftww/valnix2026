@@ -3,6 +3,7 @@ import { ProductCard } from "./ProductCard";
 import { ProductSkeleton } from "./ProductSkeleton";
 import { useFeaturedProductsApi } from "@/hooks/useApiData";
 import { Button } from "./ui/button";
+import Autoplay from "embla-carousel-autoplay";
 import {
   Carousel,
   CarouselContent,
@@ -95,7 +96,7 @@ const ProductGridComponent = () => {
       </div>
       
       <div className="relative group/carousel">
-        <Carousel opts={carouselOpts} className="w-full">
+        <Carousel opts={carouselOpts} plugins={[Autoplay({ delay: 2800, stopOnInteraction: true, stopOnMouseEnter: true })]} className="w-full">
           <CarouselContent className="-ml-2 md:-ml-3">
             {products.map((product, index) => (
               <CarouselItem
