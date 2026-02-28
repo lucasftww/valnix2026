@@ -63,7 +63,10 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
 
     const setDraggingAttr = React.useCallback((value: boolean) => {
       const node = rootRef.current;
-      if (node) node.dataset.carouselDragging = value ? "true" : "false";
+      if (!node) return;
+      const nextValue = value ? "true" : "false";
+      if (node.dataset.carouselDragging === nextValue) return;
+      node.dataset.carouselDragging = nextValue;
     }, []);
 
     const clearSuppressClickTimeout = React.useCallback(() => {
