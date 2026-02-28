@@ -69,6 +69,14 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       if (node) node.dataset.carouselDragging = "true";
     }, []);
 
+    const handlePointerUp = React.useCallback(() => {
+      // Reset dragging immediately on pointer up so clicks aren't blocked
+      // settle can be delayed due to deceleration animation
+      isDraggingRef.current = false;
+      const node = rootRef.current;
+      if (node) node.dataset.carouselDragging = "false";
+    }, []);
+
     const handleSettle = React.useCallback(() => {
       isDraggingRef.current = false;
       const node = rootRef.current;
@@ -127,6 +135,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
       api.on("reInit", onSelect);
       api.on("select", onSelect);
       api.on("pointerDown", handlePointerDown);
+      api.on("pointerUp", handlePointerUp);
       api.on("scroll", handleScroll);
       api.on("settle", handleSettle);
 
@@ -134,10 +143,11 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
         api.off("select", onSelect);
         api.off("reInit", onSelect);
         api.off("pointerDown", handlePointerDown);
+        api.off("pointerUp", handlePointerUp);
         api.off("scroll", handleScroll);
         api.off("settle", handleSettle);
       };
-    }, [api, onSelect, handlePointerDown, handleScroll, handleSettle]);
+    }, [api, onSelect, handlePointerDown, handlePointerUp, handleScroll, handleSettle]);
 
     React.useEffect(() => {
       const node = rootRef.current;
