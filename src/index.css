@@ -176,10 +176,6 @@ All colors MUST be HSL.
     will-change: transform;
   }
 
-  [data-carousel-dragging="true"] .carousel-track * {
-    pointer-events: none !important;
-  }
-
 }
 
 /* Mobile-specific fixes */
