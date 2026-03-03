@@ -147,13 +147,45 @@ Deno.serve(async (req) => {
       const statusResponse = await fetch(`${FLOWPAY_CARD_URL}/status?id=${paymentId}`, { headers: { 'x-api-key': apiKey } });
       const statusData = await statusResponse.json();
       if (!statusResponse.ok) return new Response(JSON.stringify({ success: false, error: statusData.error || 'Erro ao consultar status' }), { status: statusResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
-      // If paid, update sale_addons
+      // If paid, process order or addon
       if (statusData.payment?.status === 'COMPLETED') {
-        const upsellResults = await queryFirestore('sale_addons', 'flowpay_charge_id', 'EQUAL', paymentId);
-        if (upsellResults?.[0]?.document) {
-          const docName = upsellResults[0].document.name;
-          const docId = docName.split('/').pop()!;
-          try { await updateFirestoreDoc('sale_addons', docId, { status: 'paid', payment_status: 'paid', updated_at: new Date().toISOString() }); console.log(`✅ Upsell ${docId} marked as paid`); } catch (e) { console.warn('⚠️ Failed to update upsell addon:', e); }
+        // First check main orders
+        const orderResults = await queryFirestore('ordens', 'flowpay_charge_id', 'EQUAL', paymentId);
+        if (orderResults?.[0]?.document) {
+          const orderDoc = orderResults[0].document;
+          const orderId = orderDoc.name.split('/').pop()!;
+          const orderFields = orderDoc.fields;
+          if (orderFields?.payment_status?.stringValue !== 'paid') {
+            console.log(`🔄 Processing card order ${orderId} via upsell-status polling`);
+            const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+            const orderValue = Number(orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0);
+            const customerEmail = orderFields?.customer_email?.stringValue;
+            const userId = orderFields?.user_id?.stringValue;
+            const customerName = orderFields?.customer_name?.stringValue || '';
+            const customerPhone = orderFields?.customer_phone?.stringValue || '';
+            await updateDocOrThrow('ordens', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+            console.log(`✅ Card order ${orderId} marked as paid via upsell-status`);
+            try { await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret }); } catch (e) { console.warn('⚠️ process-delivery failed:', e); }
+            const couponId = orderFields?.coupon_id?.stringValue;
+            if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
+            let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+            try { const at6 = await getFirebaseAccessToken(); const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`; const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at6}` } }); if (iRes.ok) { const iData = await iRes.json(); const names = (iData.documents || []).filter((d: any) => d.fields?.product_name?.stringValue).map((d: any) => d.fields.product_name.stringValue); if (names.length > 0) productNamesList = names.join(', '); } } catch {}
+            const nameParts = customerName.split(' ');
+            const pollingEventId = generateEventId('Purchase', orderId);
+            await Promise.allSettled([
+              addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, content_name: productNamesList, source: 'card_auto_verify' }),
+              (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_auto_verify', event_id: pollingEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', { event_name: 'Purchase', event_id: pollingEventId, order_id: orderId, value: orderValue, currency: 'BRL', content_name: productNamesList, email: customerEmail, phone: customerPhone || undefined, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue, event_source_url: orderFields?.event_source_url?.stringValue || undefined }); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${pollingEventId} (card_auto_verify)`); } })(),
+              invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: productNamesList, utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue, utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue, utm_term: orderFields?.utm_term?.stringValue }),
+            ]);
+          }
+        } else {
+          // Check sale_addons (upsells)
+          const upsellResults = await queryFirestore('sale_addons', 'flowpay_charge_id', 'EQUAL', paymentId);
+          if (upsellResults?.[0]?.document) {
+            const docName = upsellResults[0].document.name;
+            const docId = docName.split('/').pop()!;
+            try { await updateFirestoreDoc('sale_addons', docId, { status: 'paid', payment_status: 'paid', updated_at: new Date().toISOString() }); console.log(`✅ Upsell ${docId} marked as paid`); } catch (e) { console.warn('⚠️ Failed to update upsell addon:', e); }
+          }
         }
       }
       return new Response(JSON.stringify({ success: true, status: statusData.payment?.status, paidAt: statusData.payment?.paidAt || null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
