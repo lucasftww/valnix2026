@@ -126,7 +126,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       if (pollingRef.current) return;
       pollingRef.current = true;
       try {
-        const response = await invokeFunction("flowpay-pix", {
+        const response = await invokeFunction("invictuspay-pix", {
           method: "GET",
           queryParams: { action: "status", chargeId: pixData.chargeId, orderId: `upsell-${orderId}-${addonType}` },
         });
@@ -205,7 +205,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
       // Create PIX charge immediately
       const amountInCents = Math.round(config.price * 100);
-      const pixResponse = await invokeFunction("flowpay-pix", {
+      const pixResponse = await invokeFunction("invictuspay-pix", {
         method: "POST",
         queryParams: { action: "create" },
         body: {

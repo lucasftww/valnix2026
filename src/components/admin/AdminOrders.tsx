@@ -417,7 +417,7 @@ export const AdminOrders = () => {
 
       const endpoint = isCard
         ? 'flowpay-card'
-        : 'flowpay-pix';
+        : 'invictuspay-pix';
       const qp = isCard
         ? { action: 'status', id: order.flowpay_charge_id }
         : { action: 'status', chargeId: order.flowpay_charge_id, orderId: order.id };

@@ -319,7 +319,7 @@ export default function Checkout() {
       }, orderItemsData, firebaseIdToken);
 
       setLoadingStage("generating");
-      const pixResponse = await invokeFunction('flowpay-pix', {
+      const pixResponse = await invokeFunction('invictuspay-pix', {
         method: 'POST',
         queryParams: { action: 'create' },
         headers: {},
