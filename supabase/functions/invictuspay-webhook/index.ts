@@ -1,7 +1,7 @@
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 
-// Proxy: forwards InvictusPay postbacks to flowpay-pix?action=webhook
+// Proxy: forwards InvictusPay postbacks to invictuspay-pix?action=webhook
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL') || '';
 
 Deno.serve(async (req) => {
@@ -11,7 +11,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.text();
-    const res = await fetch(`${SUPABASE_URL}/functions/v1/flowpay-pix?action=webhook`, {
+    const res = await fetch(`${SUPABASE_URL}/functions/v1/invictuspay-pix?action=webhook`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,

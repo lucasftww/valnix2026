@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
     if (req.method === 'POST' && action === 'create') {
       const createIp = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || 'unknown';
       const rlResult = await checkRateLimitFirestore(`pix_${createIp}`, 6, 60_000, 600_000);
-      if (!rlResult.allowed) { logRateLimitBlock('flowpay-pix', createIp, rlResult.attempts); return new Response(JSON.stringify({ error: 'Muitas tentativas. Aguarde alguns minutos.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
+      if (!rlResult.allowed) { logRateLimitBlock('invictuspay-pix', createIp, rlResult.attempts); return new Response(JSON.stringify({ error: 'Muitas tentativas. Aguarde alguns minutos.' }), { status: 429, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); }
 
       const authHeader = req.headers.get('authorization');
       const idToken = authHeader?.replace(/^Bearer\s+/i, '');

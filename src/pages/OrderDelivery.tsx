@@ -104,7 +104,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
     if (!pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
       try {
-        const response = await invokeFunction('flowpay-pix', {
+        const response = await invokeFunction('invictuspay-pix', {
           method: 'GET',
           queryParams: { action: 'status', chargeId: pixData.chargeId, orderId: `upsell-${orderId}-${addonType}` },
         });
@@ -167,7 +167,7 @@ function InlineUpsell({ orderId, addonType, userEmail, userName, userId, onSkip 
       });
 
       const amountInCents = Math.round(config.price * 100);
-      const pixResponse = await invokeFunction('flowpay-pix', {
+      const pixResponse = await invokeFunction('invictuspay-pix', {
         method: "POST",
         queryParams: { action: 'create' },
         body: {
