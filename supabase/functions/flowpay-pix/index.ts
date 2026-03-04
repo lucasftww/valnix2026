@@ -366,8 +366,8 @@ Deno.serve(async (req) => {
 
       // PIX QR code / brCode extraction — try common field names
       const pixObj = txData.pix || txData.payment || txData;
-      const brCode = pixObj.qr_code || pixObj.qr_code_text || pixObj.pix_code || pixObj.brCode || pixObj.emv || pixObj.copy_paste || '';
-      const qrCodeImage = pixObj.qr_code_url || pixObj.qr_code_image || pixObj.qrCodeImage || pixObj.qr_code_base64 || '';
+      const brCode = pixObj.pix_qr_code || pixObj.qr_code || pixObj.qr_code_text || pixObj.pix_code || pixObj.brCode || pixObj.emv || pixObj.copy_paste || '';
+      const qrCodeImage = pixObj.qr_code_url || pixObj.qr_code_image || pixObj.qrCodeImage || pixObj.qr_code_base64 || pixObj.pix_url || '';
 
       if (!brCode && !qrCodeImage) {
         console.error('❌ No PIX code found in response. Full data:', JSON.stringify(data));
