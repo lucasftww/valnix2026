@@ -361,12 +361,22 @@ Deno.serve(async (req) => {
 
       // ── Extract PIX data from InvictusPay response ──
       // InvictusPay may return data in various structures, try multiple paths
-      const txData = data.data || data.transaction || data;
-      const transactionHash = txData.hash || txData.transaction_hash || txData.id || '';
+      const txData = data?.data || data?.transaction || data;
+      const transactionHash = txData?.hash || txData?.transaction_hash || data?.hash || data?.transaction_hash || txData?.id || data?.id || '';
 
-      // PIX QR code / brCode extraction — try common field names
-      const pixObj = txData.pix || txData.payment || txData;
-      const brCode = pixObj.pix_qr_code || pixObj.qr_code || pixObj.qr_code_text || pixObj.pix_code || pixObj.brCode || pixObj.emv || pixObj.copy_paste || '';
+      // PIX QR code / brCode extraction — tolerate nested/wrapped gateway payloads
+      const pixCandidates = [
+        txData?.pix,
+        data?.pix,
+        data?.data?.pix,
+        txData?.payment,
+        data?.payment,
+        txData,
+        data?.data,
+        data,
+      ].filter(Boolean);
+      const pixObj = pixCandidates.find((p: any) => p?.pix_qr_code || p?.qr_code || p?.qr_code_text || p?.pix_code || p?.brCode || p?.emv || p?.copy_paste || p?.qr_code_base64 || p?.pix_url || p?.qr_code_image || p?.qr_code_url || p?.qrcode) || {};
+      const brCode = pixObj.pix_qr_code || pixObj.qr_code || pixObj.qr_code_text || pixObj.pix_code || pixObj.brCode || pixObj.emv || pixObj.copy_paste || pixObj.qrcode || '';
       const qrCodeImage = pixObj.qr_code_url || pixObj.qr_code_image || pixObj.qrCodeImage || pixObj.qr_code_base64 || pixObj.pix_url || '';
 
       if (!brCode && !qrCodeImage) {
