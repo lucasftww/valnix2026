@@ -303,7 +303,7 @@ Deno.serve(async (req) => {
 
       // ── Build postback URL ──
       const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-      const postbackUrl = `${supabaseUrl}/functions/v1/flowpay-pix?action=webhook`;
+      const postbackUrl = `${supabaseUrl}/functions/v1/invictuspay-webhook`;
 
       // ── Build cart for InvictusPay ──
       const cart = [{
