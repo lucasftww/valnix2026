@@ -332,11 +332,33 @@ Deno.serve(async (req) => {
       if (customer?.phone) invictusCustomer.phone_number = customer.phone.replace(/\D/g, '');
       if (customer?.taxId) invictusCustomer.document = customer.taxId.replace(/\D/g, '');
 
+      // For upsells, fetch customer data from the parent order if not provided
+      if (isUpsell && Object.keys(invictusCustomer).length === 0) {
+        // Extract parent orderId from "upsell-{orderId}-{addonType}"
+        const upsellParts = orderId.replace(/^upsell-/, '');
+        const lastDash = upsellParts.lastIndexOf('-');
+        const parentOrderId = lastDash > 0 ? upsellParts.substring(0, lastDash) : upsellParts;
+        try {
+          const parentFields = await getDocFields('ordens', parentOrderId);
+          if (parentFields) {
+            const pName = parentFields.customer_name?.stringValue || '';
+            const pEmail = parentFields.customer_email?.stringValue || '';
+            const pPhone = parentFields.customer_phone?.stringValue || '';
+            const pDoc = parentFields.customer_document?.stringValue || parentFields.customer_cpf?.stringValue || '';
+            if (pName) invictusCustomer.name = pName;
+            if (pEmail) invictusCustomer.email = pEmail;
+            if (pPhone) invictusCustomer.phone_number = pPhone.replace(/\D/g, '');
+            if (pDoc) invictusCustomer.document = pDoc.replace(/\D/g, '');
+            console.log(`📋 Upsell customer fetched from parent order ${parentOrderId}`);
+          }
+        } catch (e) { console.warn('⚠️ Failed to fetch parent order customer:', e); }
+      }
+
       const requestBody: Record<string, unknown> = {
         amount,
         offer_hash: INVICTUSPAY_OFFER_HASH,
         payment_method: 'pix',
-        customer: invictusCustomer,
+        ...(Object.keys(invictusCustomer).length > 0 ? { customer: invictusCustomer } : {}),
         cart,
         transaction_origin: 'api',
         postback_url: postbackUrl,
