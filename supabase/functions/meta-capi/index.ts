@@ -87,30 +87,9 @@ Deno.serve(async (req) => {
       eventPayload.custom_data = customData;
     }
 
-    // ⏸️ PAUSED: BM caiu — salvar log completo mas NÃO enviar para Meta
-    // Quando o novo pixel estiver pronto, remover este bloco e descomentar o sendToMeta
-    console.log(`⏸️ [Meta] CAPI PAUSED — logging ${event_name} without sending — event_id=${resolvedEventId}`);
-    const result = { success: true, paused: true, data: null };
-
-    // Salvar payload completo no log para replay posterior
-    await logCapiEvent(event_name, resolvedEventId, order_id || null, { success: true, error: 'paused_for_pixel_migration' });
-
-    // Salvar o payload COMPLETO para replay (incluindo user_data, custom_data, etc.)
-    try {
-      const replayAccessToken = await getFirebaseAccessToken();
-      const replayUrl = `${FIRESTORE_BASE}/capi_replay_queue`;
-      const replayFields: Record<string, unknown> = {
-        event_payload: toFirestoreValue(JSON.stringify(eventPayload)),
-        original_body: toFirestoreValue(JSON.stringify(body)),
-        event_name: toFirestoreValue(event_name),
-        event_id: toFirestoreValue(resolvedEventId),
-        order_id: toFirestoreValue(order_id || null),
-        created_at: toFirestoreValue(new Date().toISOString()),
-        replayed: toFirestoreValue(false),
-      };
-      await fetch(replayUrl, { method: 'POST', headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${replayAccessToken}` }, body: JSON.stringify({ fields: replayFields }) });
-      console.log(`💾 [Meta] Payload saved to replay queue — event_id=${resolvedEventId}`);
-    } catch (e) { console.warn('⚠️ Replay queue save failed:', e); }
+    // Send to Meta CAPI
+    const result = await sendToMeta(eventPayload, test_event_code);
+    await logCapiEvent(event_name, resolvedEventId, order_id || null, result);
 
     return new Response(JSON.stringify({ success: result.success, event_id: resolvedEventId, ...(result.error ? { error: result.error } : {}) }), {
       status: result.success ? 200 : 502, headers: { ...corsHeaders, 'Content-Type': 'application/json' },
