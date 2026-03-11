@@ -5,7 +5,7 @@ import { getFirebaseAccessToken, FIRESTORE_BASE } from '../_shared/firebase.ts';
 import { invokeEdgeFunction, generateEventId } from '../_shared/utils.ts';
 
 /**
- * CAPI Replay — reads completed orders from Firestore and sends Purchase events
+ * CAPI Replay — reads paid orders from Firestore and sends Purchase events
  * to Meta CAPI for all orders that haven't been sent yet.
  * Protected by admin auth.
  */
@@ -15,11 +15,11 @@ interface OrderDoc {
   fields: Record<string, any>;
 }
 
-async function fetchCompletedOrders(): Promise<OrderDoc[]> {
+async function fetchPaidOrders(): Promise<OrderDoc[]> {
   const accessToken = await getFirebaseAccessToken();
   const queryUrl = `${FIRESTORE_BASE}:runQuery`;
 
-  // Query orders with status = COMPLETED
+  // Query orders with payment_status = 'paid' (this is the actual field used in the system)
   const res = await fetch(queryUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -28,9 +28,9 @@ async function fetchCompletedOrders(): Promise<OrderDoc[]> {
         from: [{ collectionId: 'ordens' }],
         where: {
           fieldFilter: {
-            field: { fieldPath: 'status' },
+            field: { fieldPath: 'payment_status' },
             op: 'EQUAL',
-            value: { stringValue: 'COMPLETED' },
+            value: { stringValue: 'paid' },
           },
         },
         limit: 500,
@@ -39,7 +39,7 @@ async function fetchCompletedOrders(): Promise<OrderDoc[]> {
   });
 
   if (!res.ok) {
-    console.error('❌ Failed to query orders:', await res.text());
+    console.error('❌ Failed to query paid orders:', await res.text());
     return [];
   }
 
@@ -136,13 +136,13 @@ Deno.serve(async (req) => {
 
     console.log(`🔄 CAPI Replay started (dry_run=${dryRun})`);
 
-    // 1. Fetch completed orders + already-sent IDs in parallel
+    // 1. Fetch paid orders + already-sent IDs in parallel
     const [orders, alreadySent] = await Promise.all([
-      fetchCompletedOrders(),
+      fetchPaidOrders(),
       fetchAlreadySentIds(),
     ]);
 
-    console.log(`📊 Found ${orders.length} completed orders, ${alreadySent.size} already sent`);
+    console.log(`📊 Found ${orders.length} paid orders, ${alreadySent.size} already sent`);
 
     // 2. Filter out already-sent
     const pending = orders.filter(o => !alreadySent.has(o.id));
@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     if (dryRun) {
       return new Response(JSON.stringify({
         dry_run: true,
-        total_completed: orders.length,
+        total_paid: orders.length,
         already_sent: alreadySent.size,
         pending_replay: pending.length,
         order_ids: pending.map(o => o.id),
@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       try {
         const f = order.fields;
         const orderId = order.id;
-        const orderValue = getNum(f, 'total') || getNum(f, 'value');
+        const orderValue = getNum(f, 'total_amount') || getNum(f, 'total') || getNum(f, 'value');
         if (orderValue <= 0) {
           results.push({ orderId, success: false, error: 'no value' });
           continue;
@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
           phone: getStr(f, 'customer_phone'),
           first_name: nameParts[0] || undefined,
           last_name: nameParts.slice(1).join(' ') || undefined,
-          external_id: getStr(f, 'userId'),
+          external_id: getStr(f, 'user_id'),
           fbc: getStr(f, 'fbc'),
           fbp: getStr(f, 'fbp'),
           event_source_url: getStr(f, 'event_source_url') || 'https://www.valnix.com.br/checkout',
@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
     console.log(`🏁 CAPI Replay done: ${sent} sent, ${failed} failed`);
 
     return new Response(JSON.stringify({
-      total_completed: orders.length,
+      total_paid: orders.length,
       already_sent: alreadySent.size,
       replayed: sent,
       failed,
