@@ -219,7 +219,6 @@ export function sendPurchaseFromClient(params: {
     ? [...new Set(params.productCategories.filter(Boolean))].join(', ')
     : undefined;
 
-  // ⏸️ PAUSED: Pixel browser desabilitado durante migração de BM
   if (!PIXEL_PAUSED) {
     try {
       const eventId = generateEventId('Purchase', params.orderId);
