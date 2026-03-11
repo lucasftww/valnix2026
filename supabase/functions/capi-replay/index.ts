@@ -136,13 +136,13 @@ Deno.serve(async (req) => {
 
     console.log(`🔄 CAPI Replay started (dry_run=${dryRun})`);
 
-    // 1. Fetch completed orders + already-sent IDs in parallel
+    // 1. Fetch paid orders + already-sent IDs in parallel
     const [orders, alreadySent] = await Promise.all([
-      fetchCompletedOrders(),
+      fetchPaidOrders(),
       fetchAlreadySentIds(),
     ]);
 
-    console.log(`📊 Found ${orders.length} completed orders, ${alreadySent.size} already sent`);
+    console.log(`📊 Found ${orders.length} paid orders, ${alreadySent.size} already sent`);
 
     // 2. Filter out already-sent
     const pending = orders.filter(o => !alreadySent.has(o.id));
