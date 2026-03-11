@@ -151,7 +151,7 @@ Deno.serve(async (req) => {
     if (dryRun) {
       return new Response(JSON.stringify({
         dry_run: true,
-        total_completed: orders.length,
+        total_paid: orders.length,
         already_sent: alreadySent.size,
         pending_replay: pending.length,
         order_ids: pending.map(o => o.id),
