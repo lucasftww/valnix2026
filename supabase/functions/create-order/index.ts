@@ -117,11 +117,13 @@ Deno.serve(async (req) => {
     await Promise.all(items.map(async (item: any, idx: number) => {
       const cachedProduct = productCache.get(String(item.product_id));
       const realItemPrice = cachedProduct ? Number(cachedProduct.price?.doubleValue || cachedProduct.price?.integerValue || 0) : 0;
+      const productCategory = cachedProduct?.category?.stringValue || '';
       const itemQty = Number(item.quantity) || 1;
       const itemFields: Record<string, unknown> = {
         product_name: { stringValue: String(item.product_name || '').slice(0, 200) }, product_image: item.product_image ? { stringValue: String(item.product_image) } : { nullValue: null },
         product_id: { stringValue: String(item.product_id || '') }, quantity: { integerValue: String(itemQty) },
         unit_price: { doubleValue: realItemPrice }, total_price: { doubleValue: Math.round(realItemPrice * itemQty * 100) / 100 },
+        product_category: productCategory ? { stringValue: productCategory } : { nullValue: null },
         delivery_code: { nullValue: null }, delivery_type: { stringValue: item.delivery_type || 'manual' },
         order_id: { stringValue: orderId }, created_at: { stringValue: now },
       };
