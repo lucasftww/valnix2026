@@ -19,6 +19,63 @@ async function getDocFields(col: string, docId: string): Promise<any> {
   return doc?.fields || null;
 }
 
+/** Extract rich item data from order items subcollection for Meta CAPI */
+async function extractOrderItems(orderId: string): Promise<{
+  productNamesList: string;
+  contentIds: string[];
+  contents: { id: string; quantity: number; item_price?: number }[];
+  contentCategory: string | undefined;
+}> {
+  let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+  const contentIds: string[] = [];
+  const contents: { id: string; quantity: number; item_price?: number }[] = [];
+  const categories = new Set<string>();
+  try {
+    const at = await getFirebaseAccessToken();
+    const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`;
+    const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at}` } });
+    if (iRes.ok) {
+      const iData = await iRes.json();
+      const names: string[] = [];
+      for (const d of (iData.documents || [])) {
+        const f = d.fields || {};
+        if (f.product_name?.stringValue) names.push(f.product_name.stringValue);
+        const pid = f.product_id?.stringValue;
+        if (pid) {
+          contentIds.push(pid);
+          const qty = Number(f.quantity?.integerValue || 1);
+          const price = Number(f.unit_price?.doubleValue || f.unit_price?.integerValue || 0);
+          contents.push({ id: pid, quantity: qty, ...(price > 0 ? { item_price: price } : {}) });
+        }
+        if (f.product_category?.stringValue) categories.add(f.product_category.stringValue);
+      }
+      if (names.length > 0) productNamesList = names.join(', ');
+    }
+  } catch {}
+  return { productNamesList, contentIds, contents, contentCategory: categories.size > 0 ? [...categories].join(', ') : undefined };
+}
+
+/** Build enriched meta-capi payload for Purchase event */
+function buildMetaCapiPurchasePayload(
+  eventId: string, orderId: string, orderValue: number, items: Awaited<ReturnType<typeof extractOrderItems>>,
+  orderFields: any, customerEmail?: string, customerPhone?: string, customerName?: string, userId?: string,
+) {
+  const nameParts = (customerName || '').split(' ');
+  return {
+    event_name: 'Purchase', event_id: eventId, order_id: orderId, value: orderValue, currency: 'BRL',
+    content_name: items.productNamesList,
+    content_category: items.contentCategory || undefined,
+    content_ids: items.contentIds.length > 0 ? items.contentIds : undefined,
+    contents: items.contents.length > 0 ? items.contents : undefined,
+    num_items: items.contents.length > 0 ? items.contents.reduce((s, c) => s + c.quantity, 0) : undefined,
+    content_type: 'product',
+    email: customerEmail, phone: customerPhone || undefined,
+    first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+    external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+    event_source_url: orderFields?.event_source_url?.stringValue || 'https://www.valnix.com.br/checkout',
+  };
+}
+
 async function checkPendingOrderFlood(userId: string): Promise<boolean> {
   const rl = await checkRateLimitFirestore(`flood_${userId}`, 10, 3600_000, 3600_000);
   if (!rl.allowed) { console.warn(`🚨 ORDER FLOOD: user ${userId} exceeded 10 pending orders/hour`); return false; }
