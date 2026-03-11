@@ -75,7 +75,35 @@ export function AdminTrackingMonitor() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [hours, setHours] = useState<'24' | '48' | '168'>('24');
   const [cleaning, setCleaning] = useState(false);
+  const [replaying, setReplaying] = useState(false);
+  const [replayResult, setReplayResult] = useState<{ replayed: number; failed: number; already_sent: number; pending_replay?: number } | null>(null);
   const { toast } = useToast();
+
+  const handleCapiReplay = async (dryRun: boolean) => {
+    setReplaying(true);
+    setReplayResult(null);
+    try {
+      const token = requireAdminToken();
+      const res = await invokeFunction('capi-replay', {
+        method: 'POST',
+        body: { dry_run: dryRun },
+        headers: { 'x-admin-token': token },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setReplayResult(data);
+      if (dryRun) {
+        toast({ title: "Scan concluído", description: `${data.pending_replay} pedidos pendentes de replay.` });
+      } else {
+        toast({ title: "Replay concluído", description: `${data.replayed} enviados, ${data.failed} falhas.` });
+        refetch();
+      }
+    } catch (e: any) {
+      toast({ title: "Erro no replay", description: e.message, variant: "destructive" });
+    } finally {
+      setReplaying(false);
+    }
+  };
 
   const handleCleanupCapiLogs = async () => {
     setCleaning(true);
@@ -172,6 +200,38 @@ export function AdminTrackingMonitor() {
                 <AlertDialogAction onClick={handleCleanupCapiLogs} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
                   {cleaning ? 'Limpando...' : 'Confirmar Limpeza'}
                 </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs" disabled={replaying}>
+                {replaying ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                Replay CAPI
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Replay Purchase CAPI</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Envia eventos Purchase para o Meta CAPI de todos os pedidos pagos que ainda não foram enviados. Use "Scan" para ver quantos faltam, e "Enviar" para disparar.
+                  {replayResult && (
+                    <span className="block mt-2 text-sm font-medium">
+                      {replayResult.pending_replay !== undefined 
+                        ? `📊 ${replayResult.pending_replay} pedidos pendentes, ${replayResult.already_sent} já enviados`
+                        : `✅ ${replayResult.replayed} enviados, ${replayResult.failed} falhas`}
+                    </span>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex gap-2">
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <Button variant="outline" onClick={() => handleCapiReplay(true)} disabled={replaying}>
+                  {replaying ? 'Escaneando...' : 'Scan (dry run)'}
+                </Button>
+                <Button onClick={() => handleCapiReplay(false)} disabled={replaying}>
+                  {replaying ? 'Enviando...' : 'Enviar Todos'}
+                </Button>
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
