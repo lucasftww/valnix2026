@@ -92,24 +92,24 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
       });
     }
 
-    // ⏸️ PAUSED: Pixel browser desabilitado durante migração de BM
-    // Quando novo pixel estiver pronto, setar PIXEL_PAUSED = false
     if (!PIXEL_PAUSED) {
       try {
-        const PIXEL_WHITELIST = ['InitiateCheckout', 'Purchase'] as const;
+        const PIXEL_WHITELIST = ['PageView', 'ViewContent', 'InitiateCheckout', 'Purchase'] as const;
         const pixelEvent = PIXEL_WHITELIST.find(e => e === data.event_name);
         if (pixelEvent) {
           const fbq = (window as any).fbq;
           if (typeof fbq === 'function') {
-            fbq('track', pixelEvent, {
-              value: data.value,
+            const pixelParams: Record<string, unknown> = {
               currency: 'BRL',
-              content_name: data.content_name,
-              content_category: data.content_category,
-              content_ids: data.content_ids,
-              contents: data.contents,
-              num_items: data.num_items,
-            }, { eventID: eventId });
+              ...(data.value !== undefined && { value: data.value }),
+              ...(data.content_name && { content_name: data.content_name }),
+              ...(data.content_category && { content_category: data.content_category }),
+              ...(data.content_ids && { content_ids: data.content_ids }),
+              ...(data.contents && { contents: data.contents }),
+              ...(data.num_items && { num_items: data.num_items }),
+              content_type: 'product',
+            };
+            fbq('track', pixelEvent, pixelParams, { eventID: eventId });
           }
         }
       } catch { /* best-effort pixel */ }
