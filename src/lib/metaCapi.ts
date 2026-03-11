@@ -6,7 +6,7 @@ import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { generateEventId } from "@/lib/eventId";
 
 // ⏸️ MIGRATION FLAG: set to false when new pixel is ready
-const PIXEL_PAUSED = true;
+const PIXEL_PAUSED = false;
 
 // Read cookie by name
 function getCookie(name: string): string | undefined {
