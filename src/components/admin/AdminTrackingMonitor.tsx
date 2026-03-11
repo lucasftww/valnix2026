@@ -203,7 +203,38 @@ export function AdminTrackingMonitor() {
               </AlertDialogFooter>
             </AlertDialogContent>
           </AlertDialog>
-          <Button variant="outline" size="icon" className="h-9 w-9" onClick={() => refetch()} disabled={isFetching}>
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button variant="outline" size="sm" className="h-9 gap-1.5 text-xs" disabled={replaying}>
+                {replaying ? <RefreshCw className="h-3.5 w-3.5 animate-spin" /> : <Zap className="h-3.5 w-3.5" />}
+                Replay CAPI
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Replay Purchase CAPI</AlertDialogTitle>
+                <AlertDialogDescription>
+                  Envia eventos Purchase para o Meta CAPI de todos os pedidos pagos que ainda não foram enviados. Use "Scan" para ver quantos faltam, e "Enviar" para disparar.
+                  {replayResult && (
+                    <span className="block mt-2 text-sm font-medium">
+                      {replayResult.pending_replay !== undefined 
+                        ? `📊 ${replayResult.pending_replay} pedidos pendentes, ${replayResult.already_sent} já enviados`
+                        : `✅ ${replayResult.replayed} enviados, ${replayResult.failed} falhas`}
+                    </span>
+                  )}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter className="flex gap-2">
+                <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                <Button variant="outline" onClick={() => handleCapiReplay(true)} disabled={replaying}>
+                  {replaying ? 'Escaneando...' : 'Scan (dry run)'}
+                </Button>
+                <Button onClick={() => handleCapiReplay(false)} disabled={replaying}>
+                  {replaying ? 'Enviando...' : 'Enviar Todos'}
+                </Button>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
             <RefreshCw className={cn("h-4 w-4", isFetching && "animate-spin")} />
           </Button>
         </div>
