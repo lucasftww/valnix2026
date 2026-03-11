@@ -78,7 +78,7 @@ Deno.serve(async (req) => {
 
     const eventPayload: Record<string, unknown> = { event_name, event_time: Math.floor(Date.now() / 1000), event_id: resolvedEventId, action_source: 'website', user_data: userData };
     // event_source_url is required for action_source=website per Meta docs
-    if (event_source_url) eventPayload.event_source_url = event_source_url;
+    eventPayload.event_source_url = event_source_url || 'https://www.valnix.com.br';
 
     // Build custom_data if ANY custom field is present (not just value)
     const hasCustomData = value !== undefined || content_name || content_category || content_ids || (contents && Array.isArray(contents) && contents.length > 0) || num_items;

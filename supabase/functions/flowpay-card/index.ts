@@ -19,6 +19,63 @@ async function getDocFields(col: string, docId: string): Promise<any> {
   return doc?.fields || null;
 }
 
+/** Extract rich item data from order items subcollection for Meta CAPI */
+async function extractOrderItems(orderId: string): Promise<{
+  productNamesList: string;
+  contentIds: string[];
+  contents: { id: string; quantity: number; item_price?: number }[];
+  contentCategory: string | undefined;
+}> {
+  let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+  const contentIds: string[] = [];
+  const contents: { id: string; quantity: number; item_price?: number }[] = [];
+  const categories = new Set<string>();
+  try {
+    const at = await getFirebaseAccessToken();
+    const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`;
+    const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at}` } });
+    if (iRes.ok) {
+      const iData = await iRes.json();
+      const names: string[] = [];
+      for (const d of (iData.documents || [])) {
+        const f = d.fields || {};
+        if (f.product_name?.stringValue) names.push(f.product_name.stringValue);
+        const pid = f.product_id?.stringValue;
+        if (pid) {
+          contentIds.push(pid);
+          const qty = Number(f.quantity?.integerValue || 1);
+          const price = Number(f.unit_price?.doubleValue || f.unit_price?.integerValue || 0);
+          contents.push({ id: pid, quantity: qty, ...(price > 0 ? { item_price: price } : {}) });
+        }
+        if (f.product_category?.stringValue) categories.add(f.product_category.stringValue);
+      }
+      if (names.length > 0) productNamesList = names.join(', ');
+    }
+  } catch {}
+  return { productNamesList, contentIds, contents, contentCategory: categories.size > 0 ? [...categories].join(', ') : undefined };
+}
+
+/** Build enriched meta-capi payload for Purchase event */
+function buildMetaCapiPurchasePayload(
+  eventId: string, orderId: string, orderValue: number, items: Awaited<ReturnType<typeof extractOrderItems>>,
+  orderFields: any, customerEmail?: string, customerPhone?: string, customerName?: string, userId?: string,
+) {
+  const nameParts = (customerName || '').split(' ');
+  return {
+    event_name: 'Purchase', event_id: eventId, order_id: orderId, value: orderValue, currency: 'BRL',
+    content_name: items.productNamesList,
+    content_category: items.contentCategory || undefined,
+    content_ids: items.contentIds.length > 0 ? items.contentIds : undefined,
+    contents: items.contents.length > 0 ? items.contents : undefined,
+    num_items: items.contents.length > 0 ? items.contents.reduce((s, c) => s + c.quantity, 0) : undefined,
+    content_type: 'product',
+    email: customerEmail, phone: customerPhone || undefined,
+    first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+    external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+    event_source_url: orderFields?.event_source_url?.stringValue || 'https://www.valnix.com.br/checkout',
+  };
+}
+
 async function checkPendingOrderFlood(userId: string): Promise<boolean> {
   const rl = await checkRateLimitFirestore(`flood_${userId}`, 10, 3600_000, 3600_000);
   if (!rl.allowed) { console.warn(`🚨 ORDER FLOOD: user ${userId} exceeded 10 pending orders/hour`); return false; }
@@ -61,14 +118,13 @@ Deno.serve(async (req) => {
       console.log(`✅ Card order ${orderId} marked as paid via webhook`);
       try { await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret }); } catch (e) { console.error(`⚠️ process-delivery failed:`, e); }
       const couponId = orderFields?.coupon_id?.stringValue; if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
-      let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
-      try { const at2 = await getFirebaseAccessToken(); const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`; const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at2}` } }); if (iRes.ok) { const iData = await iRes.json(); const names = (iData.documents || []).filter((d: any) => d.fields?.product_name?.stringValue).map((d: any) => d.fields.product_name.stringValue); if (names.length > 0) productNamesList = names.join(', '); } } catch {}
-      const customerName = orderFields?.customer_name?.stringValue || ''; const customerPhone = orderFields?.customer_phone?.stringValue || ''; const nameParts = customerName.split(' ');
+      const items = await extractOrderItems(orderId);
+      const customerName = orderFields?.customer_name?.stringValue || ''; const customerPhone = orderFields?.customer_phone?.stringValue || '';
       const cardEventId = generateEventId('Purchase', orderId);
       await Promise.allSettled([
-        addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, content_name: productNamesList, source: 'card_webhook' }),
-        (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_webhook', event_id: cardEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', { event_name: 'Purchase', event_id: cardEventId, order_id: orderId, value: orderValue, currency: 'BRL', content_name: productNamesList, email: customerEmail, phone: customerPhone || undefined, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue, event_source_url: orderFields?.event_source_url?.stringValue || undefined }); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${cardEventId} (card_webhook)`); } else { console.log(`⏭️ [Meta] CAPI Purchase skipped — already sent for order ${orderId}`); } })(),
-        invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: productNamesList, utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue, utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue, utm_term: orderFields?.utm_term?.stringValue }),
+        addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, content_name: items.productNamesList, source: 'card_webhook' }),
+        (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_webhook', event_id: cardEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', buildMetaCapiPurchasePayload(cardEventId, orderId, orderValue, items, orderFields, customerEmail, customerPhone, customerName, userId)); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${cardEventId} (card_webhook)`); } else { console.log(`⏭️ [Meta] CAPI Purchase skipped — already sent for order ${orderId}`); } })(),
+        invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: items.productNamesList, utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue, utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue, utm_term: orderFields?.utm_term?.stringValue }),
       ]);
       return new Response(JSON.stringify({ success: true, orderId }), { headers: { 'Content-Type': 'application/json' } });
     }
@@ -168,14 +224,12 @@ Deno.serve(async (req) => {
             try { await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret }); } catch (e) { console.warn('⚠️ process-delivery failed:', e); }
             const couponId = orderFields?.coupon_id?.stringValue;
             if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
-            let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
-            try { const at6 = await getFirebaseAccessToken(); const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`; const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at6}` } }); if (iRes.ok) { const iData = await iRes.json(); const names = (iData.documents || []).filter((d: any) => d.fields?.product_name?.stringValue).map((d: any) => d.fields.product_name.stringValue); if (names.length > 0) productNamesList = names.join(', '); } } catch {}
-            const nameParts = customerName.split(' ');
+            const items2 = await extractOrderItems(orderId);
             const pollingEventId = generateEventId('Purchase', orderId);
             await Promise.allSettled([
-              addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, content_name: productNamesList, source: 'card_auto_verify' }),
-              (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_auto_verify', event_id: pollingEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', { event_name: 'Purchase', event_id: pollingEventId, order_id: orderId, value: orderValue, currency: 'BRL', content_name: productNamesList, email: customerEmail, phone: customerPhone || undefined, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue, event_source_url: orderFields?.event_source_url?.stringValue || undefined }); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${pollingEventId} (card_auto_verify)`); } })(),
-              invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: productNamesList, utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue, utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue, utm_term: orderFields?.utm_term?.stringValue }),
+              addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, content_name: items2.productNamesList, source: 'card_auto_verify' }),
+              (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_auto_verify', event_id: pollingEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', buildMetaCapiPurchasePayload(pollingEventId, orderId, orderValue, items2, orderFields, customerEmail, customerPhone, customerName, userId)); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${pollingEventId} (card_auto_verify)`); } })(),
+              invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: items2.productNamesList, utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue, utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue, utm_term: orderFields?.utm_term?.stringValue }),
             ]);
           }
         } else {
@@ -228,15 +282,13 @@ Deno.serve(async (req) => {
       console.log(`✅ Card order ${orderId} marked as paid (server-side confirm)`);
       try { const ws = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || ''; await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': ws }); } catch (e) { console.warn('⚠️ process-delivery failed:', e); }
       const couponId = orderFields.coupon_id?.stringValue; if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
-      let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
-      try { const at5 = await getFirebaseAccessToken(); const ciUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`; const ciRes = await fetch(ciUrl, { headers: { 'Authorization': `Bearer ${at5}` } }); if (ciRes.ok) { const ciData = await ciRes.json(); const names = (ciData.documents || []).filter((d: any) => d.fields?.product_name?.stringValue).map((d: any) => d.fields.product_name.stringValue); if (names.length > 0) productNamesList = names.join(', '); } } catch {}
+      const items3 = await extractOrderItems(orderId);
       const orderValue = Number(orderFields.total_amount?.doubleValue || orderFields.total_amount?.integerValue || 0); const userId = orderFields.user_id?.stringValue; const customerEmail = orderFields.customer_email?.stringValue; const customerName = orderFields.customer_name?.stringValue || ''; const customerPhone = orderFields.customer_phone?.stringValue || '';
-      const nameParts = customerName.split(' ');
       const confirmEventId = generateEventId('Purchase', orderId);
       await Promise.allSettled([
-        addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, page_url: 'https://www.valnix.com.br/card-callback', content_name: productNamesList }),
-        (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_confirm', event_id: confirmEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', { event_name: 'Purchase', event_id: confirmEventId, order_id: orderId, value: orderValue, currency: 'BRL', content_name: productNamesList, email: customerEmail, phone: customerPhone || undefined, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: orderFields.fbc?.stringValue, fbp: orderFields.fbp?.stringValue, event_source_url: orderFields.event_source_url?.stringValue || undefined }); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${confirmEventId} (card_confirm)`); } else { console.log(`⏭️ [Meta] CAPI Purchase skipped — already sent for order ${orderId}`); } })(),
-        invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: productNamesList, utm_source: orderFields.utm_source?.stringValue, utm_medium: orderFields.utm_medium?.stringValue, utm_campaign: orderFields.utm_campaign?.stringValue, utm_content: orderFields.utm_content?.stringValue, utm_term: orderFields.utm_term?.stringValue }),
+        addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, page_url: 'https://www.valnix.com.br/card-callback', content_name: items3.productNamesList }),
+        (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_confirm', event_id: confirmEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', buildMetaCapiPurchasePayload(confirmEventId, orderId, orderValue, items3, orderFields, customerEmail, customerPhone, customerName, userId)); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${confirmEventId} (card_confirm)`); } else { console.log(`⏭️ [Meta] CAPI Purchase skipped — already sent for order ${orderId}`); } })(),
+        invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: items3.productNamesList, utm_source: orderFields.utm_source?.stringValue, utm_medium: orderFields.utm_medium?.stringValue, utm_campaign: orderFields.utm_campaign?.stringValue, utm_content: orderFields.utm_content?.stringValue, utm_term: orderFields.utm_term?.stringValue }),
       ]);
       return new Response(JSON.stringify({ success: true, orderId }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
