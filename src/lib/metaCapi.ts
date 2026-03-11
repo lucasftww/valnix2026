@@ -238,3 +238,20 @@ export function sendPurchaseFromClient(params: {
     } catch { /* best-effort pixel */ }
   }
 }
+
+// ── ViewContent ────────────────────────────────────────────────────
+// Fires browser pixel + CAPI when user views a product page.
+export function sendViewContent(params: {
+  productId?: string;
+  productName?: string;
+  category?: string;
+  value?: number;
+}) {
+  sendMetaCapiEvent({
+    event_name: 'ViewContent',
+    content_name: params.productName,
+    content_category: params.category,
+    content_ids: params.productId ? [params.productId] : undefined,
+    value: params.value,
+  });
+}
