@@ -191,7 +191,7 @@ Deno.serve(async (req) => {
           phone: getStr(f, 'customer_phone'),
           first_name: nameParts[0] || undefined,
           last_name: nameParts.slice(1).join(' ') || undefined,
-          external_id: getStr(f, 'userId'),
+          external_id: getStr(f, 'user_id'),
           fbc: getStr(f, 'fbc'),
           fbp: getStr(f, 'fbp'),
           event_source_url: getStr(f, 'event_source_url') || 'https://www.valnix.com.br/checkout',
