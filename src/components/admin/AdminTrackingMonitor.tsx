@@ -75,7 +75,35 @@ export function AdminTrackingMonitor() {
   const { isAdmin, loading: authLoading } = useAuth();
   const [hours, setHours] = useState<'24' | '48' | '168'>('24');
   const [cleaning, setCleaning] = useState(false);
+  const [replaying, setReplaying] = useState(false);
+  const [replayResult, setReplayResult] = useState<{ replayed: number; failed: number; already_sent: number; pending_replay?: number } | null>(null);
   const { toast } = useToast();
+
+  const handleCapiReplay = async (dryRun: boolean) => {
+    setReplaying(true);
+    setReplayResult(null);
+    try {
+      const token = requireAdminToken();
+      const res = await invokeFunction('capi-replay', {
+        method: 'POST',
+        body: { dry_run: dryRun },
+        headers: { 'x-admin-token': token },
+      });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      setReplayResult(data);
+      if (dryRun) {
+        toast({ title: "Scan concluído", description: `${data.pending_replay} pedidos pendentes de replay.` });
+      } else {
+        toast({ title: "Replay concluído", description: `${data.replayed} enviados, ${data.failed} falhas.` });
+        refetch();
+      }
+    } catch (e: any) {
+      toast({ title: "Erro no replay", description: e.message, variant: "destructive" });
+    } finally {
+      setReplaying(false);
+    }
+  };
 
   const handleCleanupCapiLogs = async () => {
     setCleaning(true);
