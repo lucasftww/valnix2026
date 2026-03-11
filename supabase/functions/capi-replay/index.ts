@@ -15,11 +15,11 @@ interface OrderDoc {
   fields: Record<string, any>;
 }
 
-async function fetchCompletedOrders(): Promise<OrderDoc[]> {
+async function fetchPaidOrders(): Promise<OrderDoc[]> {
   const accessToken = await getFirebaseAccessToken();
   const queryUrl = `${FIRESTORE_BASE}:runQuery`;
 
-  // Query orders with status = COMPLETED
+  // Query orders with payment_status = 'paid' (this is the actual field used in the system)
   const res = await fetch(queryUrl, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${accessToken}` },
@@ -28,9 +28,9 @@ async function fetchCompletedOrders(): Promise<OrderDoc[]> {
         from: [{ collectionId: 'ordens' }],
         where: {
           fieldFilter: {
-            field: { fieldPath: 'status' },
+            field: { fieldPath: 'payment_status' },
             op: 'EQUAL',
-            value: { stringValue: 'COMPLETED' },
+            value: { stringValue: 'paid' },
           },
         },
         limit: 500,
