@@ -51,11 +51,19 @@ const ProductDetail = () => {
     import("@/lib/fetchProduct").then(({ logFetchTimeout }) => logFetchTimeout(id, fetchError));
   }, [id, isError, fetchError]);
 
-  // Track ViewContent when product loads
+  // Track ViewContent when product loads (analytics + Meta Pixel/CAPI)
   useEffect(() => {
     if (product?.name) {
       import("@/lib/analytics").then(({ trackViewContentEvent }) => {
         trackViewContentEvent(null, product.name, product.category || undefined);
+      });
+      import("@/lib/metaCapi").then(({ sendViewContent }) => {
+        sendViewContent({
+          productId: product.id,
+          productName: product.name,
+          category: product.category || undefined,
+          value: product.price,
+        });
       });
     }
   }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps

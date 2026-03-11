@@ -119,10 +119,11 @@
         };
         if (!f._fbq) f._fbq = n;
         n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
-        // Disable autoConfig BEFORE loading the script to prevent auto PageView
-        f.fbq('set', 'autoConfig', false, '1939179866693535');
-        f.fbq('init', '1939179866693535', {}, { agent: 'plvalnix' });
-        // Explicitly NO fbq('track','PageView') — only InitiateCheckout & Purchase
+        // Disable autoConfig BEFORE loading the script to prevent duplicate PageView
+        f.fbq('set', 'autoConfig', false, '4378225905838577');
+        f.fbq('init', '4378225905838577', {}, { agent: 'plvalnix' });
+        // Fire PageView on every page load
+        f.fbq('track', 'PageView');
         const t = document.createElement('script');
         t.async = true;
         t.src = 'https://connect.facebook.net/en_US/fbevents.js';
