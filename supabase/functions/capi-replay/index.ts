@@ -39,7 +39,7 @@ async function fetchPaidOrders(): Promise<OrderDoc[]> {
   });
 
   if (!res.ok) {
-    console.error('❌ Failed to query orders:', await res.text());
+    console.error('❌ Failed to query paid orders:', await res.text());
     return [];
   }
 
