@@ -166,7 +166,7 @@ Deno.serve(async (req) => {
       try {
         const f = order.fields;
         const orderId = order.id;
-        const orderValue = getNum(f, 'total') || getNum(f, 'value');
+        const orderValue = getNum(f, 'total_amount') || getNum(f, 'total') || getNum(f, 'value');
         if (orderValue <= 0) {
           results.push({ orderId, success: false, error: 'no value' });
           continue;
