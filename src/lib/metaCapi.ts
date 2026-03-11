@@ -225,13 +225,13 @@ export function sendPurchaseFromClient(params: {
       const fbq = (window as any).fbq;
       if (typeof fbq === 'function') {
         fbq('track', 'Purchase', {
-          value: params.value,
-          currency: 'BRL',
-          content_name: params.productNames?.join(', '),
-          content_category: contentCategory,
           content_ids: params.productIds || params.productNames,
           contents,
-          num_items: numItems,
+          content_name: params.productNames?.join(', '),
+          content_category: contentCategory,
+          content_type: 'product',
+          value: params.value,
+          currency: 'BRL',
         }, { eventID: eventId });
       }
     } catch { /* best-effort pixel */ }
