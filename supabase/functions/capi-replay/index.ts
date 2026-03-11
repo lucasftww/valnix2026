@@ -5,7 +5,7 @@ import { getFirebaseAccessToken, FIRESTORE_BASE } from '../_shared/firebase.ts';
 import { invokeEdgeFunction, generateEventId } from '../_shared/utils.ts';
 
 /**
- * CAPI Replay — reads completed orders from Firestore and sends Purchase events
+ * CAPI Replay — reads paid orders from Firestore and sends Purchase events
  * to Meta CAPI for all orders that haven't been sent yet.
  * Protected by admin auth.
  */
