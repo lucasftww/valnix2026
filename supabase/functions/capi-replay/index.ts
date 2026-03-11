@@ -220,7 +220,7 @@ Deno.serve(async (req) => {
     console.log(`🏁 CAPI Replay done: ${sent} sent, ${failed} failed`);
 
     return new Response(JSON.stringify({
-      total_completed: orders.length,
+      total_paid: orders.length,
       already_sent: alreadySent.size,
       replayed: sent,
       failed,
