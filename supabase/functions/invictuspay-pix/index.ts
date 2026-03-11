@@ -90,14 +90,32 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
   if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
 
   let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
+  let contentIds: string[] = [];
+  let contents: { id: string; quantity: number; item_price?: number }[] = [];
+  let contentCategory: string | undefined;
   try {
     const at = await getFirebaseAccessToken();
     const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`;
     const iRes = await fetch(iUrl, { headers: { 'Authorization': `Bearer ${at}` } });
     if (iRes.ok) {
       const iData = await iRes.json();
-      const names = (iData.documents || []).filter((d: any) => d.fields?.product_name?.stringValue).map((d: any) => d.fields.product_name.stringValue);
+      const docs = iData.documents || [];
+      const names: string[] = [];
+      const categories = new Set<string>();
+      for (const d of docs) {
+        const f = d.fields || {};
+        if (f.product_name?.stringValue) names.push(f.product_name.stringValue);
+        const pid = f.product_id?.stringValue;
+        if (pid) {
+          contentIds.push(pid);
+          const qty = Number(f.quantity?.integerValue || 1);
+          const price = Number(f.unit_price?.doubleValue || f.unit_price?.integerValue || 0);
+          contents.push({ id: pid, quantity: qty, ...(price > 0 ? { item_price: price } : {}) });
+        }
+        if (f.product_category?.stringValue) categories.add(f.product_category.stringValue);
+      }
       if (names.length > 0) productNamesList = names.join(', ');
+      if (categories.size > 0) contentCategory = [...categories].join(', ');
     }
   } catch {}
 
@@ -108,7 +126,19 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
     (async () => {
       const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source, event_id: purchaseEventId, created_at: new Date().toISOString() });
       if (r) {
-        await invokeEdgeFunction('meta-capi', { event_name: 'Purchase', event_id: purchaseEventId, order_id: orderId, value: orderValue, currency: 'BRL', content_name: productNamesList, email: customerEmail, phone: customerPhone || undefined, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue, event_source_url: orderFields?.event_source_url?.stringValue || undefined });
+        await invokeEdgeFunction('meta-capi', {
+          event_name: 'Purchase', event_id: purchaseEventId, order_id: orderId, value: orderValue, currency: 'BRL',
+          content_name: productNamesList,
+          content_category: contentCategory || undefined,
+          content_ids: contentIds.length > 0 ? contentIds : undefined,
+          contents: contents.length > 0 ? contents : undefined,
+          num_items: contents.length > 0 ? contents.reduce((s, c) => s + c.quantity, 0) : undefined,
+          content_type: 'product',
+          email: customerEmail, phone: customerPhone || undefined,
+          first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined,
+          external_id: userId, fbc: orderFields?.fbc?.stringValue, fbp: orderFields?.fbp?.stringValue,
+          event_source_url: orderFields?.event_source_url?.stringValue || `https://www.valnix.com.br/checkout`,
+        });
         console.log(`📡 [Meta] CAPI Purchase sent — event_id=${purchaseEventId} (${source})`);
       } else {
         console.log(`⏭️ [Meta] CAPI Purchase skipped — already sent for order ${orderId}`);
