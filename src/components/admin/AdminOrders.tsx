@@ -442,7 +442,7 @@ export const AdminOrders = () => {
           await invokeFunction("process-delivery", {
             method: "POST",
             body: { orderId: order.id },
-            headers: { "x-internal-key": token },
+            headers: { "x-admin-token": token },
           });
         } catch (e) {
           console.warn('⚠️ process-delivery call failed (non-blocking):', e);
