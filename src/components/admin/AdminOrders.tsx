@@ -1069,6 +1069,12 @@ export const AdminOrders = () => {
                                   Verificar pagamento
                                 </DropdownMenuItem>
                               )}
+                              {order.payment_status !== 'paid' && (
+                                <DropdownMenuItem onClick={() => handleForceConfirm(order)} disabled={verifyingPayment === order.id}>
+                                  {verifyingPayment === order.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+                                  Forçar confirmação
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel className="text-xs">Alterar status</DropdownMenuLabel>
                               {["pending", "processing", "completed", "cancelled"].map(s => (
