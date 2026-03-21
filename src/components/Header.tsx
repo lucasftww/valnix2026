@@ -13,7 +13,6 @@ const LazySheet = lazy(() => import("@/components/ui/sheet").then(m => ({ defaul
 const LazySheetContent = lazy(() => import("@/components/ui/sheet").then(m => ({ default: m.SheetContent })));
 const LazySheetHeader = lazy(() => import("@/components/ui/sheet").then(m => ({ default: m.SheetHeader })));
 const LazySheetTitle = lazy(() => import("@/components/ui/sheet").then(m => ({ default: m.SheetTitle })));
-const LazySheetTrigger = lazy(() => import("@/components/ui/sheet").then(m => ({ default: m.SheetTrigger })));
 
 // Lazy-load CartSidebar (pulls in ScrollArea, Separator, more Radix)
 const LazyCartSidebar = lazy(() => import("./CartSidebar").then(m => ({ default: m.CartSidebar })));
