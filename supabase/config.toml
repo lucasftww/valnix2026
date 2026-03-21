@@ -53,3 +53,12 @@ verify_jwt = false
 
 [functions.monitor-tracking]
 verify_jwt = false
+
+[functions.invictuspay-webhook]
+verify_jwt = false
+
+[functions.capi-replay]
+verify_jwt = false
+
+[functions.admin-analytics]
+verify_jwt = false
