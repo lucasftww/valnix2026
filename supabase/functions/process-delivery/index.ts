@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getFirebaseAccessToken, FIREBASE_PROJECT_ID, FIRESTORE_BASE, verifyFirebaseIdToken } from '../_shared/firebase.ts';
 import { getFirestoreDoc, updateFirestoreDoc, queryFirestore } from '../_shared/firestore.ts';
+import { verifyAdminToken } from '../_shared/auth.ts';
 
 // ── Throwing wrapper ──
 async function updateDocOrThrow(col: string, docId: string, data: Record<string, unknown>) {
