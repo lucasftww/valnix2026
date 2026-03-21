@@ -61,8 +61,10 @@ Deno.serve(async (req) => {
     const internalKey = req.headers.get('x-internal-key'); const expectedInternalKey = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
     const authHeader = req.headers.get('authorization'); const idToken = authHeader?.replace(/^Bearer\s+/i, '');
     const deliveryToken = req.headers.get('x-delivery-token');
+    const adminToken = req.headers.get('x-admin-token');
     let authSource = 'none'; let callerUid: string | null = null;
     if (internalKey && internalKey === expectedInternalKey) authSource = 'internal';
+    else if (adminToken && await verifyAdminToken(adminToken)) authSource = 'admin';
     else if (idToken) { const user = await verifyFirebaseIdToken(idToken); if (!user) return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); callerUid = user.uid; authSource = await isAdmin(user.uid) ? 'admin' : 'user'; }
     else if (deliveryToken && deliveryToken.length >= 20) authSource = 'delivery_token';
     if (authSource === 'none') return new Response(JSON.stringify({ success: false, error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
