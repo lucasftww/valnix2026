@@ -49,7 +49,7 @@ async function isAdmin(uid: string): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
+  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-admin-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
