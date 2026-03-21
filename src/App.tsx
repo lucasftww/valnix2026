@@ -92,6 +92,7 @@ const App = () => {
                         <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
 
                         <Route path="/card-callback" element={<CardPaymentCallback />} />
+                        <Route path="/order" element={<OrderDelivery />} />
                         <Route path="/order/:hash" element={<OrderDelivery />} />
                         <Route path="/product/:id" element={<ProductDetail />} />
                         {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
