@@ -446,7 +446,7 @@ export const AdminOrders = () => {
             headers: { "x-admin-token": token },
           });
         } catch (e) {
-          console.warn('⚠️ process-delivery call failed (non-blocking):', e);
+          if (import.meta.env.DEV) console.warn('⚠️ process-delivery call failed (non-blocking):', e);
         }
         
         // 3. Send CAPI Purchase + analytics (fire-and-forget)
@@ -556,7 +556,7 @@ export const AdminOrders = () => {
           headers: { "x-admin-token": token },
         });
       } catch (e) {
-        console.warn('⚠️ process-delivery call failed (non-blocking):', e);
+        if (import.meta.env.DEV) console.warn('⚠️ process-delivery call failed (non-blocking):', e);
       }
       // 3. Send CAPI Purchase + analytics (fire-and-forget)
       sendAdminCapiPurchase(order);

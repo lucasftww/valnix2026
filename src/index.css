@@ -22,6 +22,7 @@ All colors MUST be HSL.
   
   body {
     overscroll-behavior-x: none;
+    overflow-x: hidden;
   }
   
   img {

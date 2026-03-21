@@ -216,7 +216,7 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
               >
                 <img
                   src={product.image_url}
-                  alt=""
+                  alt={product.name}
                   className="w-14 h-14 object-cover rounded-lg border border-border"
                   loading="lazy"
                   decoding="async"
