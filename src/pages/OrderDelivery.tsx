@@ -41,20 +41,13 @@ interface GuestOrderData {
 export default function OrderDelivery() {
   const { hash } = useParams<{ hash: string }>();
   const [searchParams] = useSearchParams();
-  const navigate = useNavigate();
   const { toast } = useToast();
-  // Auth removed — delivery is accessed via hash, no user needed
   const [order, setOrder] = useState<GuestOrderData | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
-  
   const [liveItems, setLiveItems] = useState<OrderItemData[] | null>(null);
-
-  const upsellParam = searchParams.get("upsell");
   const orderIdParam = searchParams.get("order_id");
-
-  // No longer need single upsell config — UpsellSequence handles it
 
   // Fetch guest order + items via Edge Function (Firestore is deny-all for ordens)
   useEffect(() => {
