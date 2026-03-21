@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { invokeFunction } from "@/lib/apiHelper";
+import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { AdminErrorState } from "./AdminErrorState";
+import { generateEventId } from "@/lib/eventId";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
