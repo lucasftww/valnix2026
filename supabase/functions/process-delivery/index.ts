@@ -2,6 +2,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getFirebaseAccessToken, FIREBASE_PROJECT_ID, FIRESTORE_BASE, verifyFirebaseIdToken } from '../_shared/firebase.ts';
 import { getFirestoreDoc, updateFirestoreDoc, queryFirestore } from '../_shared/firestore.ts';
+import { verifyAdminToken } from '../_shared/auth.ts';
 
 // ── Throwing wrapper ──
 async function updateDocOrThrow(col: string, docId: string, data: Record<string, unknown>) {
@@ -48,7 +49,7 @@ async function isAdmin(uid: string): Promise<boolean> {
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
+  const corsHeaders = getCorsHeaders(req, { headers: "authorization, x-client-info, apikey, content-type, x-internal-key, x-delivery-token, x-admin-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version" });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
@@ -60,8 +61,10 @@ Deno.serve(async (req) => {
     const internalKey = req.headers.get('x-internal-key'); const expectedInternalKey = Deno.env.get('FLOWPAY_WEBHOOK_SECRET');
     const authHeader = req.headers.get('authorization'); const idToken = authHeader?.replace(/^Bearer\s+/i, '');
     const deliveryToken = req.headers.get('x-delivery-token');
+    const adminToken = req.headers.get('x-admin-token');
     let authSource = 'none'; let callerUid: string | null = null;
     if (internalKey && internalKey === expectedInternalKey) authSource = 'internal';
+    else if (adminToken && await verifyAdminToken(adminToken)) authSource = 'admin';
     else if (idToken) { const user = await verifyFirebaseIdToken(idToken); if (!user) return new Response(JSON.stringify({ success: false, error: 'Unauthorized' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }); callerUid = user.uid; authSource = await isAdmin(user.uid) ? 'admin' : 'user'; }
     else if (deliveryToken && deliveryToken.length >= 20) authSource = 'delivery_token';
     if (authSource === 'none') return new Response(JSON.stringify({ success: false, error: 'Authentication required' }), { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
