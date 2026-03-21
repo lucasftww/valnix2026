@@ -448,6 +448,8 @@ export const AdminOrders = () => {
           console.warn('⚠️ process-delivery call failed (non-blocking):', e);
         }
         
+        // 3. Send CAPI Purchase + analytics (fire-and-forget)
+        sendAdminCapiPurchase(order);
         toast({ title: "✅ Pagamento confirmado", description: `Pedido #${order.id.slice(0, 6)} pago e entrega processada.` });
         fetchOrders();
       } else {
