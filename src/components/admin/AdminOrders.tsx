@@ -447,6 +447,35 @@ export const AdminOrders = () => {
     }
   };
 
+  const handleForceConfirm = async (order: Order) => {
+    setVerifyingPayment(order.id);
+    try {
+      const token = requireAdminToken();
+      // 1. Mark as paid in Firestore
+      await invokeFunction("admin-data", {
+        method: "PUT",
+        queryParams: { resource: "verify-payment" },
+        headers: { "x-admin-token": token },
+        body: { id: order.id, payment_status: 'paid', status: 'processing' },
+      });
+      // 2. Trigger delivery processing
+      try {
+        await invokeFunction("process-delivery", {
+          method: "POST",
+          body: { orderId: order.id },
+          headers: { "x-internal-key": token },
+        });
+      } catch (e) {
+        console.warn('⚠️ process-delivery call failed (non-blocking):', e);
+      }
+      toast({ title: "✅ Pagamento confirmado", description: `Pedido #${order.id.slice(0, 6)} marcado como pago e entrega processada.` });
+      fetchOrders();
+    } catch (error: any) {
+      toast({ title: "Erro ao confirmar", description: error.message, variant: "destructive" });
+    } finally {
+      setVerifyingPayment(null);
+    }
+  };
 
 
   const handleViewDetail = async (order: Order) => {
@@ -1040,6 +1069,12 @@ export const AdminOrders = () => {
                                   Verificar pagamento
                                 </DropdownMenuItem>
                               )}
+                              {order.payment_status !== 'paid' && (
+                                <DropdownMenuItem onClick={() => handleForceConfirm(order)} disabled={verifyingPayment === order.id}>
+                                  {verifyingPayment === order.id ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Zap className="w-4 h-4 mr-2" />}
+                                  Forçar confirmação
+                                </DropdownMenuItem>
+                              )}
                               <DropdownMenuSeparator />
                               <DropdownMenuLabel className="text-xs">Alterar status</DropdownMenuLabel>
                               {["pending", "processing", "completed", "cancelled"].map(s => (
@@ -1210,6 +1245,12 @@ export const AdminOrders = () => {
                         <Button variant="secondary" size="sm" disabled={verifyingPayment === detailOrder.id} onClick={() => handleVerifyPayment(detailOrder)}>
                           {verifyingPayment === detailOrder.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Search className="w-4 h-4 mr-1" />}
                           Verificar
+                        </Button>
+                      )}
+                      {detailOrder.payment_status !== 'paid' && (
+                        <Button variant="default" size="sm" disabled={verifyingPayment === detailOrder.id} onClick={() => handleForceConfirm(detailOrder)}>
+                          {verifyingPayment === detailOrder.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 mr-1" />}
+                          Forçar confirmação
                         </Button>
                       )}
                       {detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && (
