@@ -232,6 +232,7 @@ export function sendPurchaseFromClient(params: {
           content_type: 'product',
           value: params.value,
           currency: 'BRL',
+          ...(numItems ? { num_items: numItems } : {}),
         }, { eventID: eventId });
       }
     } catch { /* best-effort pixel */ }
