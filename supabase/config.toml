@@ -57,8 +57,5 @@ verify_jwt = false
 [functions.invictuspay-webhook]
 verify_jwt = false
 
-[functions.invictuspay-pix]
-verify_jwt = false
-
 [functions.capi-replay]
 verify_jwt = false
