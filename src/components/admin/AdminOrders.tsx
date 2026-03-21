@@ -1,8 +1,9 @@
 import { useState, useEffect, useMemo, useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { invokeFunction } from "@/lib/apiHelper";
+import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { AdminErrorState } from "./AdminErrorState";
+import { generateEventId } from "@/lib/eventId";
 import { useAuth } from "@/contexts/FirebaseAuthContext";
 import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
 import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
@@ -447,6 +448,8 @@ export const AdminOrders = () => {
           console.warn('⚠️ process-delivery call failed (non-blocking):', e);
         }
         
+        // 3. Send CAPI Purchase + analytics (fire-and-forget)
+        sendAdminCapiPurchase(order);
         toast({ title: "✅ Pagamento confirmado", description: `Pedido #${order.id.slice(0, 6)} pago e entrega processada.` });
         fetchOrders();
       } else {
@@ -457,6 +460,38 @@ export const AdminOrders = () => {
     } finally {
       setVerifyingPayment(null);
     }
+  };
+
+  // ── Send CAPI Purchase + analytics after admin confirms payment ──
+  const sendAdminCapiPurchase = (order: Order) => {
+    const eventId = generateEventId('Purchase', order.id);
+    const nameParts = (order.customer_name || '').split(' ');
+    // Fire-and-forget: CAPI Purchase
+    invokeFunctionFireAndForget('meta-capi', {
+      event_name: 'Purchase',
+      event_id: eventId,
+      order_id: order.id,
+      value: order.total_amount,
+      currency: 'BRL',
+      content_name: `Pedido #${order.id.substring(0, 8)}`,
+      content_type: 'product',
+      email: order.customer_email || undefined,
+      phone: order.customer_phone || undefined,
+      first_name: nameParts[0] || undefined,
+      last_name: nameParts.slice(1).join(' ') || undefined,
+      external_id: order.user_id || undefined,
+      event_source_url: 'https://www.valnix.com.br/checkout',
+    });
+    // Fire-and-forget: Analytics Purchase
+    invokeFunctionFireAndForget('track-analytics', {
+      event_name: 'Purchase',
+      user_id: order.user_id || null,
+      page_url: 'https://www.valnix.com.br/checkout',
+      value: order.total_amount,
+      currency: 'BRL',
+      order_id: order.id,
+      content_name: `Pedido #${order.id.substring(0, 8)}`,
+    });
   };
 
   const handleForceConfirm = async (order: Order) => {
@@ -480,6 +515,8 @@ export const AdminOrders = () => {
       } catch (e) {
         console.warn('⚠️ process-delivery call failed (non-blocking):', e);
       }
+      // 3. Send CAPI Purchase + analytics (fire-and-forget)
+      sendAdminCapiPurchase(order);
       toast({ title: "✅ Pagamento confirmado", description: `Pedido #${order.id.slice(0, 6)} marcado como pago e entrega processada.` });
       fetchOrders();
     } catch (error: any) {
