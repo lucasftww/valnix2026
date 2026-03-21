@@ -84,10 +84,16 @@ Deno.serve(async (req) => {
     const hashChars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789';
     let guestHash = ''; for (let i = 0; i < 12; i++) guestHash += hashChars.charAt(Math.floor(Math.random() * hashChars.length));
     const expiresAt = new Date(); expiresAt.setDate(expiresAt.getDate() + 30);
+    const customerDocument = order.customer_document
+      ? String(order.customer_document).replace(/\D/g, '').slice(0, 14)
+      : order.customer_cpf
+        ? String(order.customer_cpf).replace(/\D/g, '').slice(0, 14)
+        : null;
 
     const orderData: Record<string, unknown> = {
       user_id: userId, customer_name: String(order.customer_name).trim().slice(0, 200), customer_email: String(order.customer_email).trim().slice(0, 255),
       customer_phone: order.customer_phone ? String(order.customer_phone).trim().slice(0, 30) : null, total_amount: serverTotal,
+      customer_document: customerDocument,
       subtotal_amount: Math.round(recalculatedTotal * 100) / 100, discount_amount: Math.round(discountAmount * 100) / 100,
       notes: order.notes ? String(order.notes).slice(0, 500) : null, status: 'pending', payment_status: 'pending',
       payment_method: order.payment_method ? String(order.payment_method).slice(0, 20) : null, hash: guestHash,

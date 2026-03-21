@@ -18,7 +18,8 @@ interface Order {
  * NO client-side Firestore writes needed.
  */
 export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () => void) {
-  const verifiedRef = useRef<Set<string>>(new Set());
+  const inFlightRef = useRef<Set<string>>(new Set());
+  const completedRef = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     if (!orders.length) return;
@@ -28,14 +29,15 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
            o.status !== 'cancelled' && 
            o.payment_method !== 'card' &&
            o.flowpay_charge_id &&
-           !verifiedRef.current.has(o.id)
+           !completedRef.current.has(o.id) &&
+           !inFlightRef.current.has(o.id)
     );
 
     if (!pendingPixOrders.length) return;
 
     const verifyOrders = async () => {
       for (const order of pendingPixOrders) {
-        verifiedRef.current.add(order.id);
+        inFlightRef.current.add(order.id);
         
         try {
           const { invokeFunction } = await import("@/lib/apiHelper");
@@ -46,11 +48,14 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           const data = await response.json();
 
           if (data.success && data.status === 'COMPLETED') {
+            completedRef.current.add(order.id);
             if (import.meta.env.DEV) console.log(`✅ Auto-verified PIX payment for order ${order.id}`);
             onOrderUpdated?.();
           }
         } catch (error) {
           if (import.meta.env.DEV) console.warn(`⚠️ Auto-verify PIX failed for order ${order.id}:`, error);
+        } finally {
+          inFlightRef.current.delete(order.id);
         }
       }
     };
