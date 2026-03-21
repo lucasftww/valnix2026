@@ -91,6 +91,7 @@ interface OrderItem {
   total_price: number;
   delivery_code: string | null;
   product_id: string | null;
+  product_category?: string | null;
 }
 
 // ── Helpers ────────────────────────────────────────────────────────
