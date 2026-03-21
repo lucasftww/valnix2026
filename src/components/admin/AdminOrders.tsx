@@ -1247,6 +1247,12 @@ export const AdminOrders = () => {
                           Verificar
                         </Button>
                       )}
+                      {detailOrder.payment_status !== 'paid' && (
+                        <Button variant="default" size="sm" disabled={verifyingPayment === detailOrder.id} onClick={() => handleForceConfirm(detailOrder)}>
+                          {verifyingPayment === detailOrder.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Zap className="w-4 h-4 mr-1" />}
+                          Forçar confirmação
+                        </Button>
+                      )}
                       {detailOrder.payment_status === 'paid' && detailOrder.status !== 'completed' && (
                         <Button 
                           variant="outline" 
