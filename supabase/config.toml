@@ -1,6 +1,6 @@
 project_id = "tiupdhnjdcmgbqifwkrd"
 
-[functions.flowpay-pix]
+[functions.invictuspay-pix]
 verify_jwt = false
 
 [functions.admin-analytics]
