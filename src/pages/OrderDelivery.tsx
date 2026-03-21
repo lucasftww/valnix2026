@@ -1,19 +1,12 @@
 import { useState, useEffect } from "react";
-import { useParams, useSearchParams, Link, useNavigate } from "react-router-dom";
-import { db } from "@/integrations/firebase/config";
+import { useParams, useSearchParams, Link } from "react-router-dom";
 import { invokeFunction } from "@/lib/apiHelper";
-import { collection, addDoc, updateDoc, serverTimestamp } from "firebase/firestore";
-import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2, Star, Shield, Zap, Clock } from "lucide-react";
+import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useToast } from "@/hooks/use-toast";
-import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
-import { QRCodeSVG } from "qrcode.react";
-import { Progress } from "@/components/ui/progress";
-import { useIsMobile } from "@/hooks/use-mobile";
 import vLogo from "@/assets/v-logo-red.png";
-import vIcon from "@/assets/v-icon.png";
 
 interface OrderItemData {
   product_name: string;
