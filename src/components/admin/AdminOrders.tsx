@@ -463,25 +463,66 @@ export const AdminOrders = () => {
     }
   };
 
-  // ── Send CAPI Purchase + analytics after admin confirms payment ──
-  const sendAdminCapiPurchase = (order: Order) => {
+  // ── Send CAPI Purchase + UTMify + analytics after admin confirms payment ──
+  const sendAdminCapiPurchase = async (order: Order) => {
     const eventId = generateEventId('Purchase', order.id);
     const nameParts = (order.customer_name || '').split(' ');
-    // Fire-and-forget: CAPI Purchase
+
+    // Fetch order items for enriched tracking (fire-and-forget, don't block UI)
+    let productNames: string | undefined;
+    let contentCategory: string | undefined;
+    let contentIds: string[] | undefined;
+    let contents: Array<{ id: string; quantity: number; item_price: number }> | undefined;
+    try {
+      const token = requireAdminToken();
+      const itemsRes = await invokeFunction("admin-data", {
+        method: "GET",
+        queryParams: { resource: "order-items", orderId: order.id },
+        headers: { "x-admin-token": token },
+      });
+      if (itemsRes.ok) {
+        const itemsData = await itemsRes.json();
+        const items: OrderItem[] = Array.isArray(itemsData.items) ? itemsData.items : [];
+        if (items.length > 0) {
+          productNames = items.map(i => i.product_name).join(', ');
+          const categories = [...new Set(items.map(i => i.product_category).filter(Boolean))];
+          contentCategory = categories.length > 0 ? categories.join(', ') : undefined;
+          contentIds = items.map(i => i.product_id || i.id).filter(Boolean) as string[];
+          contents = items.map(i => ({ id: i.product_id || i.id, quantity: i.quantity, item_price: i.unit_price }));
+        }
+      }
+    } catch { /* non-blocking */ }
+
+    // Fire-and-forget: CAPI Purchase with enriched product data
     invokeFunctionFireAndForget('meta-capi', {
       event_name: 'Purchase',
       event_id: eventId,
       order_id: order.id,
       value: order.total_amount,
       currency: 'BRL',
-      content_name: `Pedido #${order.id.substring(0, 8)}`,
+      content_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
+      content_category: contentCategory,
+      content_ids: contentIds,
+      contents,
       content_type: 'product',
+      num_items: contents?.reduce((sum, c) => sum + c.quantity, 0),
       email: order.customer_email || undefined,
       phone: order.customer_phone || undefined,
       first_name: nameParts[0] || undefined,
       last_name: nameParts.slice(1).join(' ') || undefined,
       external_id: order.user_id || undefined,
       event_source_url: 'https://www.valnix.com.br/checkout',
+    });
+    // Fire-and-forget: UTMify Purchase
+    invokeFunctionFireAndForget('utmify-event', {
+      order_id: order.id,
+      event_type: 'Purchase',
+      value: order.total_amount,
+      customer_name: order.customer_name,
+      customer_email: order.customer_email,
+      customer_phone: order.customer_phone || undefined,
+      product_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
+      product_id: contentIds?.[0] || order.id,
     });
     // Fire-and-forget: Analytics Purchase
     invokeFunctionFireAndForget('track-analytics', {
@@ -491,7 +532,8 @@ export const AdminOrders = () => {
       value: order.total_amount,
       currency: 'BRL',
       order_id: order.id,
-      content_name: `Pedido #${order.id.substring(0, 8)}`,
+      content_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
+      content_category: contentCategory || null,
     });
   };
 
