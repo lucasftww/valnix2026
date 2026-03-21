@@ -436,6 +436,18 @@ export const AdminOrders = () => {
           body: { id: order.id, payment_status: 'paid', status: 'processing' },
         });
         
+        // Trigger delivery processing (same as force confirm)
+        try {
+          await invokeFunction("process-delivery", {
+            method: "POST",
+            body: { orderId: order.id },
+            headers: { "x-internal-key": token },
+          });
+        } catch (e) {
+          console.warn('⚠️ process-delivery call failed (non-blocking):', e);
+        }
+        
+        toast({ title: "✅ Pagamento confirmado", description: `Pedido #${order.id.slice(0, 6)} pago e entrega processada.` });
         fetchOrders();
       } else {
         toast({ title: "Pagamento não confirmado", description: `Status: ${data.status || 'desconhecido'}` });
