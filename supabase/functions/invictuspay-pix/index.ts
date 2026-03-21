@@ -451,9 +451,11 @@ Deno.serve(async (req) => {
       // For upsells, store in sale_addon
       if (isUpsell) {
         try {
-          const parts = orderId.replace('upsell-', '').split('-');
-          const baseOrderId = parts.slice(0, 5).join('-');
-          const upsellAddonType = parts.slice(5).join('-');
+          // Parse "upsell-{uuid}-{addonType}" — use lastIndexOf to handle addonTypes with dashes
+          const upsellBody = orderId.replace(/^upsell-/, '');
+          const lastDash = upsellBody.lastIndexOf('-');
+          const baseOrderId = lastDash > 0 ? upsellBody.substring(0, lastDash) : upsellBody;
+          const upsellAddonType = lastDash > 0 ? upsellBody.substring(lastDash + 1) : '';
           const addonResults = await queryFirestore('sale_addons', 'order_id', 'EQUAL', baseOrderId);
           if (addonResults) {
             for (const r of addonResults) {
