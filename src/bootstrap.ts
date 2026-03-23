@@ -108,17 +108,20 @@
 // ── 4. Facebook Pixel Base — deferred 5s after load to avoid blocking LCP/TBT ──
 // FB SDK is 131 KiB (66% of total JS) — must load well AFTER critical paint
 (function initFbPixel() {
+  // Initialize the queue immediately so early events (like ViewContent) are caught
+  const f = window as any;
+  if (!f.fbq) {
+    const n: any = f.fbq = function () {
+      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
+    };
+    if (!f._fbq) f._fbq = n;
+    n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+  }
+
   window.addEventListener('load', () => {
     setTimeout(() => {
       const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
       ric(() => {
-        const f = window as any;
-        if (f.fbq) return;
-        const n: any = f.fbq = function () {
-          n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-        };
-        if (!f._fbq) f._fbq = n;
-        n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
         // Disable autoConfig BEFORE loading the script to prevent duplicate PageView
         f.fbq('set', 'autoConfig', false, '4378225905838577');
         f.fbq('init', '4378225905838577', {}, { agent: 'plvalnix' });

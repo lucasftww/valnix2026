@@ -354,8 +354,8 @@ export const AdminOrders = () => {
   const handleCleanByType = async () => {
     setCleaningActive(true);
     try {
-      // Safety: never delete orders created in the last 5 minutes (webhook may still confirm payment)
-      const safetyThreshold = new Date(Date.now() - 5 * 60 * 1000).getTime();
+      // Safety: never delete orders created in the last 60 minutes (PIX often has 30-60min expiration and users take time to pay)
+      const safetyThreshold = new Date(Date.now() - 60 * 60 * 1000).getTime();
       const isSafeToDelete = (o: Order) => new Date(o.created_at).getTime() < safetyThreshold;
 
       let toDelete: Order[] = [];
@@ -366,7 +366,7 @@ export const AdminOrders = () => {
 
       const skipped = orders.length - toDelete.length;
       if (skipped > 0 && cleanType !== "cancelled") {
-        // Safety: recent orders (< 5min) preserved
+        // Safety: recent orders (< 60min) preserved
       }
 
       const token = requireAdminToken();
@@ -720,7 +720,7 @@ export const AdminOrders = () => {
     return <AdminErrorState title="Erro ao carregar pedidos" message="Não foi possível carregar os pedidos. Verifique sua conexão e tente novamente." onRetry={() => refetchOrders()} retrying={ordersFetching} />;
   }
 
-  const safetyThresholdForCounts = new Date(Date.now() - 5 * 60 * 1000).getTime();
+  const safetyThresholdForCounts = new Date(Date.now() - 60 * 60 * 1000).getTime();
   const isSafeForCount = (o: Order) => new Date(o.created_at).getTime() < safetyThresholdForCounts;
 
   const cleanCounts = {

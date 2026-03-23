@@ -194,7 +194,15 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
       <div
         ref={carouselRef}
         className="carousel-viewport overflow-hidden"
+        style={{ touchAction: "pan-y pinch-zoom" }}
       >
+        <style>
+          {`
+            [data-carousel-dragging="true"] .carousel-viewport * {
+              pointer-events: none !important;
+            }
+          `}
+        </style>
         <div
           ref={ref}
           className={cn("carousel-track flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}

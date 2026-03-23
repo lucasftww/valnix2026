@@ -150,7 +150,7 @@ export default function Checkout() {
     sendInitiateCheckout({
       userId: effectiveUserId,
       userEmail: formData.email.trim(),
-      userPhone: hasPhone ? formData.phone : undefined,
+      userPhone: hasPhone ? `55${formData.phone.replace(/\D/g, '')}` : undefined,
       userName: formData.name.trim(),
       value: finalPrice,
       productNames: items.map(i => i.name),
