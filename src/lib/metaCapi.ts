@@ -168,9 +168,10 @@ export function sendInitiateCheckout(params: {
 
   const nameParts = (params.userName || '').split(' ');
 
-  // Derive content_category from product categories (unique, joined)
-  const contentCategory = params.productCategories
-    ? [...new Set(params.productCategories.filter(Boolean))].join(', ')
+  // Derive primary content_category from products instead of joining to avoid pixel audience mixing (sujeira)
+  const productCategoriesFiltered = params.productCategories?.filter(Boolean) || [];
+  const contentCategory = productCategoriesFiltered.length > 0
+    ? productCategoriesFiltered[0]
     : undefined;
 
   sendMetaCapiEvent({
@@ -214,9 +215,10 @@ export function sendPurchaseFromClient(params: {
 
   clearCheckoutSessionId();
 
-  // Derive content_category from product categories
-  const contentCategory = params.productCategories
-    ? [...new Set(params.productCategories.filter(Boolean))].join(', ')
+  // Derive primary content_category from products instead of joining to avoid pixel audience mixing
+  const productCategoriesFiltered = params.productCategories?.filter(Boolean) || [];
+  const contentCategory = productCategoriesFiltered.length > 0
+    ? productCategoriesFiltered[0]
     : undefined;
 
   if (!PIXEL_PAUSED) {

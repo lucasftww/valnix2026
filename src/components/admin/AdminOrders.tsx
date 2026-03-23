@@ -486,7 +486,7 @@ export const AdminOrders = () => {
         if (items.length > 0) {
           productNames = items.map(i => i.product_name).join(', ');
           const categories = [...new Set(items.map(i => i.product_category).filter(Boolean))];
-          contentCategory = categories.length > 0 ? categories.join(', ') : undefined;
+          contentCategory = categories.length > 0 ? categories[0] : undefined;
           contentIds = items.map(i => i.product_id || i.id).filter(Boolean) as string[];
           contents = items.map(i => ({ id: i.product_id || i.id, quantity: i.quantity, item_price: i.unit_price }));
         }
