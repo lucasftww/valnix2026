@@ -332,7 +332,7 @@ export const AdminOrders = () => {
 
     return {
       total: orders.length,
-      todayCount: todayOrders.length,
+      todayCount: todayPaid.length,
       todayRevenue: todayPaid.reduce((sum, o) => sum + o.total_amount, 0) + todayUpsellRevenue,
       totalRevenue: paidOrders.reduce((sum, o) => sum + o.total_amount, 0) + upsellRevenue,
       upsellRevenue,
