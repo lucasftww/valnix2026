@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Order {
   id: string;
@@ -20,6 +21,7 @@ interface Order {
 export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () => void) {
   const inFlightRef = useRef<Set<string>>(new Set());
   const completedRef = useRef<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!orders.length) return;
@@ -50,6 +52,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           if (data.success && data.status === 'COMPLETED') {
             completedRef.current.add(order.id);
             if (import.meta.env.DEV) console.log(`✅ Auto-verified PIX payment for order ${order.id}`);
+            queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
             onOrderUpdated?.();
           }
         } catch (error) {

@@ -47,7 +47,7 @@ export function PixPayment({
   onPaymentConfirmed 
 }: PixPaymentProps) {
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(5 * 60); // 5 minutes — creates urgency
+  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes — creates urgency
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -106,8 +106,10 @@ export function PixPayment({
   useEffect(() => {
     if (paymentConfirmed || !transactionId) return;
 
+    let polls = 0;
     const pollInterval = setInterval(async () => {
-      if (expiredRef.current) {
+      polls++;
+      if (polls > 360) { // 360 polls * 5s = 30 minutes
         clearInterval(pollInterval);
         return;
       }
@@ -156,7 +158,7 @@ export function PixPayment({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = (timeLeft / (5 * 60)) * 100;
+  const progressPercentage = (timeLeft / (15 * 60)) * 100;
   const isExpiring = timeLeft < 60;
   const isExpired = timeLeft === 0;
 

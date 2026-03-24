@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface Order {
   id: string;
@@ -21,6 +22,7 @@ interface Order {
 export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () => void) {
   const inFlightRef = useRef<Set<string>>(new Set());
   const completedRef = useRef<Set<string>>(new Set());
+  const queryClient = useQueryClient();
 
   useEffect(() => {
     if (!orders.length) return;
@@ -55,6 +57,7 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
           if (data.success && data.status === 'COMPLETED') {
             completedRef.current.add(order.id);
             if (import.meta.env.DEV) console.log(`✅ Auto-verified card payment for order ${order.id}`);
+            queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
             onOrderUpdated?.();
           } else {
             if (import.meta.env.DEV) console.log(`ℹ️ Card order ${order.id}: ${data.status || 'not confirmed yet'}`);

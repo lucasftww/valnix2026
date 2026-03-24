@@ -258,6 +258,35 @@ Deno.serve(async (req) => {
       const statusResponse = await fetch(`${FLOWPAY_CARD_URL}/status?id=${paymentId}`, { headers: { 'x-api-key': apiKey } });
       const statusData = await statusResponse.json();
       if (!statusResponse.ok) return new Response(JSON.stringify({ success: false, error: statusData.error || 'Erro ao consultar status' }), { status: statusResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      
+      // If paid, process order if not already paid
+      if (statusData.payment?.status === 'COMPLETED' && ownerResults?.[0]?.document) {
+        const orderDoc = ownerResults[0].document;
+        const orderId = orderDoc.name.split('/').pop()!;
+        const orderFields = orderDoc.fields;
+        if (orderFields?.payment_status?.stringValue !== 'paid') {
+          console.log(`🔄 Processing card order ${orderId} via status polling`);
+          const webhookSecret = Deno.env.get('FLOWPAY_WEBHOOK_SECRET') || '';
+          const orderValue = Number(orderFields?.total_amount?.doubleValue || orderFields?.total_amount?.integerValue || 0);
+          const customerEmail = orderFields?.customer_email?.stringValue;
+          const userId = orderFields?.user_id?.stringValue;
+          const customerName = orderFields?.customer_name?.stringValue || '';
+          const customerPhone = orderFields?.customer_phone?.stringValue || '';
+          await updateDocOrThrow('ordens', orderId, { payment_status: 'paid', status: 'processing', updated_at: new Date().toISOString() });
+          console.log(`✅ Card order ${orderId} marked as paid via status check`);
+          try { await invokeEdgeFunction('process-delivery', { orderId }, { 'x-internal-key': webhookSecret }); } catch (e) { console.warn('⚠️ process-delivery failed:', e); }
+          const couponId = orderFields?.coupon_id?.stringValue;
+          if (couponId) { try { await idempotentCouponIncrement(orderId, couponId); } catch {} }
+          const items2 = await extractOrderItems(orderId);
+          const pollingEventId = generateEventId('Purchase', orderId);
+          await Promise.allSettled([
+            addFirestoreDocWithId('analytics_events', `purchase_${orderId}`, { event_name: 'Purchase', event_time: new Date().toISOString(), user_id: userId || null, value: orderValue, currency: 'BRL', order_id: orderId, content_name: items2.productNamesList, source: 'card_auto_verify' }),
+            (async () => { const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source: 'card_auto_verify', event_id: pollingEventId, created_at: new Date().toISOString() }); if (r) { await invokeEdgeFunction('meta-capi', buildMetaCapiPurchasePayload(pollingEventId, orderId, orderValue, items2, orderFields, customerEmail, customerPhone, customerName, userId)); console.log(`📡 [Meta] CAPI Purchase sent — event_id=${pollingEventId} (card_auto_verify)`); } })(),
+            invokeEdgeFunction('utmify-event', { order_id: orderId, event_type: 'Purchase', value: orderValue, customer_name: customerName, customer_email: customerEmail, customer_phone: customerPhone || undefined, product_name: items2.productNamesList, utm_source: orderFields?.utm_source?.stringValue, utm_medium: orderFields?.utm_medium?.stringValue, utm_campaign: orderFields?.utm_campaign?.stringValue, utm_content: orderFields?.utm_content?.stringValue, utm_term: orderFields?.utm_term?.stringValue }),
+          ]);
+        }
+      }
+
       return new Response(JSON.stringify({ success: true, status: statusData.payment?.status, paidAt: statusData.payment?.paidAt || null }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 

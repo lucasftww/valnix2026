@@ -193,7 +193,7 @@ export default function CardPaymentCallback() {
 
     intervalRef.current = setInterval(() => {
       setPollCount(prev => {
-        if (prev >= 24) {
+        if (prev >= 60) {
           if (intervalRef.current) clearInterval(intervalRef.current);
           setStatus("failed");
           return prev;
