@@ -8,7 +8,7 @@ import { PixPayment } from "@/components/checkout/PixPayment";
 import { CheckoutHeader } from "@/components/checkout/CheckoutHeader";
 import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
-import { PaymentMethodSelector } from "@/components/checkout/PaymentMethodSelector";
+
 import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError, formatPhone, isValidPhone } from "@/components/checkout/PersonalInfoForm";
 import { invokeFunction } from "@/lib/apiHelper";
 import { trackInitiateCheckoutEvent } from "@/lib/analytics";
@@ -64,7 +64,7 @@ export default function Checkout() {
   const [loadingStage, setLoadingStage] = useState<"idle" | "creating" | "generating">("idle");
   const isSubmittingRef = useRef(false);
   const [paymentData, setPaymentData] = useState<PaymentData | null>(null);
-  const [paymentMethod, setPaymentMethod] = useState<"pix" | "card">("pix");
+  const paymentMethod = "pix";
   const [formData, setFormData] = useState<FormData>(() => {
     try {
       const saved = sessionStorage.getItem('valnix_checkout_form');
@@ -229,71 +229,6 @@ export default function Checkout() {
         return;
       }
 
-      // ─── CARD PAYMENT ────────────────────────────────────────────────
-      if (paymentMethod === "card") {
-        const cpfDigits = formData.document.replace(/\D/g, '');
-        const cardToken = null;
-        const orderItemsData = items.map(item => ({
-          product_id: item.id, product_name: item.name, product_image: item.image,
-          quantity: item.quantity, unit_price: item.price, total_price: item.price * item.quantity,
-          delivery_type: item.delivery_type || 'manual',
-        }));
-
-        const { orderId, guestHash: _cardHash } = await createOrderServerSide({
-          user_id: effectiveUserId,
-          customer_name: formData.name,
-          customer_email: formData.email || "",
-          customer_phone: formData.phone || "",
-          customer_document: cpfDigits,
-          total_amount: orderAmount,
-          notes: "Cartão",
-          payment_method: "card",
-          fbc: getCookie('_fbc'), fbp: getCookie('_fbp'),
-          event_source_url: window.location.href,
-          utm_source: utmParams.utm_source || null, utm_medium: utmParams.utm_medium || null,
-          utm_campaign: utmParams.utm_campaign || null, utm_content: utmParams.utm_content || null,
-          utm_term: utmParams.utm_term || null,
-        }, orderItemsData, cardToken);
-
-        const cardResponse = await invokeFunction('flowpay-card', {
-          method: 'POST',
-          queryParams: { action: 'create' },
-          body: {
-            amount: Math.round(orderAmount * 100), orderId,
-            description: `Pedido ${orderId.substring(0, 8)}`,
-            customer: {
-              name: formData.name, email: formData.email || undefined,
-              phone: formData.phone || undefined, taxId: cpfDigits,
-            },
-          },
-        });
-        const cardData = await cardResponse.json();
-        if (!cardResponse.ok || !cardData.success) {
-          throw new Error(cardData.error || 'Erro ao criar cobrança de cartão');
-        }
-
-        const deliveryToken = cardData.deliveryToken || null;
-        sessionStorage.setItem('valnix_card_payment', JSON.stringify({
-          orderId, paymentId: cardData.paymentId, deliveryToken, guestHash: _cardHash,
-          customerName: formData.name, customerEmail: formData.email || "",
-          customerPhone: formData.phone || "", userId: effectiveUserId,
-          productNames: items.map(i => i.name),
-          productIds: items.map(i => i.id),
-          productCategories: items.map(i => i.category || ''),
-          quantities: items.map(i => i.quantity),
-          prices: items.map(i => i.price),
-          amount: orderAmount,
-          eventSourceUrl: window.location.href,
-        }));
-
-        try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
-        // Store paymentUrl so callback page can redirect (avoids popup blockers on mobile)
-        sessionStorage.setItem('valnix_card_payment_url', cardData.paymentUrl);
-        clearCart();
-        navigate(`/card-callback?order_id=${orderId}&payment_id=${cardData.paymentId}`);
-        return;
-      }
-
       // ─── PIX PAYMENT ─────────────────────────────────────────────────
       setLoadingStage("creating");
       const cpfDigits = formData.document.replace(/\D/g, '');
@@ -428,11 +363,7 @@ export default function Checkout() {
         <div className="flex flex-col lg:flex-row gap-6">
           {/* Left Column */}
           <div className="flex-1 space-y-3 sm:space-y-5 mx-auto w-full max-w-lg lg:max-w-none">
-            <PaymentMethodSelector
-              paymentMethod={paymentMethod}
-              onMethodChange={setPaymentMethod}
-              finalPrice={finalPrice}
-            />
+
 
             <PersonalInfoForm
               formData={formData}
