@@ -15,7 +15,7 @@ async function buildUserData(params: {
   if (params.email) userData.em = await sha256(params.email);
   if (params.phone) {
     let phone = params.phone.replace(/\D/g, '');
-    if (phone.length === 10 || phone.length === 11) phone = '55' + phone;
+    if (!phone.startsWith('55') && phone.length >= 10) phone = '55' + phone;
     userData.ph = await sha256(phone);
   }
   if (params.firstName) userData.fn = await sha256(params.firstName);
