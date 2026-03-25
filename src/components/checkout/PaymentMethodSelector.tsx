@@ -1,9 +1,5 @@
-import { memo, useState } from "react";
+import { memo } from "react";
 import pixLogo from "@/assets/pix-logo.png";
-import creditCardIcon from "@/assets/credit-card-icon.webp";
-import visaLogo from "@/assets/visa-logo.svg";
-import mastercardLogo from "@/assets/mastercard-logo.svg";
-import amexLogo from "@/assets/amex-logo.svg";
 
 interface PaymentMethodSelectorProps {
   paymentMethod: "pix" | "card";
