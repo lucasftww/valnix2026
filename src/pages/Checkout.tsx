@@ -155,7 +155,6 @@ export default function Checkout() {
       value: finalPrice,
       productNames: items.map(i => i.name),
       productIds: items.map(i => i.id),
-      productCategories: items.map(i => i.category || ''),
       quantities: items.map(i => i.quantity),
       prices: items.map(i => i.price),
     });
@@ -330,7 +329,6 @@ export default function Checkout() {
                 customerId={effectiveUserId}
                 productNames={items.map(item => item.name)}
                 productIds={items.map(item => item.id)}
-                productCategories={items.map(item => item.category || '')}
                 quantities={items.map(item => item.quantity)}
                 prices={items.map(item => item.price)}
                 onPaymentConfirmed={clearCart}

@@ -470,7 +470,6 @@ export const AdminOrders = () => {
 
     // Fetch order items for enriched tracking (fire-and-forget, don't block UI)
     let productNames: string | undefined;
-    let contentCategory: string | undefined;
     let contentIds: string[] | undefined;
     let contents: Array<{ id: string; quantity: number; item_price: number }> | undefined;
     try {
@@ -485,8 +484,6 @@ export const AdminOrders = () => {
         const items: OrderItem[] = Array.isArray(itemsData.items) ? itemsData.items : [];
         if (items.length > 0) {
           productNames = items.map(i => i.product_name).join(', ');
-          const categories = [...new Set(items.map(i => i.product_category).filter(Boolean))];
-          contentCategory = categories.length > 0 ? categories[0] : undefined;
           contentIds = items.map(i => i.product_id || i.id).filter(Boolean) as string[];
           contents = items.map(i => ({ id: i.product_id || i.id, quantity: i.quantity, item_price: i.unit_price }));
         }
@@ -501,7 +498,6 @@ export const AdminOrders = () => {
       value: order.total_amount,
       currency: 'BRL',
       content_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
-      content_category: contentCategory,
       content_ids: contentIds,
       contents,
       content_type: 'product',
@@ -533,7 +529,6 @@ export const AdminOrders = () => {
       currency: 'BRL',
       order_id: order.id,
       content_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
-      content_category: contentCategory || null,
     });
   };
 

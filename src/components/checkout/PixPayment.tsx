@@ -23,7 +23,6 @@ interface PixPaymentProps {
   customerId?: string;
   productNames?: string[];
   productIds?: string[];
-  productCategories?: string[];
   quantities?: number[];
   prices?: number[];
   onPaymentConfirmed?: () => void;
@@ -41,7 +40,6 @@ export function PixPayment({
   customerId,
   productNames,
   productIds,
-  productCategories,
   quantities,
   prices,
   onPaymentConfirmed 
@@ -65,8 +63,8 @@ export function PixPayment({
     try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
     
     // Track Purchase event for PIX payments
-    const categoryStr = productCategories ? [...new Set(productCategories.filter(Boolean))].join(', ') : undefined;
-    trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '), categoryStr);
+    // Track Purchase event for PIX payments
+    trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
     
     // Send Purchase to Meta CAPI
     sendPurchaseFromClient({
@@ -78,7 +76,6 @@ export function PixPayment({
       name: customerName,
       productNames,
       productIds,
-      productCategories,
       quantities,
       prices,
     });
@@ -93,7 +90,7 @@ export function PixPayment({
         navigate(`/entrega-prioritaria?order_id=${orderId}`);
       }
     }, 1500);
-  }, [paymentConfirmed, amount, orderId, guestHash, customerEmail, customerName, customerPhone, customerId, productNames, productIds, productCategories, quantities, prices, onPaymentConfirmed, navigate]);
+  }, [paymentConfirmed, amount, orderId, guestHash, customerEmail, customerName, customerPhone, customerId, productNames, productIds, quantities, prices, onPaymentConfirmed, navigate]);
 
   // Keep ref in sync so polling always calls latest version
   paymentSuccessRef.current = handlePaymentSuccess;

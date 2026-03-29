@@ -149,8 +149,7 @@ export default function CardPaymentCallback() {
               sessionStorage.removeItem('valnix_card_payment');
 
               if (stored?.amount && stored?.orderId) {
-                const categoryStr = stored?.productCategories ? [...new Set(stored.productCategories.filter(Boolean))].join(', ') : undefined;
-                trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '), categoryStr);
+                trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
                 sendPurchaseFromClient({
                   orderId,
                   value: stored?.amount,
@@ -160,7 +159,6 @@ export default function CardPaymentCallback() {
                   name: stored?.customerName,
                   productNames: stored?.productNames,
                   productIds: stored?.productIds,
-                  productCategories: stored?.productCategories,
                   quantities: stored?.quantities,
                   prices: stored?.prices,
                   eventSourceUrl: stored?.eventSourceUrl,

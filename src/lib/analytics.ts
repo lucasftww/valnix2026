@@ -27,7 +27,6 @@ export function trackAnalyticsEvent(
     value?: number;
     orderId?: string;
     contentName?: string;
-    contentCategory?: string;
   } = {}
 ) {
   // Fire-and-forget — NEVER await analytics during checkout flow
@@ -42,15 +41,14 @@ export function trackAnalyticsEvent(
     currency: data.value ? 'BRL' : null,
     order_id: data.orderId || null,
     content_name: data.contentName || null,
-    content_category: data.contentCategory || null,
   });
 }
 
-export const trackViewContentEvent = (userId?: string | null, contentName?: string, contentCategory?: string) =>
-  trackAnalyticsEvent('ViewContent', { userId, contentName, contentCategory });
+export const trackViewContentEvent = (userId?: string | null, contentName?: string) =>
+  trackAnalyticsEvent('ViewContent', { userId, contentName });
 
 export const trackInitiateCheckoutEvent = (userId?: string | null, value?: number) =>
   trackAnalyticsEvent('InitiateCheckout', { userId, value });
 
-export const trackPurchaseEvent = (userId?: string | null, value?: number, orderId?: string, contentName?: string, contentCategory?: string) =>
-  trackAnalyticsEvent('Purchase', { userId, value, orderId, contentName, contentCategory });
+export const trackPurchaseEvent = (userId?: string | null, value?: number, orderId?: string, contentName?: string) =>
+  trackAnalyticsEvent('Purchase', { userId, value, orderId, contentName });

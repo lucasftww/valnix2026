@@ -55,13 +55,12 @@ const ProductDetail = () => {
   useEffect(() => {
     if (product?.name) {
       import("@/lib/analytics").then(({ trackViewContentEvent }) => {
-        trackViewContentEvent(null, product.name, product.category || undefined);
+        trackViewContentEvent(null, product.name);
       });
       import("@/lib/metaCapi").then(({ sendViewContent }) => {
         sendViewContent({
           productId: product.id,
           productName: product.name,
-          category: product.category || undefined,
           value: product.price,
         });
       });

@@ -44,7 +44,6 @@ interface MetaCapiEventData {
   order_id?: string;
   value?: number;
   content_name?: string;
-  content_category?: string;
   content_ids?: string[];
   contents?: ContentItem[];
   num_items?: number;
@@ -103,7 +102,6 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
               currency: 'BRL',
               ...(data.value !== undefined && { value: data.value }),
               ...(data.content_name && { content_name: data.content_name }),
-              ...(data.content_category && { content_category: data.content_category }),
               ...(data.content_ids && { content_ids: data.content_ids }),
               ...(data.contents && { contents: data.contents }),
               ...(data.num_items && { num_items: data.num_items }),
@@ -157,7 +155,6 @@ export function sendInitiateCheckout(params: {
   value?: number;
   productNames?: string[];
   productIds?: string[];
-  productCategories?: string[];
   quantities?: number[];
   prices?: number[];
 }) {
@@ -168,18 +165,11 @@ export function sendInitiateCheckout(params: {
 
   const nameParts = (params.userName || '').split(' ');
 
-  // Derive primary content_category from products instead of joining to avoid pixel audience mixing (sujeira)
-  const productCategoriesFiltered = params.productCategories?.filter(Boolean) || [];
-  const contentCategory = productCategoriesFiltered.length > 0
-    ? productCategoriesFiltered[0]
-    : undefined;
-
   sendMetaCapiEvent({
     event_name: 'InitiateCheckout',
     event_id: generateEventId('InitiateCheckout', checkoutSessionId),
     value: params.value,
     content_name: params.productNames?.join(', '),
-    content_category: contentCategory,
     content_ids: params.productIds || params.productNames,
     contents,
     num_items: numItems,
@@ -204,7 +194,6 @@ export function sendPurchaseFromClient(params: {
   name?: string;
   productNames?: string[];
   productIds?: string[];
-  productCategories?: string[];
   quantities?: number[];
   prices?: number[];
   eventSourceUrl?: string;
@@ -215,12 +204,6 @@ export function sendPurchaseFromClient(params: {
 
   clearCheckoutSessionId();
 
-  // Derive primary content_category from products instead of joining to avoid pixel audience mixing
-  const productCategoriesFiltered = params.productCategories?.filter(Boolean) || [];
-  const contentCategory = productCategoriesFiltered.length > 0
-    ? productCategoriesFiltered[0]
-    : undefined;
-
   if (!PIXEL_PAUSED) {
     try {
       const eventId = generateEventId('Purchase', params.orderId);
@@ -230,7 +213,6 @@ export function sendPurchaseFromClient(params: {
           content_ids: params.productIds || params.productNames,
           contents,
           content_name: params.productNames?.join(', '),
-          content_category: contentCategory,
           content_type: 'product',
           value: params.value,
           currency: 'BRL',
@@ -246,13 +228,11 @@ export function sendPurchaseFromClient(params: {
 export function sendViewContent(params: {
   productId?: string;
   productName?: string;
-  category?: string;
   value?: number;
 }) {
   sendMetaCapiEvent({
     event_name: 'ViewContent',
     content_name: params.productName,
-    content_category: params.category,
     content_ids: params.productId ? [params.productId] : undefined,
     value: params.value,
   });
