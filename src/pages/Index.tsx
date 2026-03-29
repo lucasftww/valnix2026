@@ -14,7 +14,7 @@ const CategoryCards = lazy(() => import("@/components/CategoryCards").then(m => 
 const FAQ = lazy(() => import("@/components/FAQ").then(m => ({ default: m.FAQ })));
 const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingContactButtons = lazy(() => import("@/components/FloatingContactButtons").then(m => ({ default: m.FloatingContactButtons })));
-const AdBlockDetector = lazy(() => import("@/components/AdBlockDetector").then(m => ({ default: m.AdBlockDetector })));
+const ConnectionMonitor = lazy(() => import("@/components/ConnectionMonitor").then(m => ({ default: m.ConnectionMonitor })));
 
 const IndexComponent = () => {
   // Prefetch categorias principais em background
@@ -67,7 +67,7 @@ const IndexComponent = () => {
         <FloatingContactButtons />
       </Suspense>
       <Suspense fallback={null}>
-        <AdBlockDetector />
+        <ConnectionMonitor />
       </Suspense>
     </div>
   );

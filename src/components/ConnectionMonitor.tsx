@@ -6,7 +6,7 @@ import { Button } from "./ui/button";
  * Detects if an ad blocker is blocking Firestore connections.
  * Uses passive detection via Firestore error events instead of active fetch.
  */
-const AdBlockDetectorComponent = () => {
+const ConnectionMonitorComponent = () => {
   const [isBlocked, setIsBlocked] = useState(false);
   const [dismissed, setDismissed] = useState(false);
 
@@ -85,4 +85,4 @@ const AdBlockDetectorComponent = () => {
   );
 };
 
-export const AdBlockDetector = memo(AdBlockDetectorComponent);
+export const ConnectionMonitor = memo(ConnectionMonitorComponent);
