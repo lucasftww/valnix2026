@@ -56,20 +56,7 @@ export const AdminMigration = () => {
     addLog(`🚀 Iniciando migração de ${filteredOrders.length} eventos de ${eventType}...`);
 
     const token = requireAdminToken();
-    addLog("🔑 Buscando credenciais do Meta...");
-    const credsRes = await invokeFunction("admin-data", {
-      method: "GET",
-      queryParams: { resource: "system_credentials" },
-      headers: { "x-admin-token": token },
-    });
-    const credsData = await credsRes.json();
-    const creds = Array.isArray(credsData.credentials) ? credsData.credentials : [];
-    const metaToken = creds.find((c: any) => c.id === 'META_ACCESS_TOKEN')?.value;
-    const metaPixel = creds.find((c: any) => c.id === 'META_PIXEL_ID')?.value;
-
-    if (!metaToken || !metaPixel) {
-      addLog("⚠️ Credenciais do Meta não encontradas no Firestore. Usando fallback do servidor.");
-    }
+    addLog("🚀 Enviando para o meta-relay...");
 
     for (let i = 0; i < filteredOrders.length; i++) {
       if (!isProcessing && i > 0) break;
@@ -103,9 +90,6 @@ export const AdminMigration = () => {
           last_name: nameParts.slice(1).join(' ') || undefined,
           external_id: order.user_id || undefined,
           test_event_code: testEventCode || undefined,
-          // Pass credentials to make it robust
-          access_token: metaToken,
-          pixel_id: metaPixel
         };
 
         const capiRes = await invokeFunction('meta-relay', {

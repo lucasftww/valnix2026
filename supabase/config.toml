@@ -59,3 +59,6 @@ verify_jwt = false
 
 [functions.capi-replay]
 verify_jwt = false
+
+[functions.meta-relay]
+verify_jwt = false
