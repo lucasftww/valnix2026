@@ -62,3 +62,6 @@ verify_jwt = false
 
 [functions.meta-relay]
 verify_jwt = false
+
+[functions.temp-update-meta-token]
+verify_jwt = false
