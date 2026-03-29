@@ -12,13 +12,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Get credentials
     const credsDoc = await db.collection('system_credentials').doc('meta_capi').get();
-    const creds = credsDoc.data();
+    const creds = credsDoc.data() || {};
 
-    const accessToken = creds?.token || process.env.META_ACCESS_TOKEN;
-    const pixelId = creds?.pixel_id || process.env.META_PIXEL_ID;
+    // Novo Pixel/Token (Março 2026) - Hardcoded para segurança máxima
+    const HARDCODED_PIXEL_ID = '843361478785940';
+    const HARDCODED_TOKEN = 'EAAXCTJFcZAckBRNKsxI3MuVp51Mv3IQVcMC6nZCv3JvqjAxeVC1ZCmPfa4AfiJFaXSRlmIHrFalKLxo0symr2jjjC00fzogCx63GZBadtsLHtQk0JeDK7nqs1EjVPPggKjBi0QZAUXM2ZAPY0qxdtYB01G8XcVvZAQqh3PedZC0ZAgz88yYZC1wdt4hghS4RVUWgZDZD';
+
+    // Prioridade: Firestore > Env > Hardcoded
+    const accessToken = creds.token || process.env.META_ACCESS_TOKEN || HARDCODED_TOKEN;
+    const pixelId = creds.pixel_id || process.env.META_PIXEL_ID || HARDCODED_PIXEL_ID;
 
     if (!accessToken || !pixelId) {
-      throw new Error('Missing Meta credentials');
+      console.error('❌ [MetaRelay] Missing credentials:', { hasToken: !!accessToken, hasPixel: !!pixelId });
+      throw new Error('Meta CAPI credentials not found in Firestore or Process Env');
     }
 
     const metaPayload = {
@@ -29,8 +35,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         event_source_url: url,
         event_id: event_id,
         user_data: {
-          em: hashData(userData?.email),
-          ph: hashData(userData?.phone),
+          em: hashData(userData?.email?.trim().toLowerCase()),
+          ph: hashData(userData?.phone?.trim().replace(/\D/g, '')),
           client_ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
           client_user_agent: req.headers['user-agent'],
           fbc: userData?.fbc,
@@ -40,14 +46,22 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       }]
     };
 
-    await axios.post(
-      `https://graph.facebook.com/v17.0/${pixelId}/events`,
-      metaPayload,
-      { params: { access_token: accessToken } }
-    );
-
-    return res.status(200).json({ success: true });
+    try {
+      await axios.post(
+        `https://graph.facebook.com/v17.0/${pixelId}/events`,
+        metaPayload,
+        { params: { access_token: accessToken } }
+      );
+      return res.status(200).json({ success: true, event_id });
+    } catch (metaError: any) {
+      console.error('❌ [MetaRelay] Meta API Error:', metaError.response?.data || metaError.message);
+      return res.status(500).json({ 
+        error: 'Meta API reported an error', 
+        details: metaError.response?.data || metaError.message 
+      });
+    }
   } catch (error: any) {
+    console.error('❌ [MetaRelay] Unexpected error:', error.message);
     return res.status(500).json({ error: error.message });
   }
 }

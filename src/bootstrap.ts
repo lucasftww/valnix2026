@@ -122,7 +122,7 @@
       const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
       ric(() => {
         // Use environment variable for Pixel ID, fallback to VALNIX's official pixel
-        const pixelId = import.meta.env.VITE_META_PIXEL_ID || '26357442063907810';
+        const pixelId = import.meta.env.VITE_META_PIXEL_ID || '843361478785940';
         
         // Disable autoConfig BEFORE loading the script to prevent duplicate PageView
         f.fbq('set', 'autoConfig', false, pixelId);

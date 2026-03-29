@@ -20,12 +20,23 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const baseUrl = `${protocol}://${host}`;
 
     const results = await Promise.all(eventIds.map(async (id: string) => {
+      // Lookup by event_id (which is now the doc ID)
       const eventDoc = await db.collection('analytics_events').doc(id).get();
-      if (!eventDoc.exists) return { id, status: 'not_found' };
+      
+      if (!eventDoc.exists) {
+        // Fallback: try to query by field event_id if not found as doc ID
+        const query = await db.collection('analytics_events').where('event_id', '==', id).limit(1).get();
+        if (query.empty) return { id, status: 'not_found' };
+        // Use the first match
+        var eventData = query.docs[0].data();
+      } else {
+        var eventData = eventDoc.data();
+      }
 
-      const eventData = eventDoc.data();
       try {
-        await axios.post(`${baseUrl}/api/metaRelay`, {
+        // Updated to use the corrected filename 'meta-relay'
+        const relayUrl = `${baseUrl}/api/meta-relay`;
+        await axios.post(relayUrl, {
           event: eventData?.event_name,
           userData: eventData?.user_data,
           customData: eventData?.custom_data,
@@ -34,7 +45,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         });
         return { id, status: 'success' };
       } catch (err: any) {
-        return { id, status: 'error', message: err.message };
+        console.error(`❌ [Replay] Error for ${id}:`, err.response?.data || err.message);
+        return { id, status: 'error', message: err.message, details: err.response?.data };
       }
     }));
 

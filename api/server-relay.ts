@@ -10,8 +10,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   try {
     const { event, userData, customData, event_id, url } = req.body;
 
-    // 1. Log event to Firestore
-    const eventRef = db.collection('analytics_events').doc();
+    // 1. Log event to Firestore (use event_id as doc ID for easy lookup/replay)
+    const eventRef = db.collection('analytics_events').doc(event_id || `err_${Date.now()}`);
     await eventRef.set({
       event_name: event,
       event_id,
@@ -19,48 +19,87 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       user_data: userData,
       custom_data: customData,
       timestamp: new Date().toISOString(),
-      source: 'server-relay-vercel'
+      source: 'server-relay-vercel',
+      status: 'pending'
     });
 
     // 2. Relay to Meta CAPI
     // Get credentials from Firestore
     const credsDoc = await db.collection('system_credentials').doc('meta_capi').get();
-    const creds = credsDoc.data();
+    const creds = credsDoc.data() || {};
 
-    const accessToken = creds?.token || process.env.META_ACCESS_TOKEN;
-    const pixelId = creds?.pixel_id || process.env.META_PIXEL_ID;
+    // Novo Pixel/Token (Março 2026) - Hardcoded para segurança máxima
+    const HARDCODED_PIXEL_ID = '843361478785940';
+    const HARDCODED_TOKEN = 'EAAXCTJFcZAckBRNKsxI3MuVp51Mv3IQVcMC6nZCv3JvqjAxeVC1ZCmPfa4AfiJFaXSRlmIHrFalKLxo0symr2jjjC00fzogCx63GZBadtsLHtQk0JeDK7nqs1EjVPPggKjBi0QZAUXM2ZAPY0qxdtYB01G8XcVvZAQqh3PedZC0ZAgz88yYZC1wdt4hghS4RVUWgZDZD';
 
-    if (accessToken && pixelId) {
-      // Build Meta Payload with Hashed PII
-      const metaPayload = {
-        data: [{
-          event_name: event,
-          event_time: Math.floor(Date.now() / 1000),
-          action_source: 'website',
-          event_source_url: url,
-          event_id: event_id,
-          user_data: {
-            em: hashData(userData?.email),
-            ph: hashData(userData?.phone),
-            client_ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
-            client_user_agent: req.headers['user-agent'],
-            fbc: userData?.fbc,
-            fbp: userData?.fbp
-          },
-          custom_data: customData
-        }]
-      };
+    // Prioridade: Firestore > Env > Hardcoded
+    // Mas se o do Firestore for um ID antigo/inválido (opcional, aqui apenas garantimos o fallback)
+    const accessToken = creds.token || process.env.META_ACCESS_TOKEN || HARDCODED_TOKEN;
+    const pixelId = creds.pixel_id || process.env.META_PIXEL_ID || HARDCODED_PIXEL_ID;
 
-      await axios.post(
+    if (!accessToken || !pixelId) {
+      console.error('❌ [CAPI] Missing credentials:', { hasToken: !!accessToken, hasPixel: !!pixelId });
+      await eventRef.update({ 
+        status: 'failed', 
+        error: 'Missing credentials',
+        updatedAt: new Date().toISOString()
+      });
+      return res.status(200).json({ 
+        success: true, 
+        event_id, 
+        warning: 'CAPI relay skipped due to missing credentials' 
+      });
+    }
+
+    // Build Meta Payload with Hashed PII
+    const metaPayload = {
+      data: [{
+        event_name: event,
+        event_time: Math.floor(Date.now() / 1000),
+        action_source: 'website',
+        event_source_url: url,
+        event_id: event_id,
+        user_data: {
+          em: hashData(userData?.email?.trim().toLowerCase()),
+          ph: hashData(userData?.phone?.trim().replace(/\D/g, '')),
+          client_ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+          client_user_agent: req.headers['user-agent'],
+          fbc: userData?.fbc,
+          fbp: userData?.fbp
+        },
+        custom_data: customData
+      }]
+    };
+
+    try {
+      const metaRes = await axios.post(
         `https://graph.facebook.com/v17.0/${pixelId}/events`,
         metaPayload,
         { params: { access_token: accessToken } }
       );
+      
+      await eventRef.update({ 
+        status: 'relayed', 
+        meta_response: metaRes.data,
+        updatedAt: new Date().toISOString()
+      });
+      
+      if (process.env.NODE_ENV === 'development') console.log(`✅ [CAPI] Event ${event} relayed to Meta`);
+    } catch (metaError: any) {
+      const errorMsg = metaError.response?.data || metaError.message;
+      console.error('❌ [CAPI] Meta API Error:', errorMsg);
+      
+      await eventRef.update({ 
+        status: 'failed', 
+        error: errorMsg,
+        status_code: metaError.response?.status || 500,
+        updatedAt: new Date().toISOString()
+      });
     }
 
     return res.status(200).json({ success: true, event_id });
   } catch (error: any) {
-    console.error('Relay error:', error.message);
+    console.error('❌ [Relay] Unexpected error:', error.message);
     return res.status(500).json({ error: error.message });
   }
 }

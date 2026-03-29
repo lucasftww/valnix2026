@@ -18,7 +18,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     switch (action) {
       case 'GET_ALL':
-        const snapshot = await colRef.get();
+        let query = colRef.orderBy('createdAt', 'desc');
+        if (req.body.limit) query = query.limit(req.body.limit);
+        else query = query.limit(100); // Safe default for scale
+
+        const snapshot = await query.get();
         const items = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
         return res.status(200).json(items);
 
