@@ -122,9 +122,12 @@
     setTimeout(() => {
       const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
       ric(() => {
+        // Use environment variable for Pixel ID, fallback to default
+        const pixelId = import.meta.env.VITE_META_PIXEL_ID || '4378225905838577';
+        
         // Disable autoConfig BEFORE loading the script to prevent duplicate PageView
-        f.fbq('set', 'autoConfig', false, '4378225905838577');
-        f.fbq('init', '4378225905838577', {}, { agent: 'plvalnix' });
+        f.fbq('set', 'autoConfig', false, pixelId);
+        f.fbq('init', pixelId, {}, { agent: 'plvalnix' });
         // Fire PageView on every page load
         f.fbq('track', 'PageView');
         const t = document.createElement('script');
