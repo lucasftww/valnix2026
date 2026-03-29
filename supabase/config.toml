@@ -6,13 +6,13 @@ verify_jwt = false
 [functions.admin-analytics]
 verify_jwt = false
 
-[functions.track-analytics]
+[functions.store-metrics]
 verify_jwt = false
 
 [functions.utmify-event]
 verify_jwt = false
 
-[functions.meta-capi]
+[functions.server-relay]
 verify_jwt = false
 
 [functions.flowpay-card]

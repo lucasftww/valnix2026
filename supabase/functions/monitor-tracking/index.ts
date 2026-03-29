@@ -269,7 +269,7 @@ Deno.serve(async (req) => {
 
     // No data alert
     if (capiStats.total === 0 && paidOrders.length > 0) {
-      alerts.push({ level: 'critical', message: 'Nenhum evento CAPI registrado apesar de pedidos pagos', detail: 'Verificar se meta-capi está funcionando' });
+      alerts.push({ level: 'critical', message: 'Nenhum evento CAPI registrado apesar de pedidos pagos', detail: 'Verificar se server-relay está funcionando' });
     }
 
     // All good

@@ -194,7 +194,7 @@ Deno.serve(async (req) => {
           event_source_url: getStr(f, 'event_source_url') || 'https://www.valnix.com.br/checkout',
         };
 
-        const res = await invokeEdgeFunction('meta-capi', payload);
+        const res = await invokeEdgeFunction('server-relay', payload);
         const ok = res?.ok ?? false;
         results.push({ orderId, success: ok });
 

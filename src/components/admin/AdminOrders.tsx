@@ -491,7 +491,7 @@ export const AdminOrders = () => {
     } catch { /* non-blocking */ }
 
     // Fire-and-forget: CAPI Purchase with enriched product data
-    invokeFunctionFireAndForget('meta-capi', {
+    invokeFunctionFireAndForget('server-relay', {
       event_name: 'Purchase',
       event_id: eventId,
       order_id: order.id,

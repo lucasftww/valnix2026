@@ -86,7 +86,7 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
         fbp: fbp || undefined,
       };
 
-      invokeFunctionFireAndForget('meta-capi', payload).then(() => {
+      invokeFunctionFireAndForget('server-relay', payload).then(() => {
         if (import.meta.env.DEV) console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
       });
     }

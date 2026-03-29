@@ -63,7 +63,7 @@ async function processAddonPayment(addonDoc: any, addonId: string): Promise<bool
   try { const parentOrder = await getDocFields('ordens', orderId); if (parentOrder) { parentFbc = parentOrder.fbc?.stringValue; parentFbp = parentOrder.fbp?.stringValue; parentPhone = parentOrder.customer_phone?.stringValue; parentEventSourceUrl = parentOrder.event_source_url?.stringValue; } } catch {}
   const nameParts = customerName.split(' ');
   const upsellEventId = generateEventId('Purchase', `upsell_${orderId}_${addonType}`);
-  try { await invokeEdgeFunction('meta-capi', { event_name: 'Purchase', event_id: upsellEventId, order_id: `${orderId}_${addonType}`, value: Number(amount), currency: 'BRL', content_name: `Upsell ${addonType}`, email: customerEmail || undefined, phone: parentPhone, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: parentFbc, fbp: parentFbp, event_source_url: parentEventSourceUrl }); console.log(`📡 [Meta] CAPI Upsell Purchase sent — event_id=${upsellEventId}`); } catch (e) { console.warn('⚠️ Meta CAPI upsell failed:', e); }
+  try { await invokeEdgeFunction('server-relay', { event_name: 'Purchase', event_id: upsellEventId, order_id: `${orderId}_${addonType}`, value: Number(amount), currency: 'BRL', content_name: `Upsell ${addonType}`, email: customerEmail || undefined, phone: parentPhone, first_name: nameParts[0] || undefined, last_name: nameParts.slice(1).join(' ') || undefined, external_id: userId, fbc: parentFbc, fbp: parentFbp, event_source_url: parentEventSourceUrl }); console.log(`📡 [Meta] CAPI Upsell Purchase sent — event_id=${upsellEventId}`); } catch (e) { console.warn('⚠️ Meta CAPI upsell failed:', e); }
   try { await invokeEdgeFunction('utmify-event', { order_id: `${orderId}_${addonType}`, event_type: 'Purchase', value: Number(amount), customer_name: customerName, customer_email: customerEmail, product_name: `Upsell ${addonType}`, utm_source: utmSource, utm_medium: utmMedium, utm_campaign: utmCampaign }); } catch (e) { console.warn('⚠️ UTMify upsell failed:', e); }
   return true;
 }
@@ -122,7 +122,7 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
     (async () => {
       const r = await addFirestoreDocWithId('meta_purchase_events', orderId, { sent_at: new Date().toISOString(), source, event_id: purchaseEventId, created_at: new Date().toISOString() });
       if (r) {
-        await invokeEdgeFunction('meta-capi', {
+        await invokeEdgeFunction('server-relay', {
           event_name: 'Purchase', event_id: purchaseEventId, order_id: orderId, value: orderValue, currency: 'BRL',
           content_name: productNamesList,
           content_ids: contentIds.length > 0 ? contentIds : undefined,
