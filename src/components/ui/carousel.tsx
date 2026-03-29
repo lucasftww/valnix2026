@@ -58,11 +58,7 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     }, []);
 
     const setDraggingAttr = React.useCallback((value: boolean) => {
-      const node = rootRef.current;
-      if (!node) return;
-      const nextValue = value ? "true" : "false";
-      if (node.dataset.carouselDragging === nextValue) return;
-      node.dataset.carouselDragging = nextValue;
+      // Logic removed as it was interfering with clicks
     }, []);
 
 
@@ -125,32 +121,8 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
     }, [api, onSelect]);
 
     React.useEffect(() => {
-      if (!api) return;
-
-      const handlePointerDown = () => {
-        setDraggingAttr(true);
-      };
-
-      const handlePointerUp = () => {
-        setDraggingAttr(false);
-      };
-
-      const handleSettle = () => {
-        setDraggingAttr(false);
-      };
-
-      api.on("pointerDown", handlePointerDown);
-      api.on("pointerUp", handlePointerUp);
-      api.on("settle", handleSettle);
-      api.on("reInit", handleSettle);
-
-      return () => {
-        api.off("pointerDown", handlePointerDown);
-        api.off("pointerUp", handlePointerUp);
-        api.off("settle", handleSettle);
-        api.off("reInit", handleSettle);
-      };
-    }, [api, setDraggingAttr]);
+      // Visual dragging feedback removed to restore click functionality
+    }, [api]);
 
     const contextValue = React.useMemo(
       () => ({
@@ -174,7 +146,6 @@ const Carousel = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivEl
           
           className={cn("relative", className)}
           role="region"
-          data-carousel-dragging="false"
           aria-label="Carrossel de conteúdo"
           {...props}
         >
@@ -192,13 +163,6 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
 
     return (
       <div className="carousel-wrapper w-full">
-        <style>
-          {`
-            [data-carousel-dragging="true"] .carousel-viewport * {
-              pointer-events: none !important;
-            }
-          `}
-        </style>
         <div
           ref={carouselRef}
           className="carousel-viewport overflow-hidden w-full"
