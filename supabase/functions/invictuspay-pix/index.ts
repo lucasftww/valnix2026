@@ -92,7 +92,6 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
   let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
   let contentIds: string[] = [];
   let contents: { id: string; quantity: number; item_price?: number }[] = [];
-  let contentCategory: string | undefined;
   try {
     const at = await getFirebaseAccessToken();
     const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`;
@@ -101,7 +100,6 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
       const iData = await iRes.json();
       const docs = iData.documents || [];
       const names: string[] = [];
-      const categories = new Set<string>();
       for (const d of docs) {
         const f = d.fields || {};
         if (f.product_name?.stringValue) names.push(f.product_name.stringValue);
@@ -112,10 +110,8 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
           const price = Number(f.unit_price?.doubleValue || f.unit_price?.integerValue || 0);
           contents.push({ id: pid, quantity: qty, ...(price > 0 ? { item_price: price } : {}) });
         }
-        if (f.product_category?.stringValue) categories.add(f.product_category.stringValue);
       }
       if (names.length > 0) productNamesList = names.join(', ');
-      if (categories.size > 0) contentCategory = [...categories].join(', ');
     }
   } catch {}
 
@@ -129,7 +125,6 @@ async function processOrderPaid(orderId: string, orderFields: any, chargeId: str
         await invokeEdgeFunction('meta-capi', {
           event_name: 'Purchase', event_id: purchaseEventId, order_id: orderId, value: orderValue, currency: 'BRL',
           content_name: productNamesList,
-          content_category: contentCategory || undefined,
           content_ids: contentIds.length > 0 ? contentIds : undefined,
           contents: contents.length > 0 ? contents : undefined,
           num_items: contents.length > 0 ? contents.reduce((s, c) => s + c.quantity, 0) : undefined,

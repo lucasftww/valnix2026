@@ -24,12 +24,10 @@ async function extractOrderItems(orderId: string): Promise<{
   productNamesList: string;
   contentIds: string[];
   contents: { id: string; quantity: number; item_price?: number }[];
-  contentCategory: string | undefined;
 }> {
   let productNamesList = `Pedido #${orderId.substring(0, 8)}`;
   const contentIds: string[] = [];
   const contents: { id: string; quantity: number; item_price?: number }[] = [];
-  const categories = new Set<string>();
   try {
     const at = await getFirebaseAccessToken();
     const iUrl = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`;
@@ -47,12 +45,11 @@ async function extractOrderItems(orderId: string): Promise<{
           const price = Number(f.unit_price?.doubleValue || f.unit_price?.integerValue || 0);
           contents.push({ id: pid, quantity: qty, ...(price > 0 ? { item_price: price } : {}) });
         }
-        if (f.product_category?.stringValue) categories.add(f.product_category.stringValue);
       }
       if (names.length > 0) productNamesList = names.join(', ');
     }
   } catch {}
-  return { productNamesList, contentIds, contents, contentCategory: categories.size > 0 ? [...categories].join(', ') : undefined };
+  return { productNamesList, contentIds, contents };
 }
 
 /** Build enriched meta-capi payload for Purchase event */
@@ -64,7 +61,6 @@ function buildMetaCapiPurchasePayload(
   return {
     event_name: 'Purchase', event_id: eventId, order_id: orderId, value: orderValue, currency: 'BRL',
     content_name: items.productNamesList,
-    content_category: items.contentCategory || undefined,
     content_ids: items.contentIds.length > 0 ? items.contentIds : undefined,
     contents: items.contents.length > 0 ? items.contents : undefined,
     num_items: items.contents.length > 0 ? items.contents.reduce((s, c) => s + c.quantity, 0) : undefined,

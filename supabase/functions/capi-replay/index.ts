@@ -81,7 +81,6 @@ async function fetchOrderItems(orderId: string, accessToken: string) {
   const productNames: string[] = [];
   const contentIds: string[] = [];
   const contents: { id: string; quantity: number; item_price?: number }[] = [];
-  const categories = new Set<string>();
 
   try {
     const url = `${FIRESTORE_BASE}/ordens/${orderId}/items?pageSize=50`;
@@ -98,7 +97,6 @@ async function fetchOrderItems(orderId: string, accessToken: string) {
           const price = Number(f.unit_price?.doubleValue || f.unit_price?.integerValue || 0);
           contents.push({ id: pid, quantity: qty, ...(price > 0 ? { item_price: price } : {}) });
         }
-        if (f.product_category?.stringValue) categories.add(f.product_category.stringValue);
       }
     }
   } catch {}
@@ -107,7 +105,7 @@ async function fetchOrderItems(orderId: string, accessToken: string) {
     productNamesList: productNames.length > 0 ? productNames.join(', ') : `Pedido #${orderId.substring(0, 8)}`,
     contentIds,
     contents,
-    contentCategory: categories.size > 0 ? [...categories].join(', ') : undefined,
+
   };
 }
 
@@ -183,7 +181,6 @@ Deno.serve(async (req) => {
           value: orderValue,
           currency: 'BRL',
           content_name: items.productNamesList,
-          content_category: items.contentCategory || undefined,
           content_ids: items.contentIds.length > 0 ? items.contentIds : undefined,
           contents: items.contents.length > 0 ? items.contents : undefined,
           content_type: 'product',

@@ -42,7 +42,7 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { event_name, user_id, page_url, device_type, browser, value, currency, order_id, content_name, content_category } = body;
+    const { event_name, user_id, page_url, device_type, browser, value, currency, order_id, content_name } = body;
 
     if (!event_name || !VALID_EVENTS.includes(event_name)) {
       return new Response(JSON.stringify({ error: 'Invalid event_name' }), {
@@ -73,7 +73,6 @@ Deno.serve(async (req) => {
       currency: value ? (currency || 'BRL') : null,
       order_id: order_id || null,
       content_name: typeof content_name === 'string' ? content_name.slice(0, 200) : null,
-      content_category: typeof content_category === 'string' ? content_category.slice(0, 100) : null,
     };
 
     // Purchase events use order_id as doc ID to prevent duplicates
