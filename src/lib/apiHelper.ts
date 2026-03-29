@@ -1,10 +1,10 @@
-/**
- * API Helper — abstracts all backend function calls.
- * Edge functions are hosted via Lovable Cloud runtime.
- */
-// adminAuth imported dynamically to avoid pulling admin code into homepage bundle
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 
-  `${import.meta.env.VITE_SUPABASE_URL}/functions/v1`;
+// API Helper — abstracts all backend function calls.
+// Migrated to Firebase Cloud Functions environment.
+const projectId = "valnix"; // ID do seu projeto Firebase
+const region = "southamerica-east1"; // Região padrão (São Paulo)
+
+const API_BASE_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 
+  `https://${region}-${projectId}.cloudfunctions.net`;
 
 interface InvokeFunctionOptions {
   method?: string;
@@ -31,7 +31,6 @@ export async function invokeFunction(
 
   const fetchHeaders: Record<string, string> = {
     'Content-Type': 'application/json',
-    'apikey': import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY || '',
     ...headers,
   };
 

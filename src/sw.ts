@@ -81,21 +81,7 @@ registerRoute(
   })
 );
 
-// ── 5. Supabase images ──
-registerRoute(
-  ({ url }) =>
-    /\.supabase\.co$/.test(url.hostname) &&
-    /\.(png|jpg|jpeg|svg|gif|webp)$/i.test(url.pathname),
-  new CacheFirst({
-    cacheName: 'supabase-images-cache',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 60 * 24 * 14 }),
-      cacheableOk,
-    ],
-  })
-);
-
-// ── 6. Discord images ──
+// ── 5. Discord images ──
 registerRoute(
   ({ url }) =>
     (url.hostname === 'media.discordapp.net' || url.hostname === 'cdn.discordapp.com') &&
@@ -123,33 +109,14 @@ registerRoute(
   })
 );
 
-// ── 8. Supabase Edge Functions (site-data) — SWR for instant LCP on repeat visits ──
+// ── 8. Firebase Cloud Functions — NetworkOnly (sem cache, sempre fresco) ──
 registerRoute(
   ({ url }) =>
-    /\.supabase\.co$/.test(url.hostname) && url.pathname.includes('/functions/v1/site-data'),
-  new StaleWhileRevalidate({
-    cacheName: 'site-data-cache',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 20, maxAgeSeconds: 60 * 60 }),
-      cacheableOk,
-    ],
-  })
+    url.hostname.includes('cloudfunctions.net'),
+  new NetworkOnly()
 );
 
-// ── 9. Supabase REST API ──
-registerRoute(
-  ({ url }) =>
-    /\.supabase\.co$/.test(url.hostname) && url.pathname.startsWith('/rest/v1/'),
-  new StaleWhileRevalidate({
-    cacheName: 'supabase-api-cache',
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 100, maxAgeSeconds: 60 * 30 }),
-      cacheableOk,
-    ],
-  })
-);
-
-// ── 8. Firestore REST — NetworkOnly ──
+// ── 9. Firestore REST — NetworkOnly ──
 registerRoute(
   ({ url }) => url.hostname === 'firestore.googleapis.com',
   new NetworkOnly()
