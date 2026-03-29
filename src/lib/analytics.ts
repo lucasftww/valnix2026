@@ -31,7 +31,7 @@ export function trackAnalyticsEvent(
 ) {
   // Fire-and-forget — NEVER await analytics during checkout flow
   // This prevents blocking the main thread during payment submission
-  invokeFunctionFireAndForget('track-analytics', {
+  invokeFunctionFireAndForget('store-metrics', {
     event_name: eventName,
     user_id: data.userId || null,
     page_url: window.location.href,
