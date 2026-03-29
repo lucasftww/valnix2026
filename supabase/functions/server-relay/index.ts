@@ -115,7 +115,11 @@ Deno.serve(async (req) => {
 
   try {
     const body = await req.json();
-    const { event_name, event_id, order_id, value, currency = 'BRL', content_name, content_ids, contents, content_type = 'product', num_items, event_source_url, email, phone, first_name, last_name, external_id, client_ip, user_agent, fbc, fbp, test_event_code } = body;
+    const { 
+      event_name, event_id, order_id, value, currency = 'BRL', content_name, content_ids, contents, content_type = 'product', num_items, 
+      event_source_url, email, phone, first_name, last_name, external_id, client_ip, user_agent, fbc, fbp, test_event_code,
+      event_time // Optional for historical back-fill
+    } = body;
     
     if (!event_name) return new Response(JSON.stringify({ error: 'event_name is required' }), { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
 
@@ -132,7 +136,16 @@ Deno.serve(async (req) => {
     const resolvedEventId = event_id || generateEventId(event_name, order_id);
     const userData = await buildUserData({ email, phone, firstName: first_name, lastName: last_name, clientIp: resolvedIp, userAgent: resolvedUa, fbc, fbp, externalId: external_id });
 
-    const eventPayload: Record<string, unknown> = { event_name, event_time: Math.floor(Date.now() / 1000), event_id: resolvedEventId, action_source: 'website', user_data: userData };
+    // Use provided event_time (Unix timestamp) or fallback to current time
+    const finalEventTime = event_time ? Number(event_time) : Math.floor(Date.now() / 1000);
+
+    const eventPayload: Record<string, unknown> = { 
+      event_name, 
+      event_time: finalEventTime, 
+      event_id: resolvedEventId, 
+      action_source: 'website', 
+      user_data: userData 
+    };
     eventPayload.event_source_url = event_source_url || 'https://www.valnix.com.br';
 
     const hasCustomData = value !== undefined || content_name || content_ids || (contents && Array.isArray(contents) && contents.length > 0) || num_items;

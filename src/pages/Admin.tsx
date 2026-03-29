@@ -12,6 +12,7 @@ const AdminOrders = lazy(() => import("@/components/admin/AdminOrders").then(m =
 const AdminCategories = lazy(() => import("@/components/admin/AdminCategories").then(m => ({ default: m.AdminCategories })));
 const AdminPostPaymentPages = lazy(() => import("@/components/admin/AdminPostPaymentPages").then(m => ({ default: m.AdminPostPaymentPages })));
 const AdminTrackingMonitor = lazy(() => import("@/components/admin/AdminTrackingMonitor").then(m => ({ default: m.AdminTrackingMonitor })));
+const AdminMigration = lazy(() => import("@/components/admin/AdminMigration").then(m => ({ default: m.AdminMigration })));
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
@@ -40,6 +41,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   orders: { title: "Pedidos", description: "Acompanhe e gerencie pedidos" },
   "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
   tracking: { title: "Tracking Monitor", description: "Saúde do Meta CAPI e deduplicação" },
+  migration: { title: "Migração de Dados", description: "Sincronize vendas históricas com o novo Pixel" },
 };
 
 function Admin() {
@@ -188,6 +190,7 @@ function Admin() {
                 {activeTab === "orders" && <AdminOrders />}
                 {activeTab === "post-payment" && <AdminPostPaymentPages />}
                 {activeTab === "tracking" && <AdminTrackingMonitor />}
+                {activeTab === "migration" && <AdminMigration />}
               </Suspense>
             </div>
           </main>
