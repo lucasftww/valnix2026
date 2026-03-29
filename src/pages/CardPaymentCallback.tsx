@@ -3,8 +3,6 @@ import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invokeFunction } from "@/lib/apiHelper";
-import { sendPurchaseFromClient } from "@/lib/metaCapi";
-import { trackPurchaseEvent } from "@/lib/analytics";
 
 type PaymentStatus = "redirecting" | "checking" | "paid" | "pending" | "failed";
 
@@ -149,20 +147,25 @@ export default function CardPaymentCallback() {
               sessionStorage.removeItem('valnix_card_payment');
 
               if (stored?.amount && stored?.orderId) {
-                trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
-                sendPurchaseFromClient({
-                  orderId,
-                  value: stored?.amount,
-                  userId: stored?.userId,
-                  email: stored?.customerEmail,
-                  phone: stored?.customerPhone,
-                  name: stored?.customerName,
-                  productNames: stored?.productNames,
-                  productIds: stored?.productIds,
-                  quantities: stored?.quantities,
-                  prices: stored?.prices,
-                  eventSourceUrl: stored?.eventSourceUrl,
-                });
+                import("@/lib/analytics").then(({ trackPurchaseEvent }) => {
+                  trackPurchaseEvent(stored?.userId || null, stored?.amount, orderId, stored?.productNames?.join(', '));
+                }).catch(() => {});
+
+                import("@/lib/metaCapi").then(({ sendPurchaseFromClient }) => {
+                  sendPurchaseFromClient({
+                    orderId,
+                    value: stored?.amount,
+                    userId: stored?.userId,
+                    email: stored?.customerEmail,
+                    phone: stored?.customerPhone,
+                    name: stored?.customerName,
+                    productNames: stored?.productNames,
+                    productIds: stored?.productIds,
+                    quantities: stored?.quantities,
+                    prices: stored?.prices,
+                    eventSourceUrl: stored?.eventSourceUrl,
+                  });
+                }).catch(() => {});
               }
 
               const guestHash = stored?.guestHash;

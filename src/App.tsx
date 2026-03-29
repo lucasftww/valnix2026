@@ -6,6 +6,7 @@ import { ScrollToTop } from "@/components/ScrollToTop";
 
 import { HelmetProvider } from "react-helmet-async";
 import { lazy, Suspense, useEffect } from "react";
+import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 
 // Lazy-load non-critical UI (Toaster only needed on user actions)
 const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
@@ -73,33 +74,35 @@ const App = () => {
                       <div className="w-8 h-8 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
                   }>
-                    <Routes>
-                        <Route path="/" element={<Index />} />
-                        <Route path="/cart" element={<Cart />} />
-                        <Route path="/checkout" element={<Checkout />} />
-                        <Route path="/admin" element={<ExternalRedirect url="https://www.youtube.com/watch?v=xjIYi6fnGh0" />} />
-                        <Route path="/charles/*" element={<Admin />} />
+                    <GlobalErrorBoundary>
+                      <Routes>
+                          <Route path="/" element={<Index />} />
+                          <Route path="/cart" element={<Cart />} />
+                          <Route path="/checkout" element={<Checkout />} />
+                          <Route path="/admin" element={<ExternalRedirect url="https://www.youtube.com/watch?v=xjIYi6fnGh0" />} />
+                          <Route path="/charles/*" element={<Admin />} />
 
-                        <Route path="/about" element={<About />} />
-                        <Route path="/terms" element={<Terms />} />
-                        
-                        
-                        <Route path="/painel-pagar" element={<PainelPagar />} />
-                        <Route path="/entrega-prioritaria" element={<PainelPagarEntrega />} />
-                        <Route path="/protecao-total" element={<PainelPagarTrocaDados />} />
-                        {/* Legacy redirects */}
-                        <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
-                        <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
+                          <Route path="/about" element={<About />} />
+                          <Route path="/terms" element={<Terms />} />
+                          
+                          
+                          <Route path="/painel-pagar" element={<PainelPagar />} />
+                          <Route path="/entrega-prioritaria" element={<PainelPagarEntrega />} />
+                          <Route path="/protecao-total" element={<PainelPagarTrocaDados />} />
+                          {/* Legacy redirects */}
+                          <Route path="/painel-pagar-entrega" element={<PainelPagarEntrega />} />
+                          <Route path="/painel-pagar-trocadados" element={<PainelPagarTrocaDados />} />
 
 
-                        <Route path="/order" element={<OrderDelivery />} />
-                        <Route path="/order/:hash" element={<OrderDelivery />} />
-                        <Route path="/product/:id" element={<ProductDetail />} />
-                        {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
-                        <Route path="/:categorySlug" element={<Category />} />
+                          <Route path="/order" element={<OrderDelivery />} />
+                          <Route path="/order/:hash" element={<OrderDelivery />} />
+                          <Route path="/product/:id" element={<ProductDetail />} />
+                          {/* Categorias usam o slug direto na raiz (ex: /valorant) */}
+                          <Route path="/:categorySlug" element={<Category />} />
 
-                        <Route path="*" element={<NotFound />} />
-                    </Routes>
+                          <Route path="*" element={<NotFound />} />
+                      </Routes>
+                    </GlobalErrorBoundary>
                   </Suspense>
                 </BrowserRouter>
             </CartProvider>

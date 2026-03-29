@@ -8,8 +8,6 @@ import vIcon from "@/assets/v-icon.png";
 import { invokeFunction } from "@/lib/apiHelper";
 import { useIsMobile } from "@/hooks/use-mobile";
 
-import { trackPurchaseEvent } from "@/lib/analytics";
-import { sendPurchaseFromClient } from "@/lib/metaCapi";
 
 interface PixPaymentProps {
   qrCodeText: string;
@@ -64,21 +62,26 @@ export function PixPayment({
     
     // Track Purchase event for PIX payments
     // Track Purchase event for PIX payments
-    trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
+    // Track Purchase event for PIX payments
+    import("@/lib/analytics").then(({ trackPurchaseEvent }) => {
+      trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
+    }).catch(e => console.warn("Analytics prevented", e.message));
     
     // Send Purchase to Meta CAPI
-    sendPurchaseFromClient({
-      orderId,
-      value: amount,
-      userId: customerId,
-      email: customerEmail,
-      phone: customerPhone,
-      name: customerName,
-      productNames,
-      productIds,
-      quantities,
-      prices,
-    });
+    import("@/lib/metaCapi").then(({ sendPurchaseFromClient }) => {
+      sendPurchaseFromClient({
+        orderId,
+        value: amount,
+        userId: customerId,
+        email: customerEmail,
+        phone: customerPhone,
+        name: customerName,
+        productNames,
+        productIds,
+        quantities,
+        prices,
+      });
+    }).catch(e => console.warn("MetaCapi prevented", e.message));
     
     onPaymentConfirmed?.();
     

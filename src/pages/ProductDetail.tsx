@@ -48,7 +48,7 @@ const ProductDetail = () => {
     if (!id || !isError || !fetchError) return;
     if (loggedRef.current.has(id)) return;
     loggedRef.current.add(id);
-    import("@/lib/fetchProduct").then(({ logFetchTimeout }) => logFetchTimeout(id, fetchError));
+    import("@/lib/fetchProduct").then(({ logFetchTimeout }) => logFetchTimeout(id, fetchError)).catch(() => {});
   }, [id, isError, fetchError]);
 
   // Track ViewContent when product loads (analytics + Meta Pixel/CAPI)
@@ -56,14 +56,14 @@ const ProductDetail = () => {
     if (product?.name) {
       import("@/lib/analytics").then(({ trackViewContentEvent }) => {
         trackViewContentEvent(null, product.name);
-      });
+      }).catch(() => {});
       import("@/lib/metaCapi").then(({ sendViewContent }) => {
         sendViewContent({
           productId: product.id,
           productName: product.name,
           value: product.price,
         });
-      });
+      }).catch(() => {});
     }
   }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
 

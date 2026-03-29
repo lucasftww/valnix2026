@@ -11,8 +11,6 @@ import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout
 
 import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError, formatPhone, isValidPhone } from "@/components/checkout/PersonalInfoForm";
 import { invokeFunction } from "@/lib/apiHelper";
-import { trackInitiateCheckoutEvent } from "@/lib/analytics";
-import { sendInitiateCheckout } from "@/lib/metaCapi";
 
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
@@ -146,18 +144,23 @@ export default function Checkout() {
     icFiredRef.current = true;
     try { sessionStorage.setItem('valnix_ic_fired', '1'); } catch {}
 
-    trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
-    sendInitiateCheckout({
-      userId: effectiveUserId,
-      userEmail: formData.email.trim(),
-      userPhone: hasPhone ? `55${formData.phone.replace(/\D/g, '')}` : undefined,
-      userName: formData.name.trim(),
-      value: finalPrice,
-      productNames: items.map(i => i.name),
-      productIds: items.map(i => i.id),
-      quantities: items.map(i => i.quantity),
-      prices: items.map(i => i.price),
-    });
+    import("@/lib/analytics").then(({ trackInitiateCheckoutEvent }) => {
+      trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
+    }).catch(e => console.warn("Analytics prevented", e.message));
+
+    import("@/lib/metaCapi").then(({ sendInitiateCheckout }) => {
+      sendInitiateCheckout({
+        userId: effectiveUserId,
+        userEmail: formData.email.trim(),
+        userPhone: hasPhone ? `55${formData.phone.replace(/\D/g, '')}` : undefined,
+        userName: formData.name.trim(),
+        value: finalPrice,
+        productNames: items.map(i => i.name),
+        productIds: items.map(i => i.id),
+        quantities: items.map(i => i.quantity),
+        prices: items.map(i => i.price),
+      });
+    }).catch(e => console.warn("MetaCapi prevented", e.message));
   }, [items, finalPrice, effectiveUserId, validation.name, validation.email, formData.phone, formData.email, formData.name]);
 
   useEffect(() => {
