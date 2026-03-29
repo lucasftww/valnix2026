@@ -96,7 +96,7 @@ export const AdminMigration = () => {
           method: 'POST',
           queryParams: { resource: 'relay' },
           headers: { 'x-admin-token': token },
-          body: payload,
+          body: { ...payload, resource: 'relay' },
         });
 
         if (capiRes.ok) {

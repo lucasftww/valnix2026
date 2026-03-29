@@ -487,16 +487,16 @@ async function handlePost(
   const json = (data: unknown, status = 200) =>
     new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
   
-  // DEBUG: console.log(`[relay-debug] resource=${resource} method=${req.method}`);
-  
   const body = await req.json();
-  sanitize(body);
-
-  if (resource === "relay") {
+  const effectiveResource = resource || body.resource || null;
+  
+  if (effectiveResource === "relay") {
     return await handleRelay(body, corsHeaders, req);
   }
 
-  if (resource === "products") {
+  sanitize(body);
+
+  if (effectiveResource === "products") {
     const ALLOWED = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
     const docId = body.id || crypto.randomUUID();
     delete body.id;
@@ -531,11 +531,11 @@ async function handlePost(
     return await handleCleanupAnalytics(body, corsHeaders, clientIp);
   }
 
-  if (resource === "cleanup-capi-logs") {
+  if (effectiveResource === "cleanup-capi-logs") {
     return await handleCleanupCapiLogs(corsHeaders, clientIp);
   }
 
-  return json({ error: "Invalid resource" }, 400);
+  return json({ error: `Invalid resource | version:v3.29.0730 | resource: ${effectiveResource}` }, 400);
 }
 
 // ── Meta CAPI Relay Handler ──
