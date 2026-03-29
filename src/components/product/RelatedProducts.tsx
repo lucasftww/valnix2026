@@ -96,8 +96,9 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                           height={374}
                           loading={index < 2 ? "eager" : "lazy"}
                           decoding="async"
+                          draggable={false}
                           sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
-                          className="w-full h-full object-cover"
+                          className="w-full h-full object-cover select-none"
                         />
                       </div>
 

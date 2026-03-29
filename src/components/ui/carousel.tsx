@@ -191,11 +191,7 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
     const { carouselRef, orientation } = useCarousel();
 
     return (
-      <div
-        ref={carouselRef}
-        className="carousel-viewport overflow-hidden"
-        style={{ touchAction: "pan-y pinch-zoom" }}
-      >
+      <div className="carousel-wrapper w-full">
         <style>
           {`
             [data-carousel-dragging="true"] .carousel-viewport * {
@@ -204,10 +200,16 @@ const CarouselContent = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HT
           `}
         </style>
         <div
-          ref={ref}
-          className={cn("carousel-track flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}
-          {...props}
-        />
+          ref={carouselRef}
+          className="carousel-viewport overflow-hidden w-full"
+          style={{ touchAction: "pan-y pinch-zoom" }}
+        >
+          <div
+            ref={ref}
+            className={cn("carousel-track flex", orientation === "horizontal" ? "-ml-4" : "-mt-4 flex-col", className)}
+            {...props}
+          />
+        </div>
       </div>
     );
   },
