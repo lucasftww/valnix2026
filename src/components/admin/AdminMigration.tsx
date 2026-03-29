@@ -37,7 +37,7 @@ export const AdminMigration = () => {
   });
 
   const filteredOrders = allOrders.filter((o: any) => 
-    eventType === 'Purchase' ? o.payment_status === 'paid' : o.payment_status !== 'paid'
+    eventType === 'Purchase' ? o.payment_status === 'paid' : true
   );
 
   const addLog = (msg: string) => {
