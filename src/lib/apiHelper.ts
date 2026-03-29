@@ -1,10 +1,7 @@
 // API Helper — abstracts all backend function calls.
 // Migrated to Firebase Cloud Functions environment.
-const projectId = "valnix"; // ID do seu projeto Firebase
-const region = "southamerica-east1"; // Região padrão (São Paulo)
-
-const API_BASE_URL = import.meta.env.VITE_FIREBASE_FUNCTIONS_URL || 
-  `https://${region}-${projectId}.cloudfunctions.net`;
+// Use relative path for Vercel Serverless Functions
+const API_BASE_URL = '/api';
 
 interface InvokeFunctionOptions {
   method?: string;
