@@ -947,6 +947,15 @@ async function handlePut(
     return json({ success });
   }
 
+  if (resource === "system_credentials") {
+    // Limited field update for system credentials
+    const ALLOWED = ['value', 'description', 'updated_at'];
+    const safeBody = filterFields(body, ALLOWED);
+    safeBody.updated_at = new Date().toISOString();
+    const success = await updateFirestoreDoc("system_credentials", docId, safeBody);
+    return json({ success });
+  }
+
   if (resource === "verify-payment") {
     return await handleVerifyPayment(docId, body, corsHeaders, clientIp);
   }
