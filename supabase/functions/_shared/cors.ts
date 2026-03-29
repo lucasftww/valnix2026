@@ -19,10 +19,20 @@ export function getCorsHeaders(
       "Access-Control-Allow-Methods": allowMethods,
     };
   }
-  if (!ALLOWED_ORIGINS.includes(origin)) return null;
+
+  // Normalize origin: remove trailing slash and lowercase for comparison
+  const normalizedOrigin = origin.replace(/\/$/, "").toLowerCase();
+  const isAllowed = ALLOWED_ORIGINS.some(o => o.replace(/\/$/, "").toLowerCase() === normalizedOrigin);
+
+  if (!isAllowed) {
+    console.warn(`🚫 CORS: Origin ${origin} not allowed`);
+    return null;
+  }
+  
   return {
     "Access-Control-Allow-Origin": origin,
     "Access-Control-Allow-Headers": allowHeaders,
     "Access-Control-Allow-Methods": allowMethods,
+    "Access-Control-Max-Age": "86400",
   };
 }

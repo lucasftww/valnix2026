@@ -109,9 +109,12 @@ async function logCapiEvent(eventName: string, eventId: string, orderId: string 
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req);
+  const corsHeaders = getCorsHeaders(req, {
+    headers: "authorization, x-client-info, apikey, content-type, x-admin-token, x-delivery-token",
+    methods: "GET, POST, OPTIONS",
+  });
   if (!corsHeaders) return new Response("Forbidden", { status: 403 });
-  if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
 
   try {
     const body = await req.json();
