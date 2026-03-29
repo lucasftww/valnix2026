@@ -109,12 +109,18 @@ async function logCapiEvent(eventName: string, eventId: string, orderId: string 
 }
 
 Deno.serve(async (req) => {
-  const corsHeaders = getCorsHeaders(req, {
-    headers: "authorization, x-client-info, apikey, content-type, x-admin-token, x-delivery-token",
-    methods: "GET, POST, OPTIONS",
-  });
-  if (!corsHeaders) return new Response("Forbidden", { status: 403 });
-  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  // Direct CORS handling for server-relay to ensure 100% compatibility with browser preflight
+  const origin = req.headers.get('Origin') || '*';
+  const corsHeaders = {
+    'Access-Control-Allow-Origin': origin,
+    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-admin-token, x-delivery-token',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Max-Age': '86400',
+  };
+
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
 
   try {
     const body = await req.json();
