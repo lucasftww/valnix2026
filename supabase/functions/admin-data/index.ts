@@ -2,8 +2,11 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { getCorsHeaders } from '../_shared/cors.ts';
 import { getFirebaseAccessToken, FIREBASE_PROJECT_ID, FIRESTORE_BASE } from '../_shared/firebase.ts';
 import { verifyAdminToken } from '../_shared/auth.ts';
-import { extractValue, queryCollectionSimple, queryCollectionFiltered, updateFirestoreDoc, deleteFirestoreDoc, createFirestoreDoc } from '../_shared/firestore.ts';
+import { extractValue, queryCollectionSimple, queryCollectionFiltered, updateFirestoreDoc, deleteFirestoreDoc, createFirestoreDoc, getFirestoreDoc, parseFirestoreDoc } from '../_shared/firestore.ts';
 import { createInMemoryRateLimiter } from '../_shared/rate-limit.ts';
+import { parsePublicIp, sha256, generateEventId } from '../_shared/utils.ts';
+
+const META_API_VERSION = 'v22.0';
 
 const ADMIN_SCOPE = 'https://www.googleapis.com/auth/datastore https://www.googleapis.com/auth/identitytoolkit https://www.googleapis.com/auth/firebase';
 
@@ -525,11 +528,129 @@ async function handlePost(
     return await handleCleanupCapiLogs(corsHeaders, clientIp);
   }
 
-  if (resource === "cleanup-orders") {
-    return await handleCleanupOrders(body, corsHeaders, clientIp);
+  if (resource === "relay") {
+    return await handleRelay(body, corsHeaders, req);
   }
 
   return json({ error: "Invalid resource" }, 400);
+}
+
+// ── Meta CAPI Relay Handler ──
+async function handleRelay(body: any, corsHeaders: Record<string, string>, req: Request): Promise<Response> {
+  const json = (data: unknown, status = 200) =>
+    new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+
+  try {
+    const { 
+      event_name, event_id, order_id, value, currency = 'BRL', content_name, content_ids, contents, content_type = 'product', num_items, 
+      event_source_url, email, phone, first_name, last_name, external_id, client_ip, user_agent, fbc, fbp, test_event_code,
+      event_time 
+    } = body;
+
+    if (!event_name) return json({ error: 'event_name is required' }, 400);
+
+    const resolvedIp = client_ip || parsePublicIp(req.headers.get('x-forwarded-for') || undefined) || req.headers.get('cf-connecting-ip') || req.headers.get('x-real-ip');
+    const resolvedUa = user_agent || req.headers.get('user-agent');
+    const resolvedEventId = event_id || generateEventId(event_name, order_id);
+    
+    // Build user data
+    const userData: Record<string, any> = {};
+    if (email) userData.em = await sha256(email);
+    if (phone) {
+      let ph = phone.replace(/\D/g, '');
+      if (!ph.startsWith('55') && ph.length >= 10) ph = '55' + ph;
+      userData.ph = await sha256(ph);
+    }
+    if (first_name) userData.fn = await sha256(first_name);
+    if (last_name) userData.ln = await sha256(last_name);
+    if (external_id) userData.external_id = await sha256(external_id);
+    if (resolvedIp) userData.client_ip_address = resolvedIp;
+    if (resolvedUa) userData.client_user_agent = resolvedUa;
+    if (fbc) userData.fbc = fbc;
+    if (fbp) userData.fbp = fbp;
+    userData.country = await sha256('br');
+
+    const finalEventTime = event_time ? Number(event_time) : Math.floor(Date.now() / 1000);
+
+    const eventPayload: Record<string, any> = { 
+      event_name, 
+      event_time: finalEventTime, 
+      event_id: resolvedEventId, 
+      action_source: 'website', 
+      user_data: userData,
+      event_source_url: event_source_url || 'https://www.valnix.com.br'
+    };
+
+    if (value !== undefined || content_name || content_ids || num_items) {
+      eventPayload.custom_data = { 
+        value: Number(value || 0), 
+        currency, 
+        content_name, 
+        content_ids, 
+        contents, 
+        content_type, 
+        num_items: Number(num_items || 1) 
+      };
+    }
+
+    // Send to Meta
+    const credentials = await (async () => {
+      try {
+        const [tokenDoc, pixelDoc] = await Promise.all([
+          getFirestoreDoc('system_credentials', 'META_ACCESS_TOKEN'),
+          getFirestoreDoc('system_credentials', 'META_PIXEL_ID')
+        ]);
+        return {
+          token: tokenDoc ? parseFirestoreDoc(tokenDoc).value : Deno.env.get('META_ACCESS_TOKEN'),
+          pixelId: pixelDoc ? parseFirestoreDoc(pixelDoc).value : Deno.env.get('META_PIXEL_ID')
+        };
+      } catch {
+        return { token: Deno.env.get('META_ACCESS_TOKEN'), pixelId: Deno.env.get('META_PIXEL_ID') };
+      }
+    })();
+
+    if (!credentials.token || !credentials.pixelId) {
+      return json({ error: 'Meta credentials not found' }, 500);
+    }
+
+    const metaUrl = `https://graph.facebook.com/${META_API_VERSION}/${credentials.pixelId}/events?access_token=${credentials.token}`;
+    const metaBody: any = { data: [eventPayload] };
+    if (test_event_code) metaBody.test_event_code = test_event_code;
+
+    const metaRes = await fetch(metaUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(metaBody)
+    });
+
+    const metaData = await metaRes.json();
+    
+    // Log to Firestore if possible
+    try {
+      const logUrl = `${FIRESTORE_BASE}/capi_event_log`;
+      const logToken = await getFirebaseAccessToken(ADMIN_SCOPE);
+      await fetch(logUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${logToken}` },
+        body: JSON.stringify({
+          fields: {
+            event_name: { stringValue: event_name },
+            event_id: { stringValue: resolvedEventId },
+            status: { stringValue: metaRes.ok ? 'sent' : 'failed' },
+            error_message: { stringValue: metaRes.ok ? '' : JSON.stringify(metaData) },
+            created_at: { stringValue: new Date().toISOString() }
+          }
+        })
+      });
+    } catch (logErr) {
+      console.warn('⚠️ Relay log failed:', logErr);
+    }
+
+    return json({ success: metaRes.ok, data: metaData, event_id: resolvedEventId });
+  } catch (err) {
+    console.error('❌ Relay error:', err);
+    return json({ error: String(err) }, 500);
+  }
 }
 
 // ── Cleanup analytics ──

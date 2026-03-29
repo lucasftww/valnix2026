@@ -92,15 +92,18 @@ export const AdminMigration = () => {
           event_source_url: 'https://www.valnix.com.br/checkout',
         };
 
-        const capiRes = await invokeFunction('server-relay', {
+        const capiRes = await invokeFunction('admin-data', {
           method: 'POST',
+          queryParams: { resource: 'relay' },
+          headers: { 'x-admin-token': token },
           body: payload,
         });
 
         if (capiRes.ok) {
           addLog(`✅ ${eventType} #${order.id.slice(0, 8)} enviado.`);
         } else {
-          addLog(`❌ Erro no ${eventType} #${order.id.slice(0, 8)}: ${capiRes.statusText}`);
+          const errData = await capiRes.json().catch(() => ({}));
+          addLog(`❌ Erro no ${eventType} #${order.id.slice(0, 8)}: ${errData.error || capiRes.statusText}`);
         }
       } catch (err) {
         addLog(`❌ Falha crítica no ${eventType} #${order.id.slice(0, 8)}`);
