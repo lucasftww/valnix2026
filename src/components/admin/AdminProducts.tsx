@@ -176,6 +176,10 @@ export const AdminProducts = () => {
     e.preventDefault();
 
     const now = new Date().toISOString();
+    const resolvedStock = formData.delivery_type === 'manual' 
+      ? formData.auto_delivery_codes.length 
+      : 999999;
+
     const productData = {
       name: formData.name,
       description: formData.description || null,
@@ -189,7 +193,7 @@ export const AdminProducts = () => {
       category: formData.category,
       image_url: formData.image_url || null,
       icon_url: formData.icon_url || null,
-      stock: 999999,
+      stock: resolvedStock,
       sold: parseInt(formData.sold),
       display_order: parseInt(formData.display_order),
       featured: formData.featured,

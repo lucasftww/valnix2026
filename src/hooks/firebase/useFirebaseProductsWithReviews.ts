@@ -59,9 +59,12 @@ export const useProductsWithReviews = (category: string) => {
         return mapProducts(products);
       })().then(r => { apiResult = r; return r; }).catch(() => null);
 
+      // Wait for at least one to finish. If it's valid, return immediately.
       const first = await Promise.race([firestoreFetch, apiFetch]);
       if (first && first.length > 0) return first;
 
+      // If we're here, either the first was null/empty or we need to wait for the other.
+      // This ensures we get the API result even if Firestore failed first.
       await Promise.allSettled([firestoreFetch, apiFetch]);
       if (firestoreResult && (firestoreResult as CategoryProductData[]).length > 0) return firestoreResult;
       if (apiResult && (apiResult as CategoryProductData[]).length > 0) return apiResult;
@@ -161,7 +164,7 @@ export const useProductById = (productId: string | undefined) => {
       const first = await Promise.race([firestoreFetch, apiFetch]);
       if (first) return first;
 
-      // Wait for both to settle
+      // If the first was null (e.g. Firestore blocked), wait for the other to settle
       await Promise.allSettled([firestoreFetch, apiFetch]);
       if (firestoreResult) return firestoreResult;
       if (apiResult) return apiResult;

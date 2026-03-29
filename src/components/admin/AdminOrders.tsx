@@ -370,13 +370,20 @@ export const AdminOrders = () => {
       }
 
       const token = requireAdminToken();
-      await Promise.all(toDelete.map(order =>
-        invokeFunction("admin-data", {
-          method: "DELETE",
-          queryParams: { resource: "orders", id: order.id },
-          headers: { "x-admin-token": token },
-        })
-      ));
+      // Process in chunks of 5 to avoid browser/server request limits
+      const CHUNK_SIZE = 5;
+      for (let i = 0; i < toDelete.length; i += CHUNK_SIZE) {
+        const chunk = toDelete.slice(i, i + CHUNK_SIZE);
+        await Promise.all(chunk.map(order =>
+          invokeFunction("admin-data", {
+            method: "DELETE",
+            queryParams: { resource: "orders", id: order.id },
+            headers: { "x-admin-token": token },
+          })
+        ));
+        // Small delay between chunks to be safe
+        if (i + CHUNK_SIZE < toDelete.length) await new Promise(r => setTimeout(r, 100));
+      }
 
       toast({ title: "Limpeza concluída", description: `${toDelete.length} pedido(s) removidos.` });
       fetchOrders();

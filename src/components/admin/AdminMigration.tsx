@@ -53,9 +53,37 @@ export const AdminMigration = () => {
     setIsProcessing(true);
     setProcessedCount(0);
     setProgress(0);
+    setLogs([]);
     addLog(`🚀 Iniciando migração de ${filteredOrders.length} eventos de ${eventType}...`);
 
     const token = requireAdminToken();
+    
+    // 📦 STEP 1: Batch fetch all items to avoid N+1 requests
+    addLog("📦 Carregando detalhes dos pedidos em lote...");
+    const itemsMap = new Map<string, any[]>();
+    const orderIds = filteredOrders.map((o: any) => o.id);
+    const CHUNK_SIZE = 100;
+
+    for (let i = 0; i < orderIds.length; i += CHUNK_SIZE) {
+      const chunk = orderIds.slice(i, i + CHUNK_SIZE);
+      try {
+        const res = await invokeFunction("admin-data", {
+          method: "GET",
+          queryParams: { resource: "batch-items", orderIds: chunk.join(',') },
+          headers: { "x-admin-token": token },
+        });
+        const data = await res.json();
+        if (data.batch) {
+          Object.entries(data.batch).forEach(([orderId, items]) => {
+            itemsMap.set(orderId, items as any[]);
+          });
+        }
+        addLog(`📦 Carregado lote ${Math.floor(i / CHUNK_SIZE) + 1}...`);
+      } catch (err) {
+        addLog(`⚠️ Falha ao carregar lote de itens ${i}-${i + CHUNK_SIZE}`);
+      }
+    }
+
     addLog("🚀 Enviando para o meta-relay...");
 
     for (let i = 0; i < filteredOrders.length; i++) {
@@ -63,13 +91,7 @@ export const AdminMigration = () => {
 
       const order = filteredOrders[i];
       try {
-        const itemsRes = await invokeFunction("admin-data", {
-          method: "GET",
-          queryParams: { resource: "order-items", orderId: order.id },
-          headers: { "x-admin-token": token },
-        });
-        const itemsData = await itemsRes.json();
-        const items = Array.isArray(itemsData.items) ? itemsData.items : [];
+        const items = itemsMap.get(order.id) || [];
 
         const eventId = generateEventId(eventType, order.id);
         const nameParts = (order.customer_name || '').split(' ');
@@ -112,8 +134,8 @@ export const AdminMigration = () => {
       setProcessedCount(nextCount);
       setProgress((nextCount / filteredOrders.length) * 100);
 
-      const delay = eventType === 'InitiateCheckout' ? 200 : 500;
-      if (i % 5 === 0) {
+      const delay = eventType === 'InitiateCheckout' ? 100 : 250;
+      if (i % 10 === 0) {
         await new Promise(r => setTimeout(r, delay));
       }
     }

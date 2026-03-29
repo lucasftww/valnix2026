@@ -289,6 +289,33 @@ async function handleGet(
     return json({ coupons });
   }
 
+  if (resource === "batch-items") {
+    const orderIdsStr = url.searchParams.get("orderIds");
+    if (!orderIdsStr) return json({ error: "orderIds required" }, 400);
+    const orderIds = orderIdsStr.split(',').filter(Boolean).slice(0, 100);
+    const accessToken = await getFirebaseAccessToken(ADMIN_SCOPE);
+    
+    const results = await Promise.all(orderIds.map(async (id) => {
+      try {
+        const itemsUrl = `${FIRESTORE_BASE}/ordens/${id}/items?pageSize=100`;
+        const itemsRes = await fetch(itemsUrl, { headers: { 'Authorization': `Bearer ${accessToken}` } });
+        if (!itemsRes.ok) return { orderId: id, items: [] };
+        const data = await itemsRes.json();
+        const items = (data.documents || []).map((doc: Record<string, unknown>) => {
+          const fields = (doc.fields || {}) as Record<string, unknown>;
+          const obj: Record<string, unknown> = { id: (doc.name as string).split('/').pop() };
+          for (const [k, v] of Object.entries(fields)) obj[k] = extractValue(v);
+          return obj;
+        });
+        return { orderId: id, items };
+      } catch { return { orderId: id, items: [] }; }
+    }));
+    
+    const batch: Record<string, unknown[]> = {};
+    for (const r of results) batch[r.orderId] = r.items;
+    return json({ batch });
+  }
+
   if (resource === "dashboard-stats") {
     return await handleDashboardStats(corsHeaders);
   }

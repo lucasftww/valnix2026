@@ -91,9 +91,11 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
           .map(mapToProductWithReviews);
       })().then(r => { apiResult = r; return r; }).catch(() => null);
 
+      // Wait for at least one to finish. If it's valid, return it.
       const first = await Promise.race([firestoreFetch, apiFetch]);
       if (first && first.length > 0) return first;
 
+      // If we're here, first was null or empty. Wait for both to settle to get the fallback.
       await Promise.allSettled([firestoreFetch, apiFetch]);
       if (firestoreResult && firestoreResult.length > 0) return firestoreResult;
       if (apiResult && apiResult.length > 0) return apiResult;
