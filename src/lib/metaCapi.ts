@@ -74,7 +74,12 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
     if (isServerHandled) {
       if (import.meta.env.DEV) console.log(`🔒 [Meta] CAPI blocked client-side for ${data.event_name} — server handles it`);
     } else {
-      // Only call the CAPI edge function if the server doesn't already handle it
+      // Only call the CAPI edge function for InitiateCheckout
+      if (data.event_name !== 'InitiateCheckout') {
+        if (import.meta.env.DEV) console.log(`⏭️ [Meta] CAPI skipped for ${data.event_name} — policy restricts to IC/Purchase`);
+        return;
+      }
+
       const payload = {
         ...data,
         event_id: eventId,
@@ -90,34 +95,13 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
         if (import.meta.env.DEV) console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
       });
     }
-
-    if (!PIXEL_PAUSED) {
-      try {
-        const PIXEL_WHITELIST = ['PageView', 'ViewContent', 'InitiateCheckout', 'Purchase'] as const;
-        const pixelEvent = PIXEL_WHITELIST.find(e => e === data.event_name);
-        if (pixelEvent) {
-          const fbq = (window as any).fbq;
-          if (typeof fbq === 'function') {
-            const pixelParams: Record<string, unknown> = {
-              currency: 'BRL',
-              ...(data.value !== undefined && { value: data.value }),
-              ...(data.content_name && { content_name: data.content_name }),
-              ...(data.content_ids && { content_ids: data.content_ids }),
-              ...(data.contents && { contents: data.contents }),
-              ...(data.num_items && { num_items: data.num_items }),
-              content_type: 'product',
-            };
-            fbq('track', pixelEvent, pixelParams, { eventID: eventId });
-          }
-        }
-      } catch { /* best-effort pixel */ }
-    }
   } catch (e) {
     if (import.meta.env.DEV) {
       console.warn('⚠️ Meta CAPI helper error:', e);
     }
   }
 }
+
 
 // ── Helper: build contents with safe fallbacks ─────────────────────
 function buildContents(
@@ -145,8 +129,28 @@ function buildContents(
   return { contents: cleanContents, numItems: sumQty > 0 ? sumQty : undefined };
 }
 
+// ── ViewContent ────────────────────────────────────────────────────
+// Pixel-only ViewContent per user request
+export function sendViewContent(params: {
+  productId?: string;
+  productName?: string;
+  value?: number;
+}) {
+  if (typeof window === "undefined") return;
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function') {
+    fbq('track', 'ViewContent', {
+      content_name: params.productName,
+      content_ids: params.productId ? [params.productId] : undefined,
+      content_type: 'product',
+      value: params.value,
+      currency: 'BRL',
+    }, { eventID: generateEventId('ViewContent', params.productId) });
+  }
+}
+
 // ── InitiateCheckout ───────────────────────────────────────────────
-// Now called AFTER user validates email/phone — includes PII for better match quality.
+// Hybrid (Pixel + CAPI) for better tracking
 export function sendInitiateCheckout(params: {
   userId?: string;
   userEmail?: string;
@@ -163,11 +167,27 @@ export function sendInitiateCheckout(params: {
     params.productIds, params.quantities, params.prices,
   );
 
+  const eventId = generateEventId('InitiateCheckout', checkoutSessionId);
   const nameParts = (params.userName || '').split(' ');
 
+  // 1. Browser Pixel
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function') {
+    fbq('track', 'InitiateCheckout', {
+      value: params.value,
+      currency: 'BRL',
+      content_name: params.productNames?.join(', '),
+      content_ids: params.productIds || params.productNames,
+      contents,
+      num_items: numItems,
+      content_type: 'product',
+    }, { eventID: eventId });
+  }
+
+  // 2. Server CAPI (via Relay)
   sendMetaCapiEvent({
     event_name: 'InitiateCheckout',
-    event_id: generateEventId('InitiateCheckout', checkoutSessionId),
+    event_id: eventId,
     value: params.value,
     content_name: params.productNames?.join(', '),
     content_ids: params.productIds || params.productNames,
@@ -183,8 +203,6 @@ export function sendInitiateCheckout(params: {
 
 // ── Purchase (client-side pixel only) ──────────────────────────────
 // Fires browser pixel fbq ONLY — CAPI is handled exclusively by server
-// (webhook or polling fallback, both with idempotent guards).
-// DO NOT send CAPI from client — it causes duplicate events in Meta.
 export function sendPurchaseFromClient(params: {
   orderId: string;
   value: number;
@@ -204,36 +222,21 @@ export function sendPurchaseFromClient(params: {
 
   clearCheckoutSessionId();
 
-  if (!PIXEL_PAUSED) {
-    try {
-      const eventId = generateEventId('Purchase', params.orderId);
-      const fbq = (window as any).fbq;
-      if (typeof fbq === 'function') {
-        fbq('track', 'Purchase', {
-          content_ids: params.productIds || params.productNames,
-          contents,
-          content_name: params.productNames?.join(', '),
-          content_type: 'product',
-          value: params.value,
-          currency: 'BRL',
-          ...(numItems ? { num_items: numItems } : {}),
-        }, { eventID: eventId });
-      }
-    } catch { /* best-effort pixel */ }
-  }
+  try {
+    const eventId = generateEventId('Purchase', params.orderId);
+    const fbq = (window as any).fbq;
+    if (typeof fbq === 'function') {
+      fbq('track', 'Purchase', {
+        content_ids: params.productIds || params.productNames,
+        contents,
+        content_name: params.productNames?.join(', '),
+        content_type: 'product',
+        value: params.value,
+        currency: 'BRL',
+        ...(numItems ? { num_items: numItems } : {}),
+      }, { eventID: eventId });
+    }
+  } catch { /* best-effort pixel */ }
 }
 
-// ── ViewContent ────────────────────────────────────────────────────
-// Fires browser pixel + CAPI when user views a product page.
-export function sendViewContent(params: {
-  productId?: string;
-  productName?: string;
-  value?: number;
-}) {
-  sendMetaCapiEvent({
-    event_name: 'ViewContent',
-    content_name: params.productName,
-    content_ids: params.productId ? [params.productId] : undefined,
-    value: params.value,
-  });
-}
+

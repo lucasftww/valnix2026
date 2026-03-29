@@ -104,7 +104,6 @@
     }
   }
 })();
-
 // ── 4. Facebook Pixel Base — deferred 5s after load to avoid blocking LCP/TBT ──
 // FB SDK is 131 KiB (66% of total JS) — must load well AFTER critical paint
 (function initFbPixel() {
@@ -139,6 +138,7 @@
     }, 5000); // 5s delay after load + idle callback
   }, { once: true });
 })();
+
 
 // ── 4. UTMify loader — lazy, guarded, skips admin/checkout, delayed 4s ──
 (function loadUtmify() {
