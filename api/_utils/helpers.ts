@@ -1,3 +1,4 @@
+import { VercelResponse } from '@vercel/node';
 import { createHash, createHmac } from 'crypto';
 
 /**
@@ -30,7 +31,7 @@ export function verifyAdminToken(token: string | null): boolean {
 /**
  * CORS handling for Vercel functions
  */
-export function setCorsHeaders(res: any) {
+export function setCorsHeaders(res: VercelResponse) {
   res.setHeader('Access-Control-Allow-Credentials', 'true');
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');

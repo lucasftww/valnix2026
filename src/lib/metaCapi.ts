@@ -55,10 +55,8 @@ interface MetaCapiEventData {
   event_source_url?: string;
 }
 
-// ── Events that the SERVER already sends via CAPI ──────────────────
-// For these, the client only fires the browser pixel (fbq) for dedup.
-// The server (webhook/polling) handles the CAPI call to avoid duplicates.
-const SERVER_HANDLED_CAPI_EVENTS = ['Purchase'] as const;
+// ── Events that are sent via CAPI ──────────────────
+const CAPI_ENABLED_EVENTS = ['InitiateCheckout', 'Purchase'];
 
 // ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {
@@ -68,33 +66,27 @@ export async function sendMetaCapiEvent(data: MetaCapiEventData) {
 
     const eventId = data.event_id || generateEventId(data.event_name, data.order_id);
 
-    const isServerHandled = (SERVER_HANDLED_CAPI_EVENTS as readonly string[]).includes(data.event_name);
-
-    // 🔒 DEFENSIVE: Purchase CAPI is ALWAYS server-only — never call from client
-    if (isServerHandled) {
-      if (import.meta.env.DEV) console.log(`🔒 [Meta] CAPI blocked client-side for ${data.event_name} — server handles it`);
-    } else {
-      // Only call the CAPI edge function for InitiateCheckout
-      if (data.event_name !== 'InitiateCheckout') {
-        if (import.meta.env.DEV) console.log(`⏭️ [Meta] CAPI skipped for ${data.event_name} — policy restricts to IC/Purchase`);
-        return;
-      }
-
-      const payload = {
-        ...data,
-        event_id: eventId,
-        currency: 'BRL',
-        event_source_url: data.event_source_url || window.location.href,
-        user_agent: navigator.userAgent,
-        phone: data.phone || undefined,
-        fbc: fbc || undefined,
-        fbp: fbp || undefined,
-      };
-
-      invokeFunctionFireAndForget('server-relay', payload).then(() => {
-        if (import.meta.env.DEV) console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
-      });
+    // Only allow specific events to be sent from client-side CAPI relay
+    if (!CAPI_ENABLED_EVENTS.includes(data.event_name)) {
+      if (import.meta.env.DEV) console.log(`⏭️ [Meta] CAPI skipped for ${data.event_name}`);
+      return;
     }
+
+    const payload = {
+      ...data,
+      event_id: eventId,
+      currency: 'BRL',
+      event_source_url: data.event_source_url || window.location.href,
+      user_agent: navigator.userAgent,
+      phone: data.phone || undefined,
+      fbc: fbc || undefined,
+      fbp: fbp || undefined,
+    };
+
+    // Updated to match the refined Vercel filenames (using hyphens)
+    invokeFunctionFireAndForget('server-relay', payload).then(() => {
+      if (import.meta.env.DEV) console.log(`📡 [Meta] CAPI ${data.event_name} sent — event_id=${eventId}`);
+    });
   } catch (e) {
     if (import.meta.env.DEV) {
       console.warn('⚠️ Meta CAPI helper error:', e);
@@ -224,6 +216,8 @@ export function sendPurchaseFromClient(params: {
 
   try {
     const eventId = generateEventId('Purchase', params.orderId);
+    
+    // 1. Browser Pixel
     const fbq = (window as any).fbq;
     if (typeof fbq === 'function') {
       fbq('track', 'Purchase', {
@@ -236,7 +230,25 @@ export function sendPurchaseFromClient(params: {
         ...(numItems ? { num_items: numItems } : {}),
       }, { eventID: eventId });
     }
-  } catch { /* best-effort pixel */ }
+
+    // 2. Server CAPI (via Relay)
+    sendMetaCapiEvent({
+      event_name: 'Purchase',
+      event_id: eventId,
+      order_id: params.orderId,
+      value: params.value,
+      content_name: params.productNames?.join(', '),
+      content_ids: params.productIds || params.productNames,
+      contents,
+      num_items: numItems,
+      email: params.email || undefined,
+      phone: params.phone || undefined,
+      external_id: params.userId,
+      event_source_url: params.eventSourceUrl || window.location.href,
+    });
+  } catch (e) {
+    if (import.meta.env.DEV) console.warn('⚠️ Meta Purchase tracking error:', e);
+  }
 }
 
 

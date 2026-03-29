@@ -109,10 +109,10 @@ registerRoute(
   })
 );
 
-// ── 8. Firebase Cloud Functions — NetworkOnly (sem cache, sempre fresco) ──
+// ── 8. API Backend (Firebase & Vercel) — NetworkOnly (sem cache, sempre fresco) ──
 registerRoute(
   ({ url }) =>
-    url.hostname.includes('cloudfunctions.net'),
+    url.hostname.includes('cloudfunctions.net') || url.pathname.startsWith('/api/'),
   new NetworkOnly()
 );
 

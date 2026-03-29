@@ -1,8 +1,9 @@
+import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_utils/firebase';
 import { setCorsHeaders } from './_utils/helpers';
 import axios from 'axios';
 
-export default async function handler(req: any, res: any) {
+export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
