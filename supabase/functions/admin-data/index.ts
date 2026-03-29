@@ -486,8 +486,15 @@ async function handlePost(
 ): Promise<Response> {
   const json = (data: unknown, status = 200) =>
     new Response(JSON.stringify(data), { status, headers: { ...corsHeaders, "Content-Type": "application/json" } });
+  
+  // DEBUG: console.log(`[relay-debug] resource=${resource} method=${req.method}`);
+  
   const body = await req.json();
   sanitize(body);
+
+  if (resource === "relay") {
+    return await handleRelay(body, corsHeaders, req);
+  }
 
   if (resource === "products") {
     const ALLOWED = ['name', 'slug', 'description', 'rich_description', 'price', 'old_price', 'original_price', 'discount', 'image_url', 'icon_url', 'images', 'category', 'category_id', 'is_active', 'featured', 'is_featured_in_category', 'stock', 'sold', 'delivery_type', 'delivery_info', 'instructions', 'terms_conditions', 'video_url', 'product_type', 'created_at', 'updated_at', 'display_order', 'review_count', 'review_average', 'features', 'badge', 'badge_color'];
@@ -526,10 +533,6 @@ async function handlePost(
 
   if (resource === "cleanup-capi-logs") {
     return await handleCleanupCapiLogs(corsHeaders, clientIp);
-  }
-
-  if (resource === "relay") {
-    return await handleRelay(body, corsHeaders, req);
   }
 
   return json({ error: "Invalid resource" }, 400);
