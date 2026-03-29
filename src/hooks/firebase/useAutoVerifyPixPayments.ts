@@ -50,10 +50,32 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
           const data = await response.json();
 
           if (data.success && data.status === 'COMPLETED') {
-            completedRef.current.add(order.id);
-            if (import.meta.env.DEV) console.log(`✅ Auto-verified PIX payment for order ${order.id}`);
-            queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-            onOrderUpdated?.();
+            try {
+              import("@/lib/adminAuth").then(async ({ requireAdminToken }) => {
+                const token = requireAdminToken();
+                if (token) {
+                  await invokeFunction("admin-data", {
+                    method: "PUT",
+                    queryParams: { resource: "verify-payment" },
+                    headers: { "x-admin-token": token },
+                    body: { id: order.id, payment_status: 'paid', status: 'processing' },
+                  });
+                  // Also trigger process-delivery
+                  await invokeFunction("process-delivery", {
+                    method: "POST",
+                    body: { orderId: order.id },
+                    headers: { "x-admin-token": token },
+                  }).catch(() => {});
+                  
+                  if (import.meta.env.DEV) console.log(`✅ Auto-verified PIX payment for order ${order.id}`);
+                  completedRef.current.add(order.id);
+                  queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
+                  onOrderUpdated?.();
+                }
+              });
+            } catch (err) {
+              console.warn("⚠️ Failed to explicitly set order to paid", err);
+            }
           }
         } catch (error) {
           if (import.meta.env.DEV) console.warn(`⚠️ Auto-verify PIX failed for order ${order.id}:`, error);
