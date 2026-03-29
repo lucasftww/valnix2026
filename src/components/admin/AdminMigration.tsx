@@ -92,10 +92,10 @@ export const AdminMigration = () => {
           test_event_code: testEventCode || undefined,
         };
 
-        const capiRes = await invokeFunction('meta-relay', {
+        const capiRes = await invokeFunction('capi-replay', {
           method: 'POST',
           headers: { 'x-admin-token': token },
-          body: payload,
+          body: { ...payload, resource: 'relay' },
         });
 
         if (capiRes.ok) {
