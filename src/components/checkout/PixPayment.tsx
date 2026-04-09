@@ -109,7 +109,7 @@ export function PixPayment({
     let polls = 0;
     const pollInterval = setInterval(async () => {
       polls++;
-      if (polls > 360) { // 360 polls * 5s = 30 minutes
+      if (polls > 360 || expiredRef.current) {
         clearInterval(pollInterval);
         return;
       }
