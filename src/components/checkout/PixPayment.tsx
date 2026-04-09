@@ -61,8 +61,6 @@ export function PixPayment({
     try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
     
     // Track Purchase event for PIX payments
-    // Track Purchase event for PIX payments
-    // Track Purchase event for PIX payments
     import("@/lib/analytics").then(({ trackPurchaseEvent }) => {
       trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
     }).catch(e => console.warn("Analytics prevented", e.message));
