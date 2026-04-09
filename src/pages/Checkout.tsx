@@ -309,7 +309,7 @@ export default function Checkout() {
       setLoadingStage("idle");
       isSubmittingRef.current = false;
     }
-  }, [loading, isFormValid, formData, items, finalPrice, toast, paymentMethod, clearCart, navigate, effectiveUserId]);
+  }, [loading, isFormValid, formData, items, finalPrice, toast, effectiveUserId, utmParams]);
 
   // ─── PIX PAYMENT SCREEN ────────────────────────────────────────────────
   if (paymentData) {

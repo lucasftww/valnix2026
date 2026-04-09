@@ -61,8 +61,6 @@ export function PixPayment({
     try { sessionStorage.removeItem('valnix_ic_fired'); } catch {}
     
     // Track Purchase event for PIX payments
-    // Track Purchase event for PIX payments
-    // Track Purchase event for PIX payments
     import("@/lib/analytics").then(({ trackPurchaseEvent }) => {
       trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
     }).catch(e => console.warn("Analytics prevented", e.message));
@@ -109,7 +107,7 @@ export function PixPayment({
     let polls = 0;
     const pollInterval = setInterval(async () => {
       polls++;
-      if (polls > 360) { // 360 polls * 5s = 30 minutes
+      if (polls > 360 || expiredRef.current) {
         clearInterval(pollInterval);
         return;
       }
