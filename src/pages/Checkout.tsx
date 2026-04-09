@@ -146,7 +146,7 @@ export default function Checkout() {
 
     import("@/lib/analytics").then(({ trackInitiateCheckoutEvent }) => {
       trackInitiateCheckoutEvent(effectiveUserId, finalPrice);
-    }).catch(e => console.warn("Analytics prevented", e.message));
+    }).catch(() => {});
 
     import("@/lib/metaCapi").then(({ sendInitiateCheckout }) => {
       sendInitiateCheckout({
@@ -160,7 +160,7 @@ export default function Checkout() {
         quantities: items.map(i => i.quantity),
         prices: items.map(i => i.price),
       });
-    }).catch(e => console.warn("MetaCapi prevented", e.message));
+    }).catch(() => {});
   }, [items, finalPrice, effectiveUserId, validation.name, validation.email, formData.phone, formData.email, formData.name]);
 
   useEffect(() => {

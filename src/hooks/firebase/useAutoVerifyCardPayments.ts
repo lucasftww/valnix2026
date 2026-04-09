@@ -79,7 +79,7 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
                 }
               });
             } catch (err) {
-              console.warn("⚠️ Failed to explicitly set order to paid", err);
+              if (import.meta.env.DEV) console.warn("⚠️ Failed to explicitly set order to paid", err);
             }
           } else {
             if (import.meta.env.DEV) console.log(`ℹ️ Card order ${order.id}: ${data.status || 'not confirmed yet'}`);

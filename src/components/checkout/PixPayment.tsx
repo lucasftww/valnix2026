@@ -63,7 +63,7 @@ export function PixPayment({
     // Track Purchase event for PIX payments
     import("@/lib/analytics").then(({ trackPurchaseEvent }) => {
       trackPurchaseEvent(customerId || null, amount, orderId, productNames?.join(', '));
-    }).catch(e => console.warn("Analytics prevented", e.message));
+    }).catch(() => {});
     
     // Send Purchase to Meta CAPI
     import("@/lib/metaCapi").then(({ sendPurchaseFromClient }) => {
@@ -79,7 +79,7 @@ export function PixPayment({
         quantities,
         prices,
       });
-    }).catch(e => console.warn("MetaCapi prevented", e.message));
+    }).catch(() => {});
     
     onPaymentConfirmed?.();
     

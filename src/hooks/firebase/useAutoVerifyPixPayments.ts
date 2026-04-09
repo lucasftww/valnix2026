@@ -74,7 +74,7 @@ export function useAutoVerifyPixPayments(orders: Order[], onOrderUpdated?: () =>
                 }
               });
             } catch (err) {
-              console.warn("⚠️ Failed to explicitly set order to paid", err);
+              if (import.meta.env.DEV) console.warn("⚠️ Failed to explicitly set order to paid", err);
             }
           }
         } catch (error) {

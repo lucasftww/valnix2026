@@ -99,7 +99,7 @@ export const ImageUploader = ({
       setCompressionProgress(null);
       return { compressed: compressedFile, outputType };
     } catch (error) {
-      console.error("Erro ao comprimir imagem:", error);
+      if (import.meta.env.DEV) console.error("Erro ao comprimir imagem:", error);
       setCompressionProgress(null);
       return { compressed: file, outputType: "image/webp" };
     }
@@ -167,7 +167,7 @@ export const ImageUploader = ({
       });
 
     } catch (error) {
-      console.error("Erro ao fazer upload:", error);
+      if (import.meta.env.DEV) console.error("Erro ao fazer upload:", error);
       toast({
         title: "Erro",
         description: error instanceof Error ? error.message : "Erro ao enviar imagem",
