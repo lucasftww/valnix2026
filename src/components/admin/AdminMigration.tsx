@@ -84,47 +84,60 @@ export const AdminMigration = () => {
       }
     }
 
-    addLog("🚀 Enviando para o meta-relay...");
+    addLog("🚀 Enviando para o server-relay (Meta CAPI)...");
 
     for (let i = 0; i < filteredOrders.length; i++) {
-      if (!isProcessing && i > 0) break;
-
       const order = filteredOrders[i];
       try {
         const items = itemsMap.get(order.id) || [];
 
         const eventId = generateEventId(eventType, order.id);
         const nameParts = (order.customer_name || '').split(' ');
-        const unixTimestamp = Math.floor(new Date(order.created_at).getTime() / 1000);
+
+        const contents = items
+          .map((it: { product_id?: string; id?: string; quantity?: number; unit_price?: number }) => ({
+            id: String(it.product_id || it.id || ''),
+            quantity: Number(it.quantity) || 1,
+            item_price: Number(it.unit_price) || 0,
+          }))
+          .filter((c: { id: string }) => Boolean(c.id));
 
         const payload = {
           event_name: eventType,
           event_id: eventId,
           order_id: order.id,
-          event_time: unixTimestamp,
           value: order.total_amount,
           currency: 'BRL',
-          content_name: items.map((it: any) => it.product_name).join(', ') || `Pedido #${order.id.slice(0, 8)}`,
-          content_ids: items.map((it: any) => it.product_id || it.id).filter(Boolean),
+          content_name:
+            items.map((it: { product_name?: string }) => it.product_name).filter(Boolean).join(', ') ||
+            `Pedido #${order.id.slice(0, 8)}`,
+          content_ids: items.map((it: { product_id?: string; id?: string }) => it.product_id || it.id).filter(Boolean),
+          ...(contents.length
+            ? {
+                contents,
+                content_type: 'product' as const,
+                num_items: contents.reduce((s: number, c: { quantity: number }) => s + c.quantity, 0),
+              }
+            : {}),
           email: order.customer_email || undefined,
           phone: order.customer_phone || undefined,
           first_name: nameParts[0] || undefined,
           last_name: nameParts.slice(1).join(' ') || undefined,
           external_id: order.user_id || undefined,
-          test_event_code: testEventCode || undefined,
+          event_source_url: 'https://www.valnix.com.br/checkout',
+          ...(testEventCode ? { test_event_code: testEventCode } : {}),
         };
 
-        const capiRes = await invokeFunction('capi-replay', {
+        const capiRes = await invokeFunction('server-relay', {
           method: 'POST',
-          headers: { 'x-admin-token': token },
-          body: { ...payload, resource: 'relay' },
+          body: payload,
         });
 
         if (capiRes.ok) {
           addLog(`✅ ${eventType} #${order.id.slice(0, 8)} enviado.`);
         } else {
           const errData = await capiRes.json().catch(() => ({}));
-          addLog(`❌ Erro no ${eventType} #${order.id.slice(0, 8)}: ${errData.error || capiRes.statusText}`);
+          addLog(`❌ Erro no ${eventType} #${order.id.slice(0, 8)}: ${(errData as { error?: string }).error || capiRes.statusText}`);
         }
       } catch (err) {
         addLog(`❌ Falha crítica no ${eventType} #${order.id.slice(0, 8)}`);

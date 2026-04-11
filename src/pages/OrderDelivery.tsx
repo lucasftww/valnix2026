@@ -57,7 +57,7 @@ export default function OrderDelivery() {
     let pollTimeout: ReturnType<typeof setTimeout> | null = null;
     let currentDelay = 5000; // start at 5s
     let prevItemsJson = ''; // track changes to avoid unnecessary re-renders
-    let pollStartTime = Date.now();
+    const pollStartTime = Date.now();
     const MAX_POLL_DURATION_MS = 10 * 60 * 1000; // 10 min max polling
 
     const fetchGuestOrder = async (): Promise<'ok' | 'done' | 'error'> => {
@@ -157,16 +157,58 @@ export default function OrderDelivery() {
     };
   }, [hash]);
 
-  const copyCode = (code: string, index: number) => {
-    navigator.clipboard.writeText(code.trim());
-    setCopiedCode(code.trim());
-    toast({ title: "Copiado!", description: `Código #${index + 1} copiado!` });
-    setTimeout(() => setCopiedCode(null), 2000);
+  const copyCode = async (code: string, index: number) => {
+    const text = code.trim();
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      setCopiedCode(text);
+      toast({ title: "Copiado!", description: `Código #${index + 1} copiado!` });
+      setTimeout(() => setCopiedCode(null), 2000);
+    } catch {
+      toast({
+        title: "Não foi possível copiar",
+        description: "Selecione o código manualmente.",
+        variant: "destructive",
+      });
+    }
   };
 
-  const copyAllCodes = (codes: string[]) => {
-    navigator.clipboard.writeText(codes.join("\n"));
-    toast({ title: "Copiado!", description: "Todos os códigos copiados!" });
+  const copyAllCodes = async (codes: string[]) => {
+    const text = codes.join("\n");
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const ta = document.createElement("textarea");
+        ta.value = text;
+        ta.setAttribute("readonly", "");
+        ta.style.position = "fixed";
+        ta.style.left = "-9999px";
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        document.body.removeChild(ta);
+      }
+      toast({ title: "Copiado!", description: "Todos os códigos copiados!" });
+    } catch {
+      toast({
+        title: "Não foi possível copiar",
+        description: "Copie os códigos um a um.",
+        variant: "destructive",
+      });
+    }
   };
 
   if (loading) {

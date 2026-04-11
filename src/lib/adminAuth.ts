@@ -17,7 +17,8 @@ export function getAdminToken(): string | null {
   try {
     const token = sessionStorage.getItem(ADMIN_TOKEN_KEY);
     if (!token) return null;
-    // Token format: timestampHex.nonce.hmac — check TTL client-side
+    // Server issues a fixed HMAC hex (see api/admin-auth.ts). No client TTL for that format.
+    // If a future format uses "ts.nonce.sig", apply TTL only when there are 3+ dot-separated parts.
     const parts = token.split(".");
     if (parts.length >= 3) {
       const ts = parseInt(parts[0], 16);

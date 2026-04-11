@@ -12,7 +12,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const { password } = req.body;
 
     if (!adminPassword) {
-      return res.status(500).json({ error: 'Server configuration error' });
+      return res.status(500).json({
+        error: 'ADMIN_PASSWORD não está definida no Vercel (Settings → Environment Variables).',
+      });
     }
 
     if (password === adminPassword) {

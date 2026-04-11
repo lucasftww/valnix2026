@@ -65,7 +65,7 @@ const ProductDetail = () => {
         });
       }).catch(() => {});
     }
-  }, [product?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [product?.id, product?.name, product?.price]);
 
   // Buscar avaliações com Firebase - defer até produto carregar
   const { data: reviews = [] } = useProductReviews(product?.category);

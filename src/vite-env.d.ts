@@ -1,10 +1,10 @@
 /// <reference types="vite/client" />
 
 interface Window {
-  fbq?: (
-    command: "track" | "trackCustom" | "init" | "set" | "addToCart" | "consent",
-    event?: string,
-    params?: Record<string, any>,
-    options?: { eventID?: string }
-  ) => void;
+  /** Meta Pixel stub / SDK — accepts varied argument shapes at runtime */
+  fbq?: (command: string, ...args: unknown[]) => void;
+  _fbq?: unknown;
+  __utmify_loaded?: boolean;
+  /** Set by Firestore hooks when ad-blocker / network blocks Firestore */
+  __valnix_firestore_blocked?: boolean;
 }

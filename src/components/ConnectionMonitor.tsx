@@ -21,26 +21,26 @@ const ConnectionMonitorComponent = () => {
     // Passive detection: poll the global flag set by Firestore hooks
     // Uses short interval (500ms) for responsive detection, stops after 15s
     let timer: ReturnType<typeof setTimeout> | undefined;
-    let stop: ReturnType<typeof setTimeout> | undefined;
+
+    const stopTimer = setTimeout(() => {
+      if (timer) clearTimeout(timer);
+    }, 15000);
 
     const check = () => {
-      if ((window as any).__valnix_firestore_blocked) {
+      if (window.__valnix_firestore_blocked) {
         setIsBlocked(true);
         if (timer) clearTimeout(timer);
-        if (stop) clearTimeout(stop);
+        clearTimeout(stopTimer);
         return;
       }
       timer = setTimeout(check, 500);
     };
 
     check(); // immediate first check
-    stop = setTimeout(() => {
-      if (timer) clearTimeout(timer);
-    }, 15000);
 
     return () => {
       if (timer) clearTimeout(timer);
-      if (stop) clearTimeout(stop);
+      clearTimeout(stopTimer);
     };
   }, []);
 

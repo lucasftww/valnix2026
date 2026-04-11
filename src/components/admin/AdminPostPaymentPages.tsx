@@ -84,11 +84,12 @@ export function AdminPostPaymentPages() {
     const base = `${prodOrigin}${routeMap[addonType] || "/painel-pagar"}`;
     const utm = getUtm(addonType);
     const params = new URLSearchParams();
+    // Obrigatório para a página de pós-venda carregar (mesmo fluxo do PIX/cartão após compra)
+    params.set("order_id", "COLOQUE_O_ID_DO_PEDIDO");
     if (utm.source) params.set("utm_source", utm.source);
     if (utm.medium) params.set("utm_medium", utm.medium);
     if (utm.campaign) params.set("utm_campaign", utm.campaign);
-    const qs = params.toString();
-    return qs ? `${base}?${qs}` : base;
+    return `${base}?${params.toString()}`;
   };
 
   useEffect(() => {
@@ -343,7 +344,7 @@ export function AdminPostPaymentPages() {
                 {/* Standalone Link Generator */}
                 <div className="bg-muted/30 border border-border/50 rounded-lg p-4 space-y-3">
                   <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                    <Link2 className="w-4 h-4" /> Link direto para leads (sem compra)
+                    <Link2 className="w-4 h-4" /> Modelo de URL (compra já realizada)
                   </div>
                   <div className="grid grid-cols-3 gap-2">
                     <div>
@@ -369,14 +370,20 @@ export function AdminPostPaymentPages() {
                       variant="outline"
                       size="sm"
                       onClick={() => {
-                        navigator.clipboard.writeText(buildLink(page.addon_type));
-                        toast({ title: "Link copiado!", description: "Envie para o lead." });
+                        const url = buildLink(page.addon_type);
+                        void navigator.clipboard.writeText(url).then(
+                          () => toast({ title: "Link copiado!", description: "Substitua COLOQUE_O_ID_DO_PEDIDO pelo ID real do pedido." }),
+                          () => toast({ title: "Não foi possível copiar", variant: "destructive" }),
+                        );
                       }}
                     >
                       <Copy className="w-4 h-4" />
                     </Button>
                   </div>
-                  <p className="text-[10px] text-muted-foreground/50">Preencha os UTMs e copie o link. O lead acessa direto a oferta.</p>
+                  <p className="text-[10px] text-muted-foreground/50">
+                    Troque <span className="font-mono text-foreground/80">COLOQUE_O_ID_DO_PEDIDO</span> pelo ID do pedido (o mesmo da URL após PIX/cartão). Sem{" "}
+                    <span className="font-mono">order_id</span> a página não abre.
+                  </p>
                 </div>
 
                 {/* Save */}

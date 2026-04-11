@@ -230,7 +230,8 @@ export const CategoryManager = () => {
   const toggleExpanded = (categoryId: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
-      next.has(categoryId) ? next.delete(categoryId) : next.add(categoryId);
+      if (next.has(categoryId)) next.delete(categoryId);
+      else next.add(categoryId);
       return next;
     });
   };

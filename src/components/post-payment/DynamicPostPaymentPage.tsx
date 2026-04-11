@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
 import { db } from "@/integrations/firebase/config";
 import { collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
@@ -10,6 +10,8 @@ import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import { Progress } from "@/components/ui/progress";
 import { invokeFunction } from "@/lib/apiHelper";
+import { getErrorMessage } from "@/lib/errorMessage";
+import { isValidPostPaymentOrderId } from "@/lib/postPaymentOrderId";
 import vIcon from "@/assets/v-icon.png";
 
 interface DynamicPostPaymentPageProps {
@@ -23,7 +25,7 @@ const iconMap: Record<string, typeof Shield> = {
 };
 
 /** Fire-and-forget Firestore write — never blocks UI */
-function insertSaleAddonAsync(data: Record<string, any>) {
+function insertSaleAddonAsync(data: Record<string, unknown>) {
   try {
     addDoc(collection(db, "sale_addons"), {
       ...data,
@@ -33,7 +35,7 @@ function insertSaleAddonAsync(data: Record<string, any>) {
   } catch { /* ignore */ }
 }
 
-function updateSaleAddonAsync(orderId: string, addonType: string, updates: Record<string, any>) {
+function updateSaleAddonAsync(orderId: string, addonType: string, updates: Record<string, unknown>) {
   try {
     const q = query(
       collection(db, "sale_addons"),
@@ -51,13 +53,13 @@ function updateSaleAddonAsync(orderId: string, addonType: string, updates: Recor
 export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProps) {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
-  const orderIdParam = searchParams.get("order_id") || "";
+  const orderIdParam = (searchParams.get("order_id") || "").trim();
   const hashParam = searchParams.get("hash") || "";
   const utmSource = searchParams.get("utm_source") || null;
   const utmMedium = searchParams.get("utm_medium") || null;
   const utmCampaign = searchParams.get("utm_campaign") || null;
-  const isStandalone = !orderIdParam;
-  const orderId = orderIdParam || `lead-${Date.now()}`;
+  const orderId = orderIdParam;
+  const orderIdAcceptable = isValidPostPaymentOrderId(orderIdParam);
   const { config, loading: configLoading } = usePostPaymentPage(addonType);
   const { toast } = useToast();
   const isMobile = useIsMobile();
@@ -76,20 +78,20 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   // Track page view on mount via server (immune to adblockers)
   const viewTracked = useRef(false);
   useEffect(() => {
-    if (configLoading || !config || viewTracked.current) return;
+    if (configLoading || !config || viewTracked.current || !orderIdAcceptable) return;
     viewTracked.current = true;
     invokeFunction("admin-post-payment", {
       method: "POST",
       body: {
         action: "track-view",
-        order_id: orderId,
+        order_id: orderIdParam,
         addon_type: addonType,
         utm_source: utmSource,
         utm_medium: utmMedium,
         utm_campaign: utmCampaign,
       },
     }).catch(() => {});
-  }, [configLoading, config]);
+  }, [configLoading, config, orderIdAcceptable, orderIdParam, addonType, utmSource, utmMedium, utmCampaign]);
 
   // Build next-route URL helper
   const buildNextUrl = useCallback((nextRoute: string) => {
@@ -101,10 +103,11 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     return `${nextRoute}?${params.toString()}`;
   }, [orderId, hashParam]);
 
-  // If no config after loading, redirect home
+  // If no config after loading, redirect home (only when order_id is present — avoid hijacking invalid URL flow)
   useEffect(() => {
+    if (!orderIdAcceptable) return;
     if (!configLoading && !config) navigate("/");
-  }, [configLoading, config, navigate]);
+  }, [orderIdAcceptable, configLoading, config, navigate]);
 
   // Timer for PIX
   useEffect(() => {
@@ -121,7 +124,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   // Poll payment status (PIX only — card uses redirect)
   const pollingRef = useRef(false);
   useEffect(() => {
-    if (!pixData || paymentConfirmed || timeLeft === 0) return;
+    if (!orderIdAcceptable || !pixData || paymentConfirmed || timeLeft === 0) return;
     const poll = setInterval(async () => {
       if (pollingRef.current) return;
       pollingRef.current = true;
@@ -145,10 +148,10 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       }
     }, 5000);
     return () => clearInterval(poll);
-  }, [pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, orderId, addonType]);
+  }, [orderIdAcceptable, orderIdParam, pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, orderId, addonType]);
 
   const handleAcceptCard = async () => {
-    if (!config || purchasing) return;
+    if (!orderIdAcceptable || !config || purchasing) return;
     setPurchasing(true);
     try {
       const amountInCents = Math.round(config.price * 100);
@@ -177,16 +180,16 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       // Save paymentUrl for redirect from callback (avoids popup blockers)
       sessionStorage.setItem('valnix_card_payment_url', data.paymentUrl);
       navigate(`/card-callback?order_id=${orderId}&payment_id=${data.paymentId}`);
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (import.meta.env.DEV) console.error("Card upsell payment error:", err);
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      toast({ title: "Erro", description: getErrorMessage(err, "Erro ao processar cartão"), variant: "destructive" });
     } finally {
       setPurchasing(false);
     }
   };
 
   const handleAcceptPix = async () => {
-    if (!config || purchasing) return;
+    if (!orderIdAcceptable || !config || purchasing) return;
     setPurchasing(true);
     try {
       // Fire-and-forget: record addon attempt
@@ -225,9 +228,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       });
 
       setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (import.meta.env.DEV) console.error("Upsell payment error:", err);
-      toast({ title: "Erro", description: err.message, variant: "destructive" });
+      toast({ title: "Erro", description: getErrorMessage(err, "Erro ao gerar PIX"), variant: "destructive" });
     } finally {
       setPurchasing(false);
     }
@@ -236,6 +239,10 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const handleAccept = isCardPayment ? handleAcceptCard : handleAcceptPix;
 
   const handleSkip = () => {
+    if (!orderIdAcceptable) {
+      navigate("/", { replace: true });
+      return;
+    }
     invokeFunction("admin-post-payment", {
       method: "POST",
       body: {
@@ -249,12 +256,34 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }).catch(() => {});
 
     const nextRoute = config?.next_route || "/";
-    if (isStandalone) {
-      navigate(nextRoute === "/" ? "/" : nextRoute, { replace: true });
-    } else {
-      navigate(buildNextUrl(nextRoute), { replace: true });
-    }
+    navigate(buildNextUrl(nextRoute), { replace: true });
   };
+
+  if (!orderIdParam) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <p className="text-muted-foreground max-w-md text-sm">
+          Esta página precisa do link completo enviado após a compra (inclui o pedido na URL). Abra o link do e-mail ou da página de confirmação.
+        </p>
+        <Button asChild variant="default">
+          <Link to="/">Voltar à loja</Link>
+        </Button>
+      </div>
+    );
+  }
+
+  if (!orderIdAcceptable) {
+    return (
+      <div className="min-h-[100dvh] flex flex-col items-center justify-center gap-4 bg-background p-6 text-center">
+        <p className="text-muted-foreground max-w-md text-sm">
+          O <span className="font-mono text-foreground/90">order_id</span> na URL parece um placeholder ou não é válido. Use o ID real do pedido (como no link após o pagamento) ou substitua o texto do modelo copiado no admin.
+        </p>
+        <Button asChild variant="default">
+          <Link to="/">Voltar à loja</Link>
+        </Button>
+      </div>
+    );
+  }
 
   if (configLoading) {
     return (

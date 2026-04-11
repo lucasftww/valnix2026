@@ -86,11 +86,15 @@ const getEmailTLDError = (email: string): string | undefined => {
   
   const tld = parts.slice(-1)[0];
   const compoundTld = parts.slice(-2).join(".");
-  
-  if (!VALID_TLDS.has(tld) && !VALID_TLDS.has(compoundTld)) {
-    return `Domínio ".${tld}" não é válido. Verifique seu e-mail.`;
-  }
-  return undefined;
+
+  if (VALID_TLDS.has(tld) || VALID_TLDS.has(compoundTld)) return undefined;
+
+  // Allow any plausible hostname TLD (avoids false rejects vs. a closed whitelist only)
+  const isPlausibleLabel = (label: string) =>
+    /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/i.test(label) && label.length >= 2 && label.length <= 63;
+  if (isPlausibleLabel(tld)) return undefined;
+
+  return `Domínio ".${tld}" não é válido. Verifique seu e-mail.`;
 };
 
 function ValidationIcon({ isValid, show }: { isValid: boolean; show: boolean }) {

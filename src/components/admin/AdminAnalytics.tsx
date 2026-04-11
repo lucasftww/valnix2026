@@ -62,7 +62,7 @@ interface AnalyticsEvent {
 function getPathname(url: string | null): string {
   if (!url) return '/';
   try { return new URL(url).pathname; } catch {
-    const match = url.match(/^https?:\/\/([^\/]+)(\/[^?#]*)?/);
+    const match = url.match(/^https?:\/\/([^/]+)(\/[^?#]*)?/);
     return match?.[2] || url;
   }
 }

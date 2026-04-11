@@ -4,7 +4,6 @@ import { registerRoute } from 'workbox-routing';
 import {
   StaleWhileRevalidate,
   CacheFirst,
-  NetworkFirst,
   NetworkOnly,
 } from 'workbox-strategies';
 import { ExpirationPlugin } from 'workbox-expiration';
@@ -122,15 +121,9 @@ registerRoute(
   new NetworkOnly()
 );
 
-// ── 9. HTML pages — NetworkFirst ──
+// ── 10. HTML (navegação) — NetworkOnly para evitar shell JS/HTML antigo após deploy ──
 registerRoute(
   ({ request, url }) =>
     request.mode === 'navigate' && !url.pathname.startsWith('/~oauth/'),
-  new NetworkFirst({
-    cacheName: 'pages-cache',
-    networkTimeoutSeconds: 5,
-    plugins: [
-      new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 60 * 60 * 24 }),
-    ],
-  })
+  new NetworkOnly()
 );

@@ -1,3 +1,4 @@
+import type { DocumentData } from 'firebase-admin/firestore';
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_utils/firebase';
 import { setCorsHeaders } from './_utils/helpers';
@@ -23,14 +24,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // Lookup by event_id (which is now the doc ID)
       const eventDoc = await db.collection('analytics_events').doc(id).get();
       
+      let eventData: DocumentData | undefined;
       if (!eventDoc.exists) {
         // Fallback: try to query by field event_id if not found as doc ID
         const query = await db.collection('analytics_events').where('event_id', '==', id).limit(1).get();
         if (query.empty) return { id, status: 'not_found' };
-        // Use the first match
-        var eventData = query.docs[0].data();
+        eventData = query.docs[0].data();
       } else {
-        var eventData = eventDoc.data();
+        eventData = eventDoc.data();
       }
 
       try {
@@ -44,14 +45,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           url: eventData?.url
         });
         return { id, status: 'success' };
-      } catch (err: any) {
-        console.error(`❌ [Replay] Error for ${id}:`, err.response?.data || err.message);
-        return { id, status: 'error', message: err.message, details: err.response?.data };
+      } catch (err: unknown) {
+        const ax = err as { message?: string; response?: { data?: unknown } };
+        console.error(`❌ [Replay] Error for ${id}:`, ax.response?.data || ax.message);
+        return { id, status: 'error', message: ax.message, details: ax.response?.data };
       }
     }));
 
     return res.status(200).json({ results });
-  } catch (error: any) {
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : 'Unknown error';
+    return res.status(500).json({ error: message });
   }
 }

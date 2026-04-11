@@ -1,10 +1,34 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useState, useRef, useMemo } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Loader2, CheckCircle, XCircle, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { invokeFunction } from "@/lib/apiHelper";
 
 type PaymentStatus = "redirecting" | "checking" | "paid" | "pending" | "failed";
+
+interface CardUpsellContext {
+  orderId?: string;
+  paymentId?: string;
+  nextRoute?: string;
+  hash?: string;
+}
+
+interface CardPaymentStored {
+  orderId?: string;
+  paymentId?: string;
+  deliveryToken?: string;
+  amount?: number;
+  userId?: string | null;
+  productNames?: string[];
+  productIds?: string[];
+  quantities?: number[];
+  prices?: number[];
+  eventSourceUrl?: string;
+  customerEmail?: string;
+  customerPhone?: string;
+  customerName?: string;
+  guestHash?: string;
+}
 
 export default function CardPaymentCallback() {
   const [searchParams] = useSearchParams();
@@ -18,19 +42,23 @@ export default function CardPaymentCallback() {
   const urlOrderId = searchParams.get("order_id");
   const urlPaymentId = searchParams.get("payment_id");
   
-  const upsellContext = (() => {
+  const upsellContext = useMemo((): CardUpsellContext | null => {
     try {
-      const raw = sessionStorage.getItem('valnix_card_upsell');
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  })();
+      const raw = sessionStorage.getItem("valnix_card_upsell");
+      return raw ? (JSON.parse(raw) as CardUpsellContext) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
-  const stored = (() => {
+  const stored = useMemo((): CardPaymentStored | null => {
     try {
-      const raw = sessionStorage.getItem('valnix_card_payment');
-      return raw ? JSON.parse(raw) : null;
-    } catch { return null; }
-  })();
+      const raw = sessionStorage.getItem("valnix_card_payment");
+      return raw ? (JSON.parse(raw) as CardPaymentStored) : null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const isUpsell = !!upsellContext;
   const orderId = isUpsell ? upsellContext?.orderId : (urlOrderId || stored?.orderId);
@@ -57,9 +85,12 @@ export default function CardPaymentCallback() {
     }
   }, []);
 
+  const readyToPoll = status !== "redirecting";
+
   useEffect(() => {
-    if (status === "redirecting") return; // Don't poll while redirecting
-    if (!orderId || !paymentId) return;
+    if (!readyToPoll || !orderId || !paymentId) return;
+
+    setPollCount(0);
 
     const checkStatus = async () => {
       try {
@@ -207,7 +238,7 @@ export default function CardPaymentCallback() {
     return () => {
       if (intervalRef.current) clearInterval(intervalRef.current);
     };
-  }, [orderId, paymentId, navigate, status]);
+  }, [orderId, paymentId, navigate, readyToPoll, isUpsell, upsellContext, stored]);
 
   if (!orderId || !paymentId) {
     return (

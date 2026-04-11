@@ -3,12 +3,100 @@ import { db } from './_utils/firebase';
 import { hashData, setCorsHeaders } from './_utils/helpers';
 import axios from 'axios';
 
+/** Accepts nested `{ event, userData, customData }` or flat payloads from `metaCapi` / admin (event_name, email, value, …). */
+function normalizeRelayBody(raw: unknown): {
+  event: string;
+  event_id: string | undefined;
+  url: string;
+  userData: {
+    email?: string;
+    phone?: string;
+    fbc?: string;
+    fbp?: string;
+  };
+  customData: Record<string, unknown> | undefined;
+} {
+  const b = raw && typeof raw === 'object' && !Array.isArray(raw) ? (raw as Record<string, unknown>) : {};
+
+  if (typeof b.event === 'string' && b.userData && typeof b.userData === 'object' && !Array.isArray(b.userData)) {
+    const ud = b.userData as Record<string, unknown>;
+    return {
+      event: b.event,
+      event_id: typeof b.event_id === 'string' ? b.event_id : undefined,
+      url:
+        typeof b.url === 'string'
+          ? b.url
+          : typeof b.event_source_url === 'string'
+            ? b.event_source_url
+            : 'https://www.valnix.com.br/checkout',
+      userData: {
+        email: typeof ud.email === 'string' ? ud.email : undefined,
+        phone: typeof ud.phone === 'string' ? ud.phone : undefined,
+        fbc: typeof ud.fbc === 'string' ? ud.fbc : undefined,
+        fbp: typeof ud.fbp === 'string' ? ud.fbp : undefined,
+      },
+      customData: b.customData && typeof b.customData === 'object' && !Array.isArray(b.customData)
+        ? (b.customData as Record<string, unknown>)
+        : undefined,
+    };
+  }
+
+  const event =
+    (typeof b.event === 'string' && b.event) ||
+    (typeof b.event_name === 'string' && b.event_name) ||
+    '';
+
+  const event_id = typeof b.event_id === 'string' ? b.event_id : undefined;
+  const url =
+    (typeof b.event_source_url === 'string' && b.event_source_url) ||
+    (typeof b.url === 'string' && b.url) ||
+    'https://www.valnix.com.br/checkout';
+
+  const userData = {
+    email: typeof b.email === 'string' ? b.email : undefined,
+    phone: typeof b.phone === 'string' ? b.phone : undefined,
+    fbc: typeof b.fbc === 'string' ? b.fbc : undefined,
+    fbp: typeof b.fbp === 'string' ? b.fbp : undefined,
+  };
+
+  const customKeys = [
+    'value',
+    'currency',
+    'order_id',
+    'content_ids',
+    'contents',
+    'content_name',
+    'content_type',
+    'num_items',
+    'first_name',
+    'last_name',
+    'external_id',
+    'test_event_code',
+  ] as const;
+  const customData: Record<string, unknown> = {};
+  for (const k of customKeys) {
+    if (b[k] !== undefined) customData[k] = b[k];
+  }
+
+  return {
+    event,
+    event_id,
+    url,
+    userData,
+    customData: Object.keys(customData).length ? customData : undefined,
+  };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
-    const { event, userData, customData, event_id, url } = req.body;
+    const { event, userData, customData, event_id, url } = normalizeRelayBody(req.body);
+
+    if (!event) {
+      return res.status(400).json({ error: 'Missing event / event_name' });
+    }
 
     // 1. Log event to Firestore (use event_id as doc ID for easy lookup/replay)
     const eventRef = db.collection('analytics_events').doc(event_id || `err_${Date.now()}`);

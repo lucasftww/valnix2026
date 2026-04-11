@@ -106,15 +106,32 @@
 })();
 // ── 4. Facebook Pixel Base — deferred 5s after load to avoid blocking LCP/TBT ──
 // FB SDK is 131 KiB (66% of total JS) — must load well AFTER critical paint
+type FbqStub = ((...args: unknown[]) => void) & {
+  callMethod?: (...args: unknown[]) => void;
+  queue: unknown[][];
+  push: FbqStub;
+  loaded: boolean;
+  version: string;
+};
+
 (function initFbPixel() {
   // Initialize the queue immediately so early events (like ViewContent) are caught
-  const f = window as any;
-  if (!f.fbq) {
-    const n: any = f.fbq = function () {
-      n.callMethod ? n.callMethod.apply(n, arguments) : n.queue.push(arguments);
-    };
-    if (!f._fbq) f._fbq = n;
-    n.push = n; n.loaded = true; n.version = '2.0'; n.queue = [];
+  const w = window;
+  if (!w.fbq) {
+    const stub = ((...args: unknown[]) => {
+      const self = stub as FbqStub;
+      if (self.callMethod) {
+        self.callMethod(...args);
+      } else {
+        self.queue.push(args);
+      }
+    }) as FbqStub;
+    w.fbq = stub as Window["fbq"];
+    if (!w._fbq) w._fbq = stub;
+    stub.push = stub;
+    stub.loaded = true;
+    stub.version = "2.0";
+    stub.queue = [];
   }
 
   window.addEventListener('load', () => {
@@ -123,12 +140,14 @@
       ric(() => {
         // Use environment variable for Pixel ID, fallback to VALNIX's official pixel
         const pixelId = import.meta.env.VITE_META_PIXEL_ID || '843361478785940';
-        
+        const fbq = window.fbq;
+        if (!fbq) return;
+
         // Disable autoConfig BEFORE loading the script to prevent duplicate PageView
-        f.fbq('set', 'autoConfig', false, pixelId);
-        f.fbq('init', pixelId, {}, { agent: 'plvalnix' });
+        fbq("set", "autoConfig", false, pixelId);
+        fbq("init", pixelId, {}, { agent: "plvalnix" });
         // Fire PageView on every page load
-        f.fbq('track', 'PageView');
+        fbq("track", "PageView");
         const t = document.createElement('script');
         t.async = true;
         t.src = 'https://connect.facebook.net/en_US/fbevents.js';
@@ -145,8 +164,8 @@
   const path = location.pathname;
   if (/^\/(admin|checkout|card-callback)(\/|$)/.test(path)) return;
 
-  if ((window as any).__utmify_loaded === true) return;
-  (window as any).__utmify_loaded = true;
+  if (window.__utmify_loaded === true) return;
+  window.__utmify_loaded = true;
 
   window.addEventListener('load', () => {
     setTimeout(() => {

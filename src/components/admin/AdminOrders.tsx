@@ -221,7 +221,7 @@ export const AdminOrders = () => {
     return map;
   }, [allAddons]);
 
-  const orders: Order[] = Array.isArray(rawOrders) ? rawOrders : [];
+  const orders = useMemo<Order[]>(() => (Array.isArray(rawOrders) ? rawOrders : []), [rawOrders]);
 
   const fetchOrders = useCallback(() => { refetchOrders(); }, [refetchOrders]);
 
@@ -274,10 +274,10 @@ export const AdminOrders = () => {
     if (searchTerm.trim()) {
       const term = searchTerm.toLowerCase();
       result = result.filter(o =>
-        o.customer_name.toLowerCase().includes(term) ||
-        o.customer_email.toLowerCase().includes(term) ||
-        o.customer_phone?.includes(term) ||
-        o.id.toLowerCase().includes(term)
+        (o.customer_name || "").toLowerCase().includes(term) ||
+        (o.customer_email || "").toLowerCase().includes(term) ||
+        (o.customer_phone || "").includes(term) ||
+        (o.id || "").toLowerCase().includes(term)
       );
     }
 

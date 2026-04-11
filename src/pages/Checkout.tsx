@@ -45,12 +45,43 @@ interface FormData {
   phone: string;
 }
 
+function extractPixExpirationSeconds(data: Record<string, unknown>): number | undefined {
+  const keys = ["expiresIn", "expirationInSeconds", "expires_in", "expirationSeconds", "ttlSeconds", "expires_in_seconds"] as const;
+  for (const key of keys) {
+    const v = data[key];
+    if (typeof v === "number" && Number.isFinite(v) && v >= 60) {
+      return Math.min(Math.floor(v), 24 * 60 * 60);
+    }
+  }
+  return undefined;
+}
+
+/** Gateway responses vary; accept common aliases for EMV / copia-e-cola. */
+function extractPixBrCode(data: Record<string, unknown>): string | undefined {
+  const keys = ["brCode", "qrCode", "pix_code", "emvqrcps", "copyPaste", "copy_paste", "payload"] as const;
+  for (const key of keys) {
+    const v = data[key];
+    if (typeof v === "string" && v.trim().length >= 15) return v.trim();
+  }
+  return undefined;
+}
+
+function extractPixChargeId(data: Record<string, unknown>): string | undefined {
+  for (const key of ["chargeId", "id", "transactionId", "charge_id", "txId"] as const) {
+    const v = data[key];
+    if (typeof v === "string" && v.trim().length > 0) return v.trim();
+  }
+  return undefined;
+}
+
 interface PaymentData {
   qrCodeText: string;
   transactionId: string;
   amount: number;
   orderId: string;
   guestHash?: string | null;
+  /** Segundos até expirar o PIX (gateway); UI usa fallback se ausente */
+  pixExpiresInSeconds?: number;
 }
 
 export default function Checkout() {
@@ -139,7 +170,11 @@ export default function Checkout() {
     // Wait until name AND email are BOTH valid — maximizes match quality
     if (!validation.name || !validation.email) return;
 
-    const hasPhone = formData.phone.replace(/\D/g, '').length >= 10;
+    const phoneDigits = formData.phone.replace(/\D/g, '');
+    const nationalDigits =
+      phoneDigits.startsWith("55") && phoneDigits.length > 11 ? phoneDigits.slice(2) : phoneDigits;
+    const hasPhone = nationalDigits.length >= 10;
+    const phoneE164 = hasPhone ? `55${nationalDigits}` : undefined;
 
     icFiredRef.current = true;
     try { sessionStorage.setItem('valnix_ic_fired', '1'); } catch {}
@@ -152,7 +187,7 @@ export default function Checkout() {
       sendInitiateCheckout({
         userId: effectiveUserId,
         userEmail: formData.email.trim(),
-        userPhone: hasPhone ? `55${formData.phone.replace(/\D/g, '')}` : undefined,
+        userPhone: phoneE164,
         userName: formData.name.trim(),
         value: finalPrice,
         productNames: items.map(i => i.name),
@@ -293,10 +328,21 @@ export default function Checkout() {
           : rawError || 'Erro ao gerar cobrança PIX');
       }
 
+      const raw = pixData as Record<string, unknown>;
+      const brCode = extractPixBrCode(raw);
+      const chargeId = extractPixChargeId(raw);
+      if (!brCode || !chargeId) {
+        throw new Error("Resposta do gateway incompleta (código PIX ou ID da cobrança). Tente novamente.");
+      }
+
       startTransition(() => {
         setPaymentData({
-          qrCodeText: pixData.brCode, transactionId: pixData.chargeId,
-          amount: orderAmount, orderId, guestHash: pixGuestHash,
+          qrCodeText: brCode,
+          transactionId: chargeId,
+          amount: orderAmount,
+          orderId,
+          guestHash: pixGuestHash,
+          pixExpiresInSeconds: extractPixExpirationSeconds(raw),
         });
       });
 
@@ -309,7 +355,7 @@ export default function Checkout() {
       setLoadingStage("idle");
       isSubmittingRef.current = false;
     }
-  }, [loading, isFormValid, formData, items, finalPrice, toast, effectiveUserId, utmParams]);
+  }, [loading, isFormValid, validation, formData, items, finalPrice, toast, effectiveUserId, utmParams]);
 
   // ─── PIX PAYMENT SCREEN ────────────────────────────────────────────────
   if (paymentData) {
@@ -325,6 +371,7 @@ export default function Checkout() {
                 transactionId={paymentData.transactionId}
                 amount={paymentData.amount}
                 orderId={paymentData.orderId}
+                pixExpiresInSeconds={paymentData.pixExpiresInSeconds}
                 guestHash={paymentData.guestHash || undefined}
                 customerEmail={formData.email || undefined}
                 customerName={formData.name || undefined}
@@ -356,6 +403,7 @@ export default function Checkout() {
           loading={loading}
           loadingStage={loadingStage}
           paymentMethod={paymentMethod}
+          isFormValid={isFormValid}
           onSubmit={handleSubmit}
           onRemoveItem={removeItem}
           onUpdateQuantity={updateQuantity}

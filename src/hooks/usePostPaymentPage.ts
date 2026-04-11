@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { invokeFunction } from '@/lib/apiHelper';
+import { getErrorMessage } from '@/lib/errorMessage';
 
 export interface PostPaymentPageConfig {
   id: string;
@@ -32,7 +33,8 @@ export function usePostPaymentPage(addonType: string) {
         
         const result = await res.json();
         const page = (result.pages || []).find(
-          (p: any) => p.addon_type === addonType && p.is_active !== false
+          (p: { addon_type?: string; is_active?: boolean }) =>
+            p.addon_type === addonType && p.is_active !== false
         );
 
         if (page) {
@@ -55,9 +57,9 @@ export function usePostPaymentPage(addonType: string) {
         } else {
           if (import.meta.env.DEV) console.warn(`Post-payment page "${addonType}" not found or inactive`);
         }
-      } catch (err: any) {
+      } catch (err: unknown) {
         if (import.meta.env.DEV) console.error('Error fetching post-payment page config:', err);
-        setError(err.message);
+        setError(getErrorMessage(err, 'Falha ao carregar configuração'));
       } finally {
         setLoading(false);
       }

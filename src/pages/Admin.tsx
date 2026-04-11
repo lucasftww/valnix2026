@@ -45,7 +45,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
 };
 
 function Admin() {
-  const { isAdmin, loading, signIn } = useAuth();
+  const { isAdmin, loading, signIn, signOut } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("dashboard");
   // Removed mountedTabs — render only active tab, React Query cache handles instant re-renders
@@ -67,7 +67,10 @@ function Admin() {
     setLoggingIn(true);
     const { error } = await signIn(password);
     if (error) {
-      setLoginError("Acesso negado");
+      const msg = typeof error === "object" && error !== null && "message" in error
+        ? String((error as { message?: string }).message || "Acesso negado")
+        : "Acesso negado";
+      setLoginError(msg);
       setPassword("");
     }
     setLoggingIn(false);
@@ -162,6 +165,16 @@ function Admin() {
                     <DropdownMenuSeparator />
                     <DropdownMenuItem onClick={() => navigate("/")}>
                       Voltar ao Site
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => {
+                        signOut();
+                        navigate("/", { replace: true });
+                      }}
+                      className="text-destructive focus:text-destructive"
+                    >
+                      Sair do painel
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>

@@ -1,7 +1,7 @@
 import { QRCodeSVG } from "qrcode.react";
 import { Button } from "@/components/ui/button";
 import { Copy, Check, Clock, AlertCircle, CheckCircle } from "lucide-react";
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
 import { useNavigate } from "react-router-dom";
 import vIcon from "@/assets/v-icon.png";
@@ -23,7 +23,15 @@ interface PixPaymentProps {
   productIds?: string[];
   quantities?: number[];
   prices?: number[];
+  /** Segundos até expirar (resposta do gateway); padrão 15 min se omitido */
+  pixExpiresInSeconds?: number;
   onPaymentConfirmed?: () => void;
+}
+
+function clampPixCountdownSeconds(sec: number | undefined): number {
+  const fallback = 15 * 60;
+  if (sec == null || !Number.isFinite(sec)) return fallback;
+  return Math.min(Math.max(60, Math.floor(sec)), 24 * 60 * 60);
 }
 
 export function PixPayment({ 
@@ -40,10 +48,12 @@ export function PixPayment({
   productIds,
   quantities,
   prices,
+  pixExpiresInSeconds,
   onPaymentConfirmed 
 }: PixPaymentProps) {
+  const totalSeconds = useMemo(() => clampPixCountdownSeconds(pixExpiresInSeconds), [pixExpiresInSeconds]);
   const [copied, setCopied] = useState(false);
-  const [timeLeft, setTimeLeft] = useState(15 * 60); // 15 minutes — creates urgency
+  const [timeLeft, setTimeLeft] = useState(() => clampPixCountdownSeconds(pixExpiresInSeconds));
   const [paymentConfirmed, setPaymentConfirmed] = useState(false);
   const { toast } = useToast();
   const navigate = useNavigate();
@@ -51,10 +61,13 @@ export function PixPayment({
 
   // Use ref for handlePaymentSuccess to avoid stale closure in polling effect
   const paymentSuccessRef = useRef<() => void>(() => {});
-  
+  /** Set synchronously so the countdown cannot show "expired" toast after approval. */
+  const paymentConfirmedRef = useRef(false);
+
   // Callback de confirmação de pagamento
   const handlePaymentSuccess = useCallback(async () => {
     if (paymentConfirmed) return;
+    paymentConfirmedRef.current = true;
     setPaymentConfirmed(true);
     
     // Clear InitiateCheckout flag on confirmed payment
@@ -96,6 +109,10 @@ export function PixPayment({
   // Keep ref in sync so polling always calls latest version
   paymentSuccessRef.current = handlePaymentSuccess;
 
+  useEffect(() => {
+    setTimeLeft(totalSeconds);
+  }, [totalSeconds]);
+
   // Track expiry via ref so polling effect doesn't re-run every second
   const expiredRef = useRef(false);
   useEffect(() => { expiredRef.current = timeLeft === 0; }, [timeLeft]);
@@ -129,18 +146,22 @@ export function PixPayment({
     }, 5000);
 
     return () => clearInterval(pollInterval);
-  }, [paymentConfirmed, transactionId]);
+  }, [paymentConfirmed, transactionId, orderId]);
 
   useEffect(() => {
+    if (paymentConfirmed) return;
+
     const timer = setInterval(() => {
       setTimeLeft((prev) => {
         if (prev <= 1) {
           clearInterval(timer);
-          toast({
-            title: "QR Code Expirado",
-            description: "O código PIX expirou. Recarregue a página para gerar um novo.",
-            variant: "destructive",
-          });
+          if (!paymentConfirmedRef.current) {
+            toast({
+              title: "QR Code Expirado",
+              description: "O código PIX expirou. Recarregue a página para gerar um novo.",
+              variant: "destructive",
+            });
+          }
           return 0;
         }
         return prev - 1;
@@ -148,7 +169,7 @@ export function PixPayment({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [toast]);
+  }, [toast, totalSeconds, paymentConfirmed]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -156,7 +177,7 @@ export function PixPayment({
     return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
 
-  const progressPercentage = (timeLeft / (15 * 60)) * 100;
+  const progressPercentage = totalSeconds > 0 ? (timeLeft / totalSeconds) * 100 : 0;
   const isExpiring = timeLeft < 60;
   const isExpired = timeLeft === 0;
 

@@ -9,6 +9,8 @@ interface MobileStickyCheckoutProps {
   loading: boolean;
   loadingStage?: "idle" | "creating" | "generating";
   paymentMethod: "pix" | "card";
+  /** When false, CTA stays disabled (must match desktop OrderSummary). */
+  isFormValid?: boolean;
   onSubmit: () => void;
   onRemoveItem?: (id: string) => void;
   onUpdateQuantity?: (id: string, quantity: number) => void;
@@ -20,6 +22,7 @@ const MobileStickyCheckoutComponent = ({
   loading,
   loadingStage = "idle",
   paymentMethod,
+  isFormValid = true,
   onSubmit,
   onRemoveItem,
   onUpdateQuantity,
@@ -116,7 +119,7 @@ const MobileStickyCheckoutComponent = ({
         {/* CTA Button */}
         <Button
           onClick={onSubmit}
-          disabled={loading || finalPrice < 1}
+          disabled={loading || finalPrice < 1 || !isFormValid}
           className="w-full h-[52px] bg-success hover:bg-success/90 active:scale-[0.98] text-success-foreground font-bold rounded-xl text-[15px] transition-colors duration-150"
         >
         {loading ? (
