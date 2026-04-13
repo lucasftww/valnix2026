@@ -1,5 +1,6 @@
 // TooltipProvider moved to admin/sidebar only — not needed on homepage
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClientProvider } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { CartProvider } from "@/contexts/CartContext";
 import { ScrollToTop } from "@/components/ScrollToTop";
@@ -40,22 +41,7 @@ const PainelPagarTrocaDados = lazy(() => import("./pages/PainelPagarTrocaDados")
 const OrderDelivery = lazy(() => import("./pages/OrderDelivery"));
 
 
-const queryClient = new QueryClient({
-  defaultOptions: {
-    queries: {
-      staleTime: 5 * 60 * 1000,
-      gcTime: 30 * 60 * 1000,
-      refetchOnMount: false,
-      refetchOnWindowFocus: false,
-      refetchOnReconnect: true,
-      retry: 1, // Reduced from 3 — fewer pending promises = less TBT
-      retryDelay: 2000,
-    },
-  },
-});
-
-// Exportar para prefetch global
-export { queryClient };
+export { queryClient } from "@/lib/queryClient";
 
 const App = () => {
   return (

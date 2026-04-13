@@ -10,20 +10,36 @@ import { generateConsistentSalesAndReviews } from "@/lib/productUtils";
 import { deduplicateCategories, buildCategoryTree } from "@/lib/categoryUtils";
 import type { ProductCardData, Category } from "@/types";
 
-function mapToProductCard(p: any): ProductCardData {
-  const stats = generateConsistentSalesAndReviews(p.id);
+function mapToProductCard(p: Record<string, unknown>): ProductCardData {
+  const id = String(p.id ?? "");
+  const stats = generateConsistentSalesAndReviews(id);
   return {
-    id: p.id,
-    name: p.name,
-    image_url: p.image_url,
-    icon_url: p.icon_url,
-    price: p.price,
-    old_price: p.old_price,
-    discount: p.discount,
-    category: p.category,
+    id,
+    name: String(p.name ?? ""),
+    image_url: typeof p.image_url === "string" ? p.image_url : "",
+    icon_url: typeof p.icon_url === "string" ? p.icon_url : undefined,
+    price: Number(p.price ?? 0),
+    old_price: typeof p.old_price === "number" ? p.old_price : undefined,
+    discount: typeof p.discount === "number" ? p.discount : undefined,
+    category: typeof p.category === "string" ? p.category : undefined,
     sold: stats.sold,
     reviewCount: stats.reviewCount,
   };
+}
+
+/** Same mapping as homepage query — used to hydrate React Query before first paint. */
+export function buildFeaturedProductCards(raw: unknown[]): ProductCardData[] {
+  if (!Array.isArray(raw)) return [];
+  return (raw as Record<string, unknown>[])
+    .sort((a, b) => Number(a.display_order ?? 0) - Number(b.display_order ?? 0))
+    .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
+    .map(mapToProductCard);
+}
+
+/** Hydrate cache — matches useCategoriesApi queryFn output. */
+export function buildCategoriesList(raw: unknown[]): Category[] {
+  if (!Array.isArray(raw)) return [];
+  return deduplicateCategories(raw.filter((c: { is_active?: boolean }) => c?.is_active));
 }
 
 // ── Featured products (homepage) ──
@@ -32,10 +48,7 @@ export const useFeaturedProductsApi = () => {
     queryKey: [QUERY_KEYS.BEST_SELLING],
     queryFn: async (): Promise<ProductCardData[]> => {
       const products = await fetchFeaturedProductsFallback();
-      return products
-        .sort((a: any, b: any) => (a.display_order ?? 0) - (b.display_order ?? 0))
-        .slice(0, UI_CONFIG.FEATURED_PRODUCTS_LIMIT)
-        .map(mapToProductCard);
+      return buildFeaturedProductCards(products);
     },
     staleTime: 30 * 60 * 1000,
     gcTime: 60 * 60 * 1000,
@@ -53,7 +66,7 @@ export const useCategoriesApi = () => {
     queryKey: [QUERY_KEYS.CATEGORIES],
     queryFn: async (): Promise<Category[]> => {
       const raw = await fetchCategoriesFallback();
-      return deduplicateCategories(raw.filter((c: any) => c?.is_active));
+      return buildCategoriesList(raw);
     },
     staleTime: 60 * 60 * 1000,
     gcTime: 2 * 60 * 60 * 1000,

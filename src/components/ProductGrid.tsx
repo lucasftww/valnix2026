@@ -1,11 +1,8 @@
-import { memo, useState, useEffect, lazy, Suspense } from "react";
-import { ProductCard } from "./ProductCard";
+import { memo } from "react";
 import { ProductSkeleton } from "./ProductSkeleton";
 import { useFeaturedProductsApi } from "@/hooks/useApiData";
 import { Button } from "./ui/button";
-
-// Lazy-load the entire Carousel so embla-carousel-react is NOT in the critical path
-const LazyCarousel = lazy(() => import("./ProductCarouselWrapper"));
+import ProductCarouselWrapper from "./ProductCarouselWrapper";
 
 const ProductGridComponent = () => {
   const { data: products = [], isLoading, error, refetch } = useFeaturedProductsApi();
@@ -68,29 +65,6 @@ const ProductGridComponent = () => {
     );
   }
 
-  // Static fallback: render first products as plain flex so LCP image paints instantly
-  const staticFallback = (
-    <div className="flex gap-2 md:gap-3 overflow-hidden">
-      {products.slice(0, 4).map((product, index) => (
-        <div
-          key={product.id}
-          className="shrink-0 w-[45%] sm:w-[35%] md:w-[calc(33.333%-8px)] lg:w-[calc(25%-9px)]"
-        >
-          <ProductCard 
-            id={product.id}
-            image={product.image_url || ""}
-            title={product.name}
-            reviewCount={product.reviewCount || 0}
-            price={product.price}
-            originalPrice={product.old_price || undefined}
-            discount={product.discount || undefined}
-            priority={index < 2}
-          />
-        </div>
-      ))}
-    </div>
-  );
-
   return (
     <section className="container px-4 md:px-8 py-8 md:py-16">
       <div className="mb-6 md:mb-10">
@@ -101,10 +75,8 @@ const ProductGridComponent = () => {
           Os produtos mais populares da nossa loja
         </p>
       </div>
-      
-      <Suspense fallback={staticFallback}>
-        <LazyCarousel products={products} />
-      </Suspense>
+
+      <ProductCarouselWrapper products={products} />
     </section>
   );
 };

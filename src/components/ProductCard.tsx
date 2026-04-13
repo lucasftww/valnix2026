@@ -41,7 +41,7 @@ const ProductCardComponent = ({
     schedule(() => {
       Promise.all([
         import("@/pages/ProductDetail"),
-        import("@/App").then(m => m.queryClient),
+        import("@/lib/queryClient").then(m => m.queryClient),
         import("@/lib/fetchProduct").then(m => m.fetchProduct),
       ]).then(([, qc, fetchProduct]) => {
         qc.prefetchQuery({

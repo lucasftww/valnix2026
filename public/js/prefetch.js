@@ -22,11 +22,12 @@
   var pf=fetch(base+'?type=featured',{headers:h}).then(function(r){return r.json()}).then(function(d){
     if(d&&d.products&&isHome){
       var sorted=d.products.slice().sort(function(a,b){return(a.display_order||0)-(b.display_order||0)});
-      for(var i=0;i<Math.min(2,sorted.length);i++){
+      // Preload first row (up to 4) so carousel does not show grey placeholders beside LCP image.
+      for(var i=0;i<Math.min(4,sorted.length);i++){
         var img=sorted[i].image_url;
         if(img){
           if(i===0){try{localStorage.setItem('valnix_lcp_img',img)}catch(e){}}
-          preloadImg(img,i===0);
+          preloadImg(img,i<2);
         }
       }
     }

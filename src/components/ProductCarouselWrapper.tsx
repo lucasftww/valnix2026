@@ -1,4 +1,4 @@
-import { memo, useState, useEffect } from "react";
+import { memo, useState, useEffect, useLayoutEffect } from "react";
 import { ProductCard } from "./ProductCard";
 import type { EmblaPluginType } from "embla-carousel";
 import {
@@ -7,14 +7,20 @@ import {
   CarouselItem,
   CarouselNext,
   CarouselPrevious,
+  type CarouselApi,
 } from "@/components/ui/carousel";
 import type { ProductCardData } from "@/types";
+
+/** First row on mobile/desktop — eager images avoid grey placeholder flash. */
+const ABOVE_THE_FOLD_COUNT = 4;
 
 interface Props {
   products: ProductCardData[];
 }
 
 const ProductCarouselWrapperComponent = ({ products }: Props) => {
+  const [emblaApi, setEmblaApi] = useState<CarouselApi | null>(null);
+
   // Lazy-load autoplay plugin
   const [plugins, setPlugins] = useState<EmblaPluginType[]>([]);
   useEffect(() => {
@@ -25,6 +31,19 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
     }, 2000);
     return () => clearTimeout(timer);
   }, []);
+
+  // Embla measures slides before images decode — reInit fixes empty / clipped slides on first paint.
+  useLayoutEffect(() => {
+    if (!emblaApi) return;
+    emblaApi.reInit();
+    const t = window.setTimeout(() => emblaApi.reInit(), 50);
+    const onResize = () => emblaApi.reInit();
+    window.addEventListener("resize", onResize);
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("resize", onResize);
+    };
+  }, [emblaApi, products]);
 
   const carouselOpts = {
     align: "start" as const,
@@ -39,7 +58,7 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
 
   return (
     <div className="relative group/carousel">
-      <Carousel opts={carouselOpts} plugins={plugins} className="w-full">
+      <Carousel opts={carouselOpts} plugins={plugins} className="w-full" setApi={setEmblaApi}>
         <CarouselContent className="-ml-2 md:-ml-3">
           {products.map((product, index) => (
             <CarouselItem
@@ -54,7 +73,7 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
                 price={product.price}
                 originalPrice={product.old_price || undefined}
                 discount={product.discount || undefined}
-                priority={index < 2}
+                priority={index < ABOVE_THE_FOLD_COUNT}
               />
             </CarouselItem>
           ))}
