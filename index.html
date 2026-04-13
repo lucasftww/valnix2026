@@ -10,13 +10,28 @@
     <style>
       html,body{overscroll-behavior-x:none;-webkit-text-size-adjust:100%;touch-action:pan-x pan-y;margin:0;padding:0;box-sizing:border-box}
       body{background:#000;color:#fafafa;font-family:'Poppins',system-ui,sans-serif}
-      #root{min-height:100vh;display:flex;flex-direction:column}
+      #root{min-height:100vh;display:flex;flex-direction:column;min-width:0}
+      /* Before Tailwind loads, images must not expand layout (FOUC “grandão”) */
+      img,svg,video{max-width:100%;height:auto}
       img{pointer-events:none;-webkit-user-drag:none}
       a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
       @keyframes vn-shell-pulse{0%,100%{opacity:1}50%{opacity:.45}}
       .vn-shell-pulse{animation:vn-shell-pulse 1.15s ease-in-out infinite;background:#141414!important}
+      #lcp-slot{display:flex!important;flex-flow:row nowrap;gap:8px;overflow:hidden;width:100%;min-width:0}
+      #lcp-slot [id^="lcp-shell-"]{flex:0 0 45%;max-width:45%;min-width:0;width:45%;aspect-ratio:4/5;overflow:hidden;position:relative}
+      #lcp-slot [id^="lcp-shell-"] img{position:absolute;inset:0;width:100%!important;height:100%!important;max-width:none;object-fit:cover}
       @media (min-width:640px){#lcp-slot [data-shell-wide]{display:block!important}}
       @media (min-width:768px){#shell [data-shell-search]{display:block!important}}
+      /* Homepage carousel: stable layout before Tailwind/Embla apply utilities */
+      #root .carousel-wrapper{width:100%;min-width:0}
+      #root .carousel-viewport{overflow:hidden!important;width:100%!important;min-width:0}
+      #root .carousel-track{display:flex!important;flex-direction:row!important;min-width:0}
+      #root .carousel-track > *{box-sizing:border-box;flex:0 0 45%!important;max-width:45%!important;min-width:0!important;width:45%!important;padding-left:8px}
+      @media (min-width:640px){#root .carousel-track > *{flex-basis:35%!important;max-width:35%!important;width:35%!important}}
+      @media (min-width:768px){#root .carousel-track > *{flex-basis:33.333%!important;max-width:33.333%!important;width:33.333%!important}}
+      @media (min-width:1024px){#root .carousel-track > *{flex-basis:25%!important;max-width:25%!important;width:25%!important}}
+      #root .vn-product-thumb{position:relative;width:100%;aspect-ratio:4/5;overflow:hidden;min-height:0;background:#141414}
+      #root .vn-product-thumb > img{width:100%;height:100%;object-fit:cover;display:block;position:absolute;inset:0;max-width:none}
     </style>
     <!-- Pre-warm API + preload LCP image before JS bundle parses -->
     <script src="/js/prefetch.js"></script>

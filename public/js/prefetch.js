@@ -14,7 +14,8 @@
       img.height = 375;
       img.decoding = i === 0 ? "sync" : "async";
       if (i === 0) img.fetchPriority = "high";
-      img.style.cssText = "width:100%;height:100%;object-fit:cover;display:block";
+      img.style.cssText =
+        "position:absolute;inset:0;width:100%;height:100%;max-width:none;object-fit:cover;display:block";
       img.draggable = false;
       el.appendChild(img);
       el.classList.remove("vn-shell-pulse");

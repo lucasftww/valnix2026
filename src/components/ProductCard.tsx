@@ -73,7 +73,7 @@ const ProductCardComponent = ({
         )}
 
         {/* Imagem otimizada (sem placeholder preto durante drag) */}
-        <div className="relative w-full aspect-[4/5] bg-muted/20 overflow-hidden">
+        <div className="vn-product-thumb relative w-full aspect-[4/5] bg-muted/20 overflow-hidden">
           <img
             src={image}
             alt={title}
