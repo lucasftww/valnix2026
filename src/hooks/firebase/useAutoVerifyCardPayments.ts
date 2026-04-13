@@ -1,5 +1,5 @@
-import { useEffect, useRef } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
+import { useEffect, useRef } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface Order {
   id: string;
@@ -23,6 +23,8 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
   const inFlightRef = useRef<Set<string>>(new Set());
   const completedRef = useRef<Set<string>>(new Set());
   const queryClient = useQueryClient();
+  const onOrderUpdatedRef = useRef(onOrderUpdated);
+  onOrderUpdatedRef.current = onOrderUpdated;
 
   useEffect(() => {
     if (!orders.length) return;
@@ -54,30 +56,28 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
           });
           const data = await response.json();
 
-          if (data.success && data.status === 'COMPLETED') {
+          if (data.success && data.status === "COMPLETED") {
             try {
-              import("@/lib/adminAuth").then(async ({ requireAdminToken }) => {
-                const token = requireAdminToken();
-                if (token) {
-                  await invokeFunction("admin-data", {
-                    method: "PUT",
-                    queryParams: { resource: "verify-payment" },
-                    headers: { "x-admin-token": token },
-                    body: { id: order.id, payment_status: 'paid', status: 'processing' },
-                  });
-                  // Also trigger process-delivery
-                  await invokeFunction("process-delivery", {
-                    method: "POST",
-                    body: { orderId: order.id },
-                    headers: { "x-admin-token": token },
-                  }).catch(() => {});
-                  
-                  if (import.meta.env.DEV) console.log(`✅ Auto-verified card payment for order ${order.id}`);
-                  completedRef.current.add(order.id);
-                  queryClient.invalidateQueries({ queryKey: ['admin-orders'] });
-                  onOrderUpdated?.();
-                }
-              });
+              const { requireAdminToken } = await import("@/lib/adminAuth");
+              const token = requireAdminToken();
+              if (token) {
+                await invokeFunction("admin-data", {
+                  method: "PUT",
+                  queryParams: { resource: "verify-payment" },
+                  headers: { "x-admin-token": token },
+                  body: { id: order.id, payment_status: "paid", status: "processing" },
+                });
+                await invokeFunction("process-delivery", {
+                  method: "POST",
+                  body: { orderId: order.id },
+                  headers: { "x-admin-token": token },
+                }).catch(() => {});
+
+                if (import.meta.env.DEV) console.log(`✅ Auto-verified card payment for order ${order.id}`);
+                completedRef.current.add(order.id);
+                queryClient.invalidateQueries({ queryKey: ["admin-orders"] });
+                onOrderUpdatedRef.current?.();
+              }
             } catch (err) {
               if (import.meta.env.DEV) console.warn("⚠️ Failed to explicitly set order to paid", err);
             }
@@ -93,5 +93,5 @@ export function useAutoVerifyCardPayments(orders: Order[], onOrderUpdated?: () =
     };
 
     verifyOrders();
-  }, [orders]);
+  }, [orders, queryClient]);
 }

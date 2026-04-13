@@ -94,6 +94,13 @@ interface OrderItem {
   product_category?: string | null;
 }
 
+interface SaleAddonRow {
+  id: string;
+  addon_type: string;
+  status: string;
+  amount: number;
+}
+
 // ── Helpers ────────────────────────────────────────────────────────
 const getPaymentMethodIcon = (method: string | null, paymentStatus?: string) => {
   const resolved = method || (paymentStatus === 'paid' ? 'pix' : null);
@@ -243,7 +250,7 @@ export const AdminOrders = () => {
   const [detailOrder, setDetailOrder] = useState<Order | null>(null);
   const [detailItems, setDetailItems] = useState<OrderItem[]>([]);
   const [loadingDetail, setLoadingDetail] = useState(false);
-  const [detailAddons, setDetailAddons] = useState<any[]>([]);
+  const [detailAddons, setDetailAddons] = useState<SaleAddonRow[]>([]);
   
   const [reprocessingDelivery, setReprocessingDelivery] = useState(false);
   const [cleanupEmail, setCleanupEmail] = useState("");
@@ -265,7 +272,7 @@ export const AdminOrders = () => {
         setDetailOrder(updated);
       }
     }
-  }, [orders]);
+  }, [orders, detailOrder]);
 
   // ── Filtered & sorted list ──────────────────────────────────────
   const filteredOrders = useMemo(() => {
@@ -597,7 +604,9 @@ export const AdminOrders = () => {
         });
         if (res.ok) {
           const result = await res.json();
-          setDetailAddons(Array.isArray(result.addons) ? result.addons : []);
+          setDetailAddons(
+            (Array.isArray(result.addons) ? result.addons : []) as SaleAddonRow[]
+          );
         } else {
           setDetailAddons([]);
         }
@@ -1510,7 +1519,7 @@ export const AdminOrders = () => {
                           Upsells ({detailAddons.length})
                         </h4>
                         <div className="space-y-2">
-                          {detailAddons.map((addon: any) => {
+                          {detailAddons.map((addon) => {
                             const addonLabels: Record<string, string> = {
                               premium_benefits: "🔥 Turbine Gift Card",
                               delivery_priority: "⚡ Entrega Prioritária",

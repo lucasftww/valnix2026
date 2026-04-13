@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
@@ -38,7 +38,7 @@ export const CategoryManager = () => {
     parent_id: null as string | null,
   });
 
-  const loadCategories = async () => {
+  const loadCategories = useCallback(async () => {
     setIsLoading(true);
     try {
       const token = requireAdminToken();
@@ -75,11 +75,11 @@ export const CategoryManager = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [toast]);
 
   useEffect(() => {
     loadCategories();
-  }, []);
+  }, [loadCategories]);
 
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: [QUERY_KEYS.CATEGORIES] });
