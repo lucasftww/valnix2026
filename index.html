@@ -13,6 +13,10 @@
       #root{min-height:100vh;display:flex;flex-direction:column}
       img{pointer-events:none;-webkit-user-drag:none}
       a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
+      @keyframes vn-shell-pulse{0%,100%{opacity:1}50%{opacity:.45}}
+      .vn-shell-pulse{animation:vn-shell-pulse 1.15s ease-in-out infinite;background:#141414!important}
+      @media (min-width:640px){#lcp-slot [data-shell-wide]{display:block!important}}
+      @media (min-width:768px){#shell [data-shell-search]{display:block!important}}
     </style>
     <!-- Pre-warm API + preload LCP image before JS bundle parses -->
     <script src="/js/prefetch.js"></script>
@@ -189,20 +193,23 @@
       <!-- Inline skeleton with LCP image from cache — paints before JS -->
       <div style="min-height:100vh;display:flex;flex-direction:column;background:#000" id="shell">
         <header style="position:sticky;top:0;z-index:50;width:100%;border-bottom:1px solid rgba(127,29,29,0.1);background:#000">
-          <div style="max-width:1280px;margin:0 auto;height:56px;display:flex;align-items:center;padding:0 16px">
-            <div style="width:140px;height:44px;background:#111;border-radius:8px"></div>
+          <div style="max-width:1280px;margin:0 auto;height:56px;display:flex;align-items:center;padding:0 16px;gap:12px">
+            <div class="vn-shell-pulse" style="width:140px;height:44px;border-radius:8px"></div>
             <div style="flex:1"></div>
-            <div style="width:40px;height:40px;background:#111;border-radius:50%"></div>
+            <div class="vn-shell-pulse" style="width:min(100%,400px);height:40px;border-radius:999px;display:none" data-shell-search></div>
+            <div class="vn-shell-pulse" style="width:40px;height:40px;border-radius:50%"></div>
           </div>
         </header>
         <main style="flex:1;max-width:1280px;margin:0 auto;padding:32px 16px;width:100%">
           <div style="margin-bottom:24px">
-            <div style="height:28px;width:160px;background:#111;border-radius:6px"></div>
-            <div style="height:16px;width:256px;background:#0a0a0a;border-radius:6px;margin-top:8px"></div>
+            <div class="vn-shell-pulse" style="height:28px;width:min(200px,55vw);border-radius:6px"></div>
+            <div class="vn-shell-pulse" style="height:16px;width:min(280px,80vw);border-radius:6px;margin-top:10px"></div>
           </div>
           <div id="lcp-slot" style="display:flex;gap:8px;overflow:hidden">
-            <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px;overflow:hidden" id="lcp-card"></div>
-            <div style="flex-shrink:0;width:45%;aspect-ratio:4/5;background:#111;border-radius:16px"></div>
+            <div class="vn-shell-pulse" style="flex-shrink:0;width:45%;max-width:45%;aspect-ratio:4/5;border-radius:16px;overflow:hidden" id="lcp-shell-0"></div>
+            <div class="vn-shell-pulse" style="flex-shrink:0;width:45%;max-width:45%;aspect-ratio:4/5;border-radius:16px;overflow:hidden" id="lcp-shell-1"></div>
+            <div class="vn-shell-pulse" style="flex-shrink:0;width:45%;max-width:45%;aspect-ratio:4/5;border-radius:16px;overflow:hidden;display:none" id="lcp-shell-2" data-shell-wide></div>
+            <div class="vn-shell-pulse" style="flex-shrink:0;width:45%;max-width:45%;aspect-ratio:4/5;border-radius:16px;overflow:hidden;display:none" id="lcp-shell-3" data-shell-wide></div>
           </div>
         </main>
       </div>

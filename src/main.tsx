@@ -39,7 +39,8 @@ const handleChunkError = (msg: string) => {
 window.addEventListener("error", (e) => handleChunkError(e.message));
 window.addEventListener("unhandledrejection", (e) => handleChunkError(e.reason?.message || String(e.reason)));
 
-const HYDRATE_BUDGET_MS = 180;
+/** Max wait for featured + categories cache before first paint (cold network). */
+const HYDRATE_BUDGET_MS = 480;
 
 async function boot() {
   const hydrate = Promise.all([
