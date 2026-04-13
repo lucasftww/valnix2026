@@ -1,6 +1,33 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_utils/firebase';
-import { setCorsHeaders, verifyAdminToken } from './_utils/helpers';
+import { errorMessage, setCorsHeaders, verifyAdminToken } from './_utils/helpers';
+
+type AlertLevel = 'critical' | 'warning';
+
+interface MonitorAlert {
+  level: AlertLevel;
+  message: string;
+  detail: string;
+}
+
+interface AnalyticsEventRow {
+  id: string;
+  status?: string;
+  event_name?: string;
+  event_id?: string;
+  error?: string;
+  status_code?: number;
+  timestamp?: string;
+  source?: string;
+  custom_data?: { order_id?: string };
+}
+
+interface StreakSample {
+  event_name?: string;
+  event_id?: string;
+  error?: string;
+  time?: string;
+}
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -24,18 +51,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .orderBy('timestamp', 'desc')
       .get();
 
-    const events = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+    const events: AnalyticsEventRow[] = snapshot.docs.map((doc) => ({
+      id: doc.id,
+      ...(doc.data() as Omit<AnalyticsEventRow, 'id'>),
+    }));
 
     // 3. Processamento de Métricas
     const capiStats = {
       total: events.length,
-      sent: events.filter((e: any) => e.status === 'relayed').length,
-      failed: events.filter((e: any) => e.status === 'failed').length,
+      sent: events.filter((e) => e.status === 'relayed').length,
+      failed: events.filter((e) => e.status === 'failed').length,
       byEvent: {} as Record<string, { sent: number; failed: number }>,
       recentErrors: events
-        .filter((e: any) => e.status === 'failed')
+        .filter((e) => e.status === 'failed')
         .slice(0, 10)
-        .map((e: any) => ({
+        .map((e) => ({
           event_name: e.event_name,
           event_id: e.event_id,
           error: e.error || 'Unknown error',
@@ -45,7 +75,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     };
 
     // Agrupar por tipo de evento
-    events.forEach((e: any) => {
+    events.forEach((e) => {
       if (!capiStats.byEvent[e.event_name]) {
         capiStats.byEvent[e.event_name] = { sent: 0, failed: 0 };
       }
@@ -55,7 +85,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // 4. Detecção de Duplicatas (baseado em event_id)
     const idMap = new Map<string, { count: number; sources: Set<string>; orderId?: string }>();
-    events.forEach((e: any) => {
+    events.forEach((e) => {
       if (!e.event_id) return;
       const existing = idMap.get(e.event_id) || { count: 0, sources: new Set(), orderId: e.custom_data?.order_id };
       existing.count++;
@@ -76,7 +106,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     // 5. Erros Consecutivos
     let currentStreak = 0;
     let maxStreak = 0;
-    const streakEvents: any[] = [];
+    const streakEvents: StreakSample[] = [];
     
     // Lista ordenada desc (do mais novo para o mais velho)
     for (const e of events) {
@@ -108,9 +138,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         recentErrors: capiStats.recentErrors
       },
       dedup: {
-        totalMetaPurchaseEvents: events.filter((e: any) => e.event_name === 'Purchase').length,
-        sourceDistribution: events.reduce((acc: any, e: any) => {
-          acc[e.source || 'unknown'] = (acc[e.source || 'unknown'] || 0) + 1;
+        totalMetaPurchaseEvents: events.filter((e) => e.event_name === 'Purchase').length,
+        sourceDistribution: events.reduce<Record<string, number>>((acc, e) => {
+          const src = e.source || 'unknown';
+          acc[src] = (acc[src] || 0) + 1;
           return acc;
         }, {}),
         eventIdIssues: Array.from(idMap.values()).filter(d => d.count > 1).length,
@@ -129,7 +160,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         coverageRate: 100,
         missingDetails: []
       },
-      alerts: [] as any[]
+      alerts: [] as MonitorAlert[]
     };
 
     // Geração de Alertas
@@ -144,8 +175,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(200).json(report);
-  } catch (error: any) {
-    console.error('❌ [Monitor] Error:', error.message);
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    console.error('❌ [Monitor] Error:', message);
+    return res.status(500).json({ error: message });
   }
 }

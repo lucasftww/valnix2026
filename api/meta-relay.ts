@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_utils/firebase';
-import { hashData, setCorsHeaders } from './_utils/helpers';
-import axios from 'axios';
+import { errorMessage, hashData, setCorsHeaders } from './_utils/helpers';
+import axios, { isAxiosError } from 'axios';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -53,15 +53,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         { params: { access_token: accessToken } }
       );
       return res.status(200).json({ success: true, event_id });
-    } catch (metaError: any) {
-      console.error('❌ [MetaRelay] Meta API Error:', metaError.response?.data || metaError.message);
-      return res.status(500).json({ 
-        error: 'Meta API reported an error', 
-        details: metaError.response?.data || metaError.message 
+    } catch (metaError: unknown) {
+      const details = isAxiosError(metaError)
+        ? metaError.response?.data ?? metaError.message
+        : errorMessage(metaError);
+      console.error('❌ [MetaRelay] Meta API Error:', details);
+      return res.status(500).json({
+        error: 'Meta API reported an error',
+        details,
       });
     }
-  } catch (error: any) {
-    console.error('❌ [MetaRelay] Unexpected error:', error.message);
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    console.error('❌ [MetaRelay] Unexpected error:', message);
+    return res.status(500).json({ error: message });
   }
 }

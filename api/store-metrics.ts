@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_utils/firebase';
-import { setCorsHeaders } from './_utils/helpers';
+import { errorMessage, setCorsHeaders } from './_utils/helpers';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
@@ -43,8 +43,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     });
 
     return res.status(200).json({ success: true, id: metricRef.id });
-  } catch (error: any) {
-    console.error('❌ [Metrics] error:', error.message);
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    console.error('❌ [Metrics] error:', message);
+    return res.status(500).json({ error: message });
   }
 }

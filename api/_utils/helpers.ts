@@ -40,3 +40,8 @@ export function setCorsHeaders(res: VercelResponse) {
     'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-admin-token'
   );
 }
+
+/** Safe message for API error responses and logs. */
+export function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}

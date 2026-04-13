@@ -1,7 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { db } from './_utils/firebase';
-import { hashData, setCorsHeaders } from './_utils/helpers';
-import axios from 'axios';
+import { errorMessage, hashData, setCorsHeaders } from './_utils/helpers';
+import axios, { isAxiosError } from 'axios';
 
 /** Accepts nested `{ event, userData, customData }` or flat payloads from `metaCapi` / admin (event_name, email, value, …). */
 function normalizeRelayBody(raw: unknown): {
@@ -173,22 +173,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
       
       if (process.env.NODE_ENV === 'development') console.log(`✅ [CAPI] Event ${event} relayed to Meta`);
-    } catch (metaError: any) {
-      const errorMsg = metaError.response?.data || metaError.message;
+    } catch (metaError: unknown) {
+      const errorMsg = isAxiosError(metaError)
+        ? metaError.response?.data ?? metaError.message
+        : errorMessage(metaError);
       console.error('❌ [CAPI] Meta API Error:', errorMsg);
-      
-      await eventRef.update({ 
-        status: 'failed', 
+
+      const statusCode = isAxiosError(metaError) ? metaError.response?.status ?? 500 : 500;
+      await eventRef.update({
+        status: 'failed',
         error: errorMsg,
-        status_code: metaError.response?.status || 500,
-        updatedAt: new Date().toISOString()
+        status_code: statusCode,
+        updatedAt: new Date().toISOString(),
       });
     }
 
     return res.status(200).json({ success: true, event_id });
-  } catch (error: any) {
-    console.error('❌ [Relay] Unexpected error:', error.message);
-    return res.status(500).json({ error: error.message });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    console.error('❌ [Relay] Unexpected error:', message);
+    return res.status(500).json({ error: message });
   }
 }
 
