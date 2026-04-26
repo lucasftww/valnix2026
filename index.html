@@ -21,7 +21,8 @@
       #lcp-slot [id^="lcp-shell-"]{flex:0 0 45%;max-width:45%;min-width:0;width:45%;aspect-ratio:4/5;overflow:hidden;position:relative}
       #lcp-slot [id^="lcp-shell-"] img{position:absolute;inset:0;width:100%!important;height:100%!important;max-width:none;object-fit:cover}
       @media (min-width:640px){#lcp-slot [data-shell-wide]{display:block!important}}
-      @media (min-width:768px){#shell [data-shell-search]{display:block!important}}
+      @media (min-width:768px){#shell [data-shell-search]{display:block!important}#shell [data-shell-nav]{display:block!important}#shell [data-shell-mobile-menu]{display:none!important}}
+      @media (max-width:767.98px){#shell [data-shell-mobile-menu]{display:block;background:#141414}}
       /* Homepage carousel: stable layout before Tailwind/Embla apply utilities */
       #root .carousel-wrapper{width:100%;min-width:0}
       #root .carousel-viewport{overflow:hidden!important;width:100%!important;min-width:0}
@@ -205,16 +206,33 @@
     </noscript>
     <!-- noscript pixel removed — no PageView event needed -->
     <div id="root">
-      <!-- Inline skeleton with LCP image from cache — paints before JS -->
+      <!-- Inline skeleton mirroring the real layout to avoid FOUC/jump -->
       <div style="min-height:100vh;display:flex;flex-direction:column;background:#000" id="shell">
+        <!-- Header -->
         <header style="position:sticky;top:0;z-index:50;width:100%;border-bottom:1px solid rgba(127,29,29,0.1);background:#000">
-          <div style="max-width:1280px;margin:0 auto;height:56px;display:flex;align-items:center;padding:0 16px;gap:12px">
-            <div class="vn-shell-pulse" style="width:140px;height:44px;border-radius:8px"></div>
-            <div style="flex:1"></div>
-            <div class="vn-shell-pulse" style="width:min(100%,400px);height:40px;border-radius:999px;display:none" data-shell-search></div>
-            <div class="vn-shell-pulse" style="width:40px;height:40px;border-radius:50%"></div>
+          <div style="max-width:1280px;margin:0 auto;height:56px;display:flex;align-items:center;padding:0 16px;gap:12px" data-shell-header>
+            <!-- Mobile menu placeholder (only < md) -->
+            <div data-shell-mobile-menu style="width:40px;height:40px;border-radius:9999px;flex-shrink:0"></div>
+            <!-- Logo (V) -->
+            <a href="/" aria-label="VALNIX" style="display:flex;align-items:center;height:44px;flex-shrink:0;text-decoration:none">
+              <img src="/favicon.png" alt="VALNIX" width="36" height="36" style="height:36px;width:auto;display:block" decoding="async" fetchpriority="high" />
+            </a>
+            <!-- Centered search (md+) -->
+            <div style="flex:1;display:flex;justify-content:center">
+              <div class="vn-shell-pulse" style="width:100%;max-width:400px;height:40px;border-radius:9999px;display:none" data-shell-search></div>
+            </div>
+            <!-- Cart -->
+            <div class="vn-shell-pulse" style="width:40px;height:40px;border-radius:9999px;flex-shrink:0"></div>
           </div>
         </header>
+        <!-- Navigation bar (md+) -->
+        <nav aria-label="Categorias" style="display:none;width:100%;border-bottom:1px solid rgba(127,29,29,0.1);background:#000" data-shell-nav>
+          <div style="max-width:1280px;margin:0 auto;padding:6px 32px;display:flex;align-items:center;justify-content:center;gap:24px">
+            <div class="vn-shell-pulse" style="height:18px;width:72px;border-radius:6px"></div>
+            <div class="vn-shell-pulse" style="height:18px;width:128px;border-radius:6px"></div>
+            <div class="vn-shell-pulse" style="height:18px;width:64px;border-radius:6px"></div>
+          </div>
+        </nav>
         <main style="flex:1;max-width:1280px;margin:0 auto;padding:32px 16px;width:100%">
           <div style="margin-bottom:24px">
             <div class="vn-shell-pulse" style="height:28px;width:min(200px,55vw);border-radius:6px"></div>
