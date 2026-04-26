@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_utils/firebase';
-import { errorMessage, setCorsHeaders, verifyAdminToken } from './_utils/helpers';
+import { db } from './_utils/firebase.js';
+import { errorMessage, setCorsHeaders, verifyAdminToken } from './_utils/helpers.js';
 
 type AlertLevel = 'critical' | 'warning';
 

@@ -1,6 +1,6 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { setCorsHeaders } from './_utils/helpers';
-import { isValidPostPaymentOrderId } from './_utils/postPaymentOrderId';
+import { setCorsHeaders } from './_utils/helpers.js';
+import { isValidPostPaymentOrderId } from './_utils/postPaymentOrderId.js';
 
 /**
  * GET /api/post-payment-order-check?order_id=...

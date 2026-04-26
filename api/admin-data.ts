@@ -1,7 +1,7 @@
 import type { DocumentData, QuerySnapshot } from 'firebase-admin/firestore';
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_utils/firebase';
-import { verifyAdminToken, setCorsHeaders } from './_utils/helpers';
+import { db } from './_utils/firebase.js';
+import { verifyAdminToken, setCorsHeaders } from './_utils/helpers.js';
 
 type PeriodKey = 'today' | '7d' | '30d';
 

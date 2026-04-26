@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_utils/firebase';
-import { errorMessage, hashData, setCorsHeaders } from './_utils/helpers';
+import { db } from './_utils/firebase.js';
+import { errorMessage, hashData, setCorsHeaders } from './_utils/helpers.js';
 import axios, { isAxiosError } from 'axios';
 
 /** Accepts nested `{ event, userData, customData }` or flat payloads from `metaCapi` / admin (event_name, email, value, …). */
