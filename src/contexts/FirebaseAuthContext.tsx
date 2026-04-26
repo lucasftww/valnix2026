@@ -42,6 +42,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return () => window.removeEventListener("admin:unauthorized", syncLogoutState);
   }, [syncLogoutState]);
 
+  // Helper: safely parse a Response as JSON, never throws on HTML/text bodies
+  const safeJson = async (res: Response): Promise<any> => {
+    try {
+      const text = await res.text();
+      if (!text) return {};
+      try { return JSON.parse(text); } catch { return { _raw: text }; }
+    } catch {
+      return {};
+    }
+  };
+
   // On mount, check if there's a stored token and verify it
   useEffect(() => {
     const token = getAdminToken();
@@ -57,7 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     })
       .then(async (res) => {
         if (res.ok) {
-          const data = await res.json();
+          const data = await safeJson(res);
           if (data.valid) {
             setTokenState(token);
             setIsAdmin(true);
@@ -83,22 +94,33 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         body: { password },
       });
 
-      const data = await res.json();
+      const data = await safeJson(res);
 
       if (!res.ok) {
-        return { error: { message: data.error || "Login failed" } };
+        // Friendly messages for common backend failures
+        let message: string = data?.error || "";
+        if (!message) {
+          if (res.status === 401) message = "Senha incorreta.";
+          else if (res.status >= 500) message = "Servidor indisponível no momento. Tente novamente em instantes.";
+          else message = `Falha ao entrar (HTTP ${res.status}).`;
+        }
+        return { error: { message } };
       }
 
-      if (data.token) {
+      if (data?.token) {
         setAdminToken(data.token);
         setTokenState(data.token);
         setIsAdmin(true);
         return { error: null };
       }
 
-      return { error: { message: "No token received" } };
-    } catch (error) {
-      return { error };
+      return { error: { message: "Resposta inválida do servidor." } };
+    } catch (error: any) {
+      const message =
+        error?.message?.includes("Failed to fetch") || error?.name === "TypeError"
+          ? "Sem conexão com o servidor. Verifique sua internet."
+          : (error?.message || "Erro ao conectar.");
+      return { error: { message } };
     }
   }, []);
 
