@@ -96,13 +96,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       const data = await safeJson(res);
 
-      if (!res.ok) {
-        // Friendly messages for common backend failures
+      // Detect Vercel's HTML error page (e.g. "A server error has occurred")
+      const gotHtml = typeof data?._raw === "string" &&
+        (data._raw.trim().startsWith("<") || data._raw.toLowerCase().includes("server error"));
+
+      if (!res.ok || gotHtml) {
         let message: string = data?.error || "";
         if (!message) {
-          if (res.status === 401) message = "Senha incorreta.";
-          else if (res.status >= 500) message = "Servidor indisponível no momento. Tente novamente em instantes.";
-          else message = `Falha ao entrar (HTTP ${res.status}).`;
+          if (gotHtml) {
+            message = "Servidor de autenticação indisponível. Verifique se a variável ADMIN_PASSWORD está configurada no Vercel e tente novamente.";
+          } else if (res.status === 401) {
+            message = "Senha incorreta.";
+          } else if (res.status >= 500) {
+            message = "Servidor indisponível no momento. Tente novamente em instantes.";
+          } else {
+            message = `Falha ao entrar (HTTP ${res.status}).`;
+          }
         }
         return { error: { message } };
       }
