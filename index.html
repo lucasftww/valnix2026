@@ -21,7 +21,8 @@
       #lcp-slot [id^="lcp-shell-"]{flex:0 0 45%;max-width:45%;min-width:0;width:45%;aspect-ratio:4/5;overflow:hidden;position:relative}
       #lcp-slot [id^="lcp-shell-"] img{position:absolute;inset:0;width:100%!important;height:100%!important;max-width:none;object-fit:cover}
       @media (min-width:640px){#lcp-slot [data-shell-wide]{display:block!important}}
-      @media (min-width:768px){#shell [data-shell-search]{display:block!important}}
+      @media (min-width:768px){#shell [data-shell-search]{display:block!important}#shell [data-shell-nav]{display:block!important}#shell [data-shell-mobile-menu]{display:none!important}}
+      @media (max-width:767.98px){#shell [data-shell-mobile-menu]{display:block;background:#141414}}
       /* Homepage carousel: stable layout before Tailwind/Embla apply utilities */
       #root .carousel-wrapper{width:100%;min-width:0}
       #root .carousel-viewport{overflow:hidden!important;width:100%!important;min-width:0}
