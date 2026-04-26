@@ -1,7 +1,7 @@
 import type { DocumentData } from 'firebase-admin/firestore';
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_utils/firebase';
-import { setCorsHeaders } from './_utils/helpers';
+import { db } from './_utils/firebase.js';
+import { setCorsHeaders } from './_utils/helpers.js';
 import axios from 'axios';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {

@@ -1,6 +1,6 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_utils/firebase';
-import { errorMessage, setCorsHeaders } from './_utils/helpers';
+import { db } from './_utils/firebase.js';
+import { errorMessage, setCorsHeaders } from './_utils/helpers.js';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res);
