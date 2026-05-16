@@ -22,6 +22,8 @@ dist/bundle-report.html
 
 # Migration cache (Firebase service account when running scripts/migrate-firestore-to-supabase.cjs)
 service-account.json
+*.tmp.json
+.firebase-svc.*
 
 # Editor directories and files
 .vscode/*
