@@ -7,7 +7,7 @@
 (function stripTokens() {
   const url = new URL(window.location.href);
   let dirty = false;
-  ['__lovable_token', '__dev_token'].forEach((key) => {
+  ['__dev_token'].forEach((key) => {
     if (url.searchParams.has(key)) { url.searchParams.delete(key); dirty = true; }
   });
   if (dirty) window.history.replaceState(null, '', url.toString());
