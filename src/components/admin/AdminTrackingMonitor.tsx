@@ -84,10 +84,11 @@ export function AdminTrackingMonitor() {
     setReplayResult(null);
     try {
       const token = requireAdminToken();
-      const res = await invokeFunction('capi-replay', {
+      const res = await invokeFunction('admin-data', {
         method: 'POST',
         body: { dry_run: dryRun },
         headers: { 'x-admin-token': token },
+        queryParams: { resource: 'capi-replay' },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
@@ -130,9 +131,9 @@ export function AdminTrackingMonitor() {
     queryKey: ['tracking-monitor', hours],
     queryFn: async () => {
       const token = requireAdminToken();
-      const res = await invokeFunction('monitor-tracking', {
+      const res = await invokeFunction('admin-data', {
         method: 'GET',
-        queryParams: { hours },
+        queryParams: { resource: 'monitor-tracking', hours },
         headers: { 'x-admin-token': token },
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);

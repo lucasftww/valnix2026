@@ -82,9 +82,9 @@ export function AdminAnalytics() {
     queryFn: async () => {
       const token = requireAdminToken();
 
-      const response = await invokeFunction("admin-analytics", {
+      const response = await invokeFunction("admin-data", {
         method: "GET",
-        queryParams: { dateRange },
+        queryParams: { resource: "analytics", dateRange },
         headers: { "x-admin-token": token },
       });
 

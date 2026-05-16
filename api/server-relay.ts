@@ -90,6 +90,47 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // ── Lite relay (no DB log) — consumed internally by admin-data?resource=capi-replay
+  const action = typeof req.query.action === 'string' ? req.query.action : '';
+  if (action === 'lite') {
+    try {
+      const { event, userData, customData, event_id, url } = normalizeRelayBody(req.body);
+      const creds = await getMetaCredentials();
+      if (!creds) return res.status(500).json({ error: 'Meta CAPI credentials not configured' });
+      const metaPayload = {
+        data: [{
+          event_name: event,
+          event_time: Math.floor(Date.now() / 1000),
+          action_source: 'website',
+          event_source_url: url,
+          event_id,
+          user_data: {
+            em: hashData(userData?.email?.trim().toLowerCase()),
+            ph: hashData(userData?.phone?.trim().replace(/\D/g, '')),
+            client_ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            client_user_agent: req.headers['user-agent'],
+            fbc: userData?.fbc,
+            fbp: userData?.fbp,
+          },
+          custom_data: customData,
+        }],
+      };
+      try {
+        await axios.post(
+          `https://graph.facebook.com/v17.0/${creds.pixelId}/events`,
+          metaPayload,
+          { params: { access_token: creds.accessToken } },
+        );
+        return res.status(200).json({ success: true, event_id });
+      } catch (metaError: unknown) {
+        const details = isAxiosError(metaError) ? metaError.response?.data ?? metaError.message : errorMessage(metaError);
+        return res.status(500).json({ error: 'Meta API reported an error', details });
+      }
+    } catch (error: unknown) {
+      return res.status(500).json({ error: errorMessage(error) });
+    }
+  }
+
   try {
     const { event, userData, customData, event_id, url } = normalizeRelayBody(req.body);
     if (!event) return res.status(400).json({ error: 'Missing event / event_name' });

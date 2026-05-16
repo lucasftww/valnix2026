@@ -1,6 +1,7 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_utils/supabase.js';
 import { verifyAdminToken, setCorsHeaders } from './_utils/helpers.js';
+import axios from 'axios';
 
 type PeriodKey = 'today' | '7d' | '30d';
 
@@ -298,6 +299,68 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           }
           return res.status(200).json({ batch });
         }
+        // ── Merged from admin-analytics.ts ─────────────────────────
+        case 'analytics': {
+          const period = qString(req, 'period') || qString(req, 'dateRange') || '30d';
+          const days = period === 'today' ? 1 : period === '7d' ? 7 : 30;
+          const sinceISO = new Date(Date.now() - days * 86400_000).toISOString();
+          const [eventsRes, ordersRes] = await Promise.all([
+            supabaseAdmin.from('analytics_events').select('event_name,status,timestamp,custom_data').gte('timestamp', sinceISO).order('timestamp', { ascending: false }).limit(5000),
+            supabaseAdmin.from('orders').select('id,payment_status,total_amount,created_at').gte('created_at', sinceISO),
+          ]);
+          if (eventsRes.error) throw new Error(eventsRes.error.message);
+          if (ordersRes.error) throw new Error(ordersRes.error.message);
+          const evts = eventsRes.data ?? [];
+          const ords = ordersRes.data ?? [];
+          const counts: Record<string, number> = {};
+          const byEventStatus: Record<string, { sent: number; failed: number }> = {};
+          for (const e of evts) {
+            const name = String((e as { event_name: string }).event_name || 'Unknown');
+            counts[name] = (counts[name] || 0) + 1;
+            if (!byEventStatus[name]) byEventStatus[name] = { sent: 0, failed: 0 };
+            const st = String((e as { status: string }).status || '');
+            if (st === 'relayed') byEventStatus[name].sent++;
+            if (st === 'failed') byEventStatus[name].failed++;
+          }
+          const paid = ords.filter((o) => o.payment_status === 'paid');
+          const revenue = paid.reduce((s, o) => s + Number(o.total_amount || 0), 0);
+          const funnel = {
+            pageView: counts['PageView'] || 0, viewContent: counts['ViewContent'] || 0,
+            addToCart: counts['AddToCart'] || 0, initiateCheckout: counts['InitiateCheckout'] || 0,
+            purchase: counts['Purchase'] || 0, orderRevenue: revenue, orderCount: paid.length,
+          };
+          const recent = evts.slice(0, 100).map((e) => ({
+            event_name: e.event_name, status: e.status, timestamp: e.timestamp,
+            order_id: (e as { custom_data?: { order_id?: string } }).custom_data?.order_id ?? null,
+          }));
+          return res.status(200).json({ period, funnel, byEvent: byEventStatus, recent, events: recent });
+        }
+        // ── Merged from monitor-tracking.ts ────────────────────────
+        case 'monitor-tracking': {
+          const hours = Number.parseInt(qString(req, 'hours')) || 24;
+          const sinceISO = new Date(Date.now() - hours * 3600_000).toISOString();
+          const { data, error } = await supabaseAdmin.from('analytics_events')
+            .select('id,status,event_name,event_id,error,status_code,timestamp,source,custom_data')
+            .gte('timestamp', sinceISO).order('timestamp', { ascending: false }).limit(5000);
+          if (error) throw new Error(error.message);
+          type EvtRow = { id: string; status?: string | null; event_name?: string | null; event_id?: string | null; error?: string | null; status_code?: number | null; timestamp?: string | null; source?: string | null; custom_data?: { order_id?: string } | null };
+          const events = (data ?? []) as EvtRow[];
+          const capiStats = { total: events.length, sent: events.filter((e) => e.status === 'relayed').length, failed: events.filter((e) => e.status === 'failed').length, byEvent: {} as Record<string, { sent: number; failed: number }>, recentErrors: events.filter((e) => e.status === 'failed').slice(0, 10).map((e) => ({ event_name: e.event_name, event_id: e.event_id, error: e.error || 'Unknown error', status_code: e.status_code || 500, time: e.timestamp })) };
+          for (const e of events) { const name = e.event_name || 'unknown'; if (!capiStats.byEvent[name]) capiStats.byEvent[name] = { sent: 0, failed: 0 }; if (e.status === 'relayed') capiStats.byEvent[name].sent++; if (e.status === 'failed') capiStats.byEvent[name].failed++; }
+          const idMap = new Map<string, { count: number; sources: Set<string>; orderId?: string }>();
+          for (const e of events) { if (!e.event_id) continue; const ex = idMap.get(e.event_id) || { count: 0, sources: new Set<string>(), orderId: e.custom_data?.order_id }; ex.count++; ex.sources.add(e.source || 'unknown'); idMap.set(e.event_id, ex); }
+          const duplicates = [...idMap.entries()].filter(([, d]) => d.count > 1).map(([id, d]) => ({ eventId: id, orderId: d.orderId || 'N/A', count: d.count, sources: [...d.sources] })).slice(0, 5);
+          let currentStreak = 0, maxStreak = 0;
+          for (const e of events) { if (e.status === 'failed') { currentStreak++; } else if (e.status === 'relayed') { maxStreak = Math.max(maxStreak, currentStreak); currentStreak = 0; } }
+          maxStreak = Math.max(maxStreak, currentStreak);
+          type Alert = { level: 'critical' | 'warning'; message: string; detail: string };
+          const alerts: Alert[] = [];
+          const errorRate = capiStats.total > 0 ? (capiStats.failed / capiStats.total) * 100 : 0;
+          if (errorRate > 15) alerts.push({ level: 'critical', message: 'Taxa de erro CAPI elevada', detail: `${errorRate.toFixed(1)}% de falhas.` });
+          else if (errorRate > 5) alerts.push({ level: 'warning', message: 'Erros intermitentes no CAPI', detail: 'Verifique os logs recentes.' });
+          if (maxStreak > 3) alerts.push({ level: 'critical', message: 'Múltiplas falhas consecutivas', detail: `Ocorreu uma sequência de ${maxStreak} erros.` });
+          return res.status(200).json({ period: `${hours}h`, timestamp: new Date().toISOString(), capi: { total: capiStats.total, sent: capiStats.sent, failed: capiStats.failed, errorRate, byEvent: capiStats.byEvent, recentErrors: capiStats.recentErrors }, dedup: { totalMetaPurchaseEvents: events.filter((e) => e.event_name === 'Purchase').length, sourceDistribution: events.reduce<Record<string, number>>((acc, e) => { const src = e.source || 'unknown'; acc[src] = (acc[src] || 0) + 1; return acc; }, {}), eventIdIssues: [...idMap.values()].filter((d) => d.count > 1).length, duplicates }, consecutiveErrors: { maxStreak, currentStreak: events[0]?.status === 'failed' ? currentStreak : 0, isOngoing: events[0]?.status === 'failed' }, coverage: { paidOrders: 0, withCapi: 0, missingCapi: 0, coverageRate: 100, missingDetails: [] }, alerts });
+        }
         default:
           return res.status(400).json({ error: 'Unknown or missing resource for GET' });
       }
@@ -376,6 +439,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'POST') {
       if (resource === 'cleanup-analytics') return handleCleanupAnalytics(res, body);
       if (resource === 'cleanup-capi-logs') return handleCleanupCapiLogs(res);
+
+      // ── Merged from capi-replay.ts ──────────────────────────────
+      if (resource === 'capi-replay') {
+        const { eventIds } = body as { eventIds?: unknown };
+        if (!Array.isArray(eventIds) || eventIds.length === 0) {
+          return res.status(400).json({ error: 'eventIds array required' });
+        }
+        const protocol = (req.headers['x-forwarded-proto'] as string) || 'https';
+        const host = req.headers.host;
+        const baseUrl = `${protocol}://${host}`;
+        const stringIds = eventIds.filter((x): x is string => typeof x === 'string');
+        const { data: rows, error } = await supabaseAdmin.from('analytics_events').select('event_id,event_name,user_data,custom_data,url').in('event_id', stringIds);
+        if (error) throw new Error(error.message);
+        const byId = new Map<string, (typeof rows)[number]>();
+        for (const r of rows ?? []) if (r.event_id) byId.set(r.event_id, r);
+        const results = await Promise.all(stringIds.map(async (id) => {
+          const row = byId.get(id);
+          if (!row) return { id, status: 'not_found' };
+          try {
+            await axios.post(`${baseUrl}/api/server-relay?action=lite`, { event: row.event_name, userData: row.user_data, customData: row.custom_data, event_id: row.event_id, url: row.url });
+            return { id, status: 'success' };
+          } catch (err: unknown) {
+            const ax = err as { message?: string; response?: { data?: unknown } };
+            return { id, status: 'error', message: ax.message, details: ax.response?.data };
+          }
+        }));
+        return res.status(200).json({ results });
+      }
 
       switch (resource) {
         case 'products': {
