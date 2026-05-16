@@ -108,16 +108,15 @@ registerRoute(
   })
 );
 
-// ── 8. API Backend (Firebase & Vercel) — NetworkOnly (sem cache, sempre fresco) ──
+// ── 8. /api/* — NetworkOnly (sem cache, sempre fresco) ──
 registerRoute(
-  ({ url }) =>
-    url.hostname.includes('cloudfunctions.net') || url.pathname.startsWith('/api/'),
+  ({ url }) => url.pathname.startsWith('/api/'),
   new NetworkOnly()
 );
 
-// ── 9. Firestore REST — NetworkOnly ──
+// ── 9. Supabase REST/Realtime — NetworkOnly ──
 registerRoute(
-  ({ url }) => url.hostname === 'firestore.googleapis.com',
+  ({ url }) => url.hostname.endsWith('.supabase.co'),
   new NetworkOnly()
 );
 

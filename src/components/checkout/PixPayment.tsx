@@ -129,7 +129,7 @@ export function PixPayment({
         return;
       }
       try {
-        const response = await invokeFunction('invictuspay-pix', {
+        const response = await invokeFunction('dice-pix', {
           method: 'GET',
           queryParams: { action: 'status', chargeId: transactionId, orderId },
         });

@@ -1,7 +1,7 @@
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { useAuth } from "@/contexts/AdminAuthContext";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { 
   DollarSign, ShoppingCart, Package, TrendingUp, RefreshCw, 

@@ -4,9 +4,8 @@ import { invokeFunction, invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { AdminErrorState } from "./AdminErrorState";
 import { generateEventId } from "@/lib/eventId";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
-import { useAutoVerifyPixPayments } from "@/hooks/firebase/useAutoVerifyPixPayments";
-import { useAutoVerifyCardPayments } from "@/hooks/firebase/useAutoVerifyCardPayments";
+import { useAuth } from "@/contexts/AdminAuthContext";
+import { useAutoVerifyPixPayments } from "@/hooks/data/useAutoVerifyPixPayments";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -262,7 +261,6 @@ export const AdminOrders = () => {
   const [editDeliveryCode, setEditDeliveryCode] = useState("");
 
   useAutoVerifyPixPayments(orders as any, fetchOrders);
-  useAutoVerifyCardPayments(orders as any, fetchOrders);
 
   // Keep detailOrder in sync with orders list
   useEffect(() => {
@@ -429,17 +427,12 @@ export const AdminOrders = () => {
     }
     setVerifyingPayment(order.id);
     try {
-      const isCard = order.payment_method === 'card';
-
-      const endpoint = isCard
-        ? 'flowpay-card'
-        : 'invictuspay-pix';
-      const qp = isCard
-        ? { action: 'status', id: order.flowpay_charge_id }
-        : { action: 'status', chargeId: order.flowpay_charge_id, orderId: order.id };
-      const response = await invokeFunction(endpoint, {
+      // Dice gateway handles PIX only. Card flow is no longer supported in
+      // this codebase — old card orders can still be force-confirmed by
+      // an admin via the manual action below.
+      const response = await invokeFunction('dice-pix', {
         method: 'GET',
-        queryParams: qp,
+        queryParams: { action: 'status', chargeId: order.flowpay_charge_id, orderId: order.id },
       });
 
       const data = await response.json();

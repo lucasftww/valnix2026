@@ -19,7 +19,7 @@ const NavigationComponent = () => {
     queryClient.prefetchQuery({
       queryKey: ["category-products", categorySlug],
       queryFn: async () => {
-        const { fetchCategoryProductsFallback } = await import("@/lib/firestoreFallback");
+        const { fetchCategoryProductsFallback } = await import("@/lib/publicData");
         const products = await fetchCategoryProductsFallback(categorySlug);
         return products
           .filter((p: any) => p?.is_active !== false)

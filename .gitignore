@@ -12,6 +12,17 @@ dist
 dist-ssr
 *.local
 
+# Environment files — never commit secrets
+.env
+.env.*
+!.env.example
+
+# Generated bundle reports
+dist/bundle-report.html
+
+# Migration cache (Firebase service account when running scripts/migrate-firestore-to-supabase.cjs)
+service-account.json
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

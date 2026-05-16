@@ -1,0 +1,173 @@
+import { VercelRequest, VercelResponse } from '@vercel/node';
+import { supabaseAdmin } from './_utils/supabase.js';
+import { setCorsHeaders, errorMessage } from './_utils/helpers.js';
+import { randomBytes } from 'crypto';
+
+/**
+ * POST /api/create-order
+ *
+ * Public endpoint called from the checkout. Validates each line item against
+ * the product catalog server-side — the client-supplied `unit_price` /
+ * `total_price` / `total_amount` are recomputed from the DB. This is the
+ * single most important fraud-prevention check in the whole stack: never
+ * trust the client to tell you what something costs.
+ *
+ * Body:
+ *   {
+ *     order: { user_id, customer_name, customer_email, customer_phone,
+ *              customer_document, payment_method, fbc, fbp,
+ *              event_source_url, utm_*, notes? },
+ *     items: [{ product_id, quantity, ... }]
+ *   }
+ *
+ * Returns: { success, orderId, guestHash, total }
+ */
+
+interface IncomingItem {
+  product_id?: unknown;
+  quantity?: unknown;
+}
+
+function isUuid(v: unknown): v is string {
+  return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+}
+
+function isString(v: unknown, maxLen = 255): v is string {
+  return typeof v === 'string' && v.length > 0 && v.length <= maxLen;
+}
+
+function generateGuestHash(): string {
+  return randomBytes(24).toString('base64url');
+}
+
+export default async function handler(req: VercelRequest, res: VercelResponse) {
+  setCorsHeaders(res, req);
+  if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
+
+  try {
+    const body = (req.body ?? {}) as { order?: unknown; items?: unknown };
+    const orderInput = (body.order ?? {}) as Record<string, unknown>;
+    const itemsInput = Array.isArray(body.items) ? (body.items as IncomingItem[]) : [];
+
+    if (!isString(orderInput.customer_name, 200)) {
+      return res.status(400).json({ error: 'customer_name required' });
+    }
+    if (itemsInput.length === 0 || itemsInput.length > 50) {
+      return res.status(400).json({ error: 'items must contain between 1 and 50 entries' });
+    }
+
+    // ─── Aggregate quantities by product_id ──────────────────────────────
+    const wanted = new Map<string, number>();
+    for (const raw of itemsInput) {
+      if (!isUuid(raw.product_id)) {
+        return res.status(400).json({ error: 'each item.product_id must be a UUID' });
+      }
+      const qty = Number(raw.quantity);
+      if (!Number.isInteger(qty) || qty < 1 || qty > 999) {
+        return res.status(400).json({ error: 'each item.quantity must be 1..999' });
+      }
+      wanted.set(raw.product_id, (wanted.get(raw.product_id) ?? 0) + qty);
+    }
+
+    // ─── Fetch authoritative product data ────────────────────────────────
+    const productIds = [...wanted.keys()];
+    const { data: products, error: productsErr } = await supabaseAdmin
+      .from('products')
+      .select('id,name,price,image_url,is_active,delivery_type,stock')
+      .in('id', productIds);
+    if (productsErr) throw new Error(productsErr.message);
+
+    const byId = new Map((products ?? []).map((p) => [p.id, p]));
+    let serverTotal = 0;
+    const dbItems: Array<{
+      order_id?: string;
+      product_id: string;
+      product_name: string;
+      product_image: string | null;
+      quantity: number;
+      unit_price: number;
+      total_price: number;
+      delivery_type: string;
+    }> = [];
+
+    for (const [productId, qty] of wanted) {
+      const p = byId.get(productId);
+      if (!p) return res.status(400).json({ error: `Product not found: ${productId}` });
+      if (!p.is_active) return res.status(400).json({ error: `Product unavailable: ${p.name}` });
+      if (p.stock != null && p.stock < qty) {
+        return res.status(409).json({ error: `Insufficient stock for ${p.name}` });
+      }
+      const unitPrice = Number(p.price);
+      const lineTotal = Math.round(unitPrice * qty * 100) / 100;
+      serverTotal = Math.round((serverTotal + lineTotal) * 100) / 100;
+      dbItems.push({
+        product_id: p.id,
+        product_name: p.name,
+        product_image: p.image_url,
+        quantity: qty,
+        unit_price: unitPrice,
+        total_price: lineTotal,
+        delivery_type: p.delivery_type || 'manual',
+      });
+    }
+
+    // Dice's PIX gateway rejects amounts below R$ 2,00 — keep the order
+    // floor in sync so the user never reaches checkout with a doomed total.
+    if (serverTotal < 2) {
+      return res.status(400).json({ error: 'Pedido abaixo do valor mínimo (R$ 2,00).' });
+    }
+
+    // ─── Build order row (ignore client-supplied total_amount) ──────────
+    const guestHash = generateGuestHash();
+    const orderRow = {
+      user_id: typeof orderInput.user_id === 'string' ? orderInput.user_id : null,
+      guest_hash: guestHash,
+      customer_name: String(orderInput.customer_name).slice(0, 200),
+      customer_email: typeof orderInput.customer_email === 'string' ? orderInput.customer_email.slice(0, 320) : null,
+      customer_phone: typeof orderInput.customer_phone === 'string' ? orderInput.customer_phone.slice(0, 50) : null,
+      customer_document:
+        typeof orderInput.customer_document === 'string' ? orderInput.customer_document.replace(/\D/g, '').slice(0, 20) : null,
+      total_amount: serverTotal,
+      payment_method: typeof orderInput.payment_method === 'string' ? orderInput.payment_method.slice(0, 20) : null,
+      notes: typeof orderInput.notes === 'string' ? orderInput.notes.slice(0, 2000) : null,
+      fbc: typeof orderInput.fbc === 'string' ? orderInput.fbc.slice(0, 200) : null,
+      fbp: typeof orderInput.fbp === 'string' ? orderInput.fbp.slice(0, 200) : null,
+      event_source_url:
+        typeof orderInput.event_source_url === 'string' ? orderInput.event_source_url.slice(0, 500) : null,
+      utm_source: typeof orderInput.utm_source === 'string' ? orderInput.utm_source.slice(0, 200) : null,
+      utm_medium: typeof orderInput.utm_medium === 'string' ? orderInput.utm_medium.slice(0, 200) : null,
+      utm_campaign: typeof orderInput.utm_campaign === 'string' ? orderInput.utm_campaign.slice(0, 200) : null,
+      utm_content: typeof orderInput.utm_content === 'string' ? orderInput.utm_content.slice(0, 200) : null,
+      utm_term: typeof orderInput.utm_term === 'string' ? orderInput.utm_term.slice(0, 200) : null,
+    };
+
+    const { data: created, error: orderErr } = await supabaseAdmin
+      .from('orders')
+      .insert(orderRow as never)
+      .select('id')
+      .single();
+    if (orderErr) throw new Error(orderErr.message);
+    if (!created?.id) throw new Error('Failed to create order');
+
+    const orderId = created.id;
+    const itemsRows = dbItems.map((it) => ({ ...it, order_id: orderId }));
+    const { error: itemsErr } = await supabaseAdmin.from('order_items').insert(itemsRows as never);
+    if (itemsErr) {
+      // Roll back the order so we don't leave an empty pending row.
+      await supabaseAdmin.from('orders').delete().eq('id', orderId);
+      throw new Error(itemsErr.message);
+    }
+
+    return res.status(200).json({
+      success: true,
+      orderId,
+      guestHash,
+      total: serverTotal,
+    });
+  } catch (error: unknown) {
+    const message = errorMessage(error);
+    if (process.env.NODE_ENV !== 'production') console.error('[create-order] error:', message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
+}

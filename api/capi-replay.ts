@@ -1,56 +1,61 @@
-import type { DocumentData } from 'firebase-admin/firestore';
 import { VercelRequest, VercelResponse } from '@vercel/node';
-import { db } from './_utils/firebase.js';
-import { setCorsHeaders } from './_utils/helpers.js';
+import { supabaseAdmin } from './_utils/supabase.js';
+import { setCorsHeaders, verifyAdminToken } from './_utils/helpers.js';
 import axios from 'axios';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  setCorsHeaders(res);
+  setCorsHeaders(res, req);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
+  // Replay touches Meta CAPI — admin only.
+  const adminToken = req.headers['x-admin-token'];
+  if (!verifyAdminToken(adminToken as string)) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
+
   try {
-    const { eventIds } = req.body;
-    if (!eventIds || !Array.isArray(eventIds)) {
+    const { eventIds } = (req.body ?? {}) as { eventIds?: unknown };
+    if (!Array.isArray(eventIds) || eventIds.length === 0) {
       return res.status(400).json({ error: 'eventIds array required' });
     }
 
-    // Call the internal metaRelay for each event
-    // In Vercel, we can just import the logic or call the endpoint
-    const protocol = req.headers['x-forwarded-proto'] || 'http';
+    const protocol = (req.headers['x-forwarded-proto'] as string) || 'https';
     const host = req.headers.host;
     const baseUrl = `${protocol}://${host}`;
 
-    const results = await Promise.all(eventIds.map(async (id: string) => {
-      // Lookup by event_id (which is now the doc ID)
-      const eventDoc = await db.collection('analytics_events').doc(id).get();
-      
-      let eventData: DocumentData | undefined;
-      if (!eventDoc.exists) {
-        // Fallback: try to query by field event_id if not found as doc ID
-        const query = await db.collection('analytics_events').where('event_id', '==', id).limit(1).get();
-        if (query.empty) return { id, status: 'not_found' };
-        eventData = query.docs[0].data();
-      } else {
-        eventData = eventDoc.data();
-      }
+    const stringIds = eventIds.filter((x): x is string => typeof x === 'string');
 
-      try {
-        // Updated to use the corrected filename 'meta-relay'
-        const relayUrl = `${baseUrl}/api/meta-relay`;
-        await axios.post(relayUrl, {
-          event: eventData?.event_name,
-          userData: eventData?.user_data,
-          customData: eventData?.custom_data,
-          event_id: eventData?.event_id,
-          url: eventData?.url
-        });
-        return { id, status: 'success' };
-      } catch (err: unknown) {
-        const ax = err as { message?: string; response?: { data?: unknown } };
-        console.error(`❌ [Replay] Error for ${id}:`, ax.response?.data || ax.message);
-        return { id, status: 'error', message: ax.message, details: ax.response?.data };
-      }
-    }));
+    const { data: rows, error } = await supabaseAdmin
+      .from('analytics_events')
+      .select('event_id,event_name,user_data,custom_data,url')
+      .in('event_id', stringIds);
+    if (error) throw new Error(error.message);
+
+    const byId = new Map<string, (typeof rows)[number]>();
+    for (const r of rows ?? []) if (r.event_id) byId.set(r.event_id, r);
+
+    const results = await Promise.all(
+      stringIds.map(async (id) => {
+        const row = byId.get(id);
+        if (!row) return { id, status: 'not_found' };
+        try {
+          await axios.post(`${baseUrl}/api/meta-relay`, {
+            event: row.event_name,
+            userData: row.user_data,
+            customData: row.custom_data,
+            event_id: row.event_id,
+            url: row.url,
+          });
+          return { id, status: 'success' };
+        } catch (err: unknown) {
+          const ax = err as { message?: string; response?: { data?: unknown } };
+          if (process.env.NODE_ENV !== 'production') {
+            console.error(`[Replay] error for ${id}:`, ax.response?.data || ax.message);
+          }
+          return { id, status: 'error', message: ax.message, details: ax.response?.data };
+        }
+      }),
+    );
 
     return res.status(200).json({ results });
   } catch (error: unknown) {

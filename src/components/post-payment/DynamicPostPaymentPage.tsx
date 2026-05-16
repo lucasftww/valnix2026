@@ -1,11 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { usePostPaymentPage } from "@/hooks/usePostPaymentPage";
-import { db } from "@/integrations/firebase/config";
-import { collection, addDoc, query, where, getDocs, updateDoc, serverTimestamp } from "firebase/firestore";
 import { useToast } from "@/hooks/use-toast";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { Loader2, Check, Zap, Star, Clock, Shield, CreditCard } from "lucide-react";
+import { Loader2, Check, Zap, Star, Clock, Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { QRCodeSVG } from "qrcode.react";
 import { Progress } from "@/components/ui/progress";
@@ -24,30 +22,19 @@ const iconMap: Record<string, typeof Shield> = {
   data_swap_warranty: Shield,
 };
 
-/** Fire-and-forget Firestore write — never blocks UI */
+/** Fire-and-forget addon insert — relies on the public sale-addons endpoint. */
 function insertSaleAddonAsync(data: Record<string, unknown>) {
-  try {
-    addDoc(collection(db, "sale_addons"), {
-      ...data,
-      created_at: serverTimestamp(),
-      updated_at: serverTimestamp(),
-    }).catch(() => {});
-  } catch { /* ignore */ }
+  invokeFunction("admin-post-payment", {
+    method: "POST",
+    body: { action: "addon-create", ...data },
+  }).catch(() => {});
 }
 
 function updateSaleAddonAsync(orderId: string, addonType: string, updates: Record<string, unknown>) {
-  try {
-    const q = query(
-      collection(db, "sale_addons"),
-      where("order_id", "==", orderId),
-      where("addon_type", "==", addonType)
-    );
-    getDocs(q).then((snapshot) => {
-      for (const doc of snapshot.docs) {
-        updateDoc(doc.ref, { ...updates, updated_at: serverTimestamp() }).catch(() => {});
-      }
-    }).catch(() => {});
-  } catch { /* ignore */ }
+  invokeFunction("admin-post-payment", {
+    method: "POST",
+    body: { action: "addon-update", order_id: orderId, addon_type: addonType, updates },
+  }).catch(() => {});
 }
 
 export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProps) {
@@ -63,12 +50,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
   const { config, loading: configLoading } = usePostPaymentPage(addonType);
   const { toast } = useToast();
   const isMobile = useIsMobile();
-
-  // Detect if original payment was via card
-  const paymentMethod = (() => {
-    try { return sessionStorage.getItem('valnix_payment_method') || 'pix'; } catch { return 'pix'; }
-  })();
-  const isCardPayment = paymentMethod === 'card';
 
   const [purchasing, setPurchasing] = useState(false);
   const [pixData, setPixData] = useState<{ qrCode: string; chargeId: string } | null>(null);
@@ -129,7 +110,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       if (pollingRef.current) return;
       pollingRef.current = true;
       try {
-        const response = await invokeFunction("invictuspay-pix", {
+        const response = await invokeFunction("dice-pix", {
           method: "GET",
           queryParams: { action: "status", chargeId: pixData.chargeId, orderId: `upsell-${orderId}-${addonType}` },
         });
@@ -149,44 +130,6 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }, 5000);
     return () => clearInterval(poll);
   }, [orderIdAcceptable, orderIdParam, pixData, paymentConfirmed, timeLeft, config, navigate, toast, buildNextUrl, orderId, addonType]);
-
-  const handleAcceptCard = async () => {
-    if (!orderIdAcceptable || !config || purchasing) return;
-    setPurchasing(true);
-    try {
-      const amountInCents = Math.round(config.price * 100);
-      const cardResponse = await invokeFunction("flowpay-card", {
-        method: "POST",
-        queryParams: { action: "create-upsell" },
-        body: {
-          amount: amountInCents,
-          orderId,
-          addonType,
-          description: `Upsell ${config.title}`,
-        },
-      });
-      const data = await cardResponse.json();
-      if (!cardResponse.ok || !data.success) throw new Error(data.error || "Erro ao criar cobrança");
-
-      // Store upsell context for CardPaymentCallback
-      sessionStorage.setItem('valnix_card_upsell', JSON.stringify({
-        orderId,
-        paymentId: data.paymentId,
-        addonType,
-        hash: hashParam,
-        nextRoute: config.next_route || "/",
-      }));
-
-      // Save paymentUrl for redirect from callback (avoids popup blockers)
-      sessionStorage.setItem('valnix_card_payment_url', data.paymentUrl);
-      navigate(`/card-callback?order_id=${orderId}&payment_id=${data.paymentId}`);
-    } catch (err: unknown) {
-      if (import.meta.env.DEV) console.error("Card upsell payment error:", err);
-      toast({ title: "Erro", description: getErrorMessage(err, "Erro ao processar cartão"), variant: "destructive" });
-    } finally {
-      setPurchasing(false);
-    }
-  };
 
   const handleAcceptPix = async () => {
     if (!orderIdAcceptable || !config || purchasing) return;
@@ -208,7 +151,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
       // Create PIX charge immediately
       const amountInCents = Math.round(config.price * 100);
-      const pixResponse = await invokeFunction("invictuspay-pix", {
+      const pixResponse = await invokeFunction("dice-pix", {
         method: "POST",
         queryParams: { action: "create" },
         body: {
@@ -236,7 +179,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     }
   };
 
-  const handleAccept = isCardPayment ? handleAcceptCard : handleAcceptPix;
+  const handleAccept = handleAcceptPix;
 
   const handleSkip = () => {
     if (!orderIdAcceptable) {
@@ -418,7 +361,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
             R$ {config.price.toFixed(2).replace(".", ",")}
           </p>
           <p className="text-[10px] sm:text-xs text-muted-foreground font-medium">
-            {isCardPayment ? "Pagamento único via Cartão" : "Pagamento único via PIX"}
+            Pagamento único via PIX
           </p>
         </div>
 
@@ -428,7 +371,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           onClick={handleAccept}
           disabled={purchasing}
         >
-          {purchasing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : isCardPayment ? <CreditCard className="w-5 h-5 mr-2" /> : null}
+          {purchasing ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : null}
           {config.button_accept_text}
         </Button>
 

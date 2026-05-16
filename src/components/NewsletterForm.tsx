@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/hooks/use-toast";
-import { db } from "@/integrations/firebase/config";
-import { collection, addDoc, serverTimestamp } from "firebase/firestore";
+import { supabase } from "@/integrations/supabase/client";
 import { z } from "zod";
 
 const newsletterSchema = z.object({
@@ -43,15 +42,15 @@ export const NewsletterForm = ({ showTitle = true }: NewsletterFormProps) => {
     setIsLoading(true);
 
     try {
-      const subscribersRef = collection(db, "newsletter_subscribers");
-      
-      // Write-only: no duplicate check (read is blocked by Firestore rules)
-      // Server-side deduplication can be added later if needed
-      await addDoc(subscribersRef, {
-        email: validation.data.email.toLowerCase(),
-        user_id: null,
-        created_at: serverTimestamp(),
-      });
+      const normalized = validation.data.email.toLowerCase();
+      const { error } = await supabase
+        .from("newsletter_subscribers")
+        .insert({ email: normalized, user_id: null });
+
+      // Treat unique-violation (duplicate email) as success — same UX, no leak.
+      const isDuplicate = error?.code === "23505";
+      if (error && !isDuplicate) throw error;
+
       toast({
         title: "Obrigado pela assinatura!",
         description: "Você receberá nossas novidades em breve 🎉",

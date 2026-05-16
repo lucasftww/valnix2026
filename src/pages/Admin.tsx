@@ -1,6 +1,6 @@
 import { useEffect, useState, lazy, Suspense } from "react";
 import { useNavigate } from "react-router-dom";
-import { AuthProvider, useAuth } from "@/contexts/FirebaseAuthContext";
+import { AuthProvider, useAuth } from "@/contexts/AdminAuthContext";
 import { useAdminPrefetch } from "@/hooks/useAdminPrefetch";
 import { Settings, ChevronRight } from "lucide-react";
 

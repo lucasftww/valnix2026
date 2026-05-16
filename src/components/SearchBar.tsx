@@ -38,36 +38,22 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
   const loadCatalog = useCallback(async (): Promise<Product[]> => {
     if (catalogCache) return catalogCache;
 
-    // Lazy-load Firebase only on first search interaction
-    const [config, fs] = await Promise.all([
-      import("@/integrations/firebase/config"),
-      import("firebase/firestore"),
-    ]);
-
-    const q = fs.query(fs.collection(config.db, "products"), fs.limit(500));
-
-    const firestorePromise = fs.getDocsFromServer(q);
+    // Lazy-load Supabase client only on first search interaction
+    const { supabase } = await import("@/integrations/supabase/client");
+    const queryPromise = supabase
+      .from("products")
+      .select("id,name,price,image_url,category,is_active")
+      .eq("is_active", true)
+      .limit(500);
     const timeout = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("TIMEOUT")), 4000)
+      setTimeout(() => reject(new Error("TIMEOUT")), 4000),
     );
-    firestorePromise.catch(() => {});
-    timeout.catch(() => {});
+    const result = await Promise.race([queryPromise, timeout]);
+    const { data, error } = result as { data: Product[] | null; error: { message: string } | null };
+    if (error) throw new Error(error.message);
 
-    const snapshot = await Promise.race([firestorePromise, timeout]);
-    const items = snapshot.docs.map((docSnap) => {
-      const data = docSnap.data() as Record<string, unknown>;
-      return {
-        id: docSnap.id,
-        name: String(data?.name ?? ""),
-        price: Number(data?.price ?? 0),
-        image_url: String(data?.image_url ?? ""),
-        category: String(data?.category ?? ""),
-        is_active: data?.is_active as boolean | undefined,
-      } as Product;
-    });
-
-    catalogCache = items;
-    return items;
+    catalogCache = (data ?? []) as Product[];
+    return catalogCache;
   }, []);
 
   const searchProducts = useCallback(async (searchQuery: string) => {

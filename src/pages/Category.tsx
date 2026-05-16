@@ -7,7 +7,7 @@ const FloatingContactButtons = lazy(() => import("@/components/FloatingContactBu
 import { ProductCard } from "@/components/ProductCard";
 import { ProductSkeleton } from "@/components/ProductSkeleton";
 import { CategorySidebar } from "@/components/CategorySidebar";
-import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/firebase/useFirebaseProductsWithReviews";
+import { useProductsWithReviews, useCategoryBySlug } from "@/hooks/data/useProducts";
 import { Helmet } from "react-helmet-async";
 
 

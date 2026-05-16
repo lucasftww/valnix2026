@@ -41,7 +41,7 @@
     <!-- Security Headers -->
     <meta http-equiv="X-Content-Type-Options" content="nosniff" />
     <meta name="referrer" content="strict-origin-when-cross-origin" />
-    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://connect.facebook.net https://cdn.utmify.com.br https://apis.google.com; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://media.discordapp.net https://cdn.discordapp.com https://pub-73a0e04cd31c43799c084ebb2f9dcb49.r2.dev https://storage.googleapis.com https://firebasestorage.googleapis.com https://*.googleusercontent.com https://lh3.googleusercontent.com https://www.valnix.com.br https://www.facebook.com https://connect.facebook.net; font-src 'self' data:; connect-src 'self' https://firestore.googleapis.com https://*.googleapis.com https://apis.google.com https://identitytoolkit.googleapis.com https://securetoken.googleapis.com https://oauth2.googleapis.com https://*.firebaseio.com wss://firestore.googleapis.com https://*.supabase.co https://graph.facebook.com https://api.utmify.com.br https://cdn.utmify.com.br https://flowpayments.net https://media.discordapp.net; frame-src 'self' https://*.firebaseapp.com https://apis.google.com https://cdn.utmify.com.br https://connect.facebook.net https://www.facebook.com; worker-src 'self'; form-action 'self' https://www.facebook.com; base-uri 'self'; object-src 'none';" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://connect.facebook.net https://cdn.utmify.com.br; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://*.supabase.co https://media.discordapp.net https://cdn.discordapp.com https://pub-73a0e04cd31c43799c084ebb2f9dcb49.r2.dev https://storage.googleapis.com https://www.valnix.com.br https://www.facebook.com https://connect.facebook.net; font-src 'self' data:; connect-src 'self' https://*.supabase.co https://graph.facebook.com https://api.utmify.com.br https://cdn.utmify.com.br https://*.use-dice.com https://media.discordapp.net; frame-src 'self' https://cdn.utmify.com.br https://connect.facebook.net https://www.facebook.com; worker-src 'self'; form-action 'self' https://www.facebook.com; base-uri 'self'; object-src 'none';" />
     
     <!-- Performance & Mobile Optimization -->
     <meta name="mobile-web-app-capable" content="yes" />
@@ -49,10 +49,9 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta http-equiv="X-UA-Compatible" content="IE=edge" />
     
-    <!-- DNS prefetch for secondary domains (Firebase lazy-loaded) -->
-    <link rel="dns-prefetch" href="https://firestore.googleapis.com" />
-    <link rel="dns-prefetch" href="https://identitytoolkit.googleapis.com" />
+    <!-- DNS prefetch for secondary domains -->
     <link rel="dns-prefetch" href="https://connect.facebook.net" />
+    <link rel="dns-prefetch" href="https://dev.use-dice.com" />
 
     
     <title>VALNIX</title>
@@ -92,10 +91,10 @@
       "name": "VALNIX",
       "description": "Compre Valorant Points (VP), Robux e Riot Points (RP) com entrega automática. Loja gamer segura com os melhores preços do Brasil e pagamento via PIX.",
       "url": "https://www.valnix.com.br/",
-      "logo": "https://valnixbr.com/logo.png",
+      "logo": "https://www.valnix.com.br/favicon.png",
       "image": "https://storage.googleapis.com/gpt-engineer-file-uploads/Ri0vRroGYpdpmypEOyd5IBdpKSg2/social-images/social-1764619268447-IMG_3088-removebg-preview.png",
       "priceRange": "R$ 10 - R$ 500",
-      "paymentAccepted": ["PIX", "Cartão de crédito"],
+      "paymentAccepted": ["PIX"],
       "currenciesAccepted": "BRL",
       "address": {
         "@type": "PostalAddress",

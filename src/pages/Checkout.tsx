@@ -207,7 +207,7 @@ export default function Checkout() {
 
   const isFormValid = validation.name && validation.document && validation.email && validation.phone;
 
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout>>();
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
   const handleInputChange = useCallback((field: keyof FormData, value: string) => {
     let formattedValue = value;
     if (field === 'document') {
@@ -269,7 +269,6 @@ export default function Checkout() {
       // ─── PIX PAYMENT ─────────────────────────────────────────────────
       setLoadingStage("creating");
       const cpfDigits = formData.document.replace(/\D/g, '');
-      const firebaseIdToken = null;
       const orderItemsData = items.map(item => ({
         product_id: item.id, product_name: item.name, product_image: item.image,
         quantity: item.quantity, unit_price: item.price, total_price: item.price * item.quantity,
@@ -290,10 +289,10 @@ export default function Checkout() {
         utm_source: utmParams.utm_source || null, utm_medium: utmParams.utm_medium || null,
         utm_campaign: utmParams.utm_campaign || null, utm_content: utmParams.utm_content || null,
         utm_term: utmParams.utm_term || null,
-      }, orderItemsData, firebaseIdToken);
+      }, orderItemsData, null);
 
       setLoadingStage("generating");
-      const pixResponse = await invokeFunction('invictuspay-pix', {
+      const pixResponse = await invokeFunction('dice-pix', {
         method: 'POST',
         queryParams: { action: 'create' },
         headers: {},

@@ -1,21 +1,74 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
-// CORS helper inlined to avoid any import-time crash that would make Vercel
-// return its generic HTML "A server error has occurred" page (which the
-// browser then fails to JSON.parse).
-function applyCors(res: VercelResponse) {
-  res.setHeader('Access-Control-Allow-Credentials', 'true');
-  res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,PATCH,DELETE,POST,PUT');
+const TOKEN_TTL_MS = 60 * 60 * 1000; // 1h — must match TOKEN_TTL_MS in src/lib/adminAuth.ts
+
+const ALLOWED_ORIGINS = (process.env.ADMIN_ALLOWED_ORIGINS || 'https://www.valnix.com.br,https://valnix.com.br')
+  .split(',')
+  .map((o) => o.trim())
+  .filter(Boolean);
+
+function applyCors(req: VercelRequest, res: VercelResponse) {
+  const origin = (req.headers.origin as string) || '';
+  // Only echo back an origin we know — never reflect arbitrary origins with credentials.
+  if (ALLOWED_ORIGINS.includes(origin)) {
+    res.setHeader('Access-Control-Allow-Origin', origin);
+    res.setHeader('Vary', 'Origin');
+    res.setHeader('Access-Control-Allow-Credentials', 'true');
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,OPTIONS,POST');
   res.setHeader(
     'Access-Control-Allow-Headers',
-    'X-CSRF-Token, X-Requested-With, Accept, Accept-Version, Content-Length, Content-MD5, Content-Type, Date, X-Api-Version, x-admin-token'
+    'X-CSRF-Token, X-Requested-With, Accept, Content-Type, x-admin-token'
   );
 }
 
+function constantTimeStringEqual(a: string, b: string): boolean {
+  if (typeof a !== 'string' || typeof b !== 'string') return false;
+  // Compare byte buffers of equal length via XOR. If lengths differ, still iterate
+  // over max length to keep timing roughly constant per request.
+  const ba = Buffer.from(a, 'utf8');
+  const bb = Buffer.from(b, 'utf8');
+  const len = Math.max(ba.length, bb.length);
+  let diff = ba.length ^ bb.length;
+  for (let i = 0; i < len; i++) {
+    diff |= (ba[i] ?? 0) ^ (bb[i] ?? 0);
+  }
+  return diff === 0;
+}
+
+async function signToken(adminPassword: string): Promise<string> {
+  const { createHmac, randomBytes } = await import('crypto');
+  const ts = Date.now().toString(16);
+  const nonce = randomBytes(16).toString('hex');
+  const sig = createHmac('sha256', adminPassword)
+    .update(`${ts}.${nonce}`)
+    .digest('hex');
+  return `${ts}.${nonce}.${sig}`;
+}
+
+async function verifyToken(token: string, adminPassword: string): Promise<boolean> {
+  const parts = token.split('.');
+  if (parts.length !== 3) return false;
+  const [tsHex, nonce, sig] = parts;
+  const ts = parseInt(tsHex, 16);
+  if (!Number.isFinite(ts) || Date.now() - ts > TOKEN_TTL_MS) return false;
+  if (!/^[0-9a-f]+$/i.test(nonce) || !/^[0-9a-f]+$/i.test(sig)) return false;
+
+  const { createHmac, timingSafeEqual } = await import('crypto');
+  const expected = createHmac('sha256', adminPassword)
+    .update(`${tsHex}.${nonce}`)
+    .digest('hex');
+  try {
+    const a = Buffer.from(sig, 'hex');
+    const b = Buffer.from(expected, 'hex');
+    return a.length === b.length && timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
-  // Apply CORS first, in its own try, so even a CORS failure can't break JSON output
-  try { applyCors(res); } catch { /* noop */ }
+  try { applyCors(req, res); } catch { /* noop */ }
 
   try {
     if (req.method === 'OPTIONS') {
@@ -25,7 +78,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (req.method === 'POST') {
-      // Defensive body parsing — Vercel may deliver body as string, object, Buffer, or undefined
       let parsedBody: any = req.body;
       if (Buffer.isBuffer(parsedBody)) {
         try { parsedBody = JSON.parse(parsedBody.toString('utf8')); } catch { parsedBody = {}; }
@@ -45,17 +97,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(400).json({ error: 'Senha é obrigatória.' });
       }
 
-      if (password === adminPassword) {
-        // Lazy require so any module-resolution problem still produces a JSON error,
-        // not Vercel's HTML 500 page.
-        const { createHmac } = await import('crypto');
-        const token = createHmac('sha256', adminPassword)
-          .update('admin-access')
-          .digest('hex');
-        return res.status(200).json({ token });
+      if (!constantTimeStringEqual(password, adminPassword)) {
+        return res.status(401).json({ error: 'Senha incorreta.' });
       }
 
-      return res.status(401).json({ error: 'Senha incorreta.' });
+      const token = await signToken(adminPassword);
+      return res.status(200).json({ token });
     }
 
     if (req.method === 'GET') {
@@ -66,24 +113,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (!token) {
         return res.status(200).json({ valid: false });
       }
-      const { createHmac, timingSafeEqual } = await import('crypto');
-      const expected = createHmac('sha256', adminPassword).update('admin-access').digest('hex');
-      let valid = false;
-      try {
-        const a = Buffer.from(token, 'hex');
-        const b = Buffer.from(expected, 'hex');
-        valid = a.length === b.length && timingSafeEqual(a, b);
-      } catch {
-        valid = false;
-      }
+      const valid = await verifyToken(token, adminPassword);
       return res.status(200).json({ valid });
     }
 
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (err: any) {
-    // Always return JSON so the client never sees raw HTML/text
     const message = err?.message || (typeof err === 'string' ? err : 'Internal server error');
-    try { console.error('admin-auth handler error:', message); } catch { /* noop */ }
-    return res.status(500).json({ error: message });
+    if (process.env.NODE_ENV !== 'production') {
+      try { console.error('admin-auth handler error:', message); } catch { /* noop */ }
+    }
+    return res.status(500).json({ error: 'Internal server error' });
   }
 }

@@ -162,7 +162,7 @@ type FbqStub = ((...args: unknown[]) => void) & {
 // ── 4. UTMify loader — lazy, guarded, skips admin/checkout, delayed 4s ──
 (function loadUtmify() {
   const path = location.pathname;
-  if (/^\/(admin|checkout|card-callback)(\/|$)/.test(path)) return;
+  if (/^\/(admin|charles|checkout)(\/|$)/.test(path)) return;
 
   if (window.__utmify_loaded === true) return;
   window.__utmify_loaded = true;

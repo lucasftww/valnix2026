@@ -5,7 +5,7 @@
  */
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_KEYS, UI_CONFIG } from "@/lib/constants";
-import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/firestoreFallback";
+import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/publicData";
 import { generateConsistentSalesAndReviews } from "@/lib/productUtils";
 import { deduplicateCategories, buildCategoryTree } from "@/lib/categoryUtils";
 import type { ProductCardData, Category } from "@/types";

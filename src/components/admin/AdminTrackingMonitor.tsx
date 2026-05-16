@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { useAuth } from "@/contexts/AdminAuthContext";
 import { useState } from "react";
 import { useToast } from "@/hooks/use-toast";
 import {

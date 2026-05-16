@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback, lazy, Suspense } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
-import { useAuth } from "@/contexts/FirebaseAuthContext";
+import { useAuth } from "@/contexts/AdminAuthContext";
 import { AdminErrorState } from "./AdminErrorState";
 import { invokeFunction } from "@/lib/apiHelper";
 import { format } from 'date-fns';

@@ -5,7 +5,7 @@ import "./bootstrap";
 import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
-import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/firestoreFallback";
+import { fetchFeaturedProductsFallback, fetchCategoriesFallback } from "@/lib/publicData";
 import { queryClient } from "@/lib/queryClient";
 import { QUERY_KEYS } from "@/lib/constants";
 import { buildFeaturedProductCards, buildCategoriesList } from "@/hooks/useApiData";

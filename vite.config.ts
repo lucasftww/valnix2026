@@ -1,7 +1,6 @@
 import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react-swc";
 import path from "path";
-import { componentTagger } from "lovable-tagger";
 import { VitePWA } from 'vite-plugin-pwa';
 import { visualizer } from 'rollup-plugin-visualizer';
 
@@ -14,7 +13,6 @@ export default defineConfig(({ mode }) => ({
   },
   plugins: [
     react(),
-    mode === "development" && componentTagger(),
     VitePWA({
       strategies: 'injectManifest',
       srcDir: 'src',
@@ -66,8 +64,8 @@ export default defineConfig(({ mode }) => ({
         manualChunks: {
           'vendor': ['react', 'react-dom', 'react-router-dom'],
           'query': ['@tanstack/react-query'],
-          // Firebase, Radix, charts, carousel: NOT in manualChunks
-          // so Vite only loads them when actually imported by a route
+          // Radix, charts, carousel: NOT in manualChunks so Vite only loads
+          // them when actually imported by a route.
         },
         assetFileNames: (assetInfo) => {
           if (!assetInfo.name) return 'assets/[name]-[hash][extname]';
@@ -89,13 +87,12 @@ export default defineConfig(({ mode }) => ({
     cssMinify: true,
     modulePreload: {
       // Only preload chunks that are directly imported (not lazy chunks)
-      resolveDependencies: (filename, deps) => {
-        return deps.filter(dep => 
-          !dep.includes('charts') && 
-          !dep.includes('carousel') && 
+      resolveDependencies: (_filename, deps) => {
+        return deps.filter(dep =>
+          !dep.includes('charts') &&
+          !dep.includes('carousel') &&
           !dep.includes('Admin') &&
           !dep.includes('recharts') &&
-          !dep.includes('firebase') &&
           !dep.includes('autoplay') &&
           !dep.includes('embla')
         );

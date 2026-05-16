@@ -1,8 +1,7 @@
 import { memo, useMemo, useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { Star, ChevronRight } from "lucide-react";
-import { useCategoryProducts } from "@/hooks/firebase/useFirebaseProducts";
-import { generateConsistentSalesAndReviews } from "@/hooks/firebase/useFirebaseProducts";
+import { useCategoryProducts, generateConsistentSalesAndReviews } from "@/hooks/data/useProducts";
 import { formatPrice, ROUTES } from "@/lib/constants";
 import type { EmblaPluginType } from "embla-carousel";
 import {
