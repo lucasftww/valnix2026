@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '../../src/integrations/supabase/types';
+import type { Database } from '../../src/integrations/supabase/types.js';
 
 // ============================================================================
 // Server-side Supabase client (Vercel Functions only).

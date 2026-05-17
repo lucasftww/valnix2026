@@ -1,7 +1,35 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_utils/supabase.js';
-import { verifyAdminToken, setCorsHeaders } from './_utils/helpers.js';
+import { verifyAdminToken, setCorsHeaders, signInternalRequest } from './_utils/helpers.js';
 import axios from 'axios';
+
+// ── Field allowlists for admin write operations ──────────────────────────────
+// Never spread raw body into .update()/.upsert() — admins should be able to
+// edit content fields, not silently overwrite system fields like
+// payment_status, paid_at, guest_hash, flowpay_charge_id, etc.
+const ORDER_EDITABLE = new Set([
+  'customer_name', 'customer_email', 'customer_phone', 'customer_document',
+  'status', 'notes',
+]);
+const PRODUCT_EDITABLE = new Set([
+  'name', 'description', 'rich_description', 'price', 'old_price', 'discount',
+  'image_url', 'icon_url', 'category', 'is_active', 'featured', 'is_featured_in_category',
+  'display_order', 'stock', 'sold', 'delivery_type', 'delivery_info',
+  'auto_delivery_codes', 'instructions', 'terms_conditions', 'video_url',
+  'product_type', 'offer_hash',
+]);
+const CATEGORY_EDITABLE = new Set([
+  'name', 'slug', 'description', 'image_url', 'icon_url', 'parent_id',
+  'is_active', 'display_order', 'show_on_homepage',
+]);
+
+function filterFields<T extends Record<string, unknown>>(body: T, allow: Set<string>): Partial<T> {
+  const out: Record<string, unknown> = {};
+  for (const k of Object.keys(body)) {
+    if (allow.has(k)) out[k] = body[k];
+  }
+  return out as Partial<T>;
+}
 
 type PeriodKey = 'today' | '7d' | '30d';
 
@@ -200,12 +228,14 @@ async function buildDashboardStats(): Promise<Record<string, unknown>> {
   };
 }
 
+const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}(T\d{2}:\d{2}(:\d{2}(\.\d+)?)?(Z|[+-]\d{2}:?\d{2})?)?$/;
+
 async function handleCleanupAnalytics(res: VercelResponse, body: Record<string, unknown>) {
   const after_date = String(body.after_date || '');
   const before_date = String(body.before_date || '');
   const dry_run = Boolean(body.dry_run);
-  if (!after_date || !before_date) {
-    return res.status(400).json({ error: 'after_date and before_date required', success: false });
+  if (!ISO_DATE_RE.test(after_date) || !ISO_DATE_RE.test(before_date)) {
+    return res.status(400).json({ error: 'after_date and before_date must be ISO timestamps', success: false });
   }
 
   if (dry_run) {
@@ -215,7 +245,10 @@ async function handleCleanupAnalytics(res: VercelResponse, body: Record<string, 
       .gte('timestamp', after_date)
       .lte('timestamp', before_date)
       .limit(20);
-    if (error) return res.status(500).json({ error: error.message });
+    if (error) {
+      console.error('[admin-data] cleanup dry-run error:', error.message);
+      return res.status(500).json({ error: 'Internal server error' });
+    }
     return res.status(200).json({
       dry_run: true,
       would_delete: count ?? 0,
@@ -228,7 +261,10 @@ async function handleCleanupAnalytics(res: VercelResponse, body: Record<string, 
     .delete({ count: 'exact' })
     .gte('timestamp', after_date)
     .lte('timestamp', before_date);
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[admin-data] cleanup error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
   return res.status(200).json({ success: true, deleted: count ?? 0 });
 }
 
@@ -237,7 +273,10 @@ async function handleCleanupCapiLogs(res: VercelResponse) {
     .from('analytics_events')
     .delete({ count: 'exact' })
     .eq('status', 'failed');
-  if (error) return res.status(500).json({ error: error.message });
+  if (error) {
+    console.error('[admin-data] cleanup capi logs error:', error.message);
+    return res.status(500).json({ error: 'Internal server error' });
+  }
   return res.status(200).json({ success: true, deleted: count ?? 0 });
 }
 
@@ -388,16 +427,44 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const payment_status = String(body.payment_status || 'paid');
           const status = String(body.status || 'processing');
           const update: Record<string, unknown> = { payment_status, status };
-          if (payment_status === 'paid') update.paid_at = new Date().toISOString();
-          const { error } = await supabaseAdmin.from('orders').update(update).eq('id', id);
+
+          // Only set paid_at when first transitioning to paid (idempotent re-calls
+          // don't overwrite the original timestamp).
+          if (payment_status === 'paid') {
+            const { data: cur } = await supabaseAdmin
+              .from('orders')
+              .select('paid_at')
+              .eq('id', id)
+              .maybeSingle();
+            if (cur && !cur.paid_at) update.paid_at = new Date().toISOString();
+          }
+          const { error } = await supabaseAdmin.from('orders').update(update as never).eq('id', id);
           if (error) throw new Error(error.message);
+
+          // Trigger auto-delivery in the background (best-effort). Uses an internal
+          // signature so process-delivery doesn't require an admin token here.
+          if (payment_status === 'paid') {
+            try {
+              const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
+              const host = req.headers.host;
+              if (host) {
+                const payload = JSON.stringify({ orderId: id });
+                const sig = signInternalRequest(payload);
+                await axios.post(`${proto}://${host}/api/process-delivery`, { orderId: id }, {
+                  headers: { 'Content-Type': 'application/json', 'X-Internal-Signature': sig },
+                  timeout: 15_000,
+                }).catch(() => null); // best-effort
+              }
+            } catch { /* noop */ }
+          }
           return res.status(200).json({ success: true });
         }
         case 'orders': {
           const id = String(body.id || '');
           if (!id) return res.status(400).json({ error: 'id required' });
           const { id: _i, ...rest } = body;
-          const { error } = await supabaseAdmin.from('orders').update(rest as never).eq('id', id);
+          const clean = filterFields(rest as Record<string, unknown>, ORDER_EDITABLE);
+          const { error } = await supabaseAdmin.from('orders').update(clean as never).eq('id', id);
           if (error) throw new Error(error.message);
           return res.status(200).json({ success: true });
         }
@@ -405,7 +472,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const id = String(body.id || '');
           if (!id) return res.status(400).json({ error: 'id required' });
           const { id: _i, ...rest } = body;
-          const { error } = await supabaseAdmin.from('products').update(rest as never).eq('id', id);
+          const clean = filterFields(rest as Record<string, unknown>, PRODUCT_EDITABLE);
+          const { error } = await supabaseAdmin.from('products').update(clean as never).eq('id', id);
           if (error) throw new Error(error.message);
           return res.status(200).json({ success: true });
         }
@@ -413,14 +481,15 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const id = String(body.id || '');
           if (!id) return res.status(400).json({ error: 'id required' });
           const { id: _i, ...rest } = body;
-          const { error } = await supabaseAdmin.from('categories').update(rest as never).eq('id', id);
+          const clean = filterFields(rest as Record<string, unknown>, CATEGORY_EDITABLE);
+          const { error } = await supabaseAdmin.from('categories').update(clean as never).eq('id', id);
           if (error) throw new Error(error.message);
           return res.status(200).json({ success: true });
         }
         case 'order-items': {
           const orderId = String(body.orderId || '');
           const itemId = String(body.id || '');
-          const delivery_code = String(body.delivery_code ?? '');
+          const delivery_code = typeof body.delivery_code === 'string' ? body.delivery_code.slice(0, 500) : '';
           if (!orderId || !itemId) return res.status(400).json({ error: 'orderId and id required' });
           const { error } = await supabaseAdmin
             .from('order_items')
@@ -470,10 +539,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       switch (resource) {
         case 'products': {
-          // Upsert (id may be provided for update or omitted for new product)
+          const incoming = body as Record<string, unknown>;
+          const clean = filterFields(incoming, PRODUCT_EDITABLE) as Record<string, unknown>;
+          // Preserve id when present (for upsert) — it's NOT in the editable set
+          // because that set protects against PUT-overwrite of system fields.
+          if (typeof incoming.id === 'string') clean.id = incoming.id;
           const { error, data } = await supabaseAdmin
             .from('products')
-            .upsert(body as never, { onConflict: 'id' })
+            .upsert(clean as never, { onConflict: 'id' })
             .select('id')
             .single();
           if (error) throw new Error(error.message);
@@ -481,9 +554,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         }
         case 'categories': {
           const { id: _unused, ...rest } = body;
+          const clean = filterFields(rest as Record<string, unknown>, CATEGORY_EDITABLE);
           const { data, error } = await supabaseAdmin
             .from('categories')
-            .insert(rest as never)
+            .insert(clean as never)
             .select('id')
             .single();
           if (error) throw new Error(error.message);
@@ -497,7 +571,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).json({ error: 'Method not allowed' });
   } catch (error: unknown) {
     const message = error instanceof Error ? error.message : 'Unknown error';
-    if (process.env.NODE_ENV !== 'production') console.error('Admin API error:', message);
+    console.error('[admin-data] error:', message);
     return res.status(500).json({ error: 'Internal server error' });
   }
 }

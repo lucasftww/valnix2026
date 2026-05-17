@@ -44,10 +44,33 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       .eq('order_id', order.id);
     if (itemsErr) throw new Error(itemsErr.message);
 
-    return res.status(200).json({ order, items: items ?? [] });
+    // Mask the email — the hash can leak via browser history/shared URLs; we
+    // confirm the customer's name and last 4 letters of the local part is
+    // enough for the order page UI without exposing the full address.
+    const maskedEmail = maskEmail(order.customer_email);
+
+    return res.status(200).json({
+      order: { ...order, customer_email: maskedEmail },
+      items: items ?? [],
+    });
   } catch (error: unknown) {
     const message = errorMessage(error);
     if (process.env.NODE_ENV !== 'production') console.error('[guest-order] error:', message);
     return res.status(500).json({ error: 'Internal server error' });
   }
+}
+
+function maskEmail(email: string | null | undefined): string | null {
+  if (!email || typeof email !== 'string') return null;
+  const at = email.indexOf('@');
+  if (at <= 0) return null;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  const head = local.slice(0, Math.min(2, local.length));
+  const masked = head + '***';
+  // Domain: keep TLD + first letter (e.g. "g***.com")
+  const dot = domain.lastIndexOf('.');
+  const domName = dot > 0 ? domain.slice(0, dot) : domain;
+  const tld = dot > 0 ? domain.slice(dot) : '';
+  return `${masked}@${domName[0] ?? ''}***${tld}`;
 }

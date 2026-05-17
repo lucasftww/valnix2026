@@ -1,6 +1,8 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { rateLimit, clientIp } from './_utils/helpers.js';
 
 const TOKEN_TTL_MS = 60 * 60 * 1000; // 1h — must match TOKEN_TTL_MS in src/lib/adminAuth.ts
+const CLOCK_SKEW_MS = 60_000;
 
 const ALLOWED_ORIGINS = (process.env.ADMIN_ALLOWED_ORIGINS || 'https://www.valnix.com.br,https://valnix.com.br')
   .split(',')
@@ -51,7 +53,10 @@ async function verifyToken(token: string, adminPassword: string): Promise<boolea
   if (parts.length !== 3) return false;
   const [tsHex, nonce, sig] = parts;
   const ts = parseInt(tsHex, 16);
-  if (!Number.isFinite(ts) || Date.now() - ts > TOKEN_TTL_MS) return false;
+  if (!Number.isFinite(ts)) return false;
+  const now = Date.now();
+  if (now - ts > TOKEN_TTL_MS) return false;
+  if (ts - now > CLOCK_SKEW_MS) return false;
   if (!/^[0-9a-f]+$/i.test(nonce) || !/^[0-9a-f]+$/i.test(sig)) return false;
 
   const { createHmac, timingSafeEqual } = await import('crypto');
@@ -78,6 +83,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const adminPassword = process.env.ADMIN_PASSWORD;
 
     if (req.method === 'POST') {
+      // Rate-limit login: 8 attempts / 15 min per IP. Brutally narrow window
+      // to make online brute-force impractical even with a weak password.
+      const ip = clientIp(req);
+      if (!rateLimit(`admin-login:${ip}`, 8, 15 * 60_000)) {
+        return res.status(429).json({ error: 'Muitas tentativas. Aguarde 15 minutos.' });
+      }
+
       let parsedBody: any = req.body;
       if (Buffer.isBuffer(parsedBody)) {
         try { parsedBody = JSON.parse(parsedBody.toString('utf8')); } catch { parsedBody = {}; }

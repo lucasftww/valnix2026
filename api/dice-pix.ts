@@ -1,25 +1,29 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_utils/supabase.js';
-import { setCorsHeaders, errorMessage } from './_utils/helpers.js';
+import { setCorsHeaders, errorMessage, isUuid } from './_utils/helpers.js';
 import { DICE_BASE_URL, diceCredsConfigured, diceFetch, pickField } from './_utils/dice.js';
 import axios, { isAxiosError } from 'axios';
 
 /**
- * Dice PIX gateway adapter. Mirrors the contract the front-end expected from
- * the legacy invictuspay-pix endpoint, so consumers only need to swap the
- * function name.
+ * Dice PIX gateway adapter.
  *
  *   POST /api/dice-pix?action=create
- *     body: { amount(int cents), orderId, description, customer:{name,email,phone,taxId} }
+ *     body: { amount(int cents), orderId, description?, customer:{name,email,phone,taxId} }
  *     → { success, brCode, chargeId, expiresIn }
  *
- *   GET  /api/dice-pix?action=status&chargeId=<dice_transaction_id>&orderId=<our_order_id>
+ *   GET  /api/dice-pix?action=status&chargeId=<dice_transaction_id>
  *     → { success, status: 'PENDING'|'COMPLETED'|'FAILED'|'RETIDO' }
+ *     NOTE: the client should NOT pass orderId. We resolve the order from
+ *     `orders.flowpay_charge_id = chargeId` server-side to prevent cross-order
+ *     spoofing (attacker reusing their own completed chargeId to flip someone
+ *     else's pending order to paid).
  *
- * orderId may be prefixed with "upsell-" — those don't have a row in `orders`.
+ * `orderId` for upsells is `upsell-<orderId>-<addonType>`. Upsell amounts are
+ * validated against `post_payment_pages.price` (or `sale_addons.amount` if a
+ * pre-created row exists) — the client cannot dictate the price.
  *
  * Env: DICE_CLIENT_ID, DICE_CLIENT_SECRET, DICE_BASE_URL (optional),
- *      DICE_WEBHOOK_URL (optional — sent as clientCallbackUrl per request).
+ *      DICE_WEBHOOK_URL (recommended in prod — hardcoded webhook target).
  */
 
 function ensureCreds(res: VercelResponse): boolean {
@@ -34,7 +38,6 @@ function ensureCreds(res: VercelResponse): boolean {
   return true;
 }
 
-/** Map gateway/network exceptions to user-friendly codes the front can branch on. */
 function classifyGatewayError(err: unknown): { code: string; userMessage: string } {
   if (isAxiosError(err)) {
     const status = err.response?.status;
@@ -56,12 +59,28 @@ function classifyGatewayError(err: unknown): { code: string; userMessage: string
 }
 
 function buildWebhookUrl(req: VercelRequest): string | undefined {
-  if (process.env.DICE_WEBHOOK_URL) return process.env.DICE_WEBHOOK_URL;
+  const explicit = process.env.DICE_WEBHOOK_URL;
+  const secret = process.env.DICE_WEBHOOK_SECRET || '';
+  // Append the shared secret as a query param so Dice's POSTs are accepted by
+  // /api/dice-webhook. Without this, every webhook fails 401 (by design).
+  const appendSecret = (url: string): string => {
+    if (!secret) return url;
+    const sep = url.includes('?') ? '&' : '?';
+    return `${url}${sep}secret=${encodeURIComponent(secret)}`;
+  };
+  if (explicit) return appendSecret(explicit);
   // Fall back to the host that received this request — works in prod and previews.
   const proto = (req.headers['x-forwarded-proto'] as string) || 'https';
   const host = req.headers.host;
   if (!host) return undefined;
-  return `${proto}://${host}/api/dice-webhook`;
+  return appendSecret(`${proto}://${host}/api/dice-webhook`);
+}
+
+/** Upsell external_id format: `upsell-<orderId>-<addonType>` */
+function parseUpsell(id: string): { orderId: string; addonType: string } | null {
+  const m = id.match(/^upsell-([0-9a-f-]{36})-([a-z_]+)$/);
+  if (!m) return null;
+  return { orderId: m[1], addonType: m[2] };
 }
 
 async function createCharge(req: VercelRequest, res: VercelResponse) {
@@ -70,23 +89,55 @@ async function createCharge(req: VercelRequest, res: VercelResponse) {
   const body = (req.body ?? {}) as Record<string, unknown>;
   const amountCents = Number(body.amount);
   const orderId = typeof body.orderId === 'string' ? body.orderId : '';
-  const description = typeof body.description === 'string' ? body.description : `Pedido ${orderId.slice(0, 8)}`;
-  const customer = (body.customer ?? {}) as Record<string, unknown>;
+  const description =
+    typeof body.description === 'string' && body.description.length <= 120
+      ? body.description
+      : `Pedido ${orderId.slice(0, 8)}`;
 
-  if (!Number.isInteger(amountCents) || amountCents < 200 || amountCents > 100_000_00) {
-    // Dice minimum is R$ 2,00 = 200 cents.
+  if (!Number.isInteger(amountCents) || amountCents < 200 || amountCents > 10_000_00) {
     return res.status(400).json({
-      error: 'amount must be cents between 200 (R$ 2,00) and 10000000',
+      error: 'amount must be cents between 200 (R$ 2,00) and 1000000',
       code: 'amount_out_of_range',
     });
   }
   if (!orderId) return res.status(400).json({ error: 'orderId required', code: 'order_id_missing' });
 
-  const isUpsell = orderId.startsWith('upsell-');
-  if (!isUpsell) {
+  const upsell = parseUpsell(orderId);
+  const isUpsell = !!upsell;
+
+  // ── Resolve canonical customer info & expected amount from the DB ──
+  let customerName = 'Cliente';
+  let customerEmail: string | undefined;
+  let customerDoc: string | undefined;
+  let expectedCents: number;
+
+  if (isUpsell) {
+    // Validate addon_type is known, fetch its configured price.
+    const { data: page, error: pageErr } = await supabaseAdmin
+      .from('post_payment_pages')
+      .select('price,addon_type,is_active')
+      .eq('addon_type', upsell.addonType)
+      .maybeSingle();
+    if (pageErr) return res.status(500).json({ error: 'Internal server error' });
+    if (!page || !page.is_active) return res.status(404).json({ error: 'Upsell not available' });
+    expectedCents = Math.round(Number(page.price) * 100);
+
+    // Use the original order's customer info (security: prevents identity swap).
+    const { data: order } = await supabaseAdmin
+      .from('orders')
+      .select('customer_name,customer_email,customer_document')
+      .eq('id', upsell.orderId)
+      .maybeSingle();
+    if (order) {
+      customerName = order.customer_name || customerName;
+      customerEmail = order.customer_email || undefined;
+      customerDoc = order.customer_document || undefined;
+    }
+  } else {
+    if (!isUuid(orderId)) return res.status(400).json({ error: 'invalid orderId' });
     const { data: order, error } = await supabaseAdmin
       .from('orders')
-      .select('id,total_amount,payment_status')
+      .select('id,total_amount,payment_status,customer_name,customer_email,customer_document')
       .eq('id', orderId)
       .maybeSingle();
     if (error) return res.status(500).json({ error: 'Internal server error' });
@@ -94,28 +145,31 @@ async function createCharge(req: VercelRequest, res: VercelResponse) {
     if (order.payment_status === 'paid') {
       return res.status(409).json({ error: 'Order already paid' });
     }
-    const expectedCents = Math.round(Number(order.total_amount) * 100);
-    if (Math.abs(expectedCents - amountCents) > 1) {
-      return res.status(400).json({ error: 'amount mismatch with order total' });
-    }
+    expectedCents = Math.round(Number(order.total_amount) * 100);
+    customerName = order.customer_name || customerName;
+    customerEmail = order.customer_email || undefined;
+    customerDoc = order.customer_document || undefined;
   }
 
-  const amountBrl = Math.round(amountCents) / 100;
+  if (Math.abs(expectedCents - amountCents) > 1) {
+    return res
+      .status(400)
+      .json({ error: 'amount mismatch with server-side total', code: 'amount_mismatch' });
+  }
+
+  // Use the smaller of the two — defense in depth.
+  const amountBrl = Number((Math.round(amountCents) / 100).toFixed(2));
 
   try {
-    const docDigits = typeof customer.taxId === 'string' ? customer.taxId.replace(/\D/g, '') : undefined;
-
-    // V2 = dynamic checkout. Required by our flow because the storefront
-    // generates the amount on demand instead of mapping to pre-built products.
     const payload = {
       product_name: description,
       amount: amountBrl,
       external_id: orderId,
       clientCallbackUrl: buildWebhookUrl(req),
       payer: {
-        name: typeof customer.name === 'string' ? customer.name : 'Cliente',
-        email: typeof customer.email === 'string' ? customer.email : undefined,
-        document: docDigits || undefined,
+        name: customerName,
+        email: customerEmail,
+        document: customerDoc,
       },
     };
 
@@ -127,12 +181,10 @@ async function createCharge(req: VercelRequest, res: VercelResponse) {
       return r.data as Record<string, unknown>;
     });
 
-    const txId =
-      pickField<string>(data, ['transaction_id', 'id', 'transactionId']) || '';
+    const txId = pickField<string>(data, ['transaction_id', 'id', 'transactionId']) || '';
     const brCode = pickField<string>(data, ['qr_code_text', 'qrCode', 'pix_code', 'brCode', 'copy_paste']);
     const expiresIn =
-      pickField<number>(data, ['expires_in', 'expirationInSeconds', 'expiration_in_seconds', 'expiresIn']) ??
-      3600;
+      pickField<number>(data, ['expires_in', 'expirationInSeconds', 'expiration_in_seconds', 'expiresIn']) ?? 3600;
 
     if (!txId || !brCode) {
       if (process.env.NODE_ENV !== 'production') console.error('[dice-pix] unexpected response:', data);
@@ -142,14 +194,32 @@ async function createCharge(req: VercelRequest, res: VercelResponse) {
       });
     }
 
-    if (!isUpsell) {
-      const expiresAtIso = pickField<string>(data, ['expires_at', 'expiration_at', 'expiresAt']);
+    const expiresAtIso =
+      pickField<string>(data, ['expires_at', 'expiration_at', 'expiresAt']) ??
+      new Date(Date.now() + expiresIn * 1000).toISOString();
+
+    if (isUpsell) {
+      // Upsert sale_addons row with the charge metadata. Server-controlled, never trusts client.
+      await supabaseAdmin
+        .from('sale_addons')
+        .upsert(
+          {
+            order_id: upsell!.orderId,
+            addon_type: upsell!.addonType,
+            status: 'pending',
+            amount: amountBrl,
+            pix_code: brCode,
+            flowpay_charge_id: txId,
+          } as never,
+          { onConflict: 'order_id,addon_type' },
+        );
+    } else {
       await supabaseAdmin
         .from('orders')
         .update({
           flowpay_charge_id: txId,
           pix_code: brCode,
-          pix_expires_at: expiresAtIso ?? new Date(Date.now() + expiresIn * 1000).toISOString(),
+          pix_expires_at: expiresAtIso,
         } as never)
         .eq('id', orderId);
     }
@@ -172,8 +242,9 @@ async function getStatus(req: VercelRequest, res: VercelResponse) {
   if (!ensureCreds(res)) return;
 
   const chargeId = typeof req.query.chargeId === 'string' ? req.query.chargeId : '';
-  const orderId = typeof req.query.orderId === 'string' ? req.query.orderId : '';
-  if (!chargeId) return res.status(400).json({ error: 'chargeId required' });
+  if (!chargeId || chargeId.length < 6 || chargeId.length > 256) {
+    return res.status(400).json({ error: 'chargeId required' });
+  }
 
   try {
     const data = await diceFetch(async (token) => {
@@ -185,7 +256,6 @@ async function getStatus(req: VercelRequest, res: VercelResponse) {
     });
 
     const rawStatus = String(pickField(data, ['status', 'transaction_status']) ?? 'PENDING').toUpperCase();
-    // Normalize Dice's vocabulary into the small set the front-end already handles.
     const status =
       rawStatus === 'COMPLETED' || rawStatus === 'PAID' || rawStatus === 'APPROVED'
         ? 'COMPLETED'
@@ -195,16 +265,46 @@ async function getStatus(req: VercelRequest, res: VercelResponse) {
             ? 'RETIDO'
             : 'PENDING';
 
-    if (status === 'COMPLETED' && orderId && !orderId.startsWith('upsell-')) {
-      await supabaseAdmin
+    // ── Status mirror (best-effort, idempotent) ─────────────────────────
+    // We DO NOT take orderId from the client. The order is looked up by the
+    // charge_id stored when this charge was created — this prevents an attacker
+    // from passing their own completed chargeId together with someone else's
+    // orderId to flip a stranger's order paid.
+    //
+    // Authoritative source remains the webhook (which also verifies amount).
+    // This polling path is a UX accelerant only.
+    if (status === 'COMPLETED') {
+      const { data: order } = await supabaseAdmin
         .from('orders')
-        .update({
-          payment_status: 'paid',
-          status: 'processing',
-          paid_at: new Date().toISOString(),
-        } as never)
-        .eq('id', orderId)
-        .eq('payment_status', 'pending');
+        .select('id,total_amount,payment_status')
+        .eq('flowpay_charge_id', chargeId)
+        .maybeSingle();
+
+      if (order && order.payment_status === 'pending') {
+        // Best-effort amount check too — same as webhook.
+        const amountRaw = pickField<number | string>(data, ['amount', 'amount_brl', 'paid_amount', 'value']);
+        const paidBrl =
+          typeof amountRaw === 'number'
+            ? amountRaw
+            : typeof amountRaw === 'string'
+              ? Number(amountRaw)
+              : Number(order.total_amount);
+        const expectedCents = Math.round(Number(order.total_amount) * 100);
+        const paidCents = Math.round(paidBrl * 100);
+        if (Math.abs(expectedCents - paidCents) <= 1) {
+          await supabaseAdmin
+            .from('orders')
+            .update({
+              payment_status: 'paid',
+              status: 'processing',
+              paid_at: new Date().toISOString(),
+            } as never)
+            .eq('id', order.id)
+            .eq('payment_status', 'pending');
+          // Delivery is triggered by the webhook. The polling path is just a
+          // UX hint so the UI doesn't have to wait for the webhook callback.
+        }
+      }
     }
 
     return res.status(200).json({ success: true, status });

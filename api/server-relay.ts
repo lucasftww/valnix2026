@@ -1,7 +1,22 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_utils/supabase.js';
-import { errorMessage, hashData, setCorsHeaders } from './_utils/helpers.js';
+import {
+  errorMessage,
+  hashData,
+  setCorsHeaders,
+  verifyAdminToken,
+  verifyInternalSignature,
+  rateLimit,
+  clientIp,
+} from './_utils/helpers.js';
 import axios, { isAxiosError } from 'axios';
+
+function firstXff(req: VercelRequest): string | undefined {
+  const xff = req.headers['x-forwarded-for'];
+  if (typeof xff === 'string') return xff.split(',')[0].trim();
+  if (Array.isArray(xff) && xff.length) return String(xff[0]).split(',')[0].trim();
+  return undefined;
+}
 
 /** Accepts nested `{ event, userData, customData }` or flat payloads. */
 function normalizeRelayBody(raw: unknown): {
@@ -89,10 +104,27 @@ async function getMetaCredentials(): Promise<{ accessToken: string; pixelId: str
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req);
   if (req.method === 'OPTIONS') return res.status(200).end();
+  if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
-  // ── Lite relay (no DB log) — consumed internally by admin-data?resource=capi-replay
+  // ── Public path rate-limit (the storefront fires high-volume tracking) ──
+  const ip = clientIp(req);
+  if (!rateLimit(`relay:${ip}`, 120, 60_000)) {
+    return res.status(429).json({ error: 'Too many requests' });
+  }
+
+  // ── Lite relay (no DB log) — internal only ───────────────────────────
+  // Used by admin-data?resource=capi-replay. Requires either an admin token
+  // (replay UI) or an internal signature (server-to-server). Without this
+  // gate, anyone could pump our Meta pixel with fake events.
   const action = typeof req.query.action === 'string' ? req.query.action : '';
   if (action === 'lite') {
+    const adminTok = (req.headers['x-admin-token'] as string) || '';
+    const internalSig = (req.headers['x-internal-signature'] as string) || '';
+    const rawBody = typeof req.body === 'string' ? req.body : JSON.stringify(req.body ?? {});
+    if (!verifyAdminToken(adminTok) && !verifyInternalSignature(internalSig, rawBody)) {
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
     try {
       const { event, userData, customData, event_id, url } = normalizeRelayBody(req.body);
       const creds = await getMetaCredentials();
@@ -107,7 +139,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_data: {
             em: hashData(userData?.email?.trim().toLowerCase()),
             ph: hashData(userData?.phone?.trim().replace(/\D/g, '')),
-            client_ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            client_ip_address: firstXff(req) || req.socket.remoteAddress,
             client_user_agent: req.headers['user-agent'],
             fbc: userData?.fbc,
             fbp: userData?.fbp,
@@ -124,10 +156,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         return res.status(200).json({ success: true, event_id });
       } catch (metaError: unknown) {
         const details = isAxiosError(metaError) ? metaError.response?.data ?? metaError.message : errorMessage(metaError);
-        return res.status(500).json({ error: 'Meta API reported an error', details });
+        if (process.env.NODE_ENV !== 'production') console.error('[server-relay] lite meta error:', details);
+        return res.status(502).json({ error: 'Meta API reported an error' });
       }
     } catch (error: unknown) {
-      return res.status(500).json({ error: errorMessage(error) });
+      console.error('[server-relay] lite error:', errorMessage(error));
+      return res.status(500).json({ error: 'Internal server error' });
     }
   }
 
@@ -180,7 +214,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           user_data: {
             em: hashData(userData?.email?.trim().toLowerCase()),
             ph: hashData(userData?.phone?.trim().replace(/\D/g, '')),
-            client_ip_address: req.headers['x-forwarded-for'] || req.socket.remoteAddress,
+            client_ip_address: firstXff(req) || req.socket.remoteAddress,
             client_user_agent: req.headers['user-agent'],
             fbc: userData?.fbc,
             fbp: userData?.fbp,

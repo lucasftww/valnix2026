@@ -1,6 +1,14 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_utils/supabase.js';
-import { setCorsHeaders, errorMessage } from './_utils/helpers.js';
+import {
+  setCorsHeaders,
+  errorMessage,
+  rateLimit,
+  clientIp,
+  isValidEmail,
+  isValidDocument,
+  isUuid as isUuidHelper,
+} from './_utils/helpers.js';
 import { randomBytes } from 'crypto';
 
 /**
@@ -29,11 +37,19 @@ interface IncomingItem {
 }
 
 function isUuid(v: unknown): v is string {
-  return typeof v === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v);
+  return isUuidHelper(v);
 }
 
 function isString(v: unknown, maxLen = 255): v is string {
   return typeof v === 'string' && v.length > 0 && v.length <= maxLen;
+}
+
+/** Brazilian phone — accepts 10 or 11 digits after stripping non-digits. */
+function normalizePhone(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const digits = v.replace(/\D/g, '');
+  if (digits.length < 10 || digits.length > 13) return null;
+  return digits.slice(0, 13);
 }
 
 function generateGuestHash(): string {
@@ -45,6 +61,12 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method === 'OPTIONS') return res.status(200).end();
   if (req.method !== 'POST') return res.status(405).json({ error: 'Method not allowed' });
 
+  // Rate-limit: 10 order creations / minute per IP. Stops botnet-style spam.
+  const ip = clientIp(req);
+  if (!rateLimit(`create-order:${ip}`, 10, 60_000)) {
+    return res.status(429).json({ error: 'Muitas tentativas. Aguarde alguns segundos.' });
+  }
+
   try {
     const body = (req.body ?? {}) as { order?: unknown; items?: unknown };
     const orderInput = (body.order ?? {}) as Record<string, unknown>;
@@ -53,6 +75,25 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (!isString(orderInput.customer_name, 200)) {
       return res.status(400).json({ error: 'customer_name required' });
     }
+
+    // Validate email/phone/CPF (CPF is only required for PIX KYC — soft for now).
+    const customerEmail =
+      typeof orderInput.customer_email === 'string' ? orderInput.customer_email.trim() : '';
+    if (customerEmail && !isValidEmail(customerEmail)) {
+      return res.status(400).json({ error: 'invalid customer_email' });
+    }
+    const phoneDigits = normalizePhone(orderInput.customer_phone);
+    if (orderInput.customer_phone && !phoneDigits) {
+      return res.status(400).json({ error: 'invalid customer_phone' });
+    }
+    const docDigits =
+      typeof orderInput.customer_document === 'string'
+        ? orderInput.customer_document.replace(/\D/g, '')
+        : '';
+    if (docDigits && !isValidDocument(docDigits)) {
+      return res.status(400).json({ error: 'customer_document must be 11 (CPF) or 14 (CNPJ) digits' });
+    }
+
     if (itemsInput.length === 0 || itemsInput.length > 50) {
       return res.status(400).json({ error: 'items must contain between 1 and 50 entries' });
     }
@@ -118,18 +159,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(400).json({ error: 'Pedido abaixo do valor mínimo (R$ 2,00).' });
     }
 
-    // ─── Build order row (ignore client-supplied total_amount) ──────────
+    // ─── Build order row (ignore client-supplied total_amount AND payment_method) ──
     const guestHash = generateGuestHash();
+    // user_id: accept guest_ prefix or UUID; reject anything else to keep the column clean.
+    const userIdRaw = typeof orderInput.user_id === 'string' ? orderInput.user_id : '';
+    const userId =
+      isUuid(userIdRaw) || /^guest_[a-z0-9]{6,40}$/i.test(userIdRaw) ? userIdRaw.slice(0, 60) : null;
+
     const orderRow = {
-      user_id: typeof orderInput.user_id === 'string' ? orderInput.user_id : null,
+      user_id: userId,
       guest_hash: guestHash,
       customer_name: String(orderInput.customer_name).slice(0, 200),
-      customer_email: typeof orderInput.customer_email === 'string' ? orderInput.customer_email.slice(0, 320) : null,
-      customer_phone: typeof orderInput.customer_phone === 'string' ? orderInput.customer_phone.slice(0, 50) : null,
-      customer_document:
-        typeof orderInput.customer_document === 'string' ? orderInput.customer_document.replace(/\D/g, '').slice(0, 20) : null,
+      customer_email: customerEmail || null,
+      customer_phone: phoneDigits,
+      customer_document: docDigits || null,
       total_amount: serverTotal,
-      payment_method: typeof orderInput.payment_method === 'string' ? orderInput.payment_method.slice(0, 20) : null,
+      // Hardcoded — card flow was removed during the Dice migration. Stops a
+      // confused/malicious client from inserting "free" or other junk values.
+      payment_method: 'pix',
       notes: typeof orderInput.notes === 'string' ? orderInput.notes.slice(0, 2000) : null,
       fbc: typeof orderInput.fbc === 'string' ? orderInput.fbc.slice(0, 200) : null,
       fbp: typeof orderInput.fbp === 'string' ? orderInput.fbp.slice(0, 200) : null,

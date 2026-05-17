@@ -1,21 +1,31 @@
 import { VercelRequest, VercelResponse } from '@vercel/node';
 import { supabaseAdmin } from './_utils/supabase.js';
-import { setCorsHeaders, verifyAdminToken, errorMessage } from './_utils/helpers.js';
+import {
+  setCorsHeaders,
+  verifyAdminToken,
+  errorMessage,
+  rateLimit,
+  clientIp,
+  isUuid,
+} from './_utils/helpers.js';
 
 /**
  * Multi-purpose endpoint covering:
  *
- *   GET  /api/admin-post-payment           → list all post_payment_pages (public)
- *   POST /api/admin-post-payment           → tracking + addon CRUD (mixed auth)
+ *   GET  /api/admin-post-payment           → list active post_payment_pages (public)
+ *   POST /api/admin-post-payment           → tracking + admin CRUD
  *        body.action:
- *          'track-view' | 'track-skip'      → public, inserts post_payment_events
- *          'addon-create'                   → public, inserts sale_addons row
- *          'addon-update'                   → public, updates pending sale_addons
- *          'page-upsert'                    → admin, upserts a post_payment_pages row
- *          'page-stats'                     → admin, returns addon stats
- *          'seed'                           → admin, inserts default 3 pages
- *   PUT  /api/admin-post-payment           → admin, updates a page (alias for page-upsert)
+ *          'track-view' | 'track-skip'      → public (rate-limited, validated)
+ *          'page-upsert' | 'page-stats' | 'seed' → admin
+ *   PUT  /api/admin-post-payment           → admin, alias for page-upsert
+ *
+ * `addon-create` and `addon-update` were removed: they were publicly writable
+ * and trivially abused (spoof pix_code, inflate revenue). The pending
+ * sale_addons row is now created server-side by `dice-pix?action=create` when
+ * the upsell PIX is generated, with all fields under server control.
  */
+
+const KNOWN_ADDON_TYPES = new Set(['premium_benefits', 'delivery_priority', 'data_swap_warranty']);
 
 const DEFAULT_PAGES = [
   {
@@ -84,16 +94,35 @@ function requireAdmin(req: VercelRequest): boolean {
   return verifyAdminToken(typeof token === 'string' ? token : '');
 }
 
+const PAGE_FIELDS = [
+  'id', 'addon_type', 'title', 'subtitle', 'badge_text', 'badge_color',
+  'benefits', 'price', 'original_price', 'button_accept_text', 'button_skip_text',
+  'next_route', 'is_active', 'display_order',
+] as const;
+
+function sanitizePageRow(row: Record<string, unknown>): Record<string, unknown> {
+  const clean: Record<string, unknown> = {};
+  for (const f of PAGE_FIELDS) {
+    if (row[f] !== undefined) clean[f] = row[f];
+  }
+  return clean;
+}
+
+function trimStr(v: unknown, max: number): string | null {
+  return typeof v === 'string' && v.length > 0 ? v.slice(0, max) : null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req);
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   try {
     if (req.method === 'GET') {
-      // Public list — used by the storefront upsell pages.
+      // Public list — used by the storefront upsell pages. Only active pages.
       const { data, error } = await supabaseAdmin
         .from('post_payment_pages')
         .select('*')
+        .eq('is_active', true)
         .order('display_order', { ascending: true });
       if (error) throw new Error(error.message);
       return res.status(200).json({ pages: data ?? [] });
@@ -103,56 +132,41 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const body = parseBody(req);
       const action = String(body.action || '');
 
-      // ─── Public actions ───────────────────────────────────────────
+      // ─── Public actions (rate-limited) ───────────────────────────
       if (action === 'track-view' || action === 'track-skip') {
+        const ip = clientIp(req);
+        if (!rateLimit(`pp-track:${ip}`, 60, 60_000)) {
+          return res.status(429).json({ error: 'Too many requests' });
+        }
+        const addonType = typeof body.addon_type === 'string' ? body.addon_type : '';
+        if (!KNOWN_ADDON_TYPES.has(addonType)) {
+          return res.status(400).json({ error: 'unknown addon_type' });
+        }
+        const orderIdStr = typeof body.order_id === 'string' ? body.order_id : null;
+        // Allow null OR uuid (no free-form strings).
+        if (orderIdStr !== null && !isUuid(orderIdStr)) {
+          return res.status(400).json({ error: 'invalid order_id' });
+        }
         const { error } = await supabaseAdmin.from('post_payment_events').insert({
-          order_id: body.order_id ? String(body.order_id) : null,
-          addon_type: String(body.addon_type || ''),
+          order_id: orderIdStr,
+          addon_type: addonType,
           event_type: action === 'track-view' ? 'view' : 'skip',
-          utm_source: body.utm_source ? String(body.utm_source) : null,
-          utm_medium: body.utm_medium ? String(body.utm_medium) : null,
-          utm_campaign: body.utm_campaign ? String(body.utm_campaign) : null,
+          utm_source: trimStr(body.utm_source, 200),
+          utm_medium: trimStr(body.utm_medium, 200),
+          utm_campaign: trimStr(body.utm_campaign, 200),
         });
-        if (error) throw new Error(error.message);
+        if (error) {
+          console.error('[admin-post-payment] track insert error:', error.message);
+          return res.status(500).json({ error: 'Internal server error' });
+        }
         return res.status(200).json({ success: true });
       }
 
-      if (action === 'addon-create') {
-        const { error } = await supabaseAdmin.from('sale_addons').insert({
-          order_id: body.order_id ? String(body.order_id) : null,
-          user_id: body.user_id ? String(body.user_id) : null,
-          addon_type: String(body.addon_type || ''),
-          status: String(body.status || 'pending'),
-          amount: typeof body.amount === 'number' ? body.amount : null,
-          customer_email: body.customer_email ? String(body.customer_email) : null,
-          customer_name: body.customer_name ? String(body.customer_name) : null,
-          utm_source: body.utm_source ? String(body.utm_source) : null,
-          utm_medium: body.utm_medium ? String(body.utm_medium) : null,
-          utm_campaign: body.utm_campaign ? String(body.utm_campaign) : null,
+      // `addon-create` and `addon-update` are intentionally removed (see file header).
+      if (action === 'addon-create' || action === 'addon-update') {
+        return res.status(410).json({
+          error: 'This action was removed. The upsell row is created server-side by /api/dice-pix?action=create.',
         });
-        if (error) throw new Error(error.message);
-        return res.status(200).json({ success: true });
-      }
-
-      if (action === 'addon-update') {
-        const order_id = String(body.order_id || '');
-        const addon_type = String(body.addon_type || '');
-        const updates = (body.updates && typeof body.updates === 'object'
-          ? (body.updates as Record<string, unknown>)
-          : {}) as Record<string, unknown>;
-        if (!order_id || !addon_type) return res.status(400).json({ error: 'order_id and addon_type required' });
-        // Whitelist updatable fields (anyone with order_id can call this — keep tight).
-        const safe: Record<string, unknown> = {};
-        if (typeof updates.pix_code === 'string') safe.pix_code = updates.pix_code;
-        if (typeof updates.flowpay_charge_id === 'string') safe.flowpay_charge_id = updates.flowpay_charge_id;
-        const { error } = await supabaseAdmin
-          .from('sale_addons')
-          .update(safe as never)
-          .eq('order_id', order_id)
-          .eq('addon_type', addon_type)
-          .eq('status', 'pending');
-        if (error) throw new Error(error.message);
-        return res.status(200).json({ success: true });
       }
 
       // ─── Admin-only actions ───────────────────────────────────────
@@ -160,9 +174,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
       if (action === 'page-upsert') {
         const { action: _a, ...row } = body;
+        const clean = sanitizePageRow(row);
+        if (typeof clean.addon_type !== 'string' || !clean.addon_type) {
+          return res.status(400).json({ error: 'addon_type required' });
+        }
         const { data, error } = await supabaseAdmin
           .from('post_payment_pages')
-          .upsert(row as never, { onConflict: 'addon_type' })
+          .upsert(clean as never, { onConflict: 'addon_type' })
           .select('id')
           .single();
         if (error) throw new Error(error.message);
@@ -204,9 +222,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'PUT') {
       if (!requireAdmin(req)) return res.status(401).json({ error: 'Unauthorized' });
       const body = parseBody(req);
+      const clean = sanitizePageRow(body);
+      if (typeof clean.addon_type !== 'string' || !clean.addon_type) {
+        return res.status(400).json({ error: 'addon_type required' });
+      }
       const { data, error } = await supabaseAdmin
         .from('post_payment_pages')
-        .upsert(body as never, { onConflict: 'addon_type' })
+        .upsert(clean as never, { onConflict: 'addon_type' })
         .select('id')
         .single();
       if (error) throw new Error(error.message);
