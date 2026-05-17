@@ -1,6 +1,4 @@
-// API Helper — abstracts all backend function calls.
-// Migrated to Firebase Cloud Functions environment.
-// Use relative path for Vercel Serverless Functions
+// API Helper — abstracts all backend function calls to Vercel Serverless Functions.
 const API_BASE_URL = '/api';
 
 interface InvokeFunctionOptions {
@@ -8,6 +6,8 @@ interface InvokeFunctionOptions {
   body?: any;
   headers?: Record<string, string>;
   queryParams?: Record<string, string>;
+  /** Pass an AbortController.signal to cancel the request (e.g. on unmount). */
+  signal?: AbortSignal;
 }
 
 /**
@@ -18,7 +18,7 @@ export async function invokeFunction(
   functionName: string,
   options: InvokeFunctionOptions = {}
 ): Promise<Response> {
-  const { method = 'POST', body, headers = {}, queryParams } = options;
+  const { method = 'POST', body, headers = {}, queryParams, signal } = options;
 
   let url = `${API_BASE_URL}/${functionName}`;
   if (queryParams) {
@@ -35,6 +35,7 @@ export async function invokeFunction(
     method,
     headers: fetchHeaders,
     body: body ? JSON.stringify(body) : undefined,
+    signal,
   });
 
   // Auto-handle 401 on authenticated admin calls only (not login attempts).

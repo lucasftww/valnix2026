@@ -22,20 +22,11 @@ const iconMap: Record<string, typeof Shield> = {
   data_swap_warranty: Shield,
 };
 
-/** Fire-and-forget addon insert — relies on the public sale-addons endpoint. */
-function insertSaleAddonAsync(data: Record<string, unknown>) {
-  invokeFunction("admin-post-payment", {
-    method: "POST",
-    body: { action: "addon-create", ...data },
-  }).catch(() => {});
-}
-
-function updateSaleAddonAsync(orderId: string, addonType: string, updates: Record<string, unknown>) {
-  invokeFunction("admin-post-payment", {
-    method: "POST",
-    body: { action: "addon-update", order_id: orderId, addon_type: addonType, updates },
-  }).catch(() => {});
-}
+// NOTE: `addon-create` and `addon-update` public endpoints were removed during
+// the security pass — they let anyone overwrite the pix_code (QR-hijack vector).
+// The pending sale_addons row is now created server-side by dice-pix?action=create
+// (api/dice-pix.ts upserts on (order_id, addon_type)), so the client no longer
+// needs to touch sale_addons at all.
 
 export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProps) {
   const navigate = useNavigate();
@@ -135,21 +126,9 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
     if (!orderIdAcceptable || !config || purchasing) return;
     setPurchasing(true);
     try {
-      // Fire-and-forget: record addon attempt
-      insertSaleAddonAsync({
-        order_id: orderId,
-        user_id: null,
-        addon_type: addonType,
-        status: "pending",
-        amount: config.price,
-        customer_email: null,
-        customer_name: null,
-        utm_source: utmSource,
-        utm_medium: utmMedium,
-        utm_campaign: utmCampaign,
-      });
-
-      // Create PIX charge immediately
+      // Create PIX charge. The server-side handler upserts the sale_addons row
+      // with pix_code + charge_id atomically (api/dice-pix.ts) — no separate
+      // public addon-create/addon-update calls needed (those were removed).
       const amountInCents = Math.round(config.price * 100);
       const pixResponse = await invokeFunction("dice-pix", {
         method: "POST",
@@ -158,17 +137,10 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           amount: amountInCents,
           orderId: `upsell-${orderId}-${addonType}`,
           description: `Upsell ${config.title}`,
-          addonType,
         },
       });
       const data = await pixResponse.json();
       if (!pixResponse.ok || !data.success) throw new Error(data.error || "Erro ao gerar PIX");
-
-      // Fire-and-forget: update addon with charge info
-      updateSaleAddonAsync(orderId, addonType, {
-        pix_code: data.brCode,
-        flowpay_charge_id: data.chargeId,
-      });
 
       setPixData({ qrCode: data.brCode, chargeId: data.chargeId });
     } catch (err: unknown) {
@@ -325,9 +297,23 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,hsl(var(--primary)/0.2)_0%,transparent_70%)]" />
       
       <div className="max-w-lg w-full space-y-3 sm:space-y-5 relative z-10">
+        {/* Always-visible escape hatch: take the customer straight to their
+            delivery page if they're not interested in the upsell. We don't want
+            anyone feeling their already-paid order is gated behind this offer. */}
+        {orderId && (
+          <div className="text-center">
+            <a
+              href={hashParam ? `/order/${hashParam}` : `/order?order_id=${orderId}`}
+              className="inline-flex items-center gap-1 text-xs sm:text-sm text-muted-foreground hover:text-foreground underline underline-offset-2 transition-colors"
+            >
+              Ver meu pedido →
+            </a>
+          </div>
+        )}
+
         <div className="text-center space-y-2">
           {config.badge_text && (
-            <span className="inline-block px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.5)] animate-[pulse_1.5s_ease-in-out_infinite]">
+            <span className="inline-block px-5 py-2 rounded-full text-[11px] font-black uppercase tracking-widest bg-primary text-primary-foreground shadow-[0_0_20px_hsl(var(--primary)/0.5)]">
               {config.badge_text}
             </span>
           )}
@@ -367,7 +353,7 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
 
         <Button
           size="lg"
-          className="w-full h-12 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground shadow-[0_0_30px_hsl(var(--primary)/0.5)] animate-[pulse_1.5s_cubic-bezier(0.4,0,0.6,1)_infinite] border-2 border-primary-foreground/20 uppercase tracking-wider transition-transform duration-150"
+          className="w-full h-12 sm:h-16 text-sm sm:text-lg font-black rounded-xl bg-primary hover:bg-primary/90 active:scale-[0.98] text-primary-foreground shadow-[0_0_30px_hsl(var(--primary)/0.5)] border-2 border-primary-foreground/20 uppercase tracking-wider transition-transform duration-150"
           onClick={handleAccept}
           disabled={purchasing}
         >
@@ -375,9 +361,11 @@ export function DynamicPostPaymentPage({ addonType }: DynamicPostPaymentPageProp
           {config.button_accept_text}
         </Button>
 
+        {/* Visible skip — was previously near-invisible (opacity 50/80 muted),
+            which Reclame Aqui-style complaints flagged as dark-pattern. */}
         <button
           onClick={handleSkip}
-          className="w-full text-center text-muted-foreground/50 hover:text-muted-foreground/80 active:text-muted-foreground/80 text-xs sm:text-sm py-3 transition-colors underline underline-offset-4 min-h-[48px]"
+          className="w-full text-center text-foreground/70 hover:text-foreground active:text-foreground text-sm sm:text-base py-3 transition-colors underline underline-offset-4 min-h-[48px] font-medium"
         >
           {config.button_skip_text}
         </button>

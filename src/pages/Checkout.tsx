@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef, startTransition } from "react";
 import { useNavigate } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { useCart } from "@/contexts/CartContext";
 import { useToast } from "@/hooks/use-toast";
 
@@ -391,6 +392,10 @@ export default function Checkout() {
   // ─── CHECKOUT FORM ──────────────────────────────────────────────────────
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Finalizar compra — VALNIX</title>
+        <meta name="robots" content="noindex,nofollow" />
+      </Helmet>
       <div className="hidden sm:block">
         <CheckoutHeader currentStep={1} />
       </div>

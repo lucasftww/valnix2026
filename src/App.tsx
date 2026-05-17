@@ -26,10 +26,10 @@ const ProductDetail = lazy(() => import("./pages/ProductDetail"));
 
 const Cart = lazy(() => import("./pages/Cart"));
 const Admin = lazy(() => import("./pages/Admin"));
-const checkoutImport = () => import("./pages/Checkout");
-const Checkout = lazy(checkoutImport);
-// Export for prefetch when user adds to cart
-export const prefetchCheckout = () => { checkoutImport(); };
+const Checkout = lazy(() => import("./pages/Checkout"));
+// `prefetchCheckout` now lives in src/lib/prefetchRoutes.ts so that
+// CartContext / CartSidebar don't have to dynamic-import the entire App.tsx
+// module just to warm up the Checkout chunk (broke code-splitting).
 const About = lazy(() => import("./pages/About"));
 const Terms = lazy(() => import("./pages/Terms"));
 const Category = lazy(() => import("./pages/Category"));

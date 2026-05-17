@@ -516,20 +516,11 @@ export const AdminOrders = () => {
       external_id: order.user_id || undefined,
       event_source_url: 'https://www.valnix.com.br/checkout',
     });
-    // Fire-and-forget: UTMify Purchase
-    invokeFunctionFireAndForget('utmify-event', {
-      order_id: order.id,
-      event_type: 'Purchase',
-      value: order.total_amount,
-      customer_name: order.customer_name,
-      customer_email: order.customer_email,
-      customer_phone: order.customer_phone || undefined,
-      product_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
-      product_id: contentIds?.[0] || order.id,
-    });
-    // Fire-and-forget: Analytics Purchase
-    invokeFunctionFireAndForget('track-analytics', {
-      event_name: 'Purchase',
+    // Fire-and-forget: store_metrics row (admin-confirmed purchase). The
+    // server-relay call above already writes an analytics_events row for CAPI;
+    // store_metrics is the public-side counter we still use for funnel charts.
+    invokeFunctionFireAndForget('store-metrics', {
+      event_name: 'purchase',
       user_id: order.user_id || null,
       page_url: 'https://www.valnix.com.br/checkout',
       value: order.total_amount,
@@ -537,6 +528,10 @@ export const AdminOrders = () => {
       order_id: order.id,
       content_name: productNames || `Pedido #${order.id.substring(0, 8)}`,
     });
+    // NOTE: utmify-event endpoint was removed during the Dice/Supabase
+    // migration — UTMify's own browser pixel handles client-side attribution.
+    // Admin force-confirms (this code path) intentionally skip UTMify; doing
+    // it server-side would require an as-yet-unbuilt endpoint.
   };
 
   const handleForceConfirm = async (order: Order) => {

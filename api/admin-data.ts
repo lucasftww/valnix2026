@@ -282,6 +282,9 @@ async function handleCleanupCapiLogs(res: VercelResponse) {
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req);
+  // Admin responses must NEVER hit a CDN/proxy cache — order data, dashboard
+  // stats, analytics, capi-replay results are all private/per-admin.
+  res.setHeader('Cache-Control', 'private, no-store, max-age=0');
   if (req.method === 'OPTIONS') return res.status(200).end();
 
   const adminToken = req.headers['x-admin-token'];

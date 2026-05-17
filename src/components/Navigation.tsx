@@ -3,11 +3,11 @@ import { ChevronDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 import { useCategoriesTreeApi } from "@/hooks/useApiData";
 import { useQueryClient } from "@tanstack/react-query";
+import { fetchCategoryProductsFallback } from "@/lib/publicData";
 
-// ═══════════════════════════════════════════════════════════════════
-// PERFORMANCE: No static Firebase imports!
-// Categories fetched via API; prefetch uses dynamic import.
-// ═══════════════════════════════════════════════════════════════════
+// publicData is already in the entry chunk (main.tsx imports it for hydration),
+// so the previous dynamic import here saved zero bytes and triggered a vite
+// "static+dynamic" warning that broke code-splitting estimates.
 
 const NavigationComponent = () => {
   const [openDropdown, setOpenDropdown] = useState<string | null>(null);
@@ -19,7 +19,6 @@ const NavigationComponent = () => {
     queryClient.prefetchQuery({
       queryKey: ["category-products", categorySlug],
       queryFn: async () => {
-        const { fetchCategoryProductsFallback } = await import("@/lib/publicData");
         const products = await fetchCategoryProductsFallback(categorySlug);
         return products
           .filter((p: any) => p?.is_active !== false)

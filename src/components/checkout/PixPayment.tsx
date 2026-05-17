@@ -26,6 +26,10 @@ interface PixPaymentProps {
   /** Segundos até expirar (resposta do gateway); padrão 15 min se omitido */
   pixExpiresInSeconds?: number;
   onPaymentConfirmed?: () => void;
+  /** Triggered when the user clicks "Gerar Novo QR Code" after expiry.
+   *  The parent (Checkout.tsx) should re-call dice-pix create with the same
+   *  orderId. If omitted, the button falls back to reloading the page (bad UX). */
+  onRegenerate?: () => void;
 }
 
 function clampPixCountdownSeconds(sec: number | undefined): number {
@@ -34,11 +38,11 @@ function clampPixCountdownSeconds(sec: number | undefined): number {
   return Math.min(Math.max(60, Math.floor(sec)), 24 * 60 * 60);
 }
 
-export function PixPayment({ 
-  qrCodeText, 
-  amount, 
-  transactionId, 
-  orderId, 
+export function PixPayment({
+  qrCodeText,
+  amount,
+  transactionId,
+  orderId,
   guestHash,
   customerEmail,
   customerName,
@@ -49,7 +53,8 @@ export function PixPayment({
   quantities,
   prices,
   pixExpiresInSeconds,
-  onPaymentConfirmed 
+  onPaymentConfirmed,
+  onRegenerate,
 }: PixPaymentProps) {
   const totalSeconds = useMemo(() => clampPixCountdownSeconds(pixExpiresInSeconds), [pixExpiresInSeconds]);
   const [copied, setCopied] = useState(false);
@@ -117,36 +122,71 @@ export function PixPayment({
   const expiredRef = useRef(false);
   useEffect(() => { expiredRef.current = timeLeft === 0; }, [timeLeft]);
 
-  // Poll FlowPay for payment status
+  // Poll Dice for payment status. Aborts in-flight requests on unmount so a
+  // slow response doesn't fire navigate() after the user already left.
+  const [verifyingManually, setVerifyingManually] = useState(false);
+  const abortRef = useRef<AbortController | null>(null);
+
+  // Shared check function — used by both the interval poll and the manual button.
+  const checkStatus = useCallback(async (signal?: AbortSignal) => {
+    try {
+      const response = await invokeFunction('dice-pix', {
+        method: 'GET',
+        queryParams: { action: 'status', chargeId: transactionId },
+        signal,
+      });
+      const data = await response.json();
+      if (data.success && data.status === 'COMPLETED') {
+        paymentSuccessRef.current();
+        return true;
+      }
+      return false;
+    } catch (error) {
+      if ((error as { name?: string })?.name === 'AbortError') return false;
+      if (import.meta.env.DEV) console.warn('⚠️ Status poll error:', error);
+      return false;
+    }
+  }, [transactionId]);
+
   useEffect(() => {
     if (paymentConfirmed || !transactionId) return;
 
+    // Poll cap matches countdown — no point checking after the QR expires.
+    const maxPolls = Math.max(1, Math.ceil(totalSeconds / 5));
     let polls = 0;
+    const controller = new AbortController();
+    abortRef.current = controller;
+
     const pollInterval = setInterval(async () => {
       polls++;
-      if (polls > 360 || expiredRef.current) {
+      if (polls > maxPolls || expiredRef.current || controller.signal.aborted) {
         clearInterval(pollInterval);
         return;
       }
-      try {
-        const response = await invokeFunction('dice-pix', {
-          method: 'GET',
-          queryParams: { action: 'status', chargeId: transactionId, orderId },
-        });
-        const data = await response.json();
-        
-        if (data.success && data.status === 'COMPLETED') {
-          if (import.meta.env.DEV) console.log('✅ Payment confirmed via polling!');
-          clearInterval(pollInterval);
-          paymentSuccessRef.current();
-        }
-      } catch (error) {
-        if (import.meta.env.DEV) console.warn('⚠️ Status poll error:', error);
-      }
+      const confirmed = await checkStatus(controller.signal);
+      if (confirmed) clearInterval(pollInterval);
     }, 5000);
 
-    return () => clearInterval(pollInterval);
-  }, [paymentConfirmed, transactionId, orderId]);
+    return () => {
+      clearInterval(pollInterval);
+      controller.abort();
+    };
+  }, [paymentConfirmed, transactionId, totalSeconds, checkStatus]);
+
+  // Manual "Já paguei — verificar agora" button. Useful when the customer
+  // pays, the bank confirms, and we're still ~5s away from the next poll.
+  const handleManualVerify = useCallback(async () => {
+    if (verifyingManually || paymentConfirmed) return;
+    setVerifyingManually(true);
+    const confirmed = await checkStatus();
+    setVerifyingManually(false);
+    if (!confirmed) {
+      toast({
+        title: 'Pagamento ainda não identificado',
+        description: 'Aguarde alguns segundos — bancos podem demorar até 30s para confirmar o PIX.',
+      });
+    }
+  }, [verifyingManually, paymentConfirmed, checkStatus, toast]);
 
   useEffect(() => {
     if (paymentConfirmed) return;
@@ -157,9 +197,11 @@ export function PixPayment({
           clearInterval(timer);
           if (!paymentConfirmedRef.current) {
             toast({
-              title: "QR Code Expirado",
-              description: "O código PIX expirou. Recarregue a página para gerar um novo.",
-              variant: "destructive",
+              title: 'QR Code expirado',
+              description: onRegenerate
+                ? 'Clique em "Gerar novo QR Code" para continuar.'
+                : 'O código PIX expirou. Volte ao checkout e tente novamente.',
+              variant: 'destructive',
             });
           }
           return 0;
@@ -169,7 +211,7 @@ export function PixPayment({
     }, 1000);
 
     return () => clearInterval(timer);
-  }, [toast, totalSeconds, paymentConfirmed]);
+  }, [toast, totalSeconds, paymentConfirmed, onRegenerate]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);
@@ -296,16 +338,30 @@ export function PixPayment({
           />
         </div>
         {isExpired && (
-          <Button 
-            onClick={() => window.location.reload()} 
-            variant="destructive" 
+          <Button
+            onClick={() => (onRegenerate ? onRegenerate() : window.location.reload())}
+            variant="destructive"
             className="w-full mt-3 rounded-xl"
             size="sm"
           >
-            Gerar Novo QR Code
+            Gerar novo QR Code
           </Button>
         )}
       </div>
+
+      {/* Manual verify — bridges the 5s polling gap when the user just paid. */}
+      {!paymentConfirmed && !isExpired && (
+        <Button
+          variant="outline"
+          size="sm"
+          className="w-full rounded-xl text-xs"
+          onClick={handleManualVerify}
+          disabled={verifyingManually}
+          aria-label="Já paguei — verificar agora"
+        >
+          {verifyingManually ? 'Verificando...' : 'Já paguei — verificar agora'}
+        </Button>
+      )}
 
       {/* QR Code */}
       <div className={`flex justify-center transition-opacity ${isExpired ? 'opacity-30' : ''}`}>

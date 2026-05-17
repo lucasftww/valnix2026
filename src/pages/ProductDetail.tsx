@@ -199,12 +199,10 @@ const ProductDetail = () => {
             "availability": "https://schema.org/InStock",
             "seller": { "@type": "Organization", "name": "VALNIX" },
             "url": `https://www.valnix.com.br/product/${product.id}`
-          },
-          "aggregateRating": {
-            "@type": "AggregateRating",
-            "ratingValue": "4.8",
-            "reviewCount": String(productStats.reviewCount || 50)
           }
+          // aggregateRating intentionally omitted — only emit when we have
+          // real persisted reviews. Hardcoded 4.8/50 was Google-policy risky
+          // (structured-data misrepresentation) and didn't match page content.
         })}</script>
       </Helmet>
       <Header />

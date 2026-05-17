@@ -3,6 +3,7 @@ import { Card } from "./ui/card";
 import { Badge } from "./ui/badge";
 import { Link } from "react-router-dom";
 import { QUERY_KEYS, CACHE_TIMES, formatPrice, ROUTES } from "@/lib/constants";
+import { queryClient } from "@/lib/queryClient";
 import { Star } from "lucide-react";
 
 interface ProductCardProps {
@@ -29,27 +30,33 @@ const ProductCardComponent = ({
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
 
-  // Prefetch on keyboard focus — lazy-import queryClient to reduce initial bundle
+  // Prefetch on focus/hover. queryClient is already in the entry chunk (eager
+  // import from App.tsx + main.tsx), so we can use it directly — the previous
+  // dynamic import was producing a vite warning ("static and dynamic import
+  // conflict") AND duplicating a tiny module into a wasted lazy chunk.
   const prefetchTriggered = useRef(false);
   const triggerPrefetch = useCallback(() => {
     if (!productId || prefetchTriggered.current) return;
     const conn = (navigator as any).connection;
     if (conn?.saveData || ["slow-2g", "2g"].includes(conn?.effectiveType)) return;
     prefetchTriggered.current = true;
-    // Use requestIdleCallback to avoid blocking interactions
     const schedule = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 50));
     schedule(() => {
+      // ProductDetail route + fetchProduct stay dynamic (they're heavy/route-scoped).
       Promise.all([
         import("@/pages/ProductDetail"),
-        import("@/lib/queryClient").then(m => m.queryClient),
-        import("@/lib/fetchProduct").then(m => m.fetchProduct),
-      ]).then(([, qc, fetchProduct]) => {
-        qc.prefetchQuery({
-          queryKey: [QUERY_KEYS.PRODUCT, productId],
-          queryFn: () => fetchProduct(productId),
-          ...CACHE_TIMES.MODERATE,
-        }).catch(() => {});
-      }).catch(() => {});
+        import("@/lib/fetchProduct").then((m) => m.fetchProduct),
+      ])
+        .then(([, fetchProduct]) => {
+          queryClient
+            .prefetchQuery({
+              queryKey: [QUERY_KEYS.PRODUCT, productId],
+              queryFn: () => fetchProduct(productId),
+              ...CACHE_TIMES.MODERATE,
+            })
+            .catch(() => {});
+        })
+        .catch(() => {});
     });
   }, [productId]);
 

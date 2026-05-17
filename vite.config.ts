@@ -41,7 +41,30 @@ export default defineConfig(({ mode }) => ({
         ]
       },
       injectManifest: {
-        globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,jpg,jpeg}'],
+        // Precache only the shell — index, entry JS chunk, query/vendor chunks,
+        // CSS, fonts, favicons. Admin/AdminAnalytics/AdminCategories/etc. are
+        // intentionally excluded so visitors don't pre-download ~2.5 MB of code
+        // they'll never use. Lazy chunks come down on-demand and the SW cache
+        // policies in src/sw.ts handle them at runtime.
+        globPatterns: [
+          'index.html',
+          'manifest.webmanifest',
+          'assets/index-*.css',
+          'assets/js/index-*.js',
+          'assets/js/vendor-*.js',
+          'assets/js/query-*.js',
+          'assets/poppins-*.{woff,woff2}',
+          'assets/*.css',
+          'favicon.*',
+          'icon-*.png',
+        ],
+        globIgnores: [
+          'assets/js/Admin*.js',
+          'assets/js/admin*.js',
+          'assets/js/recharts*.js',
+          'assets/js/ImageUploader*.js',
+          'assets/js/CategoryManager*.js',
+        ],
         maximumFileSizeToCacheInBytes: 5 * 1024 * 1024, // 5MB
       },
     }),

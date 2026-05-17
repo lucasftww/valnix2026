@@ -28,7 +28,7 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
   }, [onOpenChange, navigate]);
 
   const handlePrefetchCheckout = useCallback(() => {
-    import("@/App").then(m => m.prefetchCheckout?.()).catch(() => {});
+    import("@/lib/prefetchRoutes").then((m) => m.prefetchCheckout()).catch(() => {});
   }, []);
 
   const handleClose = useCallback(() => {

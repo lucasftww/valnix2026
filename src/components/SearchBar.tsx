@@ -3,11 +3,11 @@ import { Search, X } from "lucide-react";
 import { Input } from "./ui/input";
 import { useNavigate } from "react-router-dom";
 import { Button } from "./ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
-// ═══════════════════════════════════════════════════════════════════
-// PERFORMANCE: No static Firebase imports!
-// Firebase is loaded dynamically only when the user starts typing.
-// ═══════════════════════════════════════════════════════════════════
+// The supabase client is already in the critical path via publicData/useProducts
+// (eager imports from main.tsx), so the previous lazy-import in loadCatalog
+// produced a vite "static+dynamic conflict" warning without saving any bytes.
 
 interface Product {
   id: string;
@@ -38,8 +38,6 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
   const loadCatalog = useCallback(async (): Promise<Product[]> => {
     if (catalogCache) return catalogCache;
 
-    // Lazy-load Supabase client only on first search interaction
-    const { supabase } = await import("@/integrations/supabase/client");
     const queryPromise = supabase
       .from("products")
       .select("id,name,price,image_url,category,is_active")

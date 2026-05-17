@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { useParams, useSearchParams, Link } from "react-router-dom";
+import { Helmet } from "react-helmet-async";
 import { invokeFunction } from "@/lib/apiHelper";
 import { Copy, Check, CheckCircle2, Package, AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -250,6 +251,10 @@ export default function OrderDelivery() {
 
   return (
     <div className="min-h-screen bg-background">
+      <Helmet>
+        <title>Meu pedido — VALNIX</title>
+        <meta name="robots" content="noindex,nofollow" />
+      </Helmet>
       {/* Header */}
       <div className="border-b border-border bg-card">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -367,9 +372,9 @@ export default function OrderDelivery() {
                             <Package className="w-4 h-4 text-orange-500" />
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-orange-500">Entrega Pendente</p>
+                            <p className="text-sm font-medium text-orange-500">Processando entrega</p>
                             <p className="text-xs text-muted-foreground/60 mt-0.5">
-                              Os códigos aparecerão aqui quando disponíveis. Recarregue a página.
+                              Estamos preparando seus códigos. Eles aparecerão aqui automaticamente em alguns segundos.
                             </p>
                           </div>
                         </div>
