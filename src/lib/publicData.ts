@@ -71,10 +71,16 @@ export async function fetchFeaturedProductsFallback() {
   return memoize(cacheKey, fetchFeaturedFromSupabase);
 }
 
+// Public column whitelist — keep in sync with hooks/data/useProducts.ts.
+// NEVER include auto_delivery_codes (storefront would leak delivery codes).
+const PRODUCT_PUBLIC_COLS =
+  'id,name,description,price,old_price,discount,image_url,icon_url,category,' +
+  'display_order,is_active,featured,delivery_type,stock';
+
 async function fetchFeaturedFromSupabase() {
   const { data, error } = await supabase
     .from('products')
-    .select('id,name,price,old_price,discount,image_url,icon_url,category,display_order,is_active,featured')
+    .select(PRODUCT_PUBLIC_COLS)
     .eq('is_active', true)
     .eq('featured', true)
     .order('display_order', { ascending: true })
@@ -123,7 +129,7 @@ export async function fetchCategoryProductsFallback(slug: string) {
 async function fetchCategoryProductsFromSupabase(slug: string) {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select(PRODUCT_PUBLIC_COLS)
     .eq('category', slug)
     .eq('is_active', true)
     .order('display_order', { ascending: true });
@@ -144,7 +150,7 @@ export async function fetchProductFallback(id: string) {
 async function fetchProductFromSupabase(id: string) {
   const { data, error } = await supabase
     .from('products')
-    .select('*')
+    .select(PRODUCT_PUBLIC_COLS)
     .eq('id', id)
     .eq('is_active', true)
     .maybeSingle();

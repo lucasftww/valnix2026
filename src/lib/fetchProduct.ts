@@ -3,6 +3,16 @@ import type { Product } from '@/types';
 
 const TIMEOUT_MS = 4000;
 
+// IMPORTANT: never `select('*')` from the storefront client — RLS allows anon
+// reads of active products but doesn't restrict columns, so a wildcard select
+// would expose `auto_delivery_codes` (the literal codes we deliver to paying
+// customers). Always whitelist columns.
+const PUBLIC_COLUMNS =
+  'id,name,description,rich_description,price,old_price,discount,' +
+  'image_url,icon_url,category,is_active,featured,is_featured_in_category,' +
+  'display_order,stock,sold,delivery_type,delivery_info,instructions,' +
+  'terms_conditions,video_url,product_type,offer_hash,created_at,updated_at';
+
 export const shouldRetryProductFetch = (error: unknown): boolean => {
   const msg = (error as Error)?.message ?? '';
   if (msg.includes('PRODUCT_FETCH_TIMEOUT')) return true;
@@ -20,12 +30,12 @@ export async function fetchProduct(productId: string): Promise<Product | null> {
   const queryPromise = (async () => {
     const { data, error } = await supabase
       .from('products')
-      .select('*')
+      .select(PUBLIC_COLUMNS)
       .eq('id', productId)
       .eq('is_active', true)
       .maybeSingle();
     if (error) throw new Error(error.message);
-    return (data as Product) ?? null;
+    return (data as unknown as Product) ?? null;
   })();
 
   const timeoutPromise = new Promise<never>((_, reject) =>

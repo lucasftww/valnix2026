@@ -12,6 +12,24 @@ import { setCorsHeaders, errorMessage } from './_utils/helpers.js';
  * GET /api/site-data?type=category&slug=valorant
  * GET /api/site-data?type=product&id=<uuid>
  */
+/**
+ * Replace raw `auto_delivery_codes` array with the integer `effective_stock`
+ * (size of the code pool for auto-delivery products, falling back to the
+ * `stock` column for manual). Never expose the raw codes to public — they're
+ * what we deliver to paying customers.
+ */
+function stripCodes<T extends Record<string, unknown>>(row: T): Omit<T, 'auto_delivery_codes'> & { effective_stock: number | null } {
+  const codes = row.auto_delivery_codes;
+  const deliveryType = row.delivery_type;
+  const stock = row.stock;
+  const effective_stock =
+    deliveryType === 'auto'
+      ? (Array.isArray(codes) ? codes.length : 0)
+      : (typeof stock === 'number' ? stock : null);
+  const { auto_delivery_codes: _omit, ...safe } = row;
+  return { ...safe, effective_stock } as Omit<T, 'auto_delivery_codes'> & { effective_stock: number | null };
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   setCorsHeaders(res, req);
   if (req.method === 'OPTIONS') return res.status(200).end();
@@ -26,13 +44,13 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (type === 'featured') {
       const { data, error } = await supabaseAdmin
         .from('products')
-        .select('id,name,price,old_price,discount,image_url,icon_url,category,display_order,is_active,featured')
+        .select('id,name,price,old_price,discount,image_url,icon_url,category,display_order,is_active,featured,delivery_type,stock,auto_delivery_codes')
         .eq('is_active', true)
         .eq('featured', true)
         .order('display_order', { ascending: true })
         .limit(50);
       if (error) throw new Error(error.message);
-      return res.status(200).json({ products: data ?? [] });
+      return res.status(200).json({ products: (data ?? []).map(stripCodes) });
     }
 
     if (type === 'categories') {
@@ -55,7 +73,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('is_active', true)
         .order('display_order', { ascending: true });
       if (error) throw new Error(error.message);
-      return res.status(200).json({ products: data ?? [] });
+      return res.status(200).json({ products: (data ?? []).map(stripCodes) });
     }
 
     if (type === 'product') {
@@ -68,7 +86,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         .eq('is_active', true)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return res.status(200).json({ product: data ?? null });
+      return res.status(200).json({ product: data ? stripCodes(data) : null });
     }
 
     return res.status(400).json({ error: 'Unknown type' });

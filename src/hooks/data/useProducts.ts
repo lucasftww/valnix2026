@@ -27,6 +27,14 @@ interface CategoryProductData {
   reviewCount: number;
 }
 
+// Public column list — never include `auto_delivery_codes` (the actual codes
+// delivered to paying customers). Wildcards through the anon key would leak.
+const PRODUCT_PUBLIC_COLS =
+  'id,name,description,rich_description,price,old_price,discount,' +
+  'image_url,icon_url,category,is_active,featured,is_featured_in_category,' +
+  'display_order,stock,sold,delivery_type,delivery_info,instructions,' +
+  'terms_conditions,video_url,product_type,offer_hash,created_at,updated_at';
+
 /** Products on a category page — full ProductWithReviews shape. */
 export const useCategoryProducts = (categorySlug: string | undefined) => {
   return useQuery({
@@ -35,12 +43,12 @@ export const useCategoryProducts = (categorySlug: string | undefined) => {
       if (!categorySlug) return [];
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(PRODUCT_PUBLIC_COLS)
         .eq('category', categorySlug)
         .eq('is_active', true)
         .order('display_order', { ascending: true });
       if (error) throw new Error(error.message);
-      return (data ?? []).map((p) => mapToProductWithReviews(p as Product));
+      return (data ?? []).map((p) => mapToProductWithReviews(p as unknown as Product));
     },
     enabled: !!categorySlug,
     staleTime: 30 * 60 * 1000,
@@ -102,12 +110,12 @@ export const useProductById = (productId: string | undefined) => {
       if (!productId) return null;
       const { data, error } = await supabase
         .from('products')
-        .select('*')
+        .select(PRODUCT_PUBLIC_COLS)
         .eq('id', productId)
         .eq('is_active', true)
         .maybeSingle();
       if (error) throw new Error(error.message);
-      return (data as Product) ?? null;
+      return (data as unknown as Product) ?? null;
     },
     enabled: typeof productId === 'string',
     staleTime: 10 * 60 * 1000,

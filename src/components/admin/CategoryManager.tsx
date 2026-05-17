@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, lazy, Suspense } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { requireAdminToken } from "@/lib/adminAuth";
 import { invokeFunction } from "@/lib/apiHelper";
@@ -11,9 +11,14 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "
 import { Card } from "@/components/ui/card";
 import { Plus, Edit, Trash2, GripVertical, ChevronDown, ChevronRight, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
 import { ImageUploader } from "./ImageUploader";
 import type { Category } from "@/types";
+
+// @hello-pangea/dnd is ~80 KB — admins rarely reorder categories (3-5 items),
+// so we don't pay for it on every load. CategoryDnD wraps DragDropContext +
+// Droppable + Draggable and renders children when ready.
+type DropResult = { destination?: { index: number } | null; source: { index: number } };
+const CategoryDnD = lazy(() => import("./CategoryDnDWrapper").then(m => ({ default: m.CategoryDnDWrapper })));
 
 interface CategoryNode extends Category {
   children: CategoryNode[];
@@ -331,20 +336,19 @@ export const CategoryManager = () => {
         </Button>
       </div>
 
-      <DragDropContext onDragEnd={handleDragEnd}>
-        <Droppable droppableId="categories">
-          {(provided) => (
-            <div ref={provided.innerRef} {...provided.droppableProps} className="space-y-2">
-              {categories.map((category, index) => (
-                <Draggable key={category.id} draggableId={category.id} index={index}>
-                  {(dragProvided) => renderCategory(category, 0, index, dragProvided)}
-                </Draggable>
-              ))}
-              {provided.placeholder}
-            </div>
-          )}
-        </Droppable>
-      </DragDropContext>
+      <Suspense fallback={
+        <div className="space-y-2">
+          {categories.map((cat) => renderCategory(cat))}
+        </div>
+      }>
+        <CategoryDnD
+          items={categories}
+          onDragEnd={handleDragEnd}
+          renderItem={(category, index, providedProps) =>
+            renderCategory(category as CategoryNode, 0, index, providedProps)
+          }
+        />
+      </Suspense>
 
       {categories.length === 0 && (
         <div className="text-center py-12 text-muted-foreground">

@@ -115,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const productIds = [...wanted.keys()];
     const { data: products, error: productsErr } = await supabaseAdmin
       .from('products')
-      .select('id,name,price,image_url,is_active,delivery_type,stock')
+      .select('id,name,price,image_url,is_active,delivery_type,stock,auto_delivery_codes')
       .in('id', productIds);
     if (productsErr) throw new Error(productsErr.message);
 
@@ -136,8 +136,20 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const p = byId.get(productId);
       if (!p) return res.status(400).json({ error: `Product not found: ${productId}` });
       if (!p.is_active) return res.status(400).json({ error: `Product unavailable: ${p.name}` });
-      if (p.stock != null && p.stock < qty) {
-        return res.status(409).json({ error: `Insufficient stock for ${p.name}` });
+      // Stock check: for delivery_type='auto', the *real* stock is the code pool
+      // size (an admin who hasn't seeded codes effectively has 0 in stock even
+      // if products.stock column is null). For manual products, use the column.
+      const effectiveStock =
+        p.delivery_type === 'auto'
+          ? (Array.isArray(p.auto_delivery_codes) ? p.auto_delivery_codes.length : 0)
+          : (p.stock ?? null);
+      if (effectiveStock != null && effectiveStock < qty) {
+        return res.status(409).json({
+          error: `Estoque insuficiente para "${p.name}" (disponível: ${effectiveStock}, pedido: ${qty})`,
+          code: 'insufficient_stock',
+          product_id: p.id,
+          available: effectiveStock,
+        });
       }
       const unitPrice = Number(p.price);
       const lineTotal = Math.round(unitPrice * qty * 100) / 100;
