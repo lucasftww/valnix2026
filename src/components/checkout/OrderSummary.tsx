@@ -1,8 +1,9 @@
 import { memo, useMemo } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Loader2, Lock, Trash2, Plus, Minus } from "lucide-react";
-import { CartItem } from "@/contexts/CartContext";
+import { Loader2, Lock, Trash2, Plus, Minus, ShieldCheck, Zap, Tag } from "lucide-react";
+import { CartItem, useCart } from "@/contexts/CartContext";
+import { CouponInput } from "@/components/CouponInput";
 
 interface OrderSummaryProps {
   items: CartItem[];
@@ -13,6 +14,7 @@ interface OrderSummaryProps {
   loading: boolean;
   isFormValid: boolean;
   onSubmit: () => void;
+  /** Kept for backwards-compat with Checkout.tsx; ignored — card flow was removed. */
   paymentMethod?: "pix" | "card";
 }
 
@@ -25,13 +27,17 @@ export const OrderSummary = memo(function OrderSummary({
   loading,
   isFormValid,
   onSubmit,
-  paymentMethod = "pix",
 }: OrderSummaryProps) {
-  
+  // Pull discount + applied coupon from cart context (the parent only passes
+  // totalPrice/finalPrice for backwards compat — getting the breakdown here
+  // keeps the summary in sync with whatever the user did in CouponInput).
+  const { subtotal, discount, appliedCoupon } = useCart();
+
   const formattedPrices = useMemo(() => ({
-    total: totalPrice.toFixed(2).replace('.', ','),
+    subtotal: subtotal.toFixed(2).replace('.', ','),
+    discount: discount.toFixed(2).replace('.', ','),
     final: finalPrice.toFixed(2).replace('.', ','),
-  }), [totalPrice, finalPrice]);
+  }), [subtotal, discount, finalPrice]);
 
   const isSubmitDisabled = loading || finalPrice < 1 || !isFormValid;
 
@@ -94,13 +100,26 @@ export const OrderSummary = memo(function OrderSummary({
           ))}
         </div>
 
-        {/* Totals */}
-        <div className="space-y-2 border-t border-border/10 pt-4 mb-5">
+        {/* Coupon input — same component as cart sidebar */}
+        <div className="border-t border-border/10 pt-4 mb-4">
+          <CouponInput variant="compact" />
+        </div>
+
+        {/* Totals — show discount line only when a coupon is applied */}
+        <div className="space-y-2 mb-5">
           <div className="flex justify-between text-[13px]">
-            <span className="text-muted-foreground">Preço oficial</span>
-            <span className="text-foreground">R$ {formattedPrices.total}</span>
+            <span className="text-muted-foreground">Subtotal</span>
+            <span className="text-foreground">R$ {formattedPrices.subtotal}</span>
           </div>
-          <div className="flex justify-between items-center pt-2">
+          {discount > 0 && (
+            <div className="flex justify-between text-[13px]">
+              <span className="text-success flex items-center gap-1">
+                <Tag className="w-3 h-3" /> Desconto{appliedCoupon ? ` (${appliedCoupon.code})` : ''}
+              </span>
+              <span className="text-success font-medium">− R$ {formattedPrices.discount}</span>
+            </div>
+          )}
+          <div className="flex justify-between items-center pt-2 border-t border-border/10">
             <span className="text-[14px] text-foreground font-medium">Total</span>
             <span className="text-[22px] text-primary font-bold">
               R$ {formattedPrices.final}
@@ -109,7 +128,7 @@ export const OrderSummary = memo(function OrderSummary({
         </div>
 
         {/* Pay Button - Desktop */}
-        <Button 
+        <Button
           onClick={onSubmit}
           disabled={isSubmitDisabled}
           className="w-full h-14 bg-success hover:bg-success/90 text-success-foreground font-bold rounded-xl text-base hidden lg:flex transition-colors duration-200"
@@ -132,12 +151,21 @@ export const OrderSummary = memo(function OrderSummary({
           <Link to="/terms" className="text-primary hover:underline">política de privacidade</Link>.
         </p>
 
-        {/* Security Badge */}
-        <div className="flex items-center justify-center gap-2 mt-4 text-muted-foreground text-[12px]">
-          <div className="w-4 h-4 rounded-full border border-border/20 flex items-center justify-center">
-            <Lock className="w-2.5 h-2.5" />
+        {/* Trust signals — reduces last-mile abandonment on Brazilian
+            gift-card buyers who fear fraud. Lock + PIX + delivery time. */}
+        <div className="mt-4 space-y-2 text-[11px]">
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <Lock className="w-3 h-3" />
+            <span>Pagamento 100% seguro via PIX</span>
           </div>
-          <span>Compra 100% segura</span>
+          <div className="flex items-center justify-center gap-2 text-success">
+            <Zap className="w-3 h-3" />
+            <span>Entrega imediata após confirmação</span>
+          </div>
+          <div className="flex items-center justify-center gap-2 text-muted-foreground">
+            <ShieldCheck className="w-3 h-3" />
+            <span>Garantia de reposição em códigos inválidos</span>
+          </div>
         </div>
       </div>
     </div>
