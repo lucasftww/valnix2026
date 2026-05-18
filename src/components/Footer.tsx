@@ -2,8 +2,6 @@ import { Mail, MessageCircle, Shield, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Link } from "react-router-dom";
 import pixLogo from "@/assets/pix-logo.png";
-import visaLogo from "@/assets/visa-logo.svg";
-import mastercardLogo from "@/assets/mastercard-logo.svg";
 import googleSafe from "@/assets/google-safe.png";
 import nortonSecured from "@/assets/norton-secured.png";
 import reclameAqui from "@/assets/reclame-aqui.png";
@@ -140,13 +138,14 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
               </p>
             </div>
 
-            {/* Payment Methods */}
+            {/* Payment Methods — PIX only (cartão removido durante a migração
+                Dice; mostrar Visa/Mastercard implicaria aceitação que não
+                temos, risco de propaganda enganosa). */}
             <div className="flex flex-col items-center gap-3 w-full">
-              <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-1.5">
-                <img src={pixLogo} alt="PIX" className="h-7 w-auto object-contain" width={48} height={28} loading="lazy" />
-                <img src={visaLogo} alt="Visa" className="h-7 w-auto object-contain" width={48} height={28} loading="lazy" />
-                <img src={mastercardLogo} alt="Mastercard" className="h-7 w-auto object-contain" width={48} height={28} loading="lazy" />
+              <h3 className="text-foreground font-bold text-sm text-center">Pagamento</h3>
+              <div className="flex items-center justify-center gap-2">
+                <img src={pixLogo} alt="PIX" className="h-8 w-auto object-contain" width={56} height={32} loading="lazy" />
+                <span className="text-xs text-muted-foreground">Confirmação instantânea</span>
               </div>
             </div>
           </div>
@@ -164,7 +163,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
           {/* Copyright - Mobile */}
           <div className="px-6 py-6 text-center">
             <p className="text-xs text-muted-foreground">
-              © 2025-2026 VALNIX - Todos os direitos reservados
+              © {new Date().getFullYear()} VALNIX — Todos os direitos reservados
             </p>
           </div>
         </div>
@@ -248,13 +247,12 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
               </p>
             </div>
 
-            {/* Payment Methods */}
+            {/* Payment Methods — PIX only (see comment above) */}
             <div className="flex flex-col items-center gap-3 flex-shrink-0 px-6 py-5 rounded-lg">
-              <h3 className="text-foreground font-bold text-sm text-center">Métodos de pagamento</h3>
-              <div className="flex items-center justify-center gap-2">
+              <h3 className="text-foreground font-bold text-sm text-center">Pagamento</h3>
+              <div className="flex items-center justify-center gap-3">
                 <img src={pixLogo} alt="PIX" className="h-9 w-auto object-contain" width={60} height={36} loading="lazy" />
-                <img src={visaLogo} alt="Visa" className="h-9 w-auto object-contain" width={60} height={36} loading="lazy" />
-                <img src={mastercardLogo} alt="Mastercard" className="h-9 w-auto object-contain" width={60} height={36} loading="lazy" />
+                <span className="text-xs text-muted-foreground">Confirmação instantânea</span>
               </div>
             </div>
           </div>
@@ -272,7 +270,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
             {/* Copyright */}
             <div className="text-center">
               <p className="text-xs text-muted-foreground">
-                © 2025-2026 VALNIX - Todos os direitos reservados
+                © {new Date().getFullYear()} VALNIX — Todos os direitos reservados
               </p>
             </div>
           </div>
@@ -284,7 +282,7 @@ const FooterComponent = ({ showFullVersion = true }: FooterProps) => {
         <div className="container px-4 md:px-8 py-6 border-t border-border/30">
           <div className="text-center">
             <p className="text-xs text-muted-foreground">
-              © 2025-2026 VALNIX - Todos os direitos reservados
+              © {new Date().getFullYear()} VALNIX — Todos os direitos reservados
             </p>
           </div>
         </div>

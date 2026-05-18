@@ -89,7 +89,7 @@ const RecentSalesTickerComponent = () => {
 
   return (
     <div
-      className="fixed left-4 bottom-20 z-40 max-w-[260px] md:max-w-[300px] animate-in slide-in-from-left-4 fade-in duration-300"
+      className="fixed left-4 bottom-20 md:bottom-20 z-40 max-w-[260px] md:max-w-[300px] animate-in slide-in-from-left-4 fade-in duration-300 hidden sm:block"
       role="status"
       aria-live="polite"
     >

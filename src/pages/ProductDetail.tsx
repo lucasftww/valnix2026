@@ -216,7 +216,8 @@ const ProductDetail = () => {
       </Helmet>
       <Header />
       <Navigation />
-      <main className="flex-1">
+      {/* pb-24 lg:pb-0 reserves space for the mobile sticky CTA bar below */}
+      <main className="flex-1 pb-24 lg:pb-0">
         {/* Breadcrumb - desktop only */}
         <div className="container px-4 md:px-8 pt-6 pb-2 hidden lg:block">
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -634,6 +635,27 @@ const ProductDetail = () => {
       <Suspense fallback={null}>
         <FloatingContactButtons />
       </Suspense>
+
+      {/* Mobile sticky CTA — high-conversion pattern for BR e-commerce.
+          Always-visible "Comprar agora" so the user never has to scroll
+          back to the top to checkout. Hidden when out of stock. */}
+      {!isOutOfStock && (
+        <div className="lg:hidden fixed bottom-0 left-0 right-0 z-40 bg-background/95 backdrop-blur-md border-t border-border/30 px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)]">
+          <div className="max-w-lg mx-auto flex items-center gap-3">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] uppercase tracking-wider text-muted-foreground leading-tight">Total</p>
+              <p className="text-base font-bold text-primary leading-tight truncate">R$ {totalPrice}</p>
+            </div>
+            <Button
+              onClick={handleBuyNow}
+              size="lg"
+              className="flex-shrink-0 h-11 px-5 bg-success hover:bg-success/90 text-success-foreground font-bold rounded-xl"
+            >
+              Comprar agora
+            </Button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

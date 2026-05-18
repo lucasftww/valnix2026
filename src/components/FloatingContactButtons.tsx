@@ -17,6 +17,7 @@ export const FloatingContactButtons = () => {
 
   const isAdminPage = path.startsWith("/admin") || path.startsWith("/charles");
   const isCheckoutPage = path.startsWith("/checkout");
+  const isProductPage = path.startsWith("/product/");
   const isPaymentFlow =
     path.startsWith("/card-callback") ||
     path.startsWith("/painel-pagar") ||
@@ -27,6 +28,10 @@ export const FloatingContactButtons = () => {
 
   if (!shouldShow || !isVisible) return null;
 
+  // Push the cluster higher on /product/* mobile so it doesn't collide
+  // with the sticky "Comprar agora" bar.
+  const bottomClass = isProductPage ? 'bottom-24 md:bottom-20' : 'bottom-20';
+
   // Replace WhatsApp number with the admin's real number (digits only,
   // country code first — no + or spaces). Falls back to a placeholder so
   // the button still renders for testing.
@@ -36,7 +41,7 @@ export const FloatingContactButtons = () => {
   );
 
   return (
-    <div className="fixed right-4 bottom-20 z-40 flex flex-col items-end gap-3">
+    <div className={`fixed right-4 ${bottomClass} z-40 flex flex-col items-end gap-3`}>
       {/* Dismiss button — shared close for the whole cluster */}
       <button
         onClick={() => setIsVisible(false)}

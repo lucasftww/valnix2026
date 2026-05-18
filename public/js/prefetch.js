@@ -25,9 +25,8 @@
   var path = location.pathname;
   var isHome = path === "/" || path === "/index.html";
   // Same-origin /api/site-data — uses our Vercel function which proxies to
-  // the current Supabase project. Used to point at the legacy Lovable
-  // Supabase URL (tiupdhnjdcmgbqifwkrd) which 404'd after the migration,
-  // leaving the LCP shell empty until React booted.
+  // the current Supabase project. Same-origin avoids the DNS + CORS round
+  // trips of the legacy cross-origin Supabase Edge Function call.
   var base = "/api/site-data";
   var preloaded = {};
   function preloadImg(src, priority) {
