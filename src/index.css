@@ -18,11 +18,30 @@ All colors MUST be HSL.
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
     text-rendering: optimizeSpeed;
+    /* Smooth scroll for anchor links and scrollIntoView() (e.g. back-to-top
+       button in Footer). Respected by all modern browsers. */
+    scroll-behavior: smooth;
   }
-  
+
+  /* Respect users who explicitly disable motion (a11y + low-end devices) */
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+    *,*::before,*::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+
   body {
     overscroll-behavior-x: none;
     overflow-x: hidden;
+  }
+
+  /* Mobile sticky elements often live below this — make sure long-press menus
+     don't disrupt the carousel/swipeable area on iOS. */
+  [data-embla-container], [data-embla-slide] {
+    -webkit-touch-callout: none;
   }
   
   img {
