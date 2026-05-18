@@ -258,8 +258,15 @@ export default function OrderDelivery() {
       {/* Header */}
       <div className="border-b border-border bg-card">
         <div className="max-w-3xl mx-auto px-4 py-4 flex items-center justify-between">
-          <Link to="/">
-            <img src={vLogo} alt="Valnix" className="h-8" />
+          <Link to="/" style={{ display: 'inline-flex', alignItems: 'center', height: 32, overflow: 'hidden' }}>
+            <img
+              src={vLogo}
+              alt="Valnix"
+              width={32}
+              height={32}
+              className="h-8"
+              style={{ height: 32, width: 'auto', maxWidth: 48, maxHeight: 32, objectFit: 'contain', display: 'block' }}
+            />
           </Link>
           <Badge variant="outline" className="text-success border-success/30">
             <CheckCircle2 className="w-3 h-3 mr-1" />

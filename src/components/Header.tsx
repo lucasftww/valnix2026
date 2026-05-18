@@ -77,17 +77,26 @@ const HeaderComponent = () => {
             </Suspense>
           )}
 
-          {/* Logo — fixed display height matching header to prevent any
-              clip on slow paint / banner-overlay scroll transition. */}
-          <Link to="/" className="hover:opacity-90 transition-opacity flex items-center" aria-label="VALNIX home">
+          {/* Logo — INLINE styles lock dimensions BEFORE Tailwind hydrates.
+              The previous version rendered the source PNG at intrinsic size
+              (~1024px wide) during the brief gap between HTML parse and
+              CSS-class application, producing a gigantic V across the
+              entire viewport on cold-cache first paints (production bug). */}
+          <Link
+            to="/"
+            className="header-logo-link hover:opacity-90 transition-opacity"
+            aria-label="VALNIX home"
+            style={{ display: 'inline-flex', alignItems: 'center', flexShrink: 0, height: 44, overflow: 'hidden' }}
+          >
             <img
               src={logo}
               alt="VALNIX"
-              className="h-9 md:h-11 w-auto object-contain block"
+              className="header-logo-img h-9 md:h-11 w-auto object-contain block"
               width={120}
-              height={48}
+              height={44}
               decoding="async"
               fetchPriority="high"
+              style={{ height: 44, width: 'auto', maxWidth: 140, maxHeight: 44, objectFit: 'contain', display: 'block' }}
             />
           </Link>
         </div>

@@ -10,8 +10,18 @@ export function CheckoutHeader({ currentStep = 1 }: CheckoutHeaderProps) {
   return (
     <header className="border-b border-border/10 bg-background/95 backdrop-saturate-150">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-        <Link to="/">
-          <img src={vLogo} alt="Valnix" className="h-9 md:h-10" />
+        <Link
+          to="/"
+          style={{ display: 'inline-flex', alignItems: 'center', height: 40, overflow: 'hidden' }}
+        >
+          <img
+            src={vLogo}
+            alt="Valnix"
+            width={40}
+            height={40}
+            className="h-9 md:h-10"
+            style={{ height: 40, width: 'auto', maxWidth: 60, maxHeight: 40, objectFit: 'contain', display: 'block' }}
+          />
         </Link>
         
         {/* Steps - Desktop */}

@@ -14,13 +14,26 @@
       /* Before Tailwind loads, images must not expand layout (FOUC “grandão”).
          Defaults catch any <img> rendered before the JS bundle parses. */
       *,*::before,*::after{box-sizing:border-box}
-      img,svg,video{max-width:100%;height:auto;display:block}
+      /* Aggressive hard cap on EVERY image — production showed the Header
+         logo rendering at intrinsic ~1024px size before Tailwind hydrated,
+         producing a giant V across the viewport. max-height:60vh is a
+         last-resort cap that never gets in the way of legitimate sizes. */
+      img,svg,video{max-width:100%;height:auto;display:block;max-height:60vh}
       img{pointer-events:none;-webkit-user-drag:none}
       /* Belt-and-suspenders: hard cap product/category card images even if
          a class doesn't apply yet. The carousel slides constrain width
          downstream — these rules prevent the rare flash of a 1024px image. */
       #root img[width][height]{max-width:100%;height:auto}
       #root section img{max-width:100%}
+      /* Header logo — explicit hard cap so the V doesn't blow up across
+         the viewport on cold-cache first paints before Tailwind applies
+         h-9/h-11. Catches the production "V gigante" FOUC. */
+      #root header img,#root .header-logo-img,header img[alt="VALNIX"]{
+        max-height:44px!important;max-width:140px!important;height:44px;width:auto;object-fit:contain;display:block
+      }
+      #root .header-logo-link,header a[aria-label="VALNIX home"]{
+        display:inline-flex!important;align-items:center;flex-shrink:0;height:44px;overflow:hidden
+      }
       a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
       @keyframes vn-shell-pulse{0%,100%{opacity:1}50%{opacity:.45}}
       .vn-shell-pulse{animation:vn-shell-pulse 1.15s ease-in-out infinite;background:#141414!important}
