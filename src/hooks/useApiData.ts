@@ -1,7 +1,7 @@
 /**
- * API-only data hooks for homepage.
- * These hooks fetch data exclusively via edge functions (no Firebase imports),
- * ensuring Firebase SDK (~300KB) is NOT in the critical rendering path.
+ * API-only data hooks for homepage. Fetches via /api/site-data (our Vercel
+ * function backed by Supabase service_role). Anon Supabase client is NOT
+ * pulled into the critical path — important for first-paint perf.
  */
 import { useQuery } from "@tanstack/react-query";
 import { QUERY_KEYS, UI_CONFIG } from "@/lib/constants";

@@ -4,9 +4,10 @@ import { QUERY_KEYS } from '@/lib/constants';
 
 /**
  * Hook that ensures category data is warm in the React Query cache.
- * Instead of making its own Firestore call, it relies on the shared
- * useCategories hook (triggered by Header) and just seeds per-slug
- * cache entries once that data arrives.
+ * Instead of making its own API call, it relies on the shared
+ * useCategoriesApi hook (triggered by Header) and just seeds per-slug
+ * cache entries once that data arrives — making subsequent category
+ * page navigations instant.
  */
 export const useCategoryPrefetch = () => {
   const queryClient = useQueryClient();

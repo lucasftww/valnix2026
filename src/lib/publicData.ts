@@ -4,7 +4,7 @@
  * Layered in-memory + localStorage cache to keep first paint snappy.
  *
  * The `*Fallback` suffix on function names is historical — the original
- * implementation went through /api/site-data because Firestore was
+ * implementation went through /api/site-data because the public REST API was
  * blocked by adblockers. Supabase doesn't have that problem.
  */
 import { supabase } from '@/integrations/supabase/client';

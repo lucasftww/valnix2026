@@ -50,7 +50,7 @@ export default function OrderDelivery() {
   const [liveItems, setLiveItems] = useState<OrderItemData[] | null>(null);
   const orderIdParam = searchParams.get("order_id");
 
-  // Fetch guest order + items via Edge Function (Firestore is deny-all for ordens)
+  // Fetch guest order + items via Vercel function (orders table is deny-all to anon)
   useEffect(() => {
     if (!hash) { setNotFound(true); setLoading(false); return; }
 

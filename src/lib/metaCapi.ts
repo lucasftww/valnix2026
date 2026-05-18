@@ -56,9 +56,18 @@ interface MetaCapiEventData {
 }
 
 // ── Events that are sent via CAPI ──────────────────
-// AddToCart + Lead + AddPaymentInfo enabled so Meta can optimize campaigns
-// for them — without them, cost per cart-add / per lead / per checkout step
-// is much higher because Meta has no signal.
+// We forward ALL these to /api/server-relay even though the Meta dashboard
+// (Events Manager → Settings → "Server events") currently only ATTRIBUTES
+// optimization to InitiateCheckout + Purchase. Why send the rest anyway:
+//   1. Each CAPI POST also writes a row to our `analytics_events` table —
+//      that's the source of truth for the admin funnel ("Visitas → Viu →
+//      AddCart → Checkout → Comprou"). Without these CAPI calls the
+//      AdminAnalytics funnel collapses to 2 stages.
+//   2. Meta will simply NOT act on events that aren't enabled in the
+//      dashboard — it returns 200 and discards. No harm done.
+//   3. If the admin later enables more server events on Meta side, we
+//      already have the data flowing — zero code change needed.
+// Browser Pixel (fbq) fires for every event regardless of this list.
 const CAPI_ENABLED_EVENTS = ['AddToCart', 'Lead', 'AddPaymentInfo', 'InitiateCheckout', 'Purchase'];
 
 // ── Core sender ────────────────────────────────────────────────────

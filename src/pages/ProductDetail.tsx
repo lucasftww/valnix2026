@@ -38,7 +38,7 @@ const ProductDetail = () => {
   const [mobileSection, setMobileSection] = useState<string | null>(null);
   
 
-  // Buscar produto com Firebase
+  // Buscar produto via Supabase (column whitelist — never SELECT *).
   const { data: product, isLoading, isError, error: fetchError, refetch } = useProductById(id);
 
   // Log timeout once per product on final failure (no duplicates on re-render)
@@ -66,7 +66,7 @@ const ProductDetail = () => {
     }
   }, [product?.id, product?.name, product?.price]);
 
-  // Buscar avaliações com Firebase - defer até produto carregar
+  // Buscar avaliações — defer até produto carregar
   const { data: reviews = [] } = useProductReviews(product?.category);
 
   // Memoizar stats para evitar recálculo
