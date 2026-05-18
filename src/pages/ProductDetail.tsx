@@ -280,6 +280,29 @@ const ProductDetail = () => {
                     )}
                     <span className="text-2xl font-extrabold tracking-tight">R$&nbsp;{totalPrice}</span>
                   </div>
+
+                  {/* Trust badges — high-converting selos for BR gift-card buyers.
+                      Only show "Entrega imediata" + "Aprovação automática" for
+                      auto-delivery products (manual ones have a wait). */}
+                  <div className="flex flex-wrap items-center gap-1.5 pt-2">
+                    {product.delivery_type === 'auto' ? (
+                      <>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-success/10 text-success border border-success/20 px-2 py-1 rounded-full">
+                          ⚡ Entrega imediata
+                        </span>
+                        <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-primary/10 text-primary border border-primary/20 px-2 py-1 rounded-full">
+                          ✓ Aprovação automática
+                        </span>
+                      </>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-1 rounded-full">
+                        📦 Entrega em até 1h
+                      </span>
+                    )}
+                    <span className="inline-flex items-center gap-1 text-[10px] font-semibold bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 rounded-full">
+                      🛡 Garantia VALNIX
+                    </span>
+                  </div>
                 </div>
               </div>
             </div>

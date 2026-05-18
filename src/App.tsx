@@ -12,6 +12,10 @@ import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
 // Lazy-load non-critical UI (Toaster only needed on user actions)
 const Toaster = lazy(() => import("@/components/ui/toaster").then(m => ({ default: m.Toaster })));
 
+// Cart abandonment nudge — global so it works on any storefront route.
+// 3s delay + 6h cooldown, lazy so not on critical path.
+const CartAbandonmentNudge = lazy(() => import("@/components/CartAbandonmentNudge").then(m => ({ default: m.CartAbandonmentNudge })));
+
 // Redirect to external URL
 const ExternalRedirect = ({ url }: { url: string }) => {
   useEffect(() => { window.location.href = url; }, [url]);
@@ -89,6 +93,9 @@ const App = () => {
                           <Route path="*" element={<NotFound />} />
                       </Routes>
                     </GlobalErrorBoundary>
+                  </Suspense>
+                  <Suspense fallback={null}>
+                    <CartAbandonmentNudge />
                   </Suspense>
                 </BrowserRouter>
             </CartProvider>
