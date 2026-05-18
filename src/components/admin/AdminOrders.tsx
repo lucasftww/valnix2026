@@ -810,65 +810,71 @@ export const AdminOrders = () => {
           </Card>
         </div>
 
-        {/* ── Toolbar ──────────────────────────────────────────────── */}
-        <div className="flex flex-col lg:flex-row gap-3 items-start lg:items-center justify-between">
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="relative min-w-[260px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+        {/* ── Toolbar (redesigned for mobile) ────────────────────────
+            Mobile: search input full-width on its own row, then 3 selects
+            in a 3-column grid below. Was overflowing on small screens with
+            all 4 controls trying to fit in a wrap row. */}
+        <div className="space-y-2 lg:flex lg:flex-row lg:gap-3 lg:items-center lg:justify-between lg:space-y-0">
+          <div className="flex flex-col lg:flex-row lg:items-center gap-2 lg:flex-1">
+            <div className="relative w-full lg:min-w-[260px] lg:w-auto">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground pointer-events-none" />
               <Input
                 placeholder="Buscar nome, email, telefone, ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-9 h-9 bg-card/50"
+                className="pl-9 h-10 lg:h-9 bg-card/50"
               />
             </div>
 
-            <Select value={filterStatus} onValueChange={setFilterStatus}>
-              <SelectTrigger className="w-[140px] h-9 bg-card/50">
-                <Filter className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pending">Pendente</SelectItem>
-                <SelectItem value="processing">Processando</SelectItem>
-                <SelectItem value="completed">Concluído</SelectItem>
-                <SelectItem value="cancelled">Cancelado</SelectItem>
-              </SelectContent>
-            </Select>
+            {/* Filters: 3-col grid on mobile (each takes 1/3), inline on desktop */}
+            <div className="grid grid-cols-3 gap-2 w-full lg:flex lg:flex-row lg:w-auto lg:gap-2">
+              <Select value={filterStatus} onValueChange={setFilterStatus}>
+                <SelectTrigger className="h-10 lg:h-9 lg:w-[140px] bg-card/50 text-xs lg:text-sm">
+                  <Filter className="w-3.5 h-3.5 mr-1 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos status</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                  <SelectItem value="processing">Processando</SelectItem>
+                  <SelectItem value="completed">Concluído</SelectItem>
+                  <SelectItem value="cancelled">Cancelado</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={filterPayment} onValueChange={setFilterPayment}>
-              <SelectTrigger className="w-[140px] h-9 bg-card/50">
-                <DollarSign className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Pagamento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="paid">Pago</SelectItem>
-                <SelectItem value="pending">Pendente</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={filterPayment} onValueChange={setFilterPayment}>
+                <SelectTrigger className="h-10 lg:h-9 lg:w-[140px] bg-card/50 text-xs lg:text-sm">
+                  <DollarSign className="w-3.5 h-3.5 mr-1 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Pagamento" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos pgto</SelectItem>
+                  <SelectItem value="paid">Pago</SelectItem>
+                  <SelectItem value="pending">Pendente</SelectItem>
+                </SelectContent>
+              </Select>
 
-            <Select value={filterMethod} onValueChange={setFilterMethod}>
-              <SelectTrigger className="w-[130px] h-9 bg-card/50">
-                <CreditCard className="w-3.5 h-3.5 mr-1.5 text-muted-foreground" />
-                <SelectValue placeholder="Método" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="pix">PIX</SelectItem>
-                <SelectItem value="card">Cartão</SelectItem>
-              </SelectContent>
-            </Select>
+              <Select value={filterMethod} onValueChange={setFilterMethod}>
+                <SelectTrigger className="h-10 lg:h-9 lg:w-[130px] bg-card/50 text-xs lg:text-sm">
+                  <CreditCard className="w-3.5 h-3.5 mr-1 text-muted-foreground shrink-0" />
+                  <SelectValue placeholder="Método" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos métodos</SelectItem>
+                  <SelectItem value="pix">PIX</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
+          <div className="flex items-center justify-between lg:justify-end gap-2 flex-wrap">
+            <span className="text-xs lg:text-sm text-muted-foreground">
               {filteredOrders.length} pedido{filteredOrders.length !== 1 ? 's' : ''}
             </span>
+            <div className="flex items-center gap-2">
             <Button variant="outline" size="sm" onClick={handleRefresh} disabled={refreshing} className="h-9">
               <RefreshCw className={`w-4 h-4 mr-1.5 ${refreshing ? 'animate-spin' : ''}`} />
-              Atualizar
+              <span className="hidden sm:inline">Atualizar</span>
             </Button>
 
 
@@ -902,6 +908,7 @@ export const AdminOrders = () => {
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
+            </div>
           </div>
         </div>
 

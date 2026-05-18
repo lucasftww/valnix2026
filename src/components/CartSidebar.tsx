@@ -213,57 +213,63 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
               </div>
             </ScrollArea>
 
-            <div className="border-t border-border/20 bg-secondary/50 p-4 space-y-3">
-              {/* Coupon input + first-purchase nudge */}
-              <CouponInput variant="compact" />
-              {!appliedCoupon && (
-                <p className="text-[10px] text-muted-foreground text-center -mt-1">
-                  Primeira compra? Use <strong className="text-foreground">PRIMEIRA5</strong> para 5% OFF
-                </p>
-              )}
-
-              <Separator className="bg-border/20" />
-
-              {/* Price breakdown */}
-              <div className="space-y-1.5">
-                {discount > 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-muted-foreground">Subtotal</span>
-                    <span className="text-foreground">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
-                  </div>
+            {/* Strong elevation on the footer so it's clearly "another section"
+                from the scroll area above — fixes the user-reported "cupom
+                passando por cima do carrinho" visual where the gap between
+                last item and footer made it feel like content was overlapping. */}
+            <div className="border-t-2 border-border/30 bg-background shadow-[0_-8px_24px_rgba(0,0,0,0.3)] flex-shrink-0">
+              <div className="p-4 space-y-3">
+                {/* Coupon input + first-purchase nudge */}
+                <CouponInput variant="compact" />
+                {!appliedCoupon && (
+                  <p className="text-[10px] text-muted-foreground text-center -mt-1">
+                    Primeira compra? Use <strong className="text-foreground">PRIMEIRA5</strong> para 5% OFF
+                  </p>
                 )}
-                {discount > 0 && (
-                  <div className="flex justify-between items-center text-sm">
-                    <span className="text-success">Desconto ({appliedCoupon?.code})</span>
-                    <span className="text-success font-medium">− R$ {discount.toFixed(2).replace('.', ',')}</span>
+
+                <Separator className="bg-border/30" />
+
+                {/* Price breakdown */}
+                <div className="space-y-1.5">
+                  {discount > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-muted-foreground">Subtotal</span>
+                      <span className="text-foreground">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  )}
+                  {discount > 0 && (
+                    <div className="flex justify-between items-center text-sm">
+                      <span className="text-success">Desconto ({appliedCoupon?.code})</span>
+                      <span className="text-success font-medium">− R$ {discount.toFixed(2).replace('.', ',')}</span>
+                    </div>
+                  )}
+                  <div className="flex justify-between items-center">
+                    <span className="text-muted-foreground font-medium">Total</span>
+                    <span className="text-xl font-bold text-primary">
+                      R$ {finalPrice.toFixed(2).replace('.', ',')}
+                    </span>
                   </div>
-                )}
-                <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground font-medium">Total</span>
-                  <span className="text-xl font-bold text-primary">
-                    R$ {finalPrice.toFixed(2).replace('.', ',')}
+                </div>
+
+                <Button
+                  onClick={handleCheckout}
+                  onMouseEnter={handlePrefetchCheckout}
+                  onTouchStart={handlePrefetchCheckout}
+                  className="w-full h-12 bg-success hover:bg-success/90 text-success-foreground font-bold rounded-xl gap-2 shadow-lg shadow-success/20"
+                >
+                  Finalizar Compra
+                  <ArrowRight className="w-4 h-4" />
+                </Button>
+
+                {/* Trust signals */}
+                <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground pt-1">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3 h-3 text-success" /> Compra protegida
+                  </span>
+                  <span className="flex items-center gap-1">
+                    <Zap className="w-3 h-3 text-primary" /> Entrega imediata
                   </span>
                 </div>
-              </div>
-
-              <Button
-                onClick={handleCheckout}
-                onMouseEnter={handlePrefetchCheckout}
-                onTouchStart={handlePrefetchCheckout}
-                className="w-full h-12 bg-primary hover:bg-primary/90 text-primary-foreground font-semibold rounded-xl gap-2 shadow-lg shadow-primary/20"
-              >
-                Finalizar Compra
-                <ArrowRight className="w-4 h-4" />
-              </Button>
-
-              {/* Trust signals — Brazilian gift-card buyers fear fraud, these reduce abandonment */}
-              <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground pt-1">
-                <span className="flex items-center gap-1">
-                  <ShieldCheck className="w-3 h-3 text-success" /> Compra protegida
-                </span>
-                <span className="flex items-center gap-1">
-                  <Zap className="w-3 h-3 text-primary" /> Entrega imediata
-                </span>
               </div>
             </div>
           </>

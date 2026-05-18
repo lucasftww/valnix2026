@@ -11,19 +11,37 @@ interface State {
   isChunkError: boolean;
 }
 
+/**
+ * App-level error boundary. ChunkLoadError gets a quiet auto-recovery
+ * (one-shot reload via main.tsx's chunk-error handler) — we do NOT show
+ * the alarming "Erro de Conexão / Adblock" modal for those, since the
+ * reload usually succeeds and the user never notices.
+ *
+ * The fallback UI only appears for actual JS exceptions that persist
+ * beyond a reload — real bugs, not transient network/CDN hiccups.
+ */
 export class GlobalErrorBoundary extends Component<Props, State> {
   public state: State = {
     hasError: false,
-    isChunkError: false
+    isChunkError: false,
   };
 
   public static getDerivedStateFromError(error: Error): State {
-    const isChunkError = 
-      error.name === 'ChunkLoadError' || 
-      error.message.includes('Failed to fetch dynamically imported module') ||
-      error.message.includes('Importing a module script failed');
-      
-    return { hasError: true, isChunkError };
+    const msg = error.message || '';
+    const isChunkError =
+      error.name === 'ChunkLoadError' ||
+      msg.includes('Failed to fetch dynamically imported module') ||
+      msg.includes('Importing a module script failed');
+
+    // For chunk errors: skip the UI entirely. main.tsx already attaches a
+    // window error handler that triggers a one-shot location.reload() with
+    // a sessionStorage flag so we don't get into a reload loop. By the time
+    // the user would have seen anything, the reload has already started.
+    if (isChunkError) {
+      return { hasError: false, isChunkError: true };
+    }
+
+    return { hasError: true, isChunkError: false };
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
@@ -33,9 +51,6 @@ export class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   private handleReload = () => {
-    // Para ChunkLoadErrors, uma recarga limpa geralmente resolve se foi instabilidade temporária.
-    // Se for um bloqueador de anúncios persistente que quebrou a estrutura de dependência,
-    // o usuário terá que recarregar de qualquer maneira ou desativar o bloqueador.
     window.location.reload();
   };
 
@@ -44,24 +59,15 @@ export class GlobalErrorBoundary extends Component<Props, State> {
       return (
         <div className="min-h-screen bg-background flex items-center justify-center p-4">
           <div className="max-w-md w-full bg-card border border-border rounded-xl p-8 text-center shadow-lg">
-            <h1 className="text-2xl font-bold text-foreground mb-4">
-              {this.state.isChunkError ? "Erro de Conexão" : "Ops! Algo deu errado."}
-            </h1>
+            <h1 className="text-2xl font-bold text-foreground mb-4">Ops! Algo deu errado.</h1>
             <p className="text-muted-foreground mb-6">
-              {this.state.isChunkError 
-                ? "Tivemos um problema ao carregar esta página. Isso pode ter sido causado por uma falha de rede temporária ou por um bloqueador de anúncios agressivo (Adblock)."
-                : "Encontramos um erro inesperado. Nossa equipe já foi notificada."}
+              Encontramos um erro inesperado. Tente recarregar a página — se persistir, entre em
+              contato pelo nosso WhatsApp.
             </p>
             <Button onClick={this.handleReload} size="lg" className="w-full gap-2">
               <RefreshCcw className="w-4 h-4" />
-              Recarregar Página
+              Recarregar página
             </Button>
-            
-            {this.state.isChunkError && (
-              <p className="text-xs text-muted-foreground/60 mt-6">
-                Se o erro persistir, desative momentaneamente o seu bloqueador de anúncios para esta página.
-              </p>
-            )}
           </div>
         </div>
       );
