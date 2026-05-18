@@ -1,22 +1,15 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
-
 User-agent: *
 Allow: /
 
+# Block private / non-indexable areas
 Disallow: /admin
-Disallow: /auth
+Disallow: /charles
 Disallow: /checkout
-Disallow: /my-orders
-Disallow: /profile
+Disallow: /cart
+Disallow: /order
+Disallow: /painel-pagar
+Disallow: /entrega-prioritaria
+Disallow: /protecao-total
+Disallow: /api/
 
 Sitemap: https://www.valnix.com.br/sitemap.xml

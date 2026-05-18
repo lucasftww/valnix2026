@@ -233,7 +233,20 @@ export const PersonalInfoForm = memo(function PersonalInfoForm({
                 name="email"
                 value={formData.email}
                 onChange={(e) => onInputChange("email", e.target.value)}
-                onBlur={() => onBlur("email")}
+                onBlur={() => {
+                  onBlur("email");
+                  // Fire Lead event when a valid email is entered — best signal
+                  // to Meta that this visitor is converting. Deduped per-session.
+                  const email = formData.email.trim();
+                  if (email && isValidEmail(email) && !getEmailTLDError(email)) {
+                    import('@/lib/metaCapi').then(({ sendLead }) => {
+                      sendLead({
+                        email,
+                        phone: formData.phone ? formData.phone.replace(/\D/g, '') : undefined,
+                      });
+                    }).catch(() => {});
+                  }
+                }}
                 placeholder="seuemail@exemplo.com"
                 type="email"
                 autoComplete="email"

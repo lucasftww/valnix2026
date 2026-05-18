@@ -15,6 +15,10 @@ const FAQ = lazy(() => import("@/components/FAQ").then(m => ({ default: m.FAQ })
 const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingContactButtons = lazy(() => import("@/components/FloatingContactButtons").then(m => ({ default: m.FloatingContactButtons })));
 import { FirstPurchaseBanner } from "@/components/FirstPurchaseBanner";
+// Both deferred: NewsletterPopup waits 20s before first paint anyway,
+// RecentSalesTicker waits 8s — no point being in the critical-path bundle.
+const NewsletterPopup = lazy(() => import("@/components/NewsletterPopup").then(m => ({ default: m.NewsletterPopup })));
+const RecentSalesTicker = lazy(() => import("@/components/RecentSalesTicker").then(m => ({ default: m.RecentSalesTicker })));
 
 const IndexComponent = () => {
   // Prefetch categorias principais em background
@@ -66,6 +70,12 @@ const IndexComponent = () => {
       </Suspense>
       <Suspense fallback={null}>
         <FloatingContactButtons />
+      </Suspense>
+      <Suspense fallback={null}>
+        <RecentSalesTicker />
+      </Suspense>
+      <Suspense fallback={null}>
+        <NewsletterPopup />
       </Suspense>
     </div>
   );

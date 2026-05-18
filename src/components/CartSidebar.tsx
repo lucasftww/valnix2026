@@ -1,4 +1,4 @@
-import { memo, useCallback } from "react";
+import { memo, useCallback, useState, useEffect } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { ShoppingCart, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "./ui/button";
@@ -14,6 +14,14 @@ import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
 import { CouponInput } from "./CouponInput";
 
+interface SuggestedProduct {
+  id: string;
+  name: string;
+  price: number;
+  image_url: string | null;
+  category: string;
+}
+
 interface CartSidebarProps {
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
@@ -22,6 +30,25 @@ interface CartSidebarProps {
 const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
   const { items, totalItems, subtotal, discount, finalPrice, appliedCoupon, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
+  const [suggested, setSuggested] = useState<SuggestedProduct[]>([]);
+
+  // Fetch featured products on first open of an empty cart — gives the
+  // visitor something to click instead of bouncing.
+  useEffect(() => {
+    if (!open || items.length > 0 || suggested.length > 0) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch('/api/site-data?type=featured');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (cancelled) return;
+        const list = (data.products as SuggestedProduct[] | undefined)?.slice(0, 3) ?? [];
+        setSuggested(list);
+      } catch { /* silent */ }
+    })();
+    return () => { cancelled = true; };
+  }, [open, items.length, suggested.length]);
 
   const handleCheckout = useCallback(() => {
     onOpenChange?.(false);
@@ -76,16 +103,50 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
         </SheetHeader>
 
         {items.length === 0 ? (
-          <div className="flex-1 flex flex-col items-center justify-center p-6 text-center">
-            <div className="w-20 h-20 rounded-full bg-muted flex items-center justify-center mb-4">
-              <ShoppingCart className="w-8 h-8 text-muted-foreground" />
+          <div className="flex-1 flex flex-col items-center p-6">
+            <div className="flex flex-col items-center text-center mt-4 mb-6">
+              <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center mb-3">
+                <ShoppingCart className="w-7 h-7 text-muted-foreground" />
+              </div>
+              <h3 className="text-base font-semibold text-foreground mb-1">Seu carrinho está vazio</h3>
+              <p className="text-xs text-muted-foreground max-w-[230px]">
+                Adicione produtos e use o cupom <strong className="text-foreground">PRIMEIRA5</strong> para 5% OFF na primeira compra.
+              </p>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">Carrinho vazio</h3>
-            <p className="text-sm text-muted-foreground mb-6 max-w-[200px]">
-              Explore nossos produtos e adicione itens ao seu carrinho
-            </p>
-            <Button onClick={handleClose} className="bg-primary hover:bg-primary/90">
-              Explorar produtos
+
+            {suggested.length > 0 && (
+              <div className="w-full space-y-3">
+                <p className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold text-center">
+                  Sugeridos para você
+                </p>
+                <div className="space-y-2">
+                  {suggested.map((p) => (
+                    <Link
+                      key={p.id}
+                      to={`/product/${p.id}`}
+                      onClick={handleClose}
+                      className="flex items-center gap-3 p-2.5 rounded-xl bg-secondary/40 border border-border/10 hover:border-primary/30 hover:bg-secondary/70 transition-colors group"
+                    >
+                      <div className="w-12 h-12 rounded-lg bg-muted overflow-hidden flex-shrink-0">
+                        {p.image_url ? (
+                          <img src={p.image_url} alt="" className="w-full h-full object-cover" loading="lazy" />
+                        ) : null}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-medium text-foreground line-clamp-1">{p.name}</p>
+                        <p className="text-sm font-bold text-primary">
+                          R$ {Number(p.price).toFixed(2).replace('.', ',')}
+                        </p>
+                      </div>
+                      <ArrowRight className="w-3.5 h-3.5 text-muted-foreground group-hover:text-primary transition-colors flex-shrink-0" />
+                    </Link>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <Button onClick={handleClose} variant="outline" className="mt-6 w-full">
+              Continuar navegando
             </Button>
           </div>
         ) : (

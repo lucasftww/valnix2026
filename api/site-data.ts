@@ -89,6 +89,56 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ product: data ? stripCodes(data) : null });
     }
 
+    // Recent sales ticker — last 12 paid orders within 24h, customer name
+    // anonymized (first name + last initial). Public; used as social-proof
+    // floating ticker on the storefront.
+    if (type === 'recent-sales') {
+      const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+      const { data, error } = await supabaseAdmin
+        .from('orders')
+        .select('id,customer_name,paid_at')
+        .eq('payment_status', 'paid')
+        .gte('paid_at', since)
+        .order('paid_at', { ascending: false })
+        .limit(12);
+      if (error) {
+        console.error('[site-data] recent-sales error:', error.message);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+      // Fetch line items for these orders to show product name
+      const orderIds = (data ?? []).map((o) => o.id);
+      let itemsByOrder = new Map<string, string>();
+      if (orderIds.length) {
+        const { data: items } = await supabaseAdmin
+          .from('order_items')
+          .select('order_id,product_name,quantity')
+          .in('order_id', orderIds);
+        for (const it of items ?? []) {
+          const oid = (it as { order_id: string }).order_id;
+          if (!itemsByOrder.has(oid)) {
+            const qty = (it as { quantity: number }).quantity;
+            const name = (it as { product_name: string }).product_name;
+            itemsByOrder.set(oid, qty > 1 ? `${qty}× ${name}` : name);
+          }
+        }
+      }
+      const maskName = (full: string | null): string => {
+        if (!full) return 'Cliente';
+        const parts = full.trim().split(/\s+/);
+        const first = parts[0] || 'Cliente';
+        const lastInitial = parts.length > 1 ? `${parts[parts.length - 1][0]}.` : '';
+        return [first, lastInitial].filter(Boolean).join(' ');
+      };
+      const sales = (data ?? []).map((o) => ({
+        customer: maskName(o.customer_name),
+        product: itemsByOrder.get(o.id) || 'Pedido VALNIX',
+        paid_at: o.paid_at,
+      }));
+      // Cache for 60s edge — fine to be slightly stale; this is social proof.
+      res.setHeader('Cache-Control', 'public, max-age=60, s-maxage=60');
+      return res.status(200).json({ sales });
+    }
+
     // Coupon preview — public, used by the cart sidebar to show "5% OFF" hint
     // before checkout. Final validation is server-side in /api/create-order.
     if (type === 'coupon') {

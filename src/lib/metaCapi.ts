@@ -56,9 +56,9 @@ interface MetaCapiEventData {
 }
 
 // ── Events that are sent via CAPI ──────────────────
-// AddToCart enabled so Meta can optimize campaigns for it — without it, cost
-// per AddToCart on ad campaigns is much higher because Meta has no signal.
-const CAPI_ENABLED_EVENTS = ['AddToCart', 'InitiateCheckout', 'Purchase'];
+// AddToCart + Lead enabled so Meta can optimize campaigns for them — without
+// them, cost per cart-add / per lead is much higher because Meta has no signal.
+const CAPI_ENABLED_EVENTS = ['AddToCart', 'Lead', 'InitiateCheckout', 'Purchase'];
 
 // ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {
@@ -181,6 +181,40 @@ export function sendAddToCart(params: {
     content_ids: params.productId ? [params.productId] : undefined,
     contents,
     num_items: params.quantity ?? 1,
+  });
+}
+
+// ── Lead (Pixel + CAPI) ────────────────────────────────────────────
+// Fired when a user enters a valid email at checkout — signals "intent to
+// buy" to Meta. One-shot per checkout session to avoid duplicates.
+const LEAD_FIRED_KEY = 'valnix_lead_fired_v1';
+export function sendLead(params: {
+  email: string;
+  phone?: string;
+  value?: number;
+}) {
+  if (typeof window === 'undefined' || !params.email) return;
+  // Dedup: one Lead per email per browser-session is plenty for Meta.
+  try {
+    if (sessionStorage.getItem(LEAD_FIRED_KEY) === params.email) return;
+    sessionStorage.setItem(LEAD_FIRED_KEY, params.email);
+  } catch {}
+
+  const eventId = generateEventId('Lead', params.email);
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function') {
+    fbq('track', 'Lead', {
+      content_category: 'checkout_email_provided',
+      value: params.value,
+      currency: params.value ? 'BRL' : undefined,
+    }, { eventID: eventId });
+  }
+  sendMetaCapiEvent({
+    event_name: 'Lead',
+    event_id: eventId,
+    email: params.email,
+    phone: params.phone,
+    value: params.value,
   });
 }
 
