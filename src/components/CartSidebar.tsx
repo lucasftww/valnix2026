@@ -1,6 +1,6 @@
 import { memo, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { ShoppingCart, Trash2, Plus, Minus, ShoppingBag, ArrowRight } from "lucide-react";
+import { ShoppingCart, Trash2, Plus, Minus, ShoppingBag, ArrowRight, ShieldCheck, Zap } from "lucide-react";
 import { Button } from "./ui/button";
 import { useCart } from "@/contexts/CartContext";
 import {
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/sheet";
 import { Separator } from "./ui/separator";
 import { ScrollArea } from "./ui/scroll-area";
+import { CouponInput } from "./CouponInput";
 
 interface CartSidebarProps {
   open?: boolean;
@@ -19,7 +20,7 @@ interface CartSidebarProps {
 }
 
 const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
-  const { items, totalItems, finalPrice, updateQuantity, removeItem } = useCart();
+  const { items, totalItems, subtotal, discount, finalPrice, appliedCoupon, updateQuantity, removeItem } = useCart();
   const navigate = useNavigate();
 
   const handleCheckout = useCallback(() => {
@@ -151,19 +152,40 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
               </div>
             </ScrollArea>
 
-            <div className="border-t border-border/20 bg-secondary/50 p-4 space-y-4">
-              <div className="space-y-2">
+            <div className="border-t border-border/20 bg-secondary/50 p-4 space-y-3">
+              {/* Coupon input + first-purchase nudge */}
+              <CouponInput variant="compact" />
+              {!appliedCoupon && (
+                <p className="text-[10px] text-muted-foreground text-center -mt-1">
+                  Primeira compra? Use <strong className="text-foreground">PRIMEIRA5</strong> para 5% OFF
+                </p>
+              )}
+
+              <Separator className="bg-border/20" />
+
+              {/* Price breakdown */}
+              <div className="space-y-1.5">
+                {discount > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-muted-foreground">Subtotal</span>
+                    <span className="text-foreground">R$ {subtotal.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                )}
+                {discount > 0 && (
+                  <div className="flex justify-between items-center text-sm">
+                    <span className="text-success">Desconto ({appliedCoupon?.code})</span>
+                    <span className="text-success font-medium">− R$ {discount.toFixed(2).replace('.', ',')}</span>
+                  </div>
+                )}
                 <div className="flex justify-between items-center">
-                  <span className="text-muted-foreground">Total</span>
+                  <span className="text-muted-foreground font-medium">Total</span>
                   <span className="text-xl font-bold text-primary">
                     R$ {finalPrice.toFixed(2).replace('.', ',')}
                   </span>
                 </div>
               </div>
 
-              <Separator className="bg-border/20" />
-
-              <Button 
+              <Button
                 onClick={handleCheckout}
                 onMouseEnter={handlePrefetchCheckout}
                 onTouchStart={handlePrefetchCheckout}
@@ -172,10 +194,16 @@ const CartSidebarComponent = ({ open, onOpenChange }: CartSidebarProps) => {
                 Finalizar Compra
                 <ArrowRight className="w-4 h-4" />
               </Button>
-              
-              <p className="text-center text-[11px] text-muted-foreground">
-                Pagamento seguro via PIX • Entrega imediata
-              </p>
+
+              {/* Trust signals — Brazilian gift-card buyers fear fraud, these reduce abandonment */}
+              <div className="flex items-center justify-center gap-3 text-[10px] text-muted-foreground pt-1">
+                <span className="flex items-center gap-1">
+                  <ShieldCheck className="w-3 h-3 text-success" /> Compra protegida
+                </span>
+                <span className="flex items-center gap-1">
+                  <Zap className="w-3 h-3 text-primary" /> Entrega imediata
+                </span>
+              </div>
             </div>
           </>
         )}

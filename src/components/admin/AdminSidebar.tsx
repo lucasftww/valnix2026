@@ -1,7 +1,7 @@
-import { 
-  Package, ShoppingCart, FolderTree, Home, 
+import {
+  Package, ShoppingCart, FolderTree, Home,
   BarChart3, ChevronLeft, ChevronRight,
-  Zap, TrendingUp, Shield
+  Zap, TrendingUp, Shield, Tag
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -32,6 +32,7 @@ const mainMenuItems = [
   { id: "orders", title: "Pedidos", icon: ShoppingCart, badge: null },
   { id: "products", title: "Produtos", icon: Package, badge: null },
   { id: "categories", title: "Categorias", icon: FolderTree, badge: null },
+  { id: "coupons", title: "Cupons", icon: Tag, badge: null },
 ];
 
 const systemMenuItems = [

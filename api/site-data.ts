@@ -89,6 +89,30 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.status(200).json({ product: data ? stripCodes(data) : null });
     }
 
+    // Coupon preview — public, used by the cart sidebar to show "5% OFF" hint
+    // before checkout. Final validation is server-side in /api/create-order.
+    if (type === 'coupon') {
+      const code = String(req.query.code || '').trim().toUpperCase();
+      if (!code || code.length > 40) return res.status(400).json({ error: 'code required' });
+      const { data, error } = await supabaseAdmin
+        .from('coupons')
+        .select('code,description,type,value,min_order,max_discount,first_purchase_only,expires_at,applies_to_category')
+        .eq('code', code)
+        .eq('is_active', true)
+        .maybeSingle();
+      if (error) {
+        console.error('[site-data] coupon lookup error:', error.message);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+      if (!data) {
+        return res.status(404).json({ error: 'Cupom inválido ou expirado', code: 'coupon_not_found' });
+      }
+      if (data.expires_at && new Date(data.expires_at) < new Date()) {
+        return res.status(404).json({ error: 'Cupom expirado', code: 'coupon_expired' });
+      }
+      return res.status(200).json({ coupon: data });
+    }
+
     return res.status(400).json({ error: 'Unknown type' });
   } catch (error: unknown) {
     const message = errorMessage(error);

@@ -439,6 +439,16 @@ const ProductDetail = () => {
                     </div>
                   </div>
 
+                  {/* Low-stock urgency hint (only when 1 ≤ stock ≤ 5). */}
+                  {!isOutOfStock && typeof productStock === 'number' && productStock <= 5 && productStock > 0 && (
+                    <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-xs text-orange-600 dark:text-orange-400">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-orange-500 animate-pulse" />
+                      <span>
+                        <strong>Apenas {productStock}</strong> em estoque — peça agora.
+                      </span>
+                    </div>
+                  )}
+
                   {/* CTAs — disabled when out of stock to prevent paid orders
                       that admin can't fulfill (server-side check is the final
                       safety net, but blocking on the storefront avoids the

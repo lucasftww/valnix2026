@@ -74,34 +74,90 @@ export interface CartItem {
   delivery_type?: string;
 }
 
+export interface AppliedCoupon {
+  code: string;
+  type: 'percent' | 'fixed';
+  value: number;
+  min_order: number;
+  max_discount: number | null;
+  description: string | null;
+}
+
 interface CartContextType {
   items: CartItem[];
   totalItems: number;
   totalPrice: number;
+  /** Pre-discount sum of (price * qty). */
+  subtotal: number;
+  /** Discount in BRL computed from the applied coupon. */
+  discount: number;
+  /** total - discount, clamped to >= 0. */
   finalPrice: number;
+  appliedCoupon: AppliedCoupon | null;
   addItem: (item: Omit<CartItem, "quantity"> & { [key: string]: any }) => void;
   removeItem: (id: string) => void;
   updateQuantity: (id: string, quantity: number) => void;
   clearCart: () => void;
+  applyCoupon: (coupon: AppliedCoupon) => void;
+  clearCoupon: () => void;
+}
+
+const COUPON_STORAGE_KEY = 'valnix_cart_coupon_v1';
+function loadCoupon(): AppliedCoupon | null {
+  try {
+    const raw = localStorage.getItem(COUPON_STORAGE_KEY);
+    if (!raw) return null;
+    const p = JSON.parse(raw);
+    if (p && typeof p.code === 'string' && (p.type === 'percent' || p.type === 'fixed')) {
+      return p as AppliedCoupon;
+    }
+  } catch {}
+  return null;
+}
+function saveCoupon(c: AppliedCoupon | null) {
+  try {
+    if (!c) localStorage.removeItem(COUPON_STORAGE_KEY);
+    else localStorage.setItem(COUPON_STORAGE_KEY, JSON.stringify(c));
+  } catch {}
 }
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
 export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [items, setItems] = useState<CartItem[]>(loadCart);
+  const [appliedCoupon, setAppliedCoupon] = useState<AppliedCoupon | null>(loadCoupon);
 
-  // Persist cart on every change (localStorage, 7-day TTL).
+  // Persist cart + coupon on every change (localStorage, 7-day TTL on cart).
   useEffect(() => { saveCart(items); }, [items]);
+  useEffect(() => { saveCoupon(appliedCoupon); }, [appliedCoupon]);
 
   const totalItems = useMemo(
     () => items.reduce((sum, item) => sum + (Number(item.quantity) || 0), 0),
     [items],
   );
-  const totalPrice = useMemo(
+  const subtotal = useMemo(
     () => items.reduce((sum, item) => sum + (Number(item.price) || 0) * (Number(item.quantity) || 0), 0),
     [items],
   );
-  const finalPrice = totalPrice;
+  // Backwards-compat alias — components built before coupons used totalPrice.
+  const totalPrice = subtotal;
+
+  // Discount: server is the source of truth (re-validates in create-order),
+  // but we preview here so the cart shows the right number to the customer.
+  // Coupon is auto-removed if subtotal drops below min_order.
+  const discount = useMemo(() => {
+    if (!appliedCoupon || subtotal < appliedCoupon.min_order) return 0;
+    let d = appliedCoupon.type === 'percent'
+      ? (subtotal * appliedCoupon.value) / 100
+      : appliedCoupon.value;
+    if (appliedCoupon.max_discount && d > appliedCoupon.max_discount) {
+      d = appliedCoupon.max_discount;
+    }
+    d = Math.min(d, subtotal); // never below 0
+    return Math.round(d * 100) / 100;
+  }, [appliedCoupon, subtotal]);
+
+  const finalPrice = Math.max(0, Math.round((subtotal - discount) * 100) / 100);
 
   const addItem = useCallback((newItem: Omit<CartItem, "quantity">) => {
     setItems((prev) => {
@@ -138,6 +194,15 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const clearCart = useCallback(() => {
     setItems([]);
+    setAppliedCoupon(null);
+  }, []);
+
+  const applyCoupon = useCallback((coupon: AppliedCoupon) => {
+    setAppliedCoupon(coupon);
+  }, []);
+
+  const clearCoupon = useCallback(() => {
+    setAppliedCoupon(null);
   }, []);
 
   return (
@@ -146,11 +211,16 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
         items,
         totalItems,
         totalPrice,
+        subtotal,
+        discount,
         finalPrice,
+        appliedCoupon,
         addItem,
         removeItem,
         updateQuantity,
         clearCart,
+        applyCoupon,
+        clearCoupon,
       }}
     >
       {children}

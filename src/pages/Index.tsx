@@ -14,6 +14,7 @@ const CategoryCards = lazy(() => import("@/components/CategoryCards").then(m => 
 const FAQ = lazy(() => import("@/components/FAQ").then(m => ({ default: m.FAQ })));
 const Footer = lazy(() => import("@/components/Footer").then(m => ({ default: m.Footer })));
 const FloatingContactButtons = lazy(() => import("@/components/FloatingContactButtons").then(m => ({ default: m.FloatingContactButtons })));
+import { FirstPurchaseBanner } from "@/components/FirstPurchaseBanner";
 
 const IndexComponent = () => {
   // Prefetch categorias principais em background
@@ -39,6 +40,7 @@ const IndexComponent = () => {
         <meta name="twitter:description" content="Gift cards gamer com entrega automática via PIX. Melhores preços do Brasil." />
         <meta name="twitter:image" content="https://www.valnix.com.br/images/og-home.jpg" />
       </Helmet>
+      <FirstPurchaseBanner />
       <Header />
       <Navigation />
       <main className="flex-1">

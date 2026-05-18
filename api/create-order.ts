@@ -115,7 +115,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const productIds = [...wanted.keys()];
     const { data: products, error: productsErr } = await supabaseAdmin
       .from('products')
-      .select('id,name,price,image_url,is_active,delivery_type,stock,auto_delivery_codes')
+      .select('id,name,price,image_url,is_active,delivery_type,stock,auto_delivery_codes,category')
       .in('id', productIds);
     if (productsErr) throw new Error(productsErr.message);
 
@@ -165,6 +165,84 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       });
     }
 
+    // ─── Coupon application (server-side validation; client preview is just UX) ──
+    let appliedCouponCode: string | null = null;
+    let discountAmount = 0;
+    const couponCodeRaw =
+      typeof orderInput.coupon_code === 'string' ? orderInput.coupon_code.trim().toUpperCase() : '';
+    if (couponCodeRaw && couponCodeRaw.length <= 40) {
+      const { data: coupon, error: cErr } = await supabaseAdmin
+        .from('coupons')
+        .select('id,code,type,value,min_order,max_discount,max_uses,uses_count,max_uses_per_user,first_purchase_only,expires_at,starts_at,is_active,applies_to_category')
+        .eq('code', couponCodeRaw)
+        .maybeSingle();
+      if (cErr) {
+        console.error('[create-order] coupon lookup failed:', cErr.message);
+      } else if (coupon) {
+        const now = Date.now();
+        const expired = coupon.expires_at && new Date(coupon.expires_at).getTime() < now;
+        const notStarted = coupon.starts_at && new Date(coupon.starts_at).getTime() > now;
+        const overUsed = coupon.max_uses != null && coupon.uses_count >= coupon.max_uses;
+        const underMin = serverTotal < Number(coupon.min_order || 0);
+        const wrongCategory =
+          coupon.applies_to_category &&
+          !dbItems.some((it) => byId.get(it.product_id)?.category === coupon.applies_to_category);
+
+        if (!coupon.is_active) {
+          return res.status(400).json({ error: 'Cupom desativado', code: 'coupon_inactive' });
+        }
+        if (expired) return res.status(400).json({ error: 'Cupom expirado', code: 'coupon_expired' });
+        if (notStarted) return res.status(400).json({ error: 'Cupom ainda não está ativo', code: 'coupon_not_started' });
+        if (overUsed) return res.status(400).json({ error: 'Cupom esgotado', code: 'coupon_max_uses' });
+        if (underMin) {
+          return res.status(400).json({
+            error: `Pedido mínimo de R$ ${Number(coupon.min_order).toFixed(2).replace('.', ',')} para usar este cupom`,
+            code: 'coupon_min_order',
+          });
+        }
+        if (wrongCategory) {
+          return res.status(400).json({ error: 'Cupom não vale para esta categoria', code: 'coupon_wrong_category' });
+        }
+
+        // Per-user check (best-effort by customer_email; null email → no check).
+        if (coupon.first_purchase_only && customerEmail) {
+          const { count: priorOrders } = await supabaseAdmin
+            .from('orders')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_email', customerEmail)
+            .eq('payment_status', 'paid');
+          if ((priorOrders ?? 0) > 0) {
+            return res.status(400).json({ error: 'Cupom só vale na primeira compra', code: 'coupon_not_first' });
+          }
+        }
+        if (coupon.max_uses_per_user && customerEmail) {
+          const { count: userUses } = await supabaseAdmin
+            .from('coupon_redemptions')
+            .select('id', { count: 'exact', head: true })
+            .eq('coupon_id', coupon.id)
+            .eq('user_id', customerEmail);
+          if ((userUses ?? 0) >= coupon.max_uses_per_user) {
+            return res.status(400).json({ error: 'Você já usou este cupom', code: 'coupon_per_user_limit' });
+          }
+        }
+
+        // Compute discount.
+        if (coupon.type === 'percent') {
+          discountAmount = (serverTotal * Number(coupon.value)) / 100;
+          if (coupon.max_discount) {
+            discountAmount = Math.min(discountAmount, Number(coupon.max_discount));
+          }
+        } else {
+          discountAmount = Number(coupon.value);
+        }
+        discountAmount = Math.min(Math.round(discountAmount * 100) / 100, serverTotal);
+        appliedCouponCode = coupon.code;
+        serverTotal = Math.round((serverTotal - discountAmount) * 100) / 100;
+      } else {
+        return res.status(400).json({ error: 'Cupom inválido', code: 'coupon_not_found' });
+      }
+    }
+
     // Dice's PIX gateway rejects amounts below R$ 2,00 — keep the order
     // floor in sync so the user never reaches checkout with a doomed total.
     if (serverTotal < 2) {
@@ -199,6 +277,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       utm_campaign: typeof orderInput.utm_campaign === 'string' ? orderInput.utm_campaign.slice(0, 200) : null,
       utm_content: typeof orderInput.utm_content === 'string' ? orderInput.utm_content.slice(0, 200) : null,
       utm_term: typeof orderInput.utm_term === 'string' ? orderInput.utm_term.slice(0, 200) : null,
+      coupon_code: appliedCouponCode,
+      discount_amount: discountAmount,
     };
 
     const { data: created, error: orderErr } = await supabaseAdmin
@@ -218,11 +298,37 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       throw new Error(itemsErr.message);
     }
 
+    // Audit the coupon redemption + bump uses_count. Best-effort: if either of
+    // these fails the order still goes through (coupon already applied to total),
+    // so we just log and move on rather than failing the whole order.
+    if (appliedCouponCode && discountAmount > 0) {
+      const { data: c } = await supabaseAdmin
+        .from('coupons')
+        .select('id,uses_count')
+        .eq('code', appliedCouponCode)
+        .maybeSingle();
+      if (c) {
+        await supabaseAdmin.from('coupon_redemptions').insert({
+          coupon_id: c.id,
+          coupon_code: appliedCouponCode,
+          order_id: orderId,
+          user_id: customerEmail || userId || null,
+          discount_value: discountAmount,
+        } as never);
+        await supabaseAdmin
+          .from('coupons')
+          .update({ uses_count: (c.uses_count ?? 0) + 1 } as never)
+          .eq('id', c.id);
+      }
+    }
+
     return res.status(200).json({
       success: true,
       orderId,
       guestHash,
       total: serverTotal,
+      discount: discountAmount,
+      coupon_code: appliedCouponCode,
     });
   } catch (error: unknown) {
     const message = errorMessage(error);

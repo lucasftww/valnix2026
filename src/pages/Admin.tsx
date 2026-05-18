@@ -14,6 +14,7 @@ const AdminOrders = lazy(() => import("@/components/admin/AdminOrders").then(m =
 const AdminCategories = lazy(() => import("@/components/admin/AdminCategories").then(m => ({ default: m.AdminCategories })));
 const AdminPostPaymentPages = lazy(() => import("@/components/admin/AdminPostPaymentPages").then(m => ({ default: m.AdminPostPaymentPages })));
 const AdminTrackingMonitor = lazy(() => import("@/components/admin/AdminTrackingMonitor").then(m => ({ default: m.AdminTrackingMonitor })));
+const AdminCoupons = lazy(() => import("@/components/admin/AdminCoupons").then(m => ({ default: m.AdminCoupons })));
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AdminSidebar } from "@/components/admin/AdminSidebar";
 import { Button } from "@/components/ui/button";
@@ -42,6 +43,7 @@ const tabTitles: Record<string, { title: string; description: string }> = {
   orders: { title: "Pedidos", description: "Acompanhe e gerencie pedidos" },
   "post-payment": { title: "Pós-Venda", description: "Funil de upsell pós-pagamento" },
   tracking: { title: "Tracking Monitor", description: "Saúde do Meta CAPI e deduplicação" },
+  coupons: { title: "Cupons", description: "Crie e gerencie cupons de desconto" },
 };
 
 function Admin() {
@@ -203,6 +205,7 @@ function Admin() {
                 {activeTab === "orders" && <AdminOrders />}
                 {activeTab === "post-payment" && <AdminPostPaymentPages />}
                 {activeTab === "tracking" && <AdminTrackingMonitor />}
+                {activeTab === "coupons" && <AdminCoupons />}
               </Suspense>
             </div>
           </main>

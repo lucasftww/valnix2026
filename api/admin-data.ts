@@ -22,6 +22,11 @@ const CATEGORY_EDITABLE = new Set([
   'name', 'slug', 'description', 'image_url', 'icon_url', 'parent_id',
   'is_active', 'display_order', 'show_on_homepage',
 ]);
+const COUPON_EDITABLE = new Set([
+  'code', 'description', 'type', 'value', 'min_order', 'max_discount',
+  'max_uses', 'max_uses_per_user', 'first_purchase_only', 'expires_at',
+  'starts_at', 'is_active', 'applies_to_category',
+]);
 
 function filterFields<T extends Record<string, unknown>>(body: T, allow: Set<string>): Partial<T> {
   const out: Record<string, unknown> = {};
@@ -216,6 +221,39 @@ async function buildDashboardStats(): Promise<Record<string, unknown>> {
     });
   }
 
+  // Low-stock product alerts — show admin what to replenish before customers
+  // hit "Esgotado". Only flags active products with stock between 0 and 5
+  // (inclusive), or stock == 0 for manual products where admin set it.
+  const { data: lowStockRows } = await supabaseAdmin
+    .from('products')
+    .select('id,name,category,stock,delivery_type')
+    .eq('is_active', true)
+    .lte('stock', 5)
+    .gte('stock', 0)
+    .order('stock', { ascending: true })
+    .limit(20);
+  const stockAlerts = (lowStockRows ?? []).map((p) => ({
+    id: p.id,
+    name: p.name,
+    category: p.category,
+    stock: p.stock ?? 0,
+    delivery_type: p.delivery_type,
+  }));
+
+  if (stockAlerts.some((s) => s.stock === 0)) {
+    alerts.unshift({
+      type: 'error',
+      title: 'Produtos esgotados',
+      description: `${stockAlerts.filter((s) => s.stock === 0).length} produto(s) sem estoque — não estão sendo vendidos.`,
+    });
+  } else if (stockAlerts.length > 0) {
+    alerts.push({
+      type: 'warning',
+      title: 'Estoque baixo',
+      description: `${stockAlerts.length} produto(s) com menos de 5 unidades.`,
+    });
+  }
+
   return {
     periods,
     totalProducts,
@@ -225,6 +263,7 @@ async function buildDashboardStats(): Promise<Record<string, unknown>> {
     revenueByDay: buildRevenueByDay(orders),
     paymentDistribution,
     alerts,
+    stockAlerts,
   };
 }
 
@@ -312,6 +351,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
           const { data, error } = await supabaseAdmin.from('categories').select('*');
           if (error) throw new Error(error.message);
           return res.status(200).json({ categories: data ?? [] });
+        }
+        case 'coupons': {
+          const { data, error } = await supabaseAdmin
+            .from('coupons')
+            .select('*')
+            .order('created_at', { ascending: false });
+          if (error) throw new Error(error.message);
+          return res.status(200).json({ coupons: data ?? [] });
         }
         case 'dashboard-stats': {
           const stats = await buildDashboardStats();
@@ -412,8 +459,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (req.method === 'DELETE') {
       const id = qString(req, 'id');
       if (!id) return res.status(400).json({ error: 'id required' });
-      const table = resource as 'orders' | 'products' | 'categories';
-      if (!['orders', 'products', 'categories'].includes(table)) {
+      const table = resource as 'orders' | 'products' | 'categories' | 'coupons';
+      if (!['orders', 'products', 'categories', 'coupons'].includes(table)) {
         return res.status(400).json({ error: 'Unknown resource for DELETE' });
       }
       const { error } = await supabaseAdmin.from(table).delete().eq('id', id);
@@ -499,6 +546,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .update({ delivery_code, delivered_at: delivery_code ? new Date().toISOString() : null })
             .eq('id', itemId)
             .eq('order_id', orderId);
+          if (error) throw new Error(error.message);
+          return res.status(200).json({ success: true });
+        }
+        case 'coupons': {
+          const id = String(body.id || '');
+          if (!id) return res.status(400).json({ error: 'id required' });
+          const { id: _i, ...rest } = body;
+          const clean = filterFields(rest as Record<string, unknown>, COUPON_EDITABLE);
+          if (typeof clean.code === 'string') clean.code = (clean.code as string).trim().toUpperCase();
+          const { error } = await supabaseAdmin.from('coupons').update(clean as never).eq('id', id);
           if (error) throw new Error(error.message);
           return res.status(200).json({ success: true });
         }
@@ -613,6 +670,26 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
             .select('id')
             .single();
           if (error) throw new Error(error.message);
+          return res.status(200).json({ success: true, id: data?.id });
+        }
+        case 'coupons': {
+          const incoming = body as Record<string, unknown>;
+          const clean = filterFields(incoming, COUPON_EDITABLE) as Record<string, unknown>;
+          if (typeof clean.code === 'string') clean.code = (clean.code as string).trim().toUpperCase();
+          if (!clean.code || !clean.type || !clean.value) {
+            return res.status(400).json({ error: 'code, type and value are required' });
+          }
+          const { data, error } = await supabaseAdmin
+            .from('coupons')
+            .insert(clean as never)
+            .select('id')
+            .single();
+          if (error) {
+            if (String(error.message).toLowerCase().includes('duplicate')) {
+              return res.status(409).json({ error: 'Já existe um cupom com esse código' });
+            }
+            throw new Error(error.message);
+          }
           return res.status(200).json({ success: true, id: data?.id });
         }
         default:

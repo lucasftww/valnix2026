@@ -86,7 +86,7 @@ interface PaymentData {
 }
 
 export default function Checkout() {
-  const { items, totalPrice, finalPrice, clearCart, removeItem, updateQuantity } = useCart();
+  const { items, totalPrice, subtotal, discount, finalPrice, appliedCoupon, clearCart, removeItem, updateQuantity } = useCart();
   const navigate = useNavigate();
   const { toast } = useToast();
   
@@ -290,6 +290,9 @@ export default function Checkout() {
         utm_source: utmParams.utm_source || null, utm_medium: utmParams.utm_medium || null,
         utm_campaign: utmParams.utm_campaign || null, utm_content: utmParams.utm_content || null,
         utm_term: utmParams.utm_term || null,
+        // Coupon applied in cart — server re-validates and computes the
+        // final discount (cart preview is just UX, never trusted).
+        coupon_code: appliedCoupon?.code ?? null,
       }, orderItemsData, null);
 
       setLoadingStage("generating");

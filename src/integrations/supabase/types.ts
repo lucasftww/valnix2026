@@ -113,13 +113,16 @@ export type Database = {
           utm_content: string | null;
           utm_term: string | null;
           paid_at: string | null;
+          coupon_code: string | null;
+          discount_amount: number;
           created_at: string;
           updated_at: string;
         };
-        Insert: Omit<Database['public']['Tables']['orders']['Row'], 'id' | 'created_at' | 'updated_at'> & {
+        Insert: Omit<Database['public']['Tables']['orders']['Row'], 'id' | 'created_at' | 'updated_at' | 'discount_amount'> & {
           id?: string;
           created_at?: string;
           updated_at?: string;
+          discount_amount?: number;
         };
         Update: Partial<Database['public']['Tables']['orders']['Insert']>;
         Relationships: [];
@@ -309,6 +312,51 @@ export type Database = {
         };
         Insert: Database['public']['Tables']['system_credentials']['Row'];
         Update: Partial<Database['public']['Tables']['system_credentials']['Insert']>;
+        Relationships: [];
+      };
+      coupons: {
+        Row: {
+          id: string;
+          code: string;
+          description: string | null;
+          type: 'percent' | 'fixed';
+          value: number;
+          min_order: number;
+          max_discount: number | null;
+          max_uses: number | null;
+          uses_count: number;
+          max_uses_per_user: number | null;
+          first_purchase_only: boolean;
+          expires_at: string | null;
+          starts_at: string | null;
+          is_active: boolean;
+          applies_to_category: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['coupons']['Row']> & {
+          code: string;
+          type: 'percent' | 'fixed';
+          value: number;
+        };
+        Update: Partial<Database['public']['Tables']['coupons']['Insert']>;
+        Relationships: [];
+      };
+      coupon_redemptions: {
+        Row: {
+          id: string;
+          coupon_id: string | null;
+          coupon_code: string;
+          order_id: string | null;
+          user_id: string | null;
+          discount_value: number;
+          redeemed_at: string;
+        };
+        Insert: Partial<Database['public']['Tables']['coupon_redemptions']['Row']> & {
+          coupon_code: string;
+          discount_value: number;
+        };
+        Update: Partial<Database['public']['Tables']['coupon_redemptions']['Insert']>;
         Relationships: [];
       };
     };
