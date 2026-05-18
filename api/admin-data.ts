@@ -512,6 +512,55 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       if (resource === 'cleanup-analytics') return handleCleanupAnalytics(res, body);
       if (resource === 'cleanup-capi-logs') return handleCleanupCapiLogs(res);
 
+      // ── Image upload (replaces the never-built /api/upload-r2) ──
+      // Body: { fileBase64, fileName, contentType }
+      // Uploads to Supabase Storage bucket "product-images" via service_role
+      // and returns the public URL. Bucket is provisioned in migration
+      // 20260517040000_storage_product_images.sql.
+      if (resource === 'upload-image') {
+        const fileBase64 = typeof body.fileBase64 === 'string' ? body.fileBase64 : '';
+        const fileName = typeof body.fileName === 'string' ? body.fileName : '';
+        const contentType = typeof body.contentType === 'string' ? body.contentType : 'image/webp';
+
+        if (!fileBase64 || !fileName) {
+          return res.status(400).json({ error: 'fileBase64 and fileName required' });
+        }
+        const allowedTypes = ['image/webp', 'image/avif', 'image/png', 'image/jpeg', 'image/jpg'];
+        if (!allowedTypes.includes(contentType)) {
+          return res.status(400).json({ error: 'unsupported contentType' });
+        }
+        // Path sanitization — only allow safe chars, no leading slashes, no ".."
+        if (!/^[A-Za-z0-9/_.-]+$/.test(fileName) || fileName.includes('..') || fileName.startsWith('/')) {
+          return res.status(400).json({ error: 'invalid fileName' });
+        }
+        let buffer: Buffer;
+        try {
+          buffer = Buffer.from(fileBase64, 'base64');
+        } catch {
+          return res.status(400).json({ error: 'invalid base64' });
+        }
+        // 5 MB hard cap (storage bucket also enforces this).
+        if (buffer.length === 0 || buffer.length > 5 * 1024 * 1024) {
+          return res.status(413).json({ error: 'file too large or empty (max 5 MB)' });
+        }
+
+        const { error: upErr } = await supabaseAdmin.storage
+          .from('product-images')
+          .upload(fileName, buffer, {
+            contentType,
+            upsert: true,
+            cacheControl: '31536000',
+          });
+        if (upErr) {
+          console.error('[admin-data] upload-image error:', upErr.message);
+          return res.status(500).json({ error: 'Upload failed' });
+        }
+        const { data: publicData } = supabaseAdmin.storage
+          .from('product-images')
+          .getPublicUrl(fileName);
+        return res.status(200).json({ success: true, url: publicData.publicUrl, path: fileName });
+      }
+
       // ── Merged from capi-replay.ts ──────────────────────────────
       if (resource === 'capi-replay') {
         const { eventIds } = body as { eventIds?: unknown };

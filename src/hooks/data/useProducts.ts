@@ -24,6 +24,7 @@ interface CategoryProductData {
   is_active: boolean;
   featured: boolean;
   display_order: number;
+  stock: number | null;
   reviewCount: number;
 }
 
@@ -65,7 +66,7 @@ export const useProductsWithReviews = (category: string) => {
       if (!category) return [];
       const { data, error } = await supabase
         .from('products')
-        .select('id,name,price,old_price,discount,image_url,icon_url,category,is_active,featured,display_order')
+        .select('id,name,price,old_price,discount,image_url,icon_url,category,is_active,featured,display_order,stock')
         .eq('category', category)
         .eq('is_active', true)
         .order('display_order', { ascending: true });

@@ -65,7 +65,7 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
               key={product.id}
               className="pl-2 md:pl-3 basis-[45%] sm:basis-[35%] md:basis-1/3 lg:basis-1/4"
             >
-              <ProductCard 
+              <ProductCard
                 id={product.id}
                 image={product.image_url || ""}
                 title={product.name}
@@ -74,6 +74,7 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
                 originalPrice={product.old_price || undefined}
                 discount={product.discount || undefined}
                 priority={index < ABOVE_THE_FOLD_COUNT}
+                stock={(product as { stock?: number | null }).stock ?? null}
               />
             </CarouselItem>
           ))}

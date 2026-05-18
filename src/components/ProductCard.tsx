@@ -15,6 +15,9 @@ interface ProductCardProps {
   originalPrice?: number;
   discount?: number;
   priority?: boolean;
+  /** Effective stock for this product. null = unlimited (manual delivery
+   *  without explicit stock); 0 = out of stock; >0 = available. */
+  stock?: number | null;
 }
 
 const ProductCardComponent = ({
@@ -26,9 +29,11 @@ const ProductCardComponent = ({
   originalPrice,
   discount,
   priority = false,
+  stock,
 }: ProductCardProps) => {
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
+  const isOutOfStock = typeof stock === 'number' && stock <= 0;
 
   // Prefetch on focus/hover. queryClient is already in the entry chunk (eager
   // import from App.tsx + main.tsx), so we can use it directly — the previous
@@ -60,7 +65,7 @@ const ProductCardComponent = ({
     });
   }, [productId]);
 
-  const hasDiscount = discount && discount > 0;
+  const hasDiscount = !isOutOfStock && discount && discount > 0;
   const hasOriginalPrice = originalPrice && originalPrice > price;
 
   return (
@@ -69,10 +74,15 @@ const ProductCardComponent = ({
       to={ROUTES.PRODUCT(productId)}
       className="group block"
       onFocus={triggerPrefetch}
-      aria-label={`Ver produto ${title}`}
+      aria-label={`Ver produto ${title}${isOutOfStock ? ' (esgotado)' : ''}`}
     >
       <Card className="relative overflow-hidden border border-border/10 md:hover:border-border/30 bg-card cursor-pointer h-full rounded-2xl md:transition-[border-color] md:duration-300">
-        {/* Badge de desconto */}
+        {/* Out-of-stock badge takes priority over discount */}
+        {isOutOfStock && (
+          <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-muted text-muted-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border border-border/30">
+            Esgotado
+          </Badge>
+        )}
         {hasDiscount && (
           <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-discount text-discount-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full">
             -{discount}%
@@ -90,7 +100,7 @@ const ProductCardComponent = ({
             decoding={priority ? "sync" : "async"}
             fetchPriority={priority ? "high" : "auto"}
             sizes="(max-width: 640px) 45vw, (max-width: 768px) 35vw, (max-width: 1024px) 33vw, 25vw"
-            className="w-full h-full object-cover"
+            className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale opacity-60' : ''}`}
             draggable={false}
           />
         </div>
@@ -100,7 +110,7 @@ const ProductCardComponent = ({
           <h3 className="text-foreground font-semibold text-sm md:text-[15px] line-clamp-2 leading-snug min-h-[2.5rem] sm:min-h-0">
             {title}
           </h3>
-          
+
           <div className="flex items-center gap-1">
             <Star className="w-3 h-3 md:w-3.5 md:h-3.5 fill-amber-400 text-amber-400 shrink-0" />
             <span className="text-muted-foreground text-[10px] md:text-xs">
@@ -109,12 +119,12 @@ const ProductCardComponent = ({
           </div>
 
           <div className="flex items-baseline gap-2">
-            {hasOriginalPrice && (
+            {hasOriginalPrice && !isOutOfStock && (
               <span className="text-[10px] md:text-xs text-muted-foreground line-through">
                 {formatPrice(originalPrice)}
               </span>
             )}
-            <span className="text-base sm:text-lg md:text-lg font-bold text-foreground">
+            <span className={`text-base sm:text-lg md:text-lg font-bold ${isOutOfStock ? 'text-muted-foreground line-through' : 'text-foreground'}`}>
               {formatPrice(price)}
             </span>
           </div>

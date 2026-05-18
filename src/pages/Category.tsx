@@ -138,6 +138,7 @@ export default function Category() {
                       originalPrice={product.old_price ? Number(product.old_price) : undefined}
                       discount={product.discount || undefined}
                       priority={index < 2}
+                      stock={product.stock ?? null}
                     />
                   ))
                 ) : (

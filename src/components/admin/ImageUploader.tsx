@@ -135,23 +135,27 @@ export const ImageUploader = ({
       const { compressed, outputType } = await compressImage(file);
       const ext = outputType === 'image/avif' ? 'avif' : 'webp';
 
-      // Build unique file name
+      // Build unique file name (path-safe — server rejects anything else).
       const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(7)}.${ext}`;
 
-      setCompressionProgress("Enviando para Cloudflare R2...");
+      setCompressionProgress("Enviando para Supabase Storage...");
 
       const token = requireAdminToken();
 
-      // Convert to base64 and upload via edge function
+      // Convert to base64 and upload via the admin-data endpoint, which uploads
+      // to the Supabase Storage bucket "product-images" using service_role.
+      // Replaces the never-built /api/upload-r2 endpoint.
       const base64 = await fileToBase64(compressed);
 
-      const response = await invokeFunction("upload-r2", {
+      const response = await invokeFunction("admin-data", {
+        method: "POST",
+        queryParams: { resource: "upload-image" },
         body: { fileBase64: base64, fileName, contentType: outputType },
         headers: { "x-admin-token": token },
       });
 
       if (!response.ok) {
-        const err = await response.json();
+        const err = await response.json().catch(() => ({}));
         throw new Error(err.error || "Falha no upload");
       }
 
@@ -254,7 +258,7 @@ export const ImageUploader = ({
                     JPG, PNG, WEBP ou AVIF (máx. 20MB)
                   </p>
                     <p className="text-xs text-primary mt-1">
-                      ✓ Otimização automática AVIF/WebP → Cloudflare R2
+                      ✓ Otimização automática AVIF/WebP → Supabase Storage
                     </p>
                 </div>
               </>
@@ -269,6 +273,28 @@ export const ImageUploader = ({
           <span className="truncate flex-1">{previewUrl}</span>
         </div>
       )}
+
+      {/* URL manual — útil para reusar imagens já hospedadas (ex: R2 antigo) */}
+      <details className="text-xs text-muted-foreground">
+        <summary className="cursor-pointer hover:text-foreground select-none">
+          Ou colar URL externa (avançado)
+        </summary>
+        <div className="mt-2 flex gap-2">
+          <input
+            type="url"
+            placeholder="https://exemplo.com/imagem.webp"
+            className="flex-1 h-9 px-3 rounded-md border border-input bg-background text-sm"
+            defaultValue={previewUrl || ''}
+            onBlur={(e) => {
+              const v = e.target.value.trim();
+              if (v && v !== previewUrl && /^https?:\/\//.test(v)) {
+                setPreviewUrl(v);
+                onImageUploaded(v);
+              }
+            }}
+          />
+        </div>
+      </details>
     </div>
   );
 };

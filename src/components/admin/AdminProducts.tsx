@@ -537,29 +537,97 @@ export const AdminProducts = () => {
                 <TabsContent value="delivery" className="space-y-4">
                   <div className="space-y-2">
                     <Label>Tipo de Entrega</Label>
+                    {/* Backend expects exactly 'manual' | 'auto' (see schema +
+                        api/create-order.ts, api/process-delivery.ts). Previous
+                        option value 'automatic' silently broke auto-delivery
+                        for any product an admin created via this form. */}
                     <Select value={formData.delivery_type} onValueChange={(v) => setFormData({ ...formData, delivery_type: v, auto_delivery_codes: [] })}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="manual">Manual (inserir códigos reais)</SelectItem>
-                        <SelectItem value="automatic">Automática (códigos gerados)</SelectItem>
+                        <SelectItem value="manual">Manual (admin entrega 1 a 1)</SelectItem>
+                        <SelectItem value="auto">Automática (pool de códigos, entrega no momento do pagamento)</SelectItem>
                       </SelectContent>
                     </Select>
                     <p className="text-xs text-muted-foreground">
                       {formData.delivery_type === 'manual'
-                        ? 'Insira os códigos reais que serão enviados aos clientes.'
-                        : 'Os códigos serão gerados automaticamente pelo sistema.'}
+                        ? 'Admin recebe o pedido e entrega manualmente. Não usa pool de códigos.'
+                        : 'O sistema pega o próximo código do pool e entrega assim que o pagamento é confirmado.'}
                     </p>
                   </div>
-                  {formData.delivery_type === 'manual' && (
+                  {formData.delivery_type === 'auto' && (
                     <div className="space-y-2">
-                      <Label>Códigos de Entrega (um por linha)</Label>
+                      <div className="flex items-center justify-between">
+                        <Label>Códigos de Entrega (um por linha)</Label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="file"
+                            accept=".txt,.csv,text/plain,text/csv"
+                            id="bulk-codes-file"
+                            className="hidden"
+                            onChange={async (e) => {
+                              const file = e.target.files?.[0];
+                              if (!file) return;
+                              const text = await file.text();
+                              // Accept newlines, commas, semicolons, tabs as separators.
+                              const parsed = text
+                                .split(/[\r\n,;\t]+/)
+                                .map((s) => s.trim())
+                                .filter(Boolean);
+                              // De-duplicate while preserving order.
+                              const seen = new Set<string>();
+                              const merged = [
+                                ...formData.auto_delivery_codes,
+                                ...parsed,
+                              ].filter((c) => {
+                                if (seen.has(c)) return false;
+                                seen.add(c);
+                                return true;
+                              });
+                              setFormData({ ...formData, auto_delivery_codes: merged });
+                              toast({
+                                title: 'Importados',
+                                description: `${parsed.length} código(s) lido(s) do arquivo (${merged.length} no total).`,
+                              });
+                              (e.target as HTMLInputElement).value = '';
+                            }}
+                          />
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            onClick={() => document.getElementById('bulk-codes-file')?.click()}
+                          >
+                            Importar .txt / .csv
+                          </Button>
+                          {formData.auto_delivery_codes.length > 0 && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => {
+                                if (confirm(`Limpar todos os ${formData.auto_delivery_codes.length} códigos?`)) {
+                                  setFormData({ ...formData, auto_delivery_codes: [] });
+                                }
+                              }}
+                            >
+                              Limpar
+                            </Button>
+                          )}
+                        </div>
+                      </div>
                       <Textarea
                         value={formData.auto_delivery_codes.join('\n')}
-                        onChange={(e) => setFormData({ ...formData, auto_delivery_codes: e.target.value.split('\n').filter(Boolean) })}
-                        placeholder="Cole os códigos reais aqui, um por linha"
-                        className="min-h-[120px]"
+                        onChange={(e) => setFormData({ ...formData, auto_delivery_codes: e.target.value.split('\n').map(s => s.trim()).filter(Boolean) })}
+                        placeholder="Cole os códigos reais aqui, um por linha — ou importe um arquivo acima"
+                        className="min-h-[120px] font-mono text-xs"
                       />
-                      <p className="text-xs text-muted-foreground">{formData.auto_delivery_codes.length} código(s) em estoque</p>
+                      <p className="text-xs text-muted-foreground">
+                        {formData.auto_delivery_codes.length} código(s) em estoque
+                        {formData.auto_delivery_codes.length === 0 && (
+                          <span className="text-destructive ml-2">⚠ Sem códigos = produto esgotado no site</span>
+                        )}
+                      </p>
                     </div>
                   )}
                 </TabsContent>

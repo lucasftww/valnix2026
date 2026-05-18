@@ -119,8 +119,17 @@ const ProductDetail = () => {
     navigate('/cart');
   }, [navigate, handleAddToCart]);
 
+  // Stock-aware quantity controls. stock=null means unlimited (manual delivery
+  // with no explicit cap); stock<=0 means out of stock.
+  const productStock = (product as { stock?: number | null } | null)?.stock ?? null;
+  const isOutOfStock = typeof productStock === 'number' && productStock <= 0;
+  const maxQuantity = typeof productStock === 'number' && productStock > 0 ? productStock : 999;
+
   const decreaseQuantity = useCallback(() => setQuantity(q => Math.max(1, q - 1)), []);
-  const increaseQuantity = useCallback(() => setQuantity(q => q + 1), []);
+  const increaseQuantity = useCallback(
+    () => setQuantity(q => Math.min(maxQuantity, q + 1)),
+    [maxQuantity],
+  );
 
   if (isLoading) {
     return <ProductDetailSkeleton />;
@@ -430,21 +439,35 @@ const ProductDetail = () => {
                     </div>
                   </div>
 
-                  {/* CTAs */}
+                  {/* CTAs — disabled when out of stock to prevent paid orders
+                      that admin can't fulfill (server-side check is the final
+                      safety net, but blocking on the storefront avoids the
+                      whole checkout → PIX → refund loop). */}
                   <div className="space-y-2.5">
-                    <Button 
-                      onClick={handleBuyNow} 
-                      className="w-full h-12 text-[15px] font-bold bg-success hover:bg-success/90 text-success-foreground rounded-xl"
-                    >
-                      Comprar agora
-                    </Button>
-                    <Button 
-                      onClick={handleAddToCart}
-                      variant="outline"
-                      className="w-full h-11 text-sm font-medium rounded-xl border-border/20 hover:bg-muted/50"
-                    >
-                      Adicionar ao carrinho
-                    </Button>
+                    {isOutOfStock ? (
+                      <div className="rounded-xl bg-muted/40 border border-border/30 p-4 text-center space-y-2">
+                        <p className="text-sm font-semibold text-foreground">Produto esgotado</p>
+                        <p className="text-xs text-muted-foreground">
+                          No momento não temos estoque disponível. Confira nossos outros produtos!
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        <Button
+                          onClick={handleBuyNow}
+                          className="w-full h-12 text-[15px] font-bold bg-success hover:bg-success/90 text-success-foreground rounded-xl"
+                        >
+                          Comprar agora
+                        </Button>
+                        <Button
+                          onClick={handleAddToCart}
+                          variant="outline"
+                          className="w-full h-11 text-sm font-medium rounded-xl border-border/20 hover:bg-muted/50"
+                        >
+                          Adicionar ao carrinho
+                        </Button>
+                      </>
+                    )}
                   </div>
                 </div>
 

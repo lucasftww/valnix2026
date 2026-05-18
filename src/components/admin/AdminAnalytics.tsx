@@ -149,7 +149,9 @@ export function AdminAnalytics() {
 
   // ── Computed Metrics ──────────────────────────────────────────────
   const metrics = useMemo(() => {
+    const pageViews = events.filter(e => e.event_name === 'PageView');
     const views = events.filter(e => e.event_name === 'ViewContent');
+    const addToCarts = events.filter(e => e.event_name === 'AddToCart');
     const checkouts = events.filter(e => e.event_name === 'InitiateCheckout');
     const purchases = events.filter(e => e.event_name === 'Purchase');
     const revenue = purchases.reduce((sum, e) => sum + (e.value || 0), 0);
@@ -160,7 +162,9 @@ export function AdminAnalytics() {
     const dropOff = checkouts.length > 0 ? ((checkouts.length - purchases.length) / checkouts.length) * 100 : 0;
 
     return {
+      pageViews: pageViews.length,
       views: views.length,
+      addToCarts: addToCarts.length,
       checkouts: checkouts.length,
       purchases: purchases.length,
       revenue,
@@ -171,6 +175,26 @@ export function AdminAnalytics() {
       dropOff,
     };
   }, [events]);
+
+  // ── Conversion funnel: PageView → ViewContent → AddToCart → IC → Purchase ──
+  // Each step shows the absolute count + the % retention from the previous step.
+  // Lets the operator answer "where am I losing customers?" at a glance.
+  const funnel = useMemo(() => {
+    const steps = [
+      { label: 'Visitas', value: metrics.pageViews, icon: Eye, color: 'cyan' },
+      { label: 'Viu produto', value: metrics.views, icon: Package, color: 'blue' },
+      { label: 'Adicionou', value: metrics.addToCarts, icon: ShoppingCart, color: 'indigo' },
+      { label: 'Checkout', value: metrics.checkouts, icon: CreditCard, color: 'purple' },
+      { label: 'Comprou', value: metrics.purchases, icon: DollarSign, color: 'green' },
+    ];
+    // Compute retention % from the previous non-zero step.
+    return steps.map((s, i) => {
+      if (i === 0) return { ...s, retention: 100 };
+      const prev = steps[i - 1].value;
+      const retention = prev > 0 ? (s.value / prev) * 100 : 0;
+      return { ...s, retention };
+    });
+  }, [metrics]);
 
   // ── Revenue by Day ────────────────────────────────────────────────
   const revenueByDay = useMemo(() => {
@@ -426,6 +450,47 @@ export function AdminAnalytics() {
           </Button>
         </div>
       </div>
+
+      {/* ── Conversion Funnel ─────────────────────────────────────
+          Top-of-page card answers "where am I losing customers?".
+          Each step shows count + retention % from the previous step. */}
+      <Card className="bg-card/50 border-border/30">
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <TrendingUp className="w-4 h-4 text-primary" />
+            Funil de conversão
+          </CardTitle>
+          <CardDescription className="text-xs">
+            % de retenção a cada etapa — o menor número aponta o gargalo.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2">
+            {funnel.map((step, i) => {
+              const StepIcon = step.icon;
+              const drop = i > 0 && step.retention < 30 ? 'text-red-500'
+                : i > 0 && step.retention < 60 ? 'text-yellow-500'
+                : 'text-emerald-500';
+              return (
+                <div key={step.label} className="relative flex flex-col bg-background/50 rounded-lg p-3 border border-border/20">
+                  <div className="flex items-center gap-1.5 mb-1">
+                    <StepIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                    <span className="text-[10px] uppercase tracking-wider text-muted-foreground font-medium">
+                      {step.label}
+                    </span>
+                  </div>
+                  <p className="text-xl font-bold text-foreground">{step.value.toLocaleString('pt-BR')}</p>
+                  {i > 0 && (
+                    <p className={`text-[10px] font-semibold ${drop}`}>
+                      {step.retention.toFixed(1)}% retenção
+                    </p>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ── KPI Cards ────────────────────────────────────────────── */}
       <div className="grid grid-cols-2 lg:grid-cols-6 gap-3">
