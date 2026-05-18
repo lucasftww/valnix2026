@@ -87,7 +87,10 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                     className="group block h-full"
                   >
                     <div className="rounded-xl overflow-hidden border border-border/10 bg-card h-full flex flex-col">
-                      <div className="w-full aspect-[3/4] bg-muted/20 overflow-hidden">
+                      <div
+                        className="w-full aspect-[3/4] bg-muted/20 overflow-hidden relative"
+                        style={{ aspectRatio: '3 / 4', width: '100%', position: 'relative', overflow: 'hidden' }}
+                      >
                         <img
                           src={product.image_url || ""}
                           alt={product.name}
@@ -98,6 +101,7 @@ const RelatedProducts = ({ category, currentProductId }: RelatedProductsProps) =
                           draggable={false}
                           sizes="(max-width: 640px) 42vw, (max-width: 768px) 32vw, (max-width: 1024px) 25vw, 20vw"
                           className="w-full h-full object-cover select-none"
+                          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover', display: 'block' }}
                         />
                       </div>
 

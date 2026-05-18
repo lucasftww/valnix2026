@@ -24,10 +24,11 @@
 
   var path = location.pathname;
   var isHome = path === "/" || path === "/index.html";
-  var base = "https://tiupdhnjdcmgbqifwkrd.supabase.co/functions/v1/site-data";
-  var key =
-    "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRpdXBkaG5qZGNtZ2JxaWZ3a3JkIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzA0MjEwODYsImV4cCI6MjA4NTk5NzA4Nn0.xgPpT3hWbTTo6DcFuf0pjD1jcPpyWIpLQGrdNHX4IkI";
-  var h = { "Content-Type": "application/json", apikey: key };
+  // Same-origin /api/site-data — uses our Vercel function which proxies to
+  // the current Supabase project. Used to point at the legacy Lovable
+  // Supabase URL (tiupdhnjdcmgbqifwkrd) which 404'd after the migration,
+  // leaving the LCP shell empty until React booted.
+  var base = "/api/site-data";
   var preloaded = {};
   function preloadImg(src, priority) {
     if (!src || preloaded[src]) return;
@@ -45,7 +46,7 @@
       if (cached) preloadImg(cached, true);
     } catch (e) {}
   }
-  var pf = fetch(base + "?type=featured", { headers: h })
+  var pf = fetch(base + "?type=featured")
     .then(function (r) {
       return r.json();
     })
@@ -85,7 +86,7 @@
       return null;
     });
   window.__API_PREFETCH_FEATURED = pf;
-  window.__API_PREFETCH_CATEGORIES = fetch(base + "?type=categories", { headers: h })
+  window.__API_PREFETCH_CATEGORIES = fetch(base + "?type=categories")
     .then(function (r) {
       return r.json();
     })

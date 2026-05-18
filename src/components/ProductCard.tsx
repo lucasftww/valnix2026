@@ -89,8 +89,13 @@ const ProductCardComponent = ({
           </Badge>
         )}
 
-        {/* Imagem otimizada (sem placeholder preto durante drag) */}
-        <div className="vn-product-thumb relative w-full aspect-[4/5] bg-muted/20 overflow-hidden">
+        {/* Imagem otimizada — inline style on the wrapper guarantees a fixed
+            aspect ratio even before Tailwind hydrates (catches the FOUC
+            "imagem gigante" flash on first paint with a cold cache). */}
+        <div
+          className="vn-product-thumb relative w-full aspect-[4/5] bg-muted/20 overflow-hidden rounded-t-2xl"
+          style={{ aspectRatio: '4 / 5', width: '100%', position: 'relative', overflow: 'hidden' }}
+        >
           <img
             src={image}
             alt={title}
@@ -101,6 +106,7 @@ const ProductCardComponent = ({
             fetchPriority={priority ? "high" : "auto"}
             sizes="(max-width: 640px) 45vw, (max-width: 768px) 35vw, (max-width: 1024px) 33vw, 25vw"
             className={`w-full h-full object-cover ${isOutOfStock ? 'grayscale opacity-60' : ''}`}
+            style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover', display: 'block' }}
             draggable={false}
           />
         </div>

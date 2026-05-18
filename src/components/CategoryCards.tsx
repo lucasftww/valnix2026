@@ -14,7 +14,12 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
       className="block group"
     >
       <div className="rounded-2xl overflow-hidden contain-layout border border-border/10 transition-all duration-300 group-hover:border-primary/40 group-hover:-translate-y-0.5 group-hover:shadow-lg group-hover:shadow-primary/10">
-        <div className="aspect-[16/9] overflow-hidden">
+        {/* Inline aspect-ratio guards against FOUC: image keeps slot
+            even before Tailwind classes apply (cold-cache first paint). */}
+        <div
+          className="aspect-[16/9] overflow-hidden relative"
+          style={{ aspectRatio: '16 / 9', width: '100%', position: 'relative', overflow: 'hidden' }}
+        >
           {category.image_url ? (
             <img
               src={imageUrl}
@@ -24,6 +29,7 @@ const CategoryCardItem = memo(({ category }: { category: Category }) => {
               width={400}
               height={225}
               className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', maxWidth: 'none', objectFit: 'cover', display: 'block' }}
             />
           ) : (
             <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-primary/20 to-primary/5">

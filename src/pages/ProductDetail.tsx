@@ -235,9 +235,9 @@ const ProductDetail = () => {
             <div className="lg:hidden space-y-3">
               {/* Hero: Imagem + Nome + Preço */}
               <div className="space-y-4">
-                {/* Imagem */}
+                {/* Imagem — inline style to lock height before Tailwind paints */}
                 <div className="rounded-2xl overflow-hidden bg-muted/30">
-                  <div className="flex items-center justify-center px-4 py-4">
+                  <div className="flex items-center justify-center px-4 py-4" style={{ maxHeight: 340 }}>
                     {product.image_url && (
                       <img
                         src={product.image_url}
@@ -248,6 +248,7 @@ const ProductDetail = () => {
                         width={400}
                         height={400}
                         className="w-full max-h-[300px] object-contain"
+                        style={{ maxHeight: 300, width: '100%', height: 'auto', objectFit: 'contain', display: 'block' }}
                       />
                     )}
                   </div>
@@ -286,14 +287,17 @@ const ProductDetail = () => {
             <div className="hidden lg:block space-y-8">
               {/* Imagem */}
               <div className="rounded-2xl overflow-hidden bg-muted/20">
-                <div className="flex items-center justify-center p-8">
+                <div className="flex items-center justify-center p-8" style={{ maxHeight: 560 }}>
                   {product.image_url && (
                     <img
                       src={product.image_url}
                       alt={product.name}
                       loading="eager"
                       decoding="async"
+                      width={520}
+                      height={520}
                       className="max-w-full max-h-[520px] w-auto h-auto object-contain"
+                      style={{ maxWidth: '100%', maxHeight: 520, width: 'auto', height: 'auto', objectFit: 'contain', display: 'block' }}
                     />
                   )}
                 </div>

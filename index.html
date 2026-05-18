@@ -11,9 +11,16 @@
       html,body{overscroll-behavior-x:none;-webkit-text-size-adjust:100%;touch-action:pan-x pan-y;margin:0;padding:0;box-sizing:border-box}
       body{background:#000;color:#fafafa;font-family:'Poppins',system-ui,sans-serif}
       #root{min-height:100vh;display:flex;flex-direction:column;min-width:0}
-      /* Before Tailwind loads, images must not expand layout (FOUC “grandão”) */
-      img,svg,video{max-width:100%;height:auto}
+      /* Before Tailwind loads, images must not expand layout (FOUC “grandão”).
+         Defaults catch any <img> rendered before the JS bundle parses. */
+      *,*::before,*::after{box-sizing:border-box}
+      img,svg,video{max-width:100%;height:auto;display:block}
       img{pointer-events:none;-webkit-user-drag:none}
+      /* Belt-and-suspenders: hard cap product/category card images even if
+         a class doesn't apply yet. The carousel slides constrain width
+         downstream — these rules prevent the rare flash of a 1024px image. */
+      #root img[width][height]{max-width:100%;height:auto}
+      #root section img{max-width:100%}
       a,button,input,select,textarea{touch-action:manipulation;-webkit-user-select:none;user-select:none;box-sizing:border-box}
       @keyframes vn-shell-pulse{0%,100%{opacity:1}50%{opacity:.45}}
       .vn-shell-pulse{animation:vn-shell-pulse 1.15s ease-in-out infinite;background:#141414!important}
