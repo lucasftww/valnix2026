@@ -1,6 +1,10 @@
 /**
- * Analytics tracking utilities
- * Records events via backend function for the admin funnel dashboard
+ * Analytics tracking utilities.
+ * Records events via /api/store-metrics for the admin funnel dashboard
+ * (separate from Meta CAPI relay, which writes to analytics_events).
+ *
+ * Meta-style event names (PascalCase) are auto-converted to the snake_case
+ * variants the store-metrics endpoint accepts (avoiding a silent 400).
  */
 import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
 
@@ -20,6 +24,23 @@ function getBrowser(): string {
   return 'Other';
 }
 
+// Map Meta-style PascalCase to the snake_case names the server-side whitelist
+// uses. Keeps callers free to use whichever convention they prefer.
+const EVENT_NAME_MAP: Record<string, string> = {
+  PageView: 'page_view',
+  ViewContent: 'view_content',
+  AddToCart: 'add_to_cart',
+  RemoveFromCart: 'remove_from_cart',
+  InitiateCheckout: 'initiate_checkout',
+  Purchase: 'purchase',
+  Search: 'search',
+  Click: 'click',
+};
+
+function normalizeEventName(name: string): string {
+  return EVENT_NAME_MAP[name] ?? name;
+}
+
 export function trackAnalyticsEvent(
   eventName: string,
   data: {
@@ -29,10 +50,9 @@ export function trackAnalyticsEvent(
     contentName?: string;
   } = {}
 ) {
-  // Fire-and-forget — NEVER await analytics during checkout flow
-  // This prevents blocking the main thread during payment submission
+  // Fire-and-forget — NEVER await analytics during checkout flow.
   invokeFunctionFireAndForget('store-metrics', {
-    event_name: eventName,
+    event_name: normalizeEventName(eventName),
     user_id: data.userId || null,
     page_url: window.location.href,
     device_type: getDeviceType(),
@@ -44,11 +64,20 @@ export function trackAnalyticsEvent(
   });
 }
 
+export const trackPageViewEvent = (userId?: string | null) =>
+  trackAnalyticsEvent('PageView', { userId });
+
 export const trackViewContentEvent = (userId?: string | null, contentName?: string) =>
   trackAnalyticsEvent('ViewContent', { userId, contentName });
+
+export const trackAddToCartEvent = (userId?: string | null, value?: number, contentName?: string) =>
+  trackAnalyticsEvent('AddToCart', { userId, value, contentName });
 
 export const trackInitiateCheckoutEvent = (userId?: string | null, value?: number) =>
   trackAnalyticsEvent('InitiateCheckout', { userId, value });
 
 export const trackPurchaseEvent = (userId?: string | null, value?: number, orderId?: string, contentName?: string) =>
   trackAnalyticsEvent('Purchase', { userId, value, orderId, contentName });
+
+export const trackSearchEvent = (userId: string | null | undefined, query: string) =>
+  trackAnalyticsEvent('Search', { userId, contentName: query });

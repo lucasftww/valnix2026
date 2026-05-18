@@ -101,11 +101,17 @@ const SearchBarComponent = ({ inputId = "search" }: SearchBarProps) => {
   }, [query, searchProducts]);
 
   const handleSelect = useCallback((productId: string) => {
+    // Fire Search event (Pixel) + funnel metric — useful for Meta interest
+    // signal and to see what customers are actually looking for.
+    if (query.trim().length >= 2) {
+      import('@/lib/metaCapi').then(({ sendSearch }) => sendSearch(query.trim())).catch(() => {});
+      import('@/lib/analytics').then(({ trackSearchEvent }) => trackSearchEvent(null, query.trim())).catch(() => {});
+    }
     navigate(`/product/${productId}`);
     setQuery("");
     setIsOpen(false);
     setSelectedIndex(-1);
-  }, [navigate]);
+  }, [navigate, query]);
 
   const handleKeyDown = useCallback((e: KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter') {

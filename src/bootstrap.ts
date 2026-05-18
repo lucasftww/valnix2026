@@ -139,7 +139,7 @@ type FbqStub = ((...args: unknown[]) => void) & {
       const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
       ric(() => {
         // Use environment variable for Pixel ID, fallback to VALNIX's official pixel
-        const pixelId = import.meta.env.VITE_META_PIXEL_ID || '843361478785940';
+        const pixelId = import.meta.env.VITE_META_PIXEL_ID || '1399664275253859';
         const fbq = window.fbq;
         if (!fbq) return;
 

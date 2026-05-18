@@ -56,7 +56,9 @@ interface MetaCapiEventData {
 }
 
 // ── Events that are sent via CAPI ──────────────────
-const CAPI_ENABLED_EVENTS = ['InitiateCheckout', 'Purchase'];
+// AddToCart enabled so Meta can optimize campaigns for it — without it, cost
+// per AddToCart on ad campaigns is much higher because Meta has no signal.
+const CAPI_ENABLED_EVENTS = ['AddToCart', 'InitiateCheckout', 'Purchase'];
 
 // ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {
@@ -138,6 +140,57 @@ export function sendViewContent(params: {
       value: params.value,
       currency: 'BRL',
     }, { eventID: generateEventId('ViewContent', params.productId) });
+  }
+}
+
+// ── AddToCart (Pixel + CAPI) ───────────────────────────────────────
+// Hybrid so Meta can optimize ad campaigns for cart-add intent — without it
+// AddToCart-optimized campaigns have no signal and CPM stays high.
+export function sendAddToCart(params: {
+  productId?: string;
+  productName?: string;
+  value?: number;
+  quantity?: number;
+}) {
+  if (typeof window === 'undefined') return;
+  const eventId = generateEventId('AddToCart', params.productId);
+  const contents = params.productId
+    ? [{ id: params.productId, quantity: params.quantity ?? 1, item_price: params.value ?? 0 }]
+    : undefined;
+
+  // 1. Browser Pixel
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function') {
+    fbq('track', 'AddToCart', {
+      content_name: params.productName,
+      content_ids: params.productId ? [params.productId] : undefined,
+      content_type: 'product',
+      contents,
+      num_items: params.quantity ?? 1,
+      value: params.value,
+      currency: 'BRL',
+    }, { eventID: eventId });
+  }
+
+  // 2. Server CAPI (via Relay)
+  sendMetaCapiEvent({
+    event_name: 'AddToCart',
+    event_id: eventId,
+    value: params.value,
+    content_name: params.productName,
+    content_ids: params.productId ? [params.productId] : undefined,
+    contents,
+    num_items: params.quantity ?? 1,
+  });
+}
+
+// ── Search (Pixel only — CAPI is overkill for search) ──────────────
+export function sendSearch(query: string) {
+  if (typeof window === 'undefined' || !query) return;
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function') {
+    fbq('track', 'Search', { search_string: query.slice(0, 100) },
+      { eventID: generateEventId('Search', query) });
   }
 }
 

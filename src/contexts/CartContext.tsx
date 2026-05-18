@@ -174,6 +174,21 @@ export const CartProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
       return [...prev, { ...newItem, quantity: 1 }];
     });
+
+    // Fire AddToCart to Meta Pixel + CAPI (was missing — Meta ad
+    // optimization for cart-add intent was completely blind before this).
+    // Also store_metrics for the admin funnel.
+    import('@/lib/metaCapi').then(({ sendAddToCart }) => {
+      sendAddToCart({
+        productId: newItem.id,
+        productName: newItem.name,
+        value: Number(newItem.price) || 0,
+        quantity: 1,
+      });
+    }).catch(() => {});
+    import('@/lib/analytics').then(({ trackAddToCartEvent }) => {
+      trackAddToCartEvent(null, Number(newItem.price) || 0, newItem.name);
+    }).catch(() => {});
   }, []);
 
   const removeItem = useCallback((id: string) => {
