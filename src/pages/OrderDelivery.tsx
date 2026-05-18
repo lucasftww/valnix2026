@@ -276,21 +276,51 @@ export default function OrderDelivery() {
       </div>
 
       <main className="max-w-3xl mx-auto px-4 py-6 md:py-10 space-y-6">
-        {/* Success Header */}
+        {/* Success Hero */}
         <div className="text-center space-y-3">
-          <div className="w-20 h-20 bg-success/10 rounded-full flex items-center justify-center mx-auto">
+          <div className="w-20 h-20 bg-gradient-to-br from-success/20 to-success/5 rounded-full flex items-center justify-center mx-auto ring-4 ring-success/10 animate-in zoom-in duration-300">
             <CheckCircle2 className="w-10 h-10 text-success" />
           </div>
           <h1 className="text-2xl md:text-3xl font-bold text-foreground">
             Pedido Confirmado! 🎉
           </h1>
           <p className="text-muted-foreground text-sm">
-            Olá, <span className="text-foreground font-medium">{order.customer_name || "Cliente"}</span>! 
+            Olá, <span className="text-foreground font-medium">{order.customer_name || "Cliente"}</span>!
             Seu pedido #{order.order_id.slice(0, 8)} foi confirmado.
           </p>
         </div>
 
-        {/* Order email reference */}
+        {/* Progress Timeline — visualiza status do pedido */}
+        <Card className="bg-card border-border overflow-hidden">
+          <CardContent className="p-5">
+            <h2 className="text-xs font-semibold text-muted-foreground uppercase tracking-wider mb-4 text-center">
+              Status do pedido
+            </h2>
+            <div className="relative flex items-center justify-between">
+              {/* Connecting line behind the dots */}
+              <div className="absolute left-0 right-0 top-4 h-0.5 bg-border/30 z-0" />
+              <div className={`absolute left-0 top-4 h-0.5 bg-success transition-all duration-500 z-0 ${hasAnyCodes ? 'w-full' : 'w-1/2'}`} />
+
+              {[
+                { label: 'Pagamento', sub: 'Aprovado', done: true },
+                { label: 'Processando', sub: hasAnyCodes ? 'Concluído' : 'Em andamento', done: true },
+                { label: 'Entregue', sub: hasAnyCodes ? 'Pronto' : 'Aguardando', done: hasAnyCodes },
+              ].map((step, i) => (
+                <div key={i} className="relative z-10 flex flex-col items-center gap-1 flex-1">
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center transition-all ${step.done ? 'bg-success text-success-foreground' : 'bg-muted text-muted-foreground border-2 border-border'}`}>
+                    {step.done ? (
+                      <CheckCircle2 className="w-4 h-4" />
+                    ) : (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    )}
+                  </div>
+                  <p className="text-[11px] font-semibold text-foreground text-center">{step.label}</p>
+                  <p className={`text-[9px] uppercase tracking-wider ${step.done ? 'text-success' : 'text-muted-foreground'}`}>{step.sub}</p>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
 
         {/* Products & Delivery Codes */}
         <Card className="bg-card border-border">
@@ -429,14 +459,43 @@ export default function OrderDelivery() {
           </CardContent>
         </Card>
 
-        {/* CTA: Create account */}
-        {/* CTA: Back to store */}
+        {/* Repurchase nudge — high-LTV pattern for gift-card stores where
+            customers come back monthly. Sets up a return-visit cookie. */}
+        <Card className="bg-gradient-to-br from-primary/10 via-primary/5 to-transparent border-primary/20">
+          <CardContent className="p-5 text-center space-y-3">
+            <h3 className="text-base font-bold text-foreground">Curtiu a entrega rápida?</h3>
+            <p className="text-xs text-muted-foreground">
+              Volte sempre que precisar — você é cadastrado pelo email <strong className="text-foreground">{order.email}</strong>.
+            </p>
+            <div className="flex flex-col sm:flex-row gap-2 justify-center">
+              <Link to="/" className="flex-1">
+                <Button className="w-full bg-success hover:bg-success/90 text-success-foreground font-semibold gap-2">
+                  <Package className="w-4 h-4" />
+                  Comprar novamente
+                </Button>
+              </Link>
+              <a
+                href={`https://wa.me/${import.meta.env.VITE_WHATSAPP_NUMBER || '5511999999999'}?text=${encodeURIComponent('Olá! Acabei de receber meu pedido na VALNIX e quero comprar mais.')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex-1"
+              >
+                <Button variant="outline" className="w-full gap-2">
+                  Falar no WhatsApp
+                </Button>
+              </a>
+            </div>
+            <p className="text-[10px] text-muted-foreground/70 pt-1">
+              💡 Salve este link nos favoritos para acessar seu pedido a qualquer momento
+            </p>
+          </CardContent>
+        </Card>
 
         {/* Back to store */}
         <div className="text-center pb-8">
           <Link to="/">
             <Button variant="ghost" className="text-muted-foreground hover:text-foreground">
-              ← Voltar à Loja
+              ← Voltar à loja
             </Button>
           </Link>
         </div>

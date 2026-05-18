@@ -79,6 +79,7 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
                 discount={product.discount || undefined}
                 priority={index < ABOVE_THE_FOLD_COUNT}
                 stock={(product as { stock?: number | null }).stock ?? null}
+                bestSeller={index < 3}
               />
             </CarouselItem>
           ))}

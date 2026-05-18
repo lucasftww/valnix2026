@@ -1,16 +1,19 @@
 import { memo, useState, useEffect } from 'react';
 import { Tag, X, Check } from 'lucide-react';
 
-const DISMISS_KEY = 'valnix_first_purchase_banner_v2';
+const DISMISS_KEY = 'valnix_first_purchase_banner_v3';
 const COUPON_CODE = 'PRIMEIRA5';
+const REOPEN_AFTER_DAYS = 14;
 
 /**
  * Slim top-of-page promo strip. Sits ABOVE the sticky header in a shared
  * sticky wrapper (see Index.tsx) so it never overlaps the logo.
  *
  * Mobile-first compact design with a copy-to-clipboard inline button.
- * Dismissible — persisted to localStorage. Returns null when dismissed
- * so the wrapper collapses cleanly.
+ * Dismissible — persisted to localStorage with a 14-day cool-down so
+ * returning visitors see the cupom hint again after 2 weeks instead of
+ * having it disappear forever. Returns null when dismissed so the
+ * wrapper collapses cleanly.
  */
 const FirstPurchaseBannerComponent = () => {
   const [dismissed, setDismissed] = useState(true); // start hidden to avoid CLS
@@ -18,13 +21,28 @@ const FirstPurchaseBannerComponent = () => {
 
   useEffect(() => {
     try {
-      setDismissed(!!localStorage.getItem(DISMISS_KEY));
-    } catch {}
+      const stored = localStorage.getItem(DISMISS_KEY);
+      if (!stored) {
+        setDismissed(false);
+        return;
+      }
+      const ts = parseInt(stored, 10);
+      if (!Number.isFinite(ts)) {
+        setDismissed(false);
+        return;
+      }
+      // Show again if it's been >14 days since dismissal.
+      const isStale = Date.now() - ts > REOPEN_AFTER_DAYS * 24 * 60 * 60 * 1000;
+      setDismissed(!isStale);
+    } catch {
+      setDismissed(false);
+    }
   }, []);
 
   const handleDismiss = () => {
     setDismissed(true);
-    try { localStorage.setItem(DISMISS_KEY, '1'); } catch {}
+    // Persist timestamp so we can re-show after 14d.
+    try { localStorage.setItem(DISMISS_KEY, String(Date.now())); } catch {}
   };
 
   const handleCopy = async () => {

@@ -18,6 +18,9 @@ interface ProductCardProps {
   /** Effective stock for this product. null = unlimited (manual delivery
    *  without explicit stock); 0 = out of stock; >0 = available. */
   stock?: number | null;
+  /** Show a "Mais vendido" badge — typically passed for the top 3 products
+   *  in a featured carousel. Reinforces social proof at-a-glance. */
+  bestSeller?: boolean;
 }
 
 const ProductCardComponent = ({
@@ -30,6 +33,7 @@ const ProductCardComponent = ({
   discount,
   priority = false,
   stock,
+  bestSeller = false,
 }: ProductCardProps) => {
   const productId = String(id);
   const cardRef = useRef<HTMLAnchorElement>(null);
@@ -76,16 +80,24 @@ const ProductCardComponent = ({
       onFocus={triggerPrefetch}
       aria-label={`Ver produto ${title}${isOutOfStock ? ' (esgotado)' : ''}`}
     >
-      <Card className="relative overflow-hidden border border-border/10 md:hover:border-border/30 bg-card cursor-pointer h-full rounded-2xl md:transition-[border-color] md:duration-300">
-        {/* Out-of-stock badge takes priority over discount */}
+      <Card className="relative overflow-hidden border border-border/10 md:hover:border-primary/40 md:hover:shadow-lg md:hover:shadow-primary/10 md:hover:-translate-y-0.5 bg-card cursor-pointer h-full rounded-2xl md:transition-all md:duration-300">
+        {/* Top-left badges (mutex priority: out-of-stock > discount) */}
         {isOutOfStock && (
           <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-muted text-muted-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full border border-border/30">
             Esgotado
           </Badge>
         )}
-        {hasDiscount && (
-          <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-discount text-discount-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full">
+        {!isOutOfStock && hasDiscount && (
+          <Badge className="absolute top-2.5 left-2.5 md:top-3 md:left-3 z-10 bg-discount text-discount-foreground font-bold text-[10px] md:text-xs px-2 py-0.5 md:px-2.5 md:py-1 rounded-full shadow-md">
             -{discount}%
+          </Badge>
+        )}
+
+        {/* Top-right badge for bestSeller — separate slot so it can coexist
+            with discount badge on the left without overlap. */}
+        {!isOutOfStock && bestSeller && (
+          <Badge className="absolute top-2.5 right-2.5 md:top-3 md:right-3 z-10 bg-gradient-to-r from-amber-500 to-orange-500 text-white font-bold text-[9px] md:text-[10px] px-2 py-0.5 md:px-2.5 md:py-1 rounded-full shadow-md">
+            🔥 Top
           </Badge>
         )}
 
