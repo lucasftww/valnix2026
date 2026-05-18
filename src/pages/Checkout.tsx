@@ -11,6 +11,7 @@ import { OrderSummary } from "@/components/checkout/OrderSummary";
 import { MobileStickyCheckout } from "@/components/checkout/MobileStickyCheckout";
 
 import { PersonalInfoForm, formatCPF, isValidCPF, isValidEmail, getEmailTLDError, formatPhone, isValidPhone } from "@/components/checkout/PersonalInfoForm";
+import { MobileOrderSection } from "@/components/checkout/MobileOrderSection";
 import { invokeFunction } from "@/lib/apiHelper";
 
 function getCookie(name: string): string | null {
@@ -438,6 +439,10 @@ export default function Checkout() {
               onInputChange={handleInputChange}
               onBlur={handleBlur}
             />
+
+            {/* Mobile-only — desktop OrderSummary covers these in the sidebar.
+                Cupom + breakdown + trust signals + termos. */}
+            <MobileOrderSection />
           </div>
 
           {/* Right Column - Sidebar */}

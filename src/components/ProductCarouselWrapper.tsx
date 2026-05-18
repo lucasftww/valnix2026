@@ -57,9 +57,13 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
   };
 
   return (
-    <div className="relative group/carousel">
-      <Carousel opts={carouselOpts} plugins={plugins} className="w-full" setApi={setEmblaApi}>
-        <CarouselContent className="-ml-2 md:-ml-3">
+    // `carousel-wrapper` / `carousel-track` classnames are hooked by the
+    // critical CSS in index.html — they force flex-basis on slides BEFORE
+    // Tailwind hydrates the responsive `basis-[45%]` utilities, preventing
+    // the "produto gigante" FOUC where each slide briefly took 100% width.
+    <div className="relative group/carousel carousel-wrapper">
+      <Carousel opts={carouselOpts} plugins={plugins} className="w-full carousel-viewport" setApi={setEmblaApi}>
+        <CarouselContent className="-ml-2 md:-ml-3 carousel-track">
           {products.map((product, index) => (
             <CarouselItem
               key={product.id}
