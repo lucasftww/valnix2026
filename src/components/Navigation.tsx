@@ -42,7 +42,7 @@ const NavigationComponent = () => {
 
   return (
     <nav className="hidden md:block sticky top-16 w-full border-b border-border/10 bg-background z-40">
-      <div className="container px-4 md:px-8">
+      <div className="container max-w-7xl mx-auto px-4 md:px-8">
         <div className="flex items-center justify-center gap-1 py-1.5 flex-wrap">
           {categories.map((category) => {
             const hasChildren = category.children && category.children.length > 0;

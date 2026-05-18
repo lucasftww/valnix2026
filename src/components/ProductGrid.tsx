@@ -9,7 +9,7 @@ const ProductGridComponent = () => {
 
   if (isLoading) {
     return (
-      <section className="container px-4 md:px-8 py-8 md:py-16">
+      <section className="container max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-16">
         <div className="mb-6 md:mb-10">
           <div className="h-7 md:h-8 w-40 bg-muted/30 rounded" />
           <div className="h-4 w-64 bg-muted/20 rounded mt-2" />
@@ -26,18 +26,18 @@ const ProductGridComponent = () => {
   }
   
   if (error) {
-    const msg = error.message || "";
-    const isBlocked = msg.includes("network") || msg.includes("FIRESTORE_QUERY_TIMEOUT") || (error as any)?.code === "unavailable";
+    const msg = (error.message || "").toLowerCase();
+    const isNetworkBlocked = msg.includes("network") || msg.includes("failed to fetch") || msg.includes("timeout");
     return (
-      <section className="container px-4 md:px-8 py-12">
+      <section className="container max-w-7xl px-4 md:px-8 py-12">
         <div className="text-center py-12">
-          <div className="text-5xl mb-4">{isBlocked ? "🛡️" : "⚠️"}</div>
+          <div className="text-5xl mb-4">{isNetworkBlocked ? "🛡️" : "⚠️"}</div>
           <h3 className="text-xl font-bold mb-2">
-            {isBlocked ? "Conexão bloqueada" : "Erro ao carregar produtos"}
+            {isNetworkBlocked ? "Conexão indisponível" : "Erro ao carregar produtos"}
           </h3>
           <p className="text-muted-foreground mb-4 max-w-md mx-auto">
-            {isBlocked 
-              ? "Parece que um bloqueador de anúncios está impedindo o carregamento. Desative-o para este site ou adicione valnix.com.br à lista de permissões."
+            {isNetworkBlocked
+              ? "Verifique sua conexão ou se há algum bloqueador ativo. Adicione valnix.com.br à lista de permissões e tente novamente."
               : (error.message || "Tente recarregar a página")}
           </p>
           <Button onClick={() => refetch()} variant="outline">
@@ -50,7 +50,7 @@ const ProductGridComponent = () => {
   
   if (products.length === 0) {
     return (
-      <section className="container px-4 md:px-8 py-12">
+      <section className="container max-w-7xl mx-auto px-4 md:px-8 py-12">
         <div className="mb-8">
           <h2 className="text-xl md:text-2xl font-bold text-foreground tracking-tight">
             Mais vendidos
@@ -66,7 +66,7 @@ const ProductGridComponent = () => {
   }
 
   return (
-    <section className="container px-4 md:px-8 py-8 md:py-16">
+    <section className="container max-w-7xl mx-auto px-4 md:px-8 py-8 md:py-16">
       <div className="mb-6 md:mb-10">
         <h2 className="text-xl md:text-2xl lg:text-3xl font-bold text-foreground tracking-tight">
           Mais vendidos

@@ -56,9 +56,10 @@ interface MetaCapiEventData {
 }
 
 // ── Events that are sent via CAPI ──────────────────
-// AddToCart + Lead enabled so Meta can optimize campaigns for them — without
-// them, cost per cart-add / per lead is much higher because Meta has no signal.
-const CAPI_ENABLED_EVENTS = ['AddToCart', 'Lead', 'InitiateCheckout', 'Purchase'];
+// AddToCart + Lead + AddPaymentInfo enabled so Meta can optimize campaigns
+// for them — without them, cost per cart-add / per lead / per checkout step
+// is much higher because Meta has no signal.
+const CAPI_ENABLED_EVENTS = ['AddToCart', 'Lead', 'AddPaymentInfo', 'InitiateCheckout', 'Purchase'];
 
 // ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {
@@ -181,6 +182,35 @@ export function sendAddToCart(params: {
     content_ids: params.productId ? [params.productId] : undefined,
     contents,
     num_items: params.quantity ?? 1,
+  });
+}
+
+// ── AddPaymentInfo (Pixel + CAPI) ──────────────────────────────────
+// Fired when a user reaches the PIX QR-Code step — strong "ready to buy"
+// signal that helps Meta optimize. Deduped per order to avoid duplicates.
+export function sendAddPaymentInfo(params: {
+  orderId: string;
+  value: number;
+  email?: string;
+  phone?: string;
+}) {
+  if (typeof window === 'undefined' || !params.orderId) return;
+  const eventId = generateEventId('AddPaymentInfo', params.orderId);
+  const fbq = (window as any).fbq;
+  if (typeof fbq === 'function') {
+    fbq('track', 'AddPaymentInfo', {
+      content_category: 'pix',
+      value: params.value,
+      currency: 'BRL',
+    }, { eventID: eventId });
+  }
+  sendMetaCapiEvent({
+    event_name: 'AddPaymentInfo',
+    event_id: eventId,
+    order_id: params.orderId,
+    value: params.value,
+    email: params.email,
+    phone: params.phone,
   });
 }
 

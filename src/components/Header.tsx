@@ -29,8 +29,8 @@ const HeaderComponent = () => {
   }, []);
   
   return (
-    <header className="sticky top-0 z-50 w-full border-b border-border/10 bg-background">
-      <div className="container h-14 md:h-16 flex items-center px-4 md:px-6">
+    <header className="sticky top-0 z-50 w-full border-b border-border/10 bg-background backdrop-blur-sm">
+      <div className="container max-w-7xl mx-auto h-14 md:h-16 flex items-center px-4 md:px-6">
         {/* Left Section - Menu (Mobile) + Logo */}
         <div className="flex items-center gap-3 flex-shrink-0">
           {/* Menu Mobile */}
@@ -77,14 +77,17 @@ const HeaderComponent = () => {
             </Suspense>
           )}
 
-          {/* Logo */}
-          <Link to="/" className="hover:opacity-90 transition-opacity">
-            <img 
-              src={logo} 
-              alt="VALNIX" 
-              className="h-11 md:h-14 w-auto object-contain"
-              width={140}
-              height={56}
+          {/* Logo — fixed display height matching header to prevent any
+              clip on slow paint / banner-overlay scroll transition. */}
+          <Link to="/" className="hover:opacity-90 transition-opacity flex items-center" aria-label="VALNIX home">
+            <img
+              src={logo}
+              alt="VALNIX"
+              className="h-9 md:h-11 w-auto object-contain block"
+              width={120}
+              height={48}
+              decoding="async"
+              fetchPriority="high"
             />
           </Link>
         </div>

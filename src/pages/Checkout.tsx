@@ -349,6 +349,17 @@ export default function Checkout() {
         });
       });
 
+      // Fire AddPaymentInfo to Meta (Pixel + CAPI) — strong intent signal
+      // for ad campaign optimization at the "ready to pay" moment.
+      import("@/lib/metaCapi").then(({ sendAddPaymentInfo }) => {
+        sendAddPaymentInfo({
+          orderId,
+          value: orderAmount,
+          email: formData.email?.trim() || undefined,
+          phone: formData.phone ? formData.phone.replace(/\D/g, '') : undefined,
+        });
+      }).catch(() => {});
+
     } catch (error: unknown) {
       if (import.meta.env.DEV) console.error("❌ Checkout error:", error);
       const errorMessage = error instanceof Error ? error.message : "Tente novamente mais tarde.";
