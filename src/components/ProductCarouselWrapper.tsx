@@ -20,6 +20,11 @@ interface Props {
 
 const ProductCarouselWrapperComponent = ({ products }: Props) => {
   const [emblaApi, setEmblaApi] = useState<CarouselApi | null>(null);
+  // `ready` flips after Embla measures slides + applies transforms. We keep
+  // the carousel invisible until then — eliminates the user-reported flash
+  // where products briefly render at full intrinsic width before the slide
+  // basis-[45%] / lg:basis-1/4 utilities hydrate. ~50ms in practice.
+  const [ready, setReady] = useState(false);
 
   // Lazy-load autoplay plugin
   const [plugins, setPlugins] = useState<EmblaPluginType[]>([]);
@@ -36,7 +41,10 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
   useLayoutEffect(() => {
     if (!emblaApi) return;
     emblaApi.reInit();
-    const t = window.setTimeout(() => emblaApi.reInit(), 50);
+    const t = window.setTimeout(() => {
+      emblaApi.reInit();
+      setReady(true); // safe to reveal — slides have correct width now
+    }, 50);
     const onResize = () => emblaApi.reInit();
     window.addEventListener("resize", onResize);
     return () => {
@@ -44,6 +52,13 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
       window.removeEventListener("resize", onResize);
     };
   }, [emblaApi, products]);
+
+  // Hard cap: even if Embla never fires (network stall, edge browser), reveal
+  // after 800ms so the carousel doesn't stay invisible forever.
+  useEffect(() => {
+    const t = setTimeout(() => setReady(true), 800);
+    return () => clearTimeout(t);
+  }, []);
 
   const carouselOpts = {
     align: "start" as const,
@@ -61,7 +76,13 @@ const ProductCarouselWrapperComponent = ({ products }: Props) => {
     // critical CSS in index.html — they force flex-basis on slides BEFORE
     // Tailwind hydrates the responsive `basis-[45%]` utilities, preventing
     // the "produto gigante" FOUC where each slide briefly took 100% width.
-    <div className="relative group/carousel carousel-wrapper">
+    //
+    // Inline opacity-fade hides the brief moment between "carousel rendered"
+    // and "Embla applied transforms + Tailwind classes resolved".
+    <div
+      className="relative group/carousel carousel-wrapper"
+      style={{ opacity: ready ? 1 : 0, transition: 'opacity 200ms ease-out' }}
+    >
       <Carousel opts={carouselOpts} plugins={plugins} className="w-full carousel-viewport" setApi={setEmblaApi}>
         <CarouselContent className="-ml-2 md:-ml-3 carousel-track">
           {products.map((product, index) => (
