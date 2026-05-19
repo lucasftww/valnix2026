@@ -56,19 +56,19 @@ interface MetaCapiEventData {
 }
 
 // ── Events that are sent via CAPI ──────────────────
-// We forward ALL these to /api/server-relay even though the Meta dashboard
+// All 6 events are forwarded to /api/server-relay. Meta's dashboard
 // (Events Manager → Settings → "Server events") currently only ATTRIBUTES
-// optimization to InitiateCheckout + Purchase. Why send the rest anyway:
-//   1. Each CAPI POST also writes a row to our `analytics_events` table —
-//      that's the source of truth for the admin funnel ("Visitas → Viu →
-//      AddCart → Checkout → Comprou"). Without these CAPI calls the
-//      AdminAnalytics funnel collapses to 2 stages.
-//   2. Meta will simply NOT act on events that aren't enabled in the
-//      dashboard — it returns 200 and discards. No harm done.
-//   3. If the admin later enables more server events on Meta side, we
-//      already have the data flowing — zero code change needed.
-// Browser Pixel (fbq) fires for every event regardless of this list.
-const CAPI_ENABLED_EVENTS = ['AddToCart', 'Lead', 'AddPaymentInfo', 'InitiateCheckout', 'Purchase'];
+// optimization to InitiateCheckout + Purchase — but we still send the rest:
+//   1. Each CAPI POST writes to our `analytics_events` table — source of
+//      truth for the admin funnel.
+//   2. Meta silently discards events that aren't enabled — no harm.
+//   3. CAPI coverage on PageView matters: Meta surfaces a "Improve your
+//      rate of Pixel events covered by Conversions API" recommendation
+//      that lowers CPM by ~25% when PageView is dual-tracked. Both Pixel
+//      and CAPI use the SAME event_id so Meta dedups correctly.
+//      (PageView itself is fired from bootstrap.ts using sendBeacon, not
+//      this helper — listed here for documentation only.)
+const CAPI_ENABLED_EVENTS = ['PageView', 'AddToCart', 'Lead', 'AddPaymentInfo', 'InitiateCheckout', 'Purchase'];
 
 // ── Core sender ────────────────────────────────────────────────────
 export async function sendMetaCapiEvent(data: MetaCapiEventData) {

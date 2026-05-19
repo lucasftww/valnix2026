@@ -146,8 +146,38 @@ type FbqStub = ((...args: unknown[]) => void) & {
         // Disable autoConfig BEFORE loading the script to prevent duplicate PageView
         fbq("set", "autoConfig", false, pixelId);
         fbq("init", pixelId, {}, { agent: "plvalnix" });
-        // Fire PageView on every page load
-        fbq("track", "PageView");
+
+        // Generate ONE stable event_id used by BOTH browser pixel and CAPI.
+        // Meta's Events Manager uses this to deduplicate the two sources;
+        // without it our Pixel coverage report shows 0% on PageView.
+        const pageviewEventId =
+          `pv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+
+        // 1) Browser Pixel PageView with eventID for dedup
+        fbq("track", "PageView", {}, { eventID: pageviewEventId });
+
+        // 2) Server CAPI PageView — fire-and-forget, same event_id.
+        //    Server-relay enriches with ip/UA/fbc/fbp and forwards to Meta.
+        try {
+          const body = JSON.stringify({
+            event: "PageView",
+            event_id: pageviewEventId,
+            url: window.location.href,
+          });
+          // Use sendBeacon when available so the call survives page navigation.
+          if (navigator.sendBeacon) {
+            const blob = new Blob([body], { type: "application/json" });
+            navigator.sendBeacon("/api/server-relay", blob);
+          } else {
+            fetch("/api/server-relay", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body,
+              keepalive: true,
+            }).catch(() => {});
+          }
+        } catch { /* never block page load on tracking */ }
+
         const t = document.createElement('script');
         t.async = true;
         t.src = 'https://connect.facebook.net/en_US/fbevents.js';
