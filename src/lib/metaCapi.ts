@@ -4,6 +4,7 @@
  */
 import { invokeFunctionFireAndForget } from "@/lib/apiHelper";
 import { generateEventId } from "@/lib/eventId";
+import { shouldFireOnce, shouldFireWithCooldown, isProbablyBot } from "@/lib/eventDedup";
 
 // ⏸️ MIGRATION FLAG: set to false when new pixel is ready
 const PIXEL_PAUSED = false;
@@ -134,13 +135,19 @@ function buildContents(
 }
 
 // ── ViewContent ────────────────────────────────────────────────────
-// Pixel-only ViewContent per user request
+// Pixel-only ViewContent per user request.
+// DEDUP: same product viewed within 30min in a session = 1 event.
+// Different products in same session = different events (correct).
 export function sendViewContent(params: {
   productId?: string;
   productName?: string;
   value?: number;
 }) {
-  if (typeof window === "undefined") return;
+  if (typeof window === "undefined" || isProbablyBot()) return;
+  // 30-min cooldown per product — prevents F5/back-button noise on the
+  // same product page from inflating ViewContent counts.
+  if (!shouldFireWithCooldown('ViewContent', params.productId, 30 * 60 * 1000)) return;
+
   const fbq = (window as any).fbq;
   if (typeof fbq === 'function') {
     fbq('track', 'ViewContent', {
@@ -154,15 +161,18 @@ export function sendViewContent(params: {
 }
 
 // ── AddToCart (Pixel + CAPI) ───────────────────────────────────────
-// Hybrid so Meta can optimize ad campaigns for cart-add intent — without it
-// AddToCart-optimized campaigns have no signal and CPM stays high.
+// Hybrid so Meta can optimize ad campaigns for cart-add intent.
+// DEDUP: 5-minute cooldown per product. Impatient users clicking
+// "Add to cart" 5x = 1 event, but legitimate "add same product again
+// after browsing for 10min" = 2 events.
 export function sendAddToCart(params: {
   productId?: string;
   productName?: string;
   value?: number;
   quantity?: number;
 }) {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || isProbablyBot()) return;
+  if (!shouldFireWithCooldown('AddToCart', params.productId, 5 * 60 * 1000)) return;
   const eventId = generateEventId('AddToCart', params.productId);
   const contents = params.productId
     ? [{ id: params.productId, quantity: params.quantity ?? 1, item_price: params.value ?? 0 }]
@@ -195,15 +205,16 @@ export function sendAddToCart(params: {
 }
 
 // ── AddPaymentInfo (Pixel + CAPI) ──────────────────────────────────
-// Fired when a user reaches the PIX QR-Code step — strong "ready to buy"
-// signal that helps Meta optimize. Deduped per order to avoid duplicates.
+// Fired when a user reaches the PIX QR-Code step.
+// DEDUP: once per orderId per session. QR re-render does not duplicate.
 export function sendAddPaymentInfo(params: {
   orderId: string;
   value: number;
   email?: string;
   phone?: string;
 }) {
-  if (typeof window === 'undefined' || !params.orderId) return;
+  if (typeof window === 'undefined' || !params.orderId || isProbablyBot()) return;
+  if (!shouldFireOnce('AddPaymentInfo', params.orderId)) return;
   const eventId = generateEventId('AddPaymentInfo', params.orderId);
   const fbq = (window as any).fbq;
   if (typeof fbq === 'function') {
@@ -224,20 +235,16 @@ export function sendAddPaymentInfo(params: {
 }
 
 // ── Lead (Pixel + CAPI) ────────────────────────────────────────────
-// Fired when a user enters a valid email at checkout — signals "intent to
-// buy" to Meta. One-shot per checkout session to avoid duplicates.
-const LEAD_FIRED_KEY = 'valnix_lead_fired_v1';
+// Fired when a user enters a valid email at checkout.
+// DEDUP: once per (email, session). Same email re-typed = no duplicate;
+// different email = new event.
 export function sendLead(params: {
   email: string;
   phone?: string;
   value?: number;
 }) {
-  if (typeof window === 'undefined' || !params.email) return;
-  // Dedup: one Lead per email per browser-session is plenty for Meta.
-  try {
-    if (sessionStorage.getItem(LEAD_FIRED_KEY) === params.email) return;
-    sessionStorage.setItem(LEAD_FIRED_KEY, params.email);
-  } catch {}
+  if (typeof window === 'undefined' || !params.email || isProbablyBot()) return;
+  if (!shouldFireOnce('Lead', params.email)) return;
 
   const eventId = generateEventId('Lead', params.email);
   const fbq = (window as any).fbq;
@@ -258,17 +265,24 @@ export function sendLead(params: {
 }
 
 // ── Search (Pixel only — CAPI is overkill for search) ──────────────
+// DEDUP: same query in 10min = 1 event.
 export function sendSearch(query: string) {
-  if (typeof window === 'undefined' || !query) return;
+  if (typeof window === 'undefined' || !query || isProbablyBot()) return;
+  const normalized = query.trim().toLowerCase().slice(0, 100);
+  if (!shouldFireWithCooldown('Search', normalized, 10 * 60 * 1000)) return;
+
   const fbq = (window as any).fbq;
   if (typeof fbq === 'function') {
     fbq('track', 'Search', { search_string: query.slice(0, 100) },
-      { eventID: generateEventId('Search', query) });
+      { eventID: generateEventId('Search', normalized) });
   }
 }
 
 // ── InitiateCheckout ───────────────────────────────────────────────
-// Hybrid (Pixel + CAPI) for better tracking
+// Hybrid (Pixel + CAPI). DEDUP: keyed by checkoutSessionId which persists
+// in localStorage — same checkout session = same event_id = Meta dedups.
+// We also block re-firing within the session via sessionStorage so the
+// browser pixel doesn't fire twice on quick F5/back-button.
 export function sendInitiateCheckout(params: {
   userId?: string;
   userEmail?: string;
@@ -280,7 +294,9 @@ export function sendInitiateCheckout(params: {
   quantities?: number[];
   prices?: number[];
 }) {
+  if (typeof window === 'undefined' || isProbablyBot()) return;
   const checkoutSessionId = getCheckoutSessionId();
+  if (!shouldFireOnce('InitiateCheckout', checkoutSessionId)) return;
   const { contents, numItems } = buildContents(
     params.productIds, params.quantities, params.prices,
   );
@@ -320,7 +336,11 @@ export function sendInitiateCheckout(params: {
 }
 
 // ── Purchase (client-side pixel only) ──────────────────────────────
-// Fires browser pixel fbq ONLY — CAPI is handled exclusively by server
+// Fires browser pixel fbq + CAPI relay. CRITICAL DEDUP: exactly ONCE
+// per orderId per session. PIX-payment users often refresh the success
+// page or click back/forward — without this guard, those reloads would
+// each fire a Purchase event. event_id matches across Pixel+CAPI so Meta
+// dedupes server-side too, but client-side guard is the first line.
 export function sendPurchaseFromClient(params: {
   orderId: string;
   value: number;
@@ -334,6 +354,17 @@ export function sendPurchaseFromClient(params: {
   prices?: number[];
   eventSourceUrl?: string;
 }) {
+  if (typeof window === 'undefined' || !params.orderId || isProbablyBot()) return;
+  // Bulletproof: even refreshes / React StrictMode double-mounts won't
+  // refire. localStorage (not sessionStorage) so user can't bypass with
+  // a new tab on the same order. Persists for 30 days then auto-expires.
+  const lsKey = `valnix_purchase_fired_${params.orderId}`;
+  try {
+    const ts = localStorage.getItem(lsKey);
+    if (ts && Date.now() - parseInt(ts, 10) < 30 * 24 * 60 * 60 * 1000) return;
+    localStorage.setItem(lsKey, String(Date.now()));
+  } catch {}
+
   const { contents, numItems } = buildContents(
     params.productIds, params.quantities, params.prices,
   );

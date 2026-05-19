@@ -134,6 +134,14 @@ type FbqStub = ((...args: unknown[]) => void) & {
     stub.queue = [];
   }
 
+  // Bot / headless filter — skip pixel work entirely for crawlers, Lighthouse,
+  // Puppeteer, etc. so they don't pollute the funnel.
+  const ua = (navigator.userAgent || '').toLowerCase();
+  const isBot =
+    /bot|crawler|spider|crawling|googlebot|bingbot|slurp|duckduckbot|baiduspider|yandex|sogou|exabot|facebot|ia_archiver|prerender|chrome-lighthouse|pagespeed|gtmetrix/i.test(ua) ||
+    (navigator as { webdriver?: boolean }).webdriver === true;
+  if (isBot) return;
+
   window.addEventListener('load', () => {
     setTimeout(() => {
       const ric = window.requestIdleCallback || ((cb: () => void) => setTimeout(cb, 100));
@@ -147,24 +155,48 @@ type FbqStub = ((...args: unknown[]) => void) & {
         fbq("set", "autoConfig", false, pixelId);
         fbq("init", pixelId, {}, { agent: "plvalnix" });
 
-        // Generate ONE stable event_id used by BOTH browser pixel and CAPI.
-        // Meta's Events Manager uses this to deduplicate the two sources;
-        // without it our Pixel coverage report shows 0% on PageView.
-        const pageviewEventId =
-          `pv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        // ── PageView dedup (intra-session) ──────────────────────────
+        // Fire exactly ONCE per browser session. F5 / hard reloads in
+        // the same tab won't duplicate the event. New tab / new browser
+        // session = new event (legitimate new visit). Meta itself dedups
+        // within ~1h via event_id, but we want a cleaner funnel client-side.
+        const SESSION_KEY = 'valnix_pv_session_v1';
+        let pageviewEventId: string;
+        let alreadyFiredThisSession = false;
+        try {
+          const existing = sessionStorage.getItem(SESSION_KEY);
+          if (existing) {
+            alreadyFiredThisSession = true;
+            pageviewEventId = existing;
+          } else {
+            pageviewEventId = `pv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+            sessionStorage.setItem(SESSION_KEY, pageviewEventId);
+          }
+        } catch {
+          pageviewEventId = `pv_${Date.now()}_${Math.random().toString(36).slice(2, 10)}`;
+        }
 
-        // 1) Browser Pixel PageView with eventID for dedup
+        // Always load the FB SDK script (other events still need fbq).
+        const t = document.createElement('script');
+        t.async = true;
+        t.src = 'https://connect.facebook.net/en_US/fbevents.js';
+        const s = document.getElementsByTagName('script')[0];
+        s.parentNode!.insertBefore(t, s);
+
+        // Bail out if PageView already fired this session — no Pixel call,
+        // no CAPI call. Prevents duplicate noise from F5/refreshes.
+        if (alreadyFiredThisSession) return;
+
+        // 1) Browser Pixel PageView with eventID for Pixel↔CAPI dedup
         fbq("track", "PageView", {}, { eventID: pageviewEventId });
 
         // 2) Server CAPI PageView — fire-and-forget, same event_id.
-        //    Server-relay enriches with ip/UA/fbc/fbp and forwards to Meta.
         try {
           const body = JSON.stringify({
             event: "PageView",
             event_id: pageviewEventId,
             url: window.location.href,
           });
-          // Use sendBeacon when available so the call survives page navigation.
           if (navigator.sendBeacon) {
             const blob = new Blob([body], { type: "application/json" });
             navigator.sendBeacon("/api/server-relay", blob);
@@ -177,12 +209,6 @@ type FbqStub = ((...args: unknown[]) => void) & {
             }).catch(() => {});
           }
         } catch { /* never block page load on tracking */ }
-
-        const t = document.createElement('script');
-        t.async = true;
-        t.src = 'https://connect.facebook.net/en_US/fbevents.js';
-        const s = document.getElementsByTagName('script')[0];
-        s.parentNode!.insertBefore(t, s);
       });
     }, 5000); // 5s delay after load + idle callback
   }, { once: true });
